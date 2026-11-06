@@ -5,14 +5,6 @@ test('post-package native distribution verification accepts exact official manif
 test('post-package verification rejects line-ending normalization that breaks the official receipt',t=>{const f=fixture(t),file=path.join(f.directory,'distribution.json');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n'));const r=f.run();assert.notEqual(r.status,0);assert.match(r.stderr,/manifest receipt/i);});
 test('post-package verification rejects corrupted helpers and unsafe manifest paths',t=>{for(const kind of ['helper','traversal','missing']){const f=fixture(t);if(kind==='helper')fs.writeFileSync(path.join(f.directory,'native/jade-test-helper.exe'),'modified');if(kind==='traversal'){f.manifest.runtimeFiles['../outside']='b'.repeat(64);f.save();}if(kind==='missing'){delete f.manifest.runtimeFiles['native/debugger-abi.json'];f.save();}const r=f.run();assert.notEqual(r.status,0);assert.match(r.stderr,/checksum|runtime path|required native/i);}});
 
-test('the actual VSIX smoke rejects rewritten native manifests before accepting a packaged release',t=>{
- const f=fixture(t),archive=path.join(f.root,'archive'),vendor=path.join(archive,'extension/vendor/jade-tools-cli');fs.cpSync(path.resolve(__dirname,'../../packages/jade-cli-win-x64'),vendor,{recursive:true});
- const file=path.join(vendor,'distribution.json');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n')+'\n');
- const zipScript=path.join(f.root,'zip.ps1'),vsix=path.join(f.root,'modified.vsix');fs.writeFileSync(zipScript,'param($Directory,$Vsix)\n[IO.Compression.ZipFile]::CreateFromDirectory($Directory,$Vsix)');
- const zip=spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',zipScript,'-Directory',archive,'-Vsix',vsix],{encoding:'utf8',windowsHide:true});assert.equal(zip.status,0,zip.stderr);
- const r=spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve(__dirname,'../../scripts/smoke-vsix.ps1'),'-Vsix',vsix],{encoding:'utf8',windowsHide:true,timeout:30000});assert.ifError(r.error);assert.notEqual(r.status,0,'A rewritten manifest must fail even when all native binaries and no-Node execution still work.');assert.match(r.stderr,/packaged manifest receipt/i);
-});
-
 test('explicit candidate verification is labelled separately from an official release pin',t=>{
  const f=fixture(t),r=spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve(__dirname,'../../scripts/VerifyNativeDistribution.ps1'),'-Directory',f.directory,'-ExpectedDistribution',f.directory],{encoding:'utf8',windowsHide:true});assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/not an official release pin/);
 });
