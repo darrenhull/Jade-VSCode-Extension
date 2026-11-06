@@ -44,9 +44,25 @@ end;
  if(Test-Path -LiteralPath (Join-Path $temporary 'database-must-not-be-opened')){throw 'Database-free discovery created a database directory.'}
  Write-Output 'PASS extracted VSIX native CLI outside checkout; no Node on PATH; workspace test discovery; no database connection.'
 }finally{
- if($cli -and (Test-Path -LiteralPath $cli)){& $cli shutdown --json|Out-Null}
+ $cleanupFailure=$null
+ try{
+ if($cli -and (Test-Path -LiteralPath $cli)){
+  $status=& $cli status --json|ConvertFrom-Json
+  if($LASTEXITCODE -ne 0 -or !$status.brokerPID){throw 'Could not identify the owned portable broker before cleanup.'}
+  $brokerPID=[int]$status.brokerPID
+  & $cli shutdown --json|Out-Null
+  # Confirm owned broker exit before deleting its executable.
+  try { Wait-Process -Id $brokerPID -Timeout 5 -ErrorAction Stop }
+  catch {
+   # An already-exited process can disappear before Wait-Process looks it up.
+   if(Get-Process -Id $brokerPID -ErrorAction SilentlyContinue){throw}
+  }
+  # End owned broker exit wait.
+ }
+ }catch{$cleanupFailure=$_}
  Set-Location -LiteralPath $location.Path;$env:PATH=$oldPath
  if($null -eq $oldElectron){Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue}else{$env:ELECTRON_RUN_AS_NODE=$oldElectron}
  if($null -eq $oldState){Remove-Item Env:JADE_TOOLS_STATE_DIRECTORY -ErrorAction SilentlyContinue}else{$env:JADE_TOOLS_STATE_DIRECTORY=$oldState}
+ if($cleanupFailure){throw $cleanupFailure}
  if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Recurse -Force}
 }
