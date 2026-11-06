@@ -54,6 +54,8 @@ For ordinary `.jade` editors, use **Jade: Run Scratch Pad (Working)** or **Jade:
 
 **F5 does not execute Scratch Pad code.** Compilation happens as part of the explicit Run action. Native errors become Problems at the original cell/editor position. Run All stops after a failed or cancelled run. Native output can be buffered until the native process finishes; output limits/truncation are reported. Jade's redirected standard output uses the Windows code page and can replace unrepresentable characters. Standard input is closed: native `read` receives EOF/defaults rather than an interactive editor prompt.
 
+The selected schema controls compilation and saved application definitions. Execution uses the native `RootSchemaApp` application context, so `currentSchema` may refer to RootSchema. Metadata queries should resolve the selected schema explicitly; selecting a schema does not switch the running application.
+
 Scratch Pad requires native CLI **0.4.0 or newer**. Packaging rejects older bundled runtimes; development candidate testing uses the explicit `JADE_CLI_DISTRIBUTION` override and verifies all native runtime hashes. Source publication, extraction and debugging continue through their existing explicit workflows.
 
 This project is independently maintained; no affiliation with or endorsement by the Jade or VS Code vendors is claimed.
