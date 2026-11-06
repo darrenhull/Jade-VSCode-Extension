@@ -1,11 +1,11 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path');
-const CliReleaseUpdater=require('jade-tools-cli/automation/cli-release-updater');
+const {bundleCli}=require('./bundle-cli.cjs');
+const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 async function main(){
- const root=path.resolve(__dirname,'..');
- if(process.argv[2]==='--verify-lock'){CliReleaseUpdater.verifyLock(root);console.log('CLI lockfile integrity verified.');return;}
- const result=await new CliReleaseUpdater({root}).run(process.argv[2]||'');
- if(process.env.GITHUB_OUTPUT)for(const key of ['updated','tag','version','sha','branch'])if(result[key]!==undefined)fs.appendFileSync(process.env.GITHUB_OUTPUT,key+'='+result[key]+'\n');
- console.log(JSON.stringify(result,null,2));
+ if(process.argv[2]==='--verify-lock'){bundleCli({verifyOnly:true});console.log('Native CLI distribution integrity verified.');return;}
+ const script=process.env.JADE_NATIVE_UPDATER_SCRIPT||path.join(__dirname,'update-native-cli.ps1');
+ if(!path.isAbsolute(script)||!fs.existsSync(script))throw Error('The extension-owned native ZIP updater is missing. Legacy JavaScript CLI updates are disabled.');
+ const result=spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',script,'-Root',path.resolve(__dirname,'..'),...(process.argv[2]?['-Tag',process.argv[2]]:[])],{stdio:'inherit',windowsHide:true,shell:false});
+ if(result.error)throw result.error;if(result.status!==0)process.exitCode=result.status||1;
 }
 main().catch(error=>{console.error(error.message);process.exitCode=1;});

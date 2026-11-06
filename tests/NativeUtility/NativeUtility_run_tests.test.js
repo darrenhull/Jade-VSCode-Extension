@@ -1,0 +1,5 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {nativeProcess}=require('../../extension/src/native-utility'),gateway=require('../../extension/src/cli-gateway');
+test('publication utilities use the native CLI gateway and preserve failure output',async()=>{const seen=[];gateway.configure({runNative:async(executable,args,options,output)=>{seen.push({executable,args,options});output('Native loader failure');return {success:false,code:6026};}});try{const output=[],result=await nativeProcess('C:/Jade/bin/jadloadb.exe',['schemaFile=Pets.scm'],{root:'private'},text=>output.push(text));assert.equal(result.code,6026);assert.deepEqual(output,['Native loader failure']);assert.equal(seen[0].options.root,'private');}finally{gateway.configure(undefined);}});
+test('missing native CLI ownership fails closed instead of starting a separate Jade process',async()=>{gateway.configure(undefined);await assert.rejects(nativeProcess('C:/Jade/bin/jadloadb.exe',[]),/CLI.*session|CLI.*gateway/i);});

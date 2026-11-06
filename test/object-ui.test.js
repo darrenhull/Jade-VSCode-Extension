@@ -7,7 +7,7 @@ const test = require("node:test"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../extension/src/object-explorer");
 const oid = (n) => n.toString(16).padStart(44, "0");
-function setup({ delayedBusy = false, authentication = false } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     panels = [],
@@ -141,6 +141,8 @@ function setup({ delayedBusy = false, authentication = false } = {}) {
   };
   const controller = registerObjectExplorer(vscode, context, {
     config: () => config,
+    inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}),
+    workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     isBusy: () => busy,
     setBusy: async (value) => {
       busy = value;
@@ -242,6 +244,11 @@ function setup({ delayedBusy = false, authentication = false } = {}) {
     },
   };
 }
+
+test('Working inspection uses the native resolved target even when no legacy JavaScript marker exists',async()=>{
+ const s=setup({nativeTarget:true});
+ try{await s.commands.get('jadeNative.connectObjects')();assert.equal(s.sessionData[0].databasePath,path.join(s.root,'actual-native-working/system'));assert.equal(s.sessionData[0].readOnly,true);}finally{await s.cleanup();}
+});
 test("build handoff waits for the native inspector process to close before releasing its database lock", async () => {
   const s = setup();
   try {

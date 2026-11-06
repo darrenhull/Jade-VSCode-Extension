@@ -23,6 +23,7 @@ concurrency:
 
 jobs:
   update:
-    uses: darrenhull/Jade-CLI/.github/workflows/update-consumer.yml@fd723456490a67d04ce6f5cc27496b03601d7e74
+    uses: ./.github/workflows/update-consumer.yml
     with:
+      consumer_automation_ref: ${{ github.sha }}
       cli_tag: ${{ inputs.cli_tag || github.event.client_payload.cli_tag || '' }}

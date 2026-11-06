@@ -2,7 +2,7 @@
 
 ## Architecture and responsibilities
 
-This repository owns editor commands, language/UI integration, Testing, views, DAP presentation and its pinned CLI dependency. It adapts the CLI rather than implementing another compiler, broker or object manager.
+This repository owns editor commands, language/UI integration, Testing, views, DAP presentation and its pinned native CLI distribution. It adapts the native C++ CLI rather than implementing another compiler, broker or object manager. JavaScript belongs in VS Code presentation and thin protocol adapters; do not add a Node CLI/broker fallback.
 
 - Review activation, registration, settings, disposal and reload behavior. Use the bundled CLI and report startup failures; do not silently use legacy backends.
 - Preserve individual tests, outcomes, source locations and compiler Problems across cancellation and repeated runs.
@@ -11,7 +11,7 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 - Review webview messages, escaping, CSP, keyboard support, accessible labels, loading/empty/error states and stale asynchronous responses.
 - Make dirty-editor state, saved-file compilation and reviewed publication snapshots explicit. Do not overwrite unsaved edits or publish different bytes from the reviewed source.
 - Keep DAP capabilities honest and preserve supported breakpoints, stack/variables and lifecycle behavior.
-- Dependency updates must commit the verified CLI archive and lock together, validate the VSIX and open a PR. Marketplace and Source publication are separate explicit actions.
+- Dependency updates must commit the verified native distribution and its manifest together, validate the VSIX and open a PR. Marketplace and Source publication are separate explicit actions.
 
 ## Engineering approach
 
@@ -20,7 +20,7 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 - Keep one top-level class per source file, named for that class. Keep executable entry points thin. Cohesive stateless functions are appropriate; avoid artificial classes.
 - Store new tests under tests/{Class}/{Class}_{method}_tests.test.js (or .test.ts). Use the module name for functional modules and share realistic fixture setup.
 - Apply SOLID at actual boundaries: separate transport, configuration, orchestration, native execution and presentation; inject process/filesystem/network dependencies where tests need control.
-- Apply DRY across repositories: the CLI/SDK owns native semantics, shared sessions, dependency selection, release dependency updates and standalone packaging. Consumers use public versioned exports.
+- Apply DRY at repository boundaries: the native CLI owns Jade semantics, shared sessions and dependency selection. This repository owns editor integration and product release-update automation; the MCP repository owns its protocol packaging tools. Reuse versioned interfaces without putting consumer-specific tooling in the CLI.
 - Prefer maintained libraries and official SDKs for established protocols. Keep custom glue small and readable; avoid speculative abstractions and catch-and-ignore fallbacks.
 - Run focused tests first, then relevant regression/build/package checks. Default tests must not open a developer's Jade database; connected tests require explicit opt-in, disposable validated fixtures and cleanup of owned resources only.
 - Review the final diff for unintended files, secrets, stale comments and behavior changes. Document the final behavior, validation and practical limitations.
@@ -57,7 +57,9 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 
 ## Builds, releases and maintenance
 
-- Independent checkouts must build from committed inputs and lockfiles. The pinned CLI archive is an intentional consumer build dependency.
+- Target new pull requests at main. Preserve required code-owner approval; do not bypass it or push product changes directly to the protected default branch.
+
+- Independent checkouts must build from committed inputs and lockfiles. packages/jade-cli-win-x64 is the pinned native runtime; verify format, identity and every manifest hash before staging. Do not restore the legacy CLI SDK dependency or ship development tooling in the VSIX.
 - Exclude credentials, user configuration, databases, caches, logs and research notes from Git. Track requested diagrams and build-required source, tests and notices.
 - Pin toolchains/dependencies and test the actual portable artifact outside the checkout without Node on PATH.
 - Validate PRs without publishing. Tags must match package versions and reference reviewed-default-branch commits. Do not merge PRs or create release tags without authorization.

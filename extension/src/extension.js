@@ -105,7 +105,7 @@ function activate(context) {
     const directory = settings.cacheDirectory ? path.resolve(folder?.uri.fsPath || path.dirname(document.uri.fsPath), settings.cacheDirectory)
       : path.join(context.globalStorageUri.fsPath, 'native');
     config.storagePath = directory;
-    config.helperPath = settings.cppHelperPath || path.join(context.extensionPath, 'native', 'jade-native-helper.exe');
+    config.helperPath = settings.cppHelperPath || path.join(context.extensionPath, 'vendor', 'jade-tools-cli', 'native', 'jade-native-helper.exe');
     config.systemSnapshotPath = settings.systemSnapshotPath;
     config.testDependencyScope = settings.testDependencyScope || 'auto';
     config.workingDatabaseDirectory = settings.workingDatabaseDirectory || undefined;
@@ -176,6 +176,7 @@ function activate(context) {
   });
   const projectTools=require('./project-tools').registerProjectTools(vscode,context,{
     beforeOperation,
+    prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),
     config:classConfig,output:publishOutput,isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
@@ -183,11 +184,12 @@ function activate(context) {
   require('./collection-designer').registerCollections(vscode,context);
   require('./application-debug-ui').registerApplicationDebug(vscode,context);
   require('./debugger').registerDebugger(vscode,context,{
-    beforeOperation,config:classConfig,workingFiles,isBusy:()=>publishing,
+    beforeOperation,config:classConfig,workingFiles,startWorking,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);}
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{
     config:inspectionConfig,beforeConnect:()=>nativeTests.release(),isBusy:()=>publishing,
+    inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config),
     setBusy:async value=>{publishing=value;}
   });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
@@ -394,7 +396,7 @@ function activate(context) {
     vscode.commands.registerCommand('jadeNative.showWorkingDatabase', async () => {
       const document=vscode.window.activeTextEditor?.document;
       if(!document)throw new Error('Open a CLS file first.');
-      const config=classConfig(document),location=require('./working-database').workingLocation(config);
+      const config=classConfig(document),location=await nativeTests.workingLocation(config);
       if(!fs.existsSync(location.root))throw new Error('Compile or run tests first to create the working database.');
       await vscode.commands.executeCommand('revealFileInOS',vscode.Uri.file(location.databasePath));
     }),

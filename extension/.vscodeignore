@@ -8,5 +8,8 @@ python/**
 
 dist/**
 docs/**
-native/*.exe
+native/**
+src/headless-runner.js
+src/project-runner.js
+src/working-database.js
 media/architecture.png

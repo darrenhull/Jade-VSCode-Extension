@@ -5,9 +5,9 @@ function configDto(config){
  return Object.fromEntries(Object.entries(config||{}).filter(([key,value])=>!blocked.has(key)&&typeof value!=='function'));
 }
 function cliInvocation(entry,args,options={}){
- const env={...process.env,...options.env},standalone=path.extname(entry).toLowerCase()==='.exe';
- if(standalone)delete env.ELECTRON_RUN_AS_NODE;else env.ELECTRON_RUN_AS_NODE='1';
- return {executable:standalone?entry:process.execPath,args:standalone?args:[entry,...args],options:{...options,env}};
+ if(path.extname(entry).toLowerCase()!=='.exe')throw Error('The Jade CLI must be a native Windows executable.');
+ const env={...process.env,...options.env};delete env.ELECTRON_RUN_AS_NODE;
+ return {executable:entry,args,options:{...options,shell:false,env}};
 }
 class CliWorkingSession{
  constructor({entry=path.join(__dirname,'../vendor/jade-tools-cli/jade-cli.exe'),spawn:spawnProcess=spawn}={}){
@@ -67,6 +67,20 @@ class CliWorkingSession{
   const result=await this.request('disconnect').promise;
   if(result?.passed===false)throw Error(result.report?.error||'Jade CLI could not release its native session.');
  }
+ async resolveNative(command,config,field,body={},output){
+  const request=this.request(command,{config:configDto(config),...body},output);
+  const abort=()=>{void this.request('cancel',{operationId:request.id}).promise.catch(()=>{});};
+  config?.signal?.addEventListener('abort',abort,{once:true});if(config?.signal?.aborted)abort();
+  try{
+   const result=await request.promise;
+   if(result?.passed!==true)throw Error(result?.report?.error||'Native Jade target resolution failed.');
+   const value=result[field];if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Native Jade target resolution returned an incomplete result.');
+   return value;
+  }finally{config?.signal?.removeEventListener('abort',abort);}
+ }
+ workingLocation(config){return this.resolveNative('working.location',config,'working');}
+ prepareWorking(config,output){return this.resolveNative('working.prepare',config,'working',{},output);}
+ inspectionTarget(config,target){return this.resolveNative('inspect.target',config,'config',{target});}
  runNative(executable,args,options={},output=()=>{}){
   const config=configDto({...options,installPath:options.installPath||path.dirname(path.dirname(executable))});
   for(const name of ['path','ini','server']){const value=args.find(value=>value.startsWith(name+'='))?.slice(name.length+1);if(value)config[{path:'databasePath',ini:'iniPath',server:'server'}[name]]=value;}

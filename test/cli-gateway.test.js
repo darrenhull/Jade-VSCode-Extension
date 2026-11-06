@@ -9,8 +9,8 @@ test('utility gateway preserves streamed native output, outcome and cancellation
 });
 test('helper gateway keeps native protocol pipes but launches the packaged CLI, not native executable',()=>{
  let launch;
- gateway.configure({entry:'/packed/bin/jade-cli.js',spawn:(...args)=>(launch=args,{stub:true})});
- try{assert.equal(gateway.spawnHelper('inspect','native.exe',['session.json'],{windowsHide:true}).stub,true);assert.equal(launch[0],process.execPath);assert.deepEqual(launch[1],['/packed/bin/jade-cli.js','helper','inspect','session.json']);assert.equal(launch[2].env.ELECTRON_RUN_AS_NODE,'1');}finally{gateway.configure(undefined);}
+ gateway.configure({entry:'/packed/jade-cli.exe',spawn:(...args)=>(launch=args,{stub:true})});
+ try{assert.equal(gateway.spawnHelper('inspect','native.exe',['session.json'],{windowsHide:true}).stub,true);assert.equal(launch[0],'/packed/jade-cli.exe');assert.deepEqual(launch[1],['helper','inspect','session.json']);assert.equal(launch[2].env.ELECTRON_RUN_AS_NODE,undefined);}finally{gateway.configure(undefined);}
 });
 test('standalone helper gateways use the same packaged executable directly',()=>{
  let launch;

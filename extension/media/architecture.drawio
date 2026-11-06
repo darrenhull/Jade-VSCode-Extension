@@ -1,14 +1,14 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <mxfile host="app.diagrams.net" version="26.0.0" type="device">
   <diagram id="jade-architecture" name="Architecture">
-    <mxGraphModel dx="1500" dy="1150" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1500" pageHeight="1150" background="#f8fafc" adaptiveColors="auto">
+    <mxGraphModel dx="1500" dy="1380" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1500" pageHeight="1380" background="#f8fafc" adaptiveColors="auto">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" value="Jade for VS Code — connected architecture" style="text;html=1;align=left;fontSize=29;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+        <mxCell id="title" value="Jade for VS Code — native C++ backend" style="text;html=1;align=left;fontSize=29;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="35" y="25" width="1430" height="40" />
         </mxCell>
-        <mxCell id="subtitle" value="One shared native backend for the editor, terminal and MCP clients. Source files remain the versioned inputs." style="text;html=1;align=left;fontSize=14;fontColor=#475569;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="Thin editor and MCP adapters invoke one native CLI. Jade source files remain the versioned inputs; Node is not part of the CLI." style="text;html=1;align=left;fontSize=14;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="35" y="70" width="1430" height="28" />
         </mxCell>
         <mxCell id="vscode" value="VS CODE / EXTENSION REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#eef5ff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="1">
@@ -17,7 +17,7 @@
         <mxCell id="mcp" value="MCP CLIENTS / MCP REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f4efff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="500" y="120" width="300" height="385" />
         </mxCell>
-        <mxCell id="cli" value="JADE CLI / SHARED SDK REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#eaf8f2;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="1">
+        <mxCell id="cli" value="NATIVE C++ CLI REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#eaf8f2;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="830" y="120" width="640" height="385" />
         </mxCell>
         <mxCell id="jade" value="INSTALLED JADE — THE NATIVE COMPILER, OBJECT MANAGER AND DATABASE ENGINE" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#fff7e8;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="1">
@@ -113,22 +113,22 @@
         <mxCell id="ui" value="&lt;b&gt;Editor and views&lt;/b&gt;&lt;br&gt;F5, Test Explorer, navigation,&lt;br&gt;collections and debugger UI" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
           <mxGeometry as="geometry" x="230" y="65" width="185" height="120" />
         </mxCell>
-        <mxCell id="adapter" value="&lt;b&gt;VS Code adapters&lt;/b&gt;&lt;br&gt;Commands, Problems, Testing, DAP and views&lt;br&gt;Call the pinned, bundled CLI executable" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
+        <mxCell id="adapter" value="&lt;b&gt;Thin VS Code adapter (JavaScript)&lt;/b&gt;&lt;br&gt;Commands, Problems, Testing, DAP and views&lt;br&gt;Invokes the pinned native jade-cli.exe" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
           <mxGeometry as="geometry" x="50" y="235" width="340" height="110" />
         </mxCell>
-        <mxCell id="copilot" value="&lt;b&gt;Copilot / MCP clients&lt;/b&gt;&lt;br&gt;Tools, resources and prompts" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
+        <mxCell id="copilot" value="&lt;b&gt;GitHub Copilot / MCP clients&lt;/b&gt;&lt;br&gt;Code generation and Jade tool calls" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
           <mxGeometry as="geometry" x="30" y="65" width="240" height="100" />
         </mxCell>
-        <mxCell id="server" value="&lt;b&gt;Jade MCP server&lt;/b&gt;&lt;br&gt;Official SDK and validated tools&lt;br&gt;Uses the same pinned CLI backend" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
+        <mxCell id="server" value="&lt;b&gt;MCP adapter (JavaScript)&lt;/b&gt;&lt;br&gt;Official SDK; embedded Node runtime&lt;br&gt;Invokes native jade-cli.exe" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
           <mxGeometry as="geometry" x="30" y="235" width="240" height="110" />
         </mxCell>
-        <mxCell id="exe" value="&lt;b&gt;jade-cli.exe&lt;/b&gt;&lt;br&gt;Command / service entry point&lt;br&gt;Embedded runtime; no Node install" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+        <mxCell id="exe" value="&lt;b&gt;jade-cli.exe — native C++&lt;/b&gt;&lt;br&gt;Config, discovery and command handling&lt;br&gt;No Node or Python runtime" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
           <mxGeometry as="geometry" x="35" y="65" width="260" height="120" />
         </mxCell>
-        <mxCell id="broker" value="&lt;b&gt;Shared local broker&lt;/b&gt;&lt;br&gt;Serial jobs and database ownership&lt;br&gt;Warm native runtime and job results" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+        <mxCell id="broker" value="&lt;b&gt;C++ named-pipe broker&lt;/b&gt;&lt;br&gt;Serial jobs, authenticated client ownership&lt;br&gt;Warm native sessions and cancellation" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
           <mxGeometry as="geometry" x="330" y="65" width="280" height="120" />
         </mxCell>
-        <mxCell id="helpers" value="&lt;b&gt;C++ helper boundary&lt;/b&gt;&lt;br&gt;Native loader / test runtime, read-only inspector and debugger&lt;br&gt;Thin integration with the installed Jade runtime" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+        <mxCell id="helpers" value="&lt;b&gt;C++ → Jade native boundary&lt;/b&gt;&lt;br&gt;Native loader / test runtime, read-only inspector and debugger&lt;br&gt;Thin integration with the installed Jade runtime" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
           <mxGeometry as="geometry" x="35" y="235" width="575" height="110" />
         </mxCell>
         <mxCell id="dll" value="&lt;b&gt;Jade native DLLs&lt;/b&gt;&lt;br&gt;Compilation, object semantics,&lt;br&gt;loading, tests and debugging" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="jade">
@@ -143,11 +143,35 @@
         <mxCell id="git" value="&lt;b&gt;Three Git repositories&lt;/b&gt;&lt;br&gt;Source, tests, diagrams and build rules&lt;br&gt;CLI / extension / MCP version separately" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
           <mxGeometry as="geometry" x="35" y="75" width="360" height="125" />
         </mxCell>
-        <mxCell id="actions" value="&lt;b&gt;GitHub Actions&lt;/b&gt;&lt;br&gt;Tests → Windows builds → release assets&lt;br&gt;CLI release checked by consumer updater" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
+        <mxCell id="actions" value="&lt;b&gt;GitHub Actions&lt;/b&gt;&lt;br&gt;Tests → native CLI / VSIX / MCP builds&lt;br&gt;Verified native CLI release updates consumers" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
           <mxGeometry as="geometry" x="500" y="75" width="380" height="125" />
         </mxCell>
-        <mxCell id="releases" value="&lt;b&gt;Pinned consumer releases&lt;/b&gt;&lt;br&gt;Reviewed update PR commits CLI archive&lt;br&gt;VSIX and MCP bundle include that version" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
+        <mxCell id="releases" value="&lt;b&gt;Pinned consumer releases&lt;/b&gt;&lt;br&gt;Reviewed PR commits native CLI ZIP&lt;br&gt;VSIX and MCP bundle include that build" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
           <mxGeometry as="geometry" x="985" y="75" width="420" height="125" />
+        </mxCell>
+        <mxCell style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f2f5f9;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="appGitBoundary" parent="1" vertex="1" value="APPLICATION SOURCE / GIT">
+          <mxGeometry y="1125" width="440" height="205" x="30" as="geometry" />
+        </mxCell>
+        <mxCell style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f2f5f9;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="adoBoundary" parent="1" vertex="1" value="AZURE DEVOPS — OPTIONAL">
+          <mxGeometry y="1125" width="440" height="205" x="500" as="geometry" />
+        </mxCell>
+        <mxCell style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f2f5f9;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="nextEnvironmentBoundary" parent="1" vertex="1" value="TARGET JADE ENVIRONMENT">
+          <mxGeometry y="1125" width="500" height="205" x="970" as="geometry" />
+        </mxCell>
+        <mxCell style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="appGit" parent="appGitBoundary" vertex="1" value="&lt;b&gt;Workspace files committed to Git&lt;/b&gt;&lt;br&gt;Application CLS / SCM / native resources&lt;br&gt;Pull request review approves the source">
+          <mxGeometry y="65" width="380" height="110" x="30" as="geometry" />
+        </mxCell>
+        <mxCell style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="adoPromotion" parent="adoBoundary" vertex="1" value="&lt;b&gt;Build / test / promotion pipeline&lt;/b&gt;&lt;br&gt;Uses the same native jade-cli.exe&lt;br&gt;Optional design; pipeline not configured">
+          <mxGeometry y="65" width="380" height="110" x="30" as="geometry" />
+        </mxCell>
+        <mxCell style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" id="promotedJade" parent="nextEnvironmentBoundary" vertex="1" value="&lt;b&gt;Promoted application and database&lt;/b&gt;&lt;br&gt;Native Jade loads approved source&lt;br&gt;Environment configuration stays separate">
+          <mxGeometry y="65" width="440" height="110" x="30" as="geometry" />
+        </mxCell>
+        <mxCell value="approved source" edge="1" parent="1" target="adoPromotion" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" id="e-app-promotion" source="appGit">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell value="native deployment" edge="1" parent="1" target="promotedJade" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" id="e-next-environment" source="adoPromotion">
+          <mxGeometry as="geometry" relative="1" />
         </mxCell>
       </root>
     </mxGraphModel>

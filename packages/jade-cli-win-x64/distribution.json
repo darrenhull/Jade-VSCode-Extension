@@ -1,0 +1,18 @@
+{
+  "formatVersion": 2,
+  "arch": "x64",
+  "executable": "jade-cli.exe",
+  "platform": "win32",
+  "runtimeFiles": {
+    "README.md": "d48c45335aaf86c030cfafe857779f193feb3e1a529f2f756889f6d6a1d4ca3f",
+    "native/jade-inspect-helper.exe": "493f1ceea407f48dd8fd523f741cf99397b93b9d34a35fc6895338f37496bded",
+    "native/jade-native-helper.exe": "4fbdfe1ef78d7fc753974a6ac2f09bbab835b2c4717e18104e4e11d0129d83f3",
+    "native/jade-debug-helper.exe": "50d6ee4da4e0acb0ab1cee5debfdadf5e06430e535f10a893310204e6343dfd4",
+    "native/debugger-abi.json": "73e1ff8ac2e417ed75b2170fbd365041b50f0c3d3f03cf00199851be3055f4f5",
+    "native/jade-test-helper.exe": "5a359dcc0dc63f7f4f457e90a029682cdcbea40339bbab96444d480861a04d57",
+    "ThirdPartyNotices.txt": "ac1241ef6060a10dea5357a2f7c4452a77cc05d8d7d9c930d9c67eea5c74942f"
+  },
+  "packageVersion": "0.2.0",
+  "runtime": "native-cpp",
+  "executableSha256": "873493cf4b3e7981bd82cb6975309359400627505cf842ebae5cf8b3bd2a3077"
+}

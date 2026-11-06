@@ -1,4 +1,5 @@
 node_modules/
+.jade-automation/
 dist/
 **/build/
 evidence/

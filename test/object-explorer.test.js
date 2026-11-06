@@ -5,8 +5,8 @@ const test = require("node:test"),
   { PassThrough } = require("node:stream");
 const {
   InspectionSession,
-  inspectionTarget,
 } = require("../extension/src/object-session");
+const {inspectionTarget}=require('./fixtures/legacy-object-target.cjs');
 const { InspectorTransport } = require("../extension/src/object-transport");
 const config = {
   installPath: "C:/Jade",
@@ -17,7 +17,7 @@ const config = {
   storagePath: "C:/cache",
   workspaceRoots: ["C:/source"],
 };
-test("source selection preserves configured connection; working selection never creates a database", () => {
+test("legacy baseline source selection preserves its configured connection without creating a database", () => {
   const source = inspectionTarget(config, "source");
   assert.equal(source.server, "multiUser");
   assert.equal(source.databasePath, config.databasePath);

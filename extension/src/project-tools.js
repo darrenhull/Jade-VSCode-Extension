@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {scanProject,scaffoldSchema,hash}=require('./native-project');
-const {prepareWorkingDatabase,nativeProcess}=require('./working-database');
+const {nativeProcess}=require('./native-utility');
 const {joinProject,loadProject}=require('./native-project-build');
 const {resolveExtractConfig,startExtract}=require('./extract');
 const {organizeSources}=require('./source-layout');
@@ -36,7 +36,7 @@ function registerProjectTools(vscode,context,options){
    const document=await vscode.workspace.openTextDocument(project.schemas[0].header.file),config=options.config(document),id=targetKey(config),saved=context.workspaceState.get('jadeNative.nativeProjectPublished',{});
    if(saved[id]===project.hash){output.appendLine('No workspace source changes to publish.');return {success:true,results:[]};}
    output.clear();output.show(true);output.appendLine('Preparing and compiling a frozen native project in the working database ...');
-   const working=await prepareWorkingDatabase(config,text=>output.append(text));await applyRenames(working,project,text=>output.append(text));const bundle=await joinProject(working,project,text=>output.append(text));
+   const working=await options.prepareWorking(config,text=>output.append(text));await applyRenames(working,project,text=>output.append(text));const bundle=await joinProject(working,project,text=>output.append(text));
    const checked=await loadProject(working,bundle,text=>output.append(text));if(!checked.success)throw Error('Working-base validation failed. Nothing was published to the target.');
    temporary=fs.mkdtempSync(path.join(os.tmpdir(),'jade-publish-review-'));
    const extracted=await startExtract(resolveExtractConfig(config),path.join(temporary,'raw'),text=>output.append(text)).completion;

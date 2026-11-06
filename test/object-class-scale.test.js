@@ -45,6 +45,8 @@ function fixture(t) {
     config: () => ({ installPath: 'C:/Jade', databasePath: path.join(root, 'database'),
       iniPath: path.join(root, 'jade.ini'), server: 'singleUser' }),
     isBusy: () => false, setBusy: async () => {},
+    inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection}),
+    workingLocation: async () => ({databasePath:path.join(root,'native-working/system')}),
     createTransport: () => { const c = new EventEmitter(); c.ready = Promise.resolve({ readOnly: true });
       c.closed = new Promise(resolve => { c.stop = () => { c.emit('close', 0); resolve(); return c.closed; }; });
       c.request = async (command, args) => { requests.push({ command, args });

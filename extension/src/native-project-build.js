@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const os=require('node:os');
 const {stageProject,decode}=require('./native-project');
-const {nativeProcess}=require('./working-database');
+const {nativeProcess}=require('./native-utility');
 const {compilerDiagnostics}=require('./native-reports');
 const {parseSource,sourcePosition}=require('./source_symbols');
 async function joinProject(working,project,output=()=>{}){

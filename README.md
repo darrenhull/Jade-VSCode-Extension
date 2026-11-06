@@ -1,10 +1,10 @@
 # Jade VS Code extension
 
-Independent development workspace for the Jade Native Runner extension. Version 0.11.1 is a release candidate that routes native operations to the separately packaged Jade CLI while retaining the existing VS Code interface.
+Independent development workspace for the Jade Native Runner extension. Version 0.12.0 migrates the backend to the native C++ Jade CLI while retaining the existing VS Code interface.
 
 This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
 
-End users do not need a separate Node.js installation. The extension includes the standalone `jade-cli.exe` and its runtime files; a compatible installed Jade runtime is still required.
+The extension itself uses VS Code's JavaScript extension host. Its backend is the native C++ `jade-cli.exe`, with no embedded Node runtime or JavaScript compiler/broker implementation. A compatible installed Jade runtime is still required; Jade owns compilation and execution.
 
 ## Build and test
 
@@ -18,7 +18,7 @@ npm run package
 
 The default test command excludes native database opt-ins. Packaged VSIX output is written to `dist`, which is not committed. Actual-host and connected-native controls require explicit configuration and private fixture databases; see the test scripts and the release verification notes.
 
-Native helper development belongs to the independent Jade CLI repository. Its production sources and portable native build script reproduce the helpers supplied in the pinned CLI package. Rebuild/repack the CLI, update the explicit package artifact here and then package the extension. Vendor Jade DLLs, vendor SDK headers and databases are not included. Any locally retained compatibility sources or binaries are not an alternative active backend.
+Native development belongs to the independent Jade CLI repository. The pinned Windows x64 distribution lives in `packages/jade-cli-win-x64/`. Packaging verifies its native-runtime identity and every manifest checksum before copying the executable and declared helpers into the VSIX. It excludes the old JavaScript SDK and any undeclared runtime files. For explicit candidate validation, set `JADE_CLI_DISTRIBUTION` to a native distribution folder; normal independent builds use the committed package. There is no sibling-checkout search or JavaScript CLI fallback. Vendor Jade DLLs, vendor SDK headers and databases are not included.
 
 ## User workflows retained
 
@@ -34,9 +34,9 @@ See the [extension's detailed documentation](extension/README.md) and [changelog
 
 ## Repository boundaries
 
-`Jade-CLI` owns the shared native backend and CLI implementation. `Jade-VSCode-Extension` owns VS Code commands, editor integration, views, Testing and debugger presentation. `Jade-Local-MCP` owns the future MCP adapter and remains a planning scaffold until separately implemented.
+`Jade-CLI` owns the native C++ CLI, broker and backend. `Jade-VSCode-Extension` owns VS Code commands, editor integration, views, Testing and debugger presentation. `Jade-Local-MCP` is the separately implemented adapter using the official MCP SDK; it calls the same native CLI service.
 
-This repository can be cloned and built independently. No remote is configured by the local workspace split. Existing packaged third-party notices are preserved; the repository does not grant redistribution rights to the vendor's Jade runtime.
+This repository can be cloned and built independently. Existing packaged third-party notices are preserved; the repository does not grant redistribution rights to the vendor's Jade runtime.
 
 ## Migration acceptance
 
@@ -44,9 +44,11 @@ The CLI migration is accepted only after standalone CLI compilation/testing and 
 
 ## GitHub Actions and releases
 
-The Build and release extension workflow runs the default tests and packages a Windows-tested VSIX on pushes, pull requests and manual runs. A version tag such as `v0.11.1` publishes that tested VSIX and `SHA256SUMS` to GitHub Releases. The tag, root package and extension manifest versions must match, and the tagged commit must be on the approved default branch. Tags on unmerged feature commits cannot publish. This does not publish to the VS Code Marketplace. Hosted CI does not run connected Jade tests or access a developer database.
+`main` is the default branch and the target for review pull requests. Your code-owner approval is required before merging; automation must open a PR rather than push product changes directly to `main`.
 
-Update pinned Jade CLI checks the latest stable [CLI release](https://github.com/darrenhull/Jade-CLI/releases) hourly. It can also be run immediately from Actions with a `cli_tag`, or by a `jade-cli-released` repository-dispatch event. The shared CLI SDK updater verifies official release URLs, SHA-256, archive paths, package identity and version before changing the committed archive. The lockfile, tests and VSIX are verified before an update pull request is opened. The update never merges itself, publishes an extension, or modifies a Jade database.
+The Build and release extension workflow runs the default tests and packages a Windows-tested VSIX on pushes, pull requests and manual runs. Before uploading it, `scripts/smoke-vsix.ps1` extracts that VSIX outside the checkout and checks bundled native CLI test discovery with no Node on PATH and no database connection. A version tag such as `v0.12.0` publishes that tested VSIX and `SHA256SUMS` to GitHub Releases. The tag, root package and extension manifest versions must match, and the tagged commit must be on reviewed `main`. Tags on unmerged feature commits cannot publish. This does not publish to the VS Code Marketplace. Hosted CI does not run connected Jade tests or access a developer database.
+
+This repository owns CLI-consumer release automation; the CLI repository owns only the CLI and Jade integration. `node scripts/update-cli.cjs --verify-lock` verifies the pinned native manifest and all runtime hashes. Updates use this repository's `scripts/update-native-cli.ps1`. Other consumers can reuse the same implementation through an explicitly pinned extension automation checkout and `JADE_NATIVE_UPDATER_SCRIPT`. The updater accepts only official stable CLI releases, verifies the ZIP checksum, bounds download and expanded sizes, rejects unsafe archive entries and validates every native manifest hash before atomically replacing the runtime. Downgrades are rejected. Native updates must pass tests and package the VSIX before opening a reviewable dependency PR. They must not merge themselves, publish an extension or modify a Jade database.
 
 CI is explicitly dispatched on the update branch; validation does not depend on pull-request events created by `GITHUB_TOKEN`. The repository must allow Actions to create pull requests. Hourly updates use only this repository's scoped `GITHUB_TOKEN`, so no cross-repository secret is required. Immediate dispatch from a different repository requires a GitHub App or token with access to this repository; polling is the default link.
 
