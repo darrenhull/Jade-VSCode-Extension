@@ -46,6 +46,7 @@ jobs:
           CLI_BRANCH: ${{ steps.cli.outputs.branch }}
           CLI_TAG: ${{ steps.cli.outputs.tag }}
           CLI_SHA: ${{ steps.cli.outputs.sha }}
+          DEPENDENCY_CHANGED: ${{ steps.cli.outputs.dependencyChanged }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         shell: pwsh
         run: |
@@ -58,8 +59,10 @@ jobs:
           $remote = git ls-remote --heads origin "refs/heads/$env:CLI_BRANCH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($remote) { $env:CLI_BRANCH += '-retry-' + [guid]::NewGuid().ToString('N') }
-          node scripts/bump-consumer-version.cjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:DEPENDENCY_CHANGED -eq 'true') {
+            node scripts/bump-consumer-version.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$env:CLI_BRANCH"

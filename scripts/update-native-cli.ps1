@@ -119,7 +119,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
  if(Test-Path -LiteralPath $pin){
   $current=Get-Content -LiteralPath $pin -Raw|ConvertFrom-Json
   if($current.version -match '^\d+\.\d+\.\d+$' -and [version]$Version -lt [version]$current.version){throw 'Native CLI downgrade is forbidden.'}
-  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.tag -eq ('v'+$Version) -and $current.sha256 -eq $ExpectedHash -and $current.distributionSha256 -match '^[a-fA-F0-9]{64}$' -and $current.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash){return @{updated=$false;version=$Version;sha=$ExpectedHash}}
+  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.tag -eq ('v'+$Version) -and $current.sha256 -eq $ExpectedHash -and $current.distributionSha256 -match '^[a-fA-F0-9]{64}$' -and $current.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash){return @{updated=$false;dependencyChanged=$false;version=$Version;sha=$ExpectedHash}}
  }
  $suffix=[guid]::NewGuid().ToString('N');$stage=Join-Path $packages ('.jade-native-'+$suffix+'.stage');$backup=Join-Path $packages ('.jade-native-'+$suffix+'.backup');$pinTemp=Join-Path $packages ('.jade-pin-'+$suffix+'.json');$installed=$false;$committed=$false
  try{
@@ -128,7 +128,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
   if(Test-Path -LiteralPath $destination){Move-Item -LiteralPath $destination -Destination $backup}
   Move-Item -LiteralPath $stage -Destination $destination;$installed=$true
   [IO.File]::WriteAllText($pinTemp,(@{version=$Version;sha256=$ExpectedHash;tag='v'+$Version;distributionSha256=(Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash.ToLowerInvariant()}|ConvertTo-Json));Move-Item -LiteralPath $pinTemp -Destination $pin -Force;$committed=$true
-  return @{updated=$true;version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
+  return @{updated=$true;dependencyChanged=(!$current -or $current.version -ne $Version -or $current.sha256 -ne $ExpectedHash);version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
  }finally{
   if(!$committed){
    if($installed -and (Test-Path -LiteralPath $destination)){Assert-NativeContained $packages $destination;Remove-Item -LiteralPath $destination -Recurse -Force}
@@ -167,7 +167,7 @@ function Update-NativeRelease([string]$Root,[string]$Tag){
    if($pin.version -eq $version -and $pin.tag -eq $metadata.release.tag_name -and $pin.sha256 -eq $expectedHash -and $pin.distributionSha256 -match '^[a-fA-F0-9]{64}$'){
     $valid=$false
     try{$local=Test-NativeDistribution $destination;$valid=$local.packageVersion -eq $version -and $pin.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash}catch [Security.SecurityException]{throw}catch{$valid=$false}
-    if($valid){return @{updated=$false;version=$version;sha=$expectedHash;tag=$metadata.release.tag_name}}
+    if($valid){return @{updated=$false;dependencyChanged=$false;version=$version;sha=$expectedHash;tag=$metadata.release.tag_name}}
    }
   }
   $archive=Join-Path $temporary 'native.zip';Save-NativeDownload -Url $metadata.asset.browser_download_url -File $archive -MaxBytes 268435456
@@ -177,6 +177,6 @@ function Update-NativeRelease([string]$Root,[string]$Tag){
 if($MyInvocation.InvocationName -ne '.'){
  try{
   if($VerifyOnly){Test-NativeDistribution (Join-Path $Root 'packages/jade-cli-win-x64')|Out-Null;Write-Output 'Native CLI distribution integrity verified.'}
-  else{$result=Update-NativeRelease -Root $Root -Tag $Tag;if($env:GITHUB_OUTPUT){foreach($key in @('updated','version','sha','tag','branch')){if($result.ContainsKey($key)){Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($key+'='+$result[$key].ToString().ToLowerInvariant())}}};$result|ConvertTo-Json -Compress}
+  else{$result=Update-NativeRelease -Root $Root -Tag $Tag;if($env:GITHUB_OUTPUT){foreach($key in @('updated','dependencyChanged','version','sha','tag','branch')){if($result.ContainsKey($key)){Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($key+'='+$result[$key].ToString().ToLowerInvariant())}}};$result|ConvertTo-Json -Compress}
  }catch{Write-Error $_;exit 1}
 }

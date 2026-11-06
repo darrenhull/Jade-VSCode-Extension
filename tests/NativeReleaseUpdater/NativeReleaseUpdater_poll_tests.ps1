@@ -14,11 +14,11 @@ try{
  function Save-NativeDownload {param($Url,$File,$MaxBytes) if($Url -eq 'checks'){[IO.File]::WriteAllText($File,($script:hash+'  jade-cli-win-x64.zip'))}else{$script:zipDownloads++;Copy-Item -LiteralPath $script:archive -Destination $File}}
  $consumer=Join-Path $temporary 'consumer';[IO.Directory]::CreateDirectory($consumer)|Out-Null
  $first=Update-NativeRelease -Root $consumer
- if(!$first.updated -or $first.version -ne '0.3.0' -or $script:zipDownloads -ne 1){throw 'A newly published CLI release was not installed'}
+ if(!$first.dependencyChanged -or !$first.updated -or $first.version -ne '0.3.0' -or $script:zipDownloads -ne 1){throw 'A newly published CLI release was not installed'}
  $second=Update-NativeRelease -Root $consumer
- if($second.updated -or $script:zipDownloads -ne 1){throw 'Unchanged verified release downloaded its ZIP again'}
+ if($second.dependencyChanged -or $second.updated -or $script:zipDownloads -ne 1){throw 'Unchanged verified release downloaded its ZIP again'}
  [IO.File]::WriteAllText((Join-Path $consumer 'packages/jade-cli-win-x64/jade-cli.exe'),'corrupt')
  $repair=Update-NativeRelease -Root $consumer
- if(!$repair.updated -or $script:zipDownloads -ne 2){throw 'Corrupt local payload was skipped instead of repaired'}
+ if($repair.dependencyChanged -or !$repair.updated -or $script:zipDownloads -ne 2){throw 'Corrupt local payload was skipped instead of repaired'}
  Write-Output 'PASS NativeReleaseUpdater polling detects publication, skips unchanged ZIP downloads and repairs corrupt payloads'
 }finally{Remove-Item -LiteralPath $temporary -Recurse -Force}
