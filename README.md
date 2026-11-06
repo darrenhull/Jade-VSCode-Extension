@@ -1,10 +1,16 @@
 # Jade VS Code extension
 
-Independent development workspace for the Jade Native Runner extension. Version 0.12.1 migrates the backend to the native C++ Jade CLI while retaining the existing VS Code interface.
+Independent development workspace for the Jade Native Runner extension. The backend is the native C++ Jade CLI; VS Code supplies editor, Testing and debugger integration.
 
 This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
 
 The extension itself uses VS Code's JavaScript extension host. Its backend is the native C++ `jade-cli.exe`, with no embedded Node runtime or JavaScript compiler/broker implementation. A compatible installed Jade runtime is still required; Jade owns compilation and execution.
+
+## Install or update
+
+Download the `.vsix` asset from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest). In VS Code, run **Extensions: Install from VSIX…**, select the download, then reload the window if prompted. Installing the same extension ID updates it; no separate CLI installation is needed. GitHub releases do not automatically update an installed VSIX.
+
+The extension includes **Error Lens** (`usernamehw.errorlens`) as an extension-pack companion. VS Code installs it alongside Jade when Marketplace access is available, so native compiler diagnostics can appear beside the source line. Users can disable or uninstall the companion while keeping Jade working. Offline installations require the companion's VSIX separately if wanted. No paid AI extensions are required or installed.
 
 ## Build and test
 
@@ -26,11 +32,16 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 - Test Explorer, CodeLens and Ctrl+F5 run native Jade tests and report individual failures.
 - Shift+F5 and the publish controls retain explicit target review and confirmation.
 - Object Explorer provides schema/class/member navigation and reusable focused previews.
+- Format Document/Selection indents complete Jade method bodies while preserving native headers, metadata and literal contents.
 - Database Objects provides read-only Source/Working inspection and paged collections.
 - The keyed collection designer creates native source; compilation and publication remain separate actions.
 - The experimental debugger retains its existing pinned native-runtime capabilities and limitations.
 
 See the [extension's detailed documentation](extension/README.md) and [changelog](extension/CHANGELOG.md) for the existing feature scope. Repository separation does not add the missing array/set/index designers or general debugger features.
+
+Actual VS Code formatting verification (document/selection formatting, undo and idempotence):
+
+![Formatted Jade method in the running VS Code extension host](docs/images/jade-formatting.png)
 
 ## Repository boundaries
 

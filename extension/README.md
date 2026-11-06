@@ -1,4 +1,4 @@
-# Jade Native Runner 0.11.0
+# Jade Native Runner
 
 Edit Jade source in VS Code, compile and run native tests through the packaged Jade CLI, and publish after reviewing the target changes. A compatible Windows Jade runtime is required. The Jade development IDE is not required.
 
@@ -15,6 +15,12 @@ flowchart LR
 ```
 
 The CLI is a pinned package included in this VSIX. The extension launches the bundled standalone `jade-cli.exe` directly, with its runtime files. End users do not need a sibling checkout, a globally installed CLI, Python or a separate Node.js installation. Node.js and npm are development build tools only. The broker retains warm native build/test state. The CLI and extension are independent Git repositories; SDK/native development belongs to the CLI product.
+
+## Install or update
+
+Download the `.vsix` asset from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest), run **Extensions: Install from VSIX…** in the Command Palette, then reload VS Code if requested. The bundled native CLI updates with the extension; no separate CLI installation is needed. Installing from GitHub is manual, rather than a Marketplace auto-update.
+
+Error Lens (`usernamehw.errorlens`) is an install-alongside companion that displays compiler diagnostics inline. VS Code retrieves it from the Marketplace when available; it can be disabled or uninstalled independently. Offline users can install its VSIX separately. Jade compilation and testing work without it.
 
 ## Start
 
@@ -42,7 +48,11 @@ Syntax highlighting, completion, hover, signatures, definitions, references, imp
 
 Build/test/publish deliberately save their source inputs. The command-line client reads disk; it does not automatically see unsaved editor buffers.
 
+**Format Document** (**Shift+Alt+F** on Windows) and **Format Selection** format indentation inside complete Jade method bodies in `.cls` and `.jade` files. The formatter follows the editor's tabs/spaces and indent size. It preserves signatures, native declarations/metadata, comments, string contents and line endings. Ambiguous, incomplete or unsupported block structures are left unchanged. It does not automatically reformat extracted source or change declarations.
+
 ## Tests and diagnostics
+
+Jade's **Workspace** scratch editor is distinct from a VS Code workspace and from named **JadeScript** methods. A signature-free Workspace execution command is not implemented in this extension. Native `Process.executeScript` supports this mode; an isolated proof compiled and executed it without a CLS publication. A future CLI operation must report the native compiler result and positions, execute in Working, and preserve cancellation and selected-buffer source mapping. Ordinary F5 remains class/method compilation rather than scratch execution.
 
 Native compiler errors appear in **Problems** and **Jade Compile** output. Errors retain their Jade codes and mapped method/file/line/column. Structural errors show generated locations when an original mapping is unavailable.
 
@@ -61,6 +71,16 @@ Class catalogue UI pages are bounded to 100 rows, but the native metadata catalo
 Run **Jade: Create Keyed Collection** from the Command Palette. Choose a schema, collection name, collection class and member/external key mode. Select ordered composite keys, ascending/descending order, duplicate-key policy and optional text case/locale settings. Inherited properties and reference paths are available. Advanced controls include compatible dictionary superclass and load factor.
 
 The designer previews/copies native source and creates a CLS file. Press F5 to compile; publication is a separate reviewed action. It currently handles keyed dictionaries, not general arrays, sets, runtime dynamic collections or ad hoc query indexes. Complete inverse/relationship and lifetime/key compatibility checks are not all performed in the form; native validation and runtime rules still apply.
+
+| Collection setup | Current scope |
+|---|---|
+| Member/external keys, ordered composite keys, direction and duplicate-key policy | Supported by the existing designer. |
+| Text comparison | Case-insensitive flags and positive LCIDs; explicit Binary/Latin1 special-mode source generation is not yet verified. |
+| Inheritance and key paths | Workspace ancestry and reference paths supported; inherited-key compatibility and automatic inverse maintenance still require native validation/source authoring. |
+| Sizing and tuning | Individual external-key length/precision and load factor; no complete aggregate key-budget, population/block-size or file-mapping workflow. |
+| Other collection families and indexes | Arrays, sets, dynamic dictionaries and ad hoc index lifecycle have no dedicated designer. Native source can still express supported declarations. |
+
+The [native dictionary-key documentation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/userguide/ch3definingclasses/definekeysfordictionaryclass.htm) describes choices beyond this form. Native API integers are not necessarily valid CLS tokens: the installed loader rejects literal `0`/`-1` locale tokens. The designer does not advertise those choices until their native extraction and semantics have been proved.
 
 ## Debugger
 
