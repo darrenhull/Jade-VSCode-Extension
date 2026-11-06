@@ -22,4 +22,4 @@ test('extension review automation permits its own repository and preserves real 
  assert.match(workflow,/default: darrenhull/);
 });
 
-test('release and update automation use only the scripts in the current checkout',()=>{for(const name of ['publish-consumer.yml','update-consumer.yml','update-cli.yml','ci.yml'])assert.doesNotMatch(read(name),/consumer_automation_ref|\.jade-automation|repository: darrenhull/);assert.match(read('publish-consumer.yml'),/node scripts\/ReleasePublisher.cjs/);assert.match(read('update-cli.yml'),/2-59\/5 \* \* \* \*/);});
+test('release and update automation use only the scripts in the current checkout',()=>{for(const name of ['publish-consumer.yml','update-consumer.yml','update-cli.yml','ci.yml'])assert.doesNotMatch(read(name),/consumer_automation_ref|\.jade-automation|repository: darrenhull/);assert.match(read('publish-consumer.yml'),/node scripts\/ReleasePublisher.cjs/);assert.match(read('update-cli.yml'),/3-58\/5 \* \* \* \*/);});

@@ -58,6 +58,7 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 ## Builds, releases and maintenance
 
 - Target new pull requests at main. Preserve required code-owner approval; do not bypass it or push product changes directly to the protected default branch.
+- Open work-in-progress pull requests as **Draft**. Keep them Draft while implementation, required native dependencies, tests, packaging, UI evidence or review fixes remain incomplete. A push alone must not mark a Draft ready, request its owner review or queue auto-merge. Mark ready only after relevant work and verification are complete; ready PRs still require the owner's approval and passing protected checks.
 
 - Independent checkouts must build from committed inputs and lockfiles. packages/jade-cli-win-x64 is the pinned native runtime; verify format, identity and every manifest hash before staging. Do not restore the legacy CLI SDK dependency or ship development tooling in the VSIX.
 - Exclude credentials, user configuration, databases, caches, logs and research notes from Git. Track requested diagrams and build-required source, tests and notices.
