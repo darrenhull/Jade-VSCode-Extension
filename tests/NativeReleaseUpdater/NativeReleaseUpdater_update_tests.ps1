@@ -10,12 +10,16 @@ function Archive($Name,$Extra=$null){
  [IO.File]::WriteAllText((Join-Path $directory 'jade-cli.exe'),'native '+$Name)
  [IO.File]::WriteAllText((Join-Path $directory 'native/helper.exe'),'helper')
  $manifest=@{formatVersion=2;runtime='native-cpp';platform='win32';arch='x64';packageVersion='0.2.0';executable='jade-cli.exe';executableSha256=(Get-FileHash (Join-Path $directory 'jade-cli.exe')).Hash.ToLowerInvariant();runtimeFiles=@{'native/helper.exe'=(Get-FileHash (Join-Path $directory 'native/helper.exe')).Hash.ToLowerInvariant()}}
+ [IO.Directory]::CreateDirectory((Join-Path $directory 'native'))|Out-Null
+ foreach($helper in @('jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json')){$relative='native/'+$helper;$file=Join-Path $directory $relative;[IO.File]::WriteAllText($file,'verified '+$helper);$manifest.runtimeFiles[$relative]=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()}
  [IO.File]::WriteAllText((Join-Path $directory 'distribution.json'),($manifest|ConvertTo-Json -Depth 6))
  $zip=Join-Path $root ($Name+'.zip');Compress-Archive -Path (Join-Path $directory '*') -DestinationPath $zip
  if($Extra){$archive=[IO.Compression.ZipFile]::Open($zip,[IO.Compression.ZipArchiveMode]::Update);try{& $Extra $archive}finally{$archive.Dispose()}}
  return $zip
 }
 try{
+ $missingHelper=Archive 'missing-required-helper' {param($z)ChangeManifest $z {param($m)$m.runtimeFiles.Remove('native/jade-debug-helper.exe')};$z.GetEntry('native/jade-debug-helper.exe').Delete()}
+ Reject {Install-NativeRelease -Root (Join-Path $root 'missing-helper-consumer') -Archive $missingHelper -ExpectedHash (Get-FileHash $missingHelper).Hash -Version '0.2.0'} 'Required native runtime'
  $repository=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
  if(Test-Path (Join-Path $repository 'packages/jade-cli-win-x64')){Assert-NativeContained $repository (Join-Path $repository 'packages/jade-cli-win-x64')}
  Initialize-NativePathInspection

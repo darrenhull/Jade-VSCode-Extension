@@ -6,9 +6,6 @@ on:
       artifact_name:
         type: string
         required: true
-      consumer_automation_ref:
-        type: string
-        required: true
       archive_name:
         type: string
         default: ''
@@ -27,17 +24,6 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-          persist-credentials: false
-      - name: Validate immutable automation
-        env:
-          AUTOMATION_REF: ${{ inputs.consumer_automation_ref }}
-        run: '[[ "$AUTOMATION_REF" =~ ^[a-f0-9]{40}$ ]]'
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          repository: darrenhull/Jade-VSCode-Extension
-          ref: ${{ inputs.consumer_automation_ref }}
-          path: .jade-automation
-          sparse-checkout: scripts
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -60,4 +46,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: node .jade-automation/scripts/ReleasePublisher.cjs
+        run: node scripts/ReleasePublisher.cjs

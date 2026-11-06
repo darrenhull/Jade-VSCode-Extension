@@ -1,6 +1,6 @@
 # Jade VS Code extension
 
-Independent development workspace for the Jade Native Runner extension. Version 0.12.0 migrates the backend to the native C++ Jade CLI while retaining the existing VS Code interface.
+Independent development workspace for the Jade Native Runner extension. Version 0.12.1 migrates the backend to the native C++ Jade CLI while retaining the existing VS Code interface.
 
 This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
 
@@ -50,7 +50,7 @@ The build runs once for a pull request and once after its reviewed merge to `mai
 
 This repository owns consumer release automation. The native CLI repository owns the CLI and Jade integration. `node scripts/update-cli.cjs --verify-lock` checks the pin version/tag, the exact manifest digest recorded when the official ZIP was verified, and every native runtime hash, including required helpers and debugger ABI metadata. The ZIP checksum is an installation receipt; verification does not reconstruct an archive from installed files.
 
-Hourly polling discovers stable official CLI releases using this repository's scoped `GITHUB_TOKEN`. The updater authenticates metadata requests, checks official asset URLs and checksums, bounds sizes, rejects unsafe entries and atomically installs verified files. A dependency update bumps the consumer patch version and matching manifests/lockfile, then opens a PR requesting owner review and queues protected squash auto-merge. Its normal PR workflow performs the full validation once. GitHub may require the owner to approve the first workflow run for a bot-created PR. There is no additional workflow dispatch or cross-repository secret. A reviewed merge publishes the new consumer version after the main build succeeds; no Jade database is modified by this automation.
+An independent five-minute poller discovers stable official CLI releases using this repository's scoped `GITHUB_TOKEN`. Each check authenticates release metadata and fetches checksums first. An unchanged release skips the ZIP download only when the local pin, manifest receipt and all required runtime files verify; corruption triggers verified repair. New releases are downloaded with bounded sizes, unsafe archive entries are rejected, and verified files are installed atomically. A dependency update bumps the consumer patch version and matching manifests/lockfile, then opens a PR requesting owner review and queues protected squash auto-merge. Its normal PR workflow performs the full validation once. GitHub may require the owner to approve the first workflow run for a bot-created PR. All review, build, publisher and updater automation comes from this repository at the current commit. There is no external workflow checkout, extra dispatch or cross-repository credential. GitHub schedules are best-effort; manual and repository-dispatch triggers are also available. A reviewed merge publishes the new consumer version after the main build succeeds; no Jade database is modified by this automation.
 
 ## Architecture diagram
 

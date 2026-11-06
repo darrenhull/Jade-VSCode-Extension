@@ -56,4 +56,3 @@ jobs:
     uses: ./.github/workflows/publish-consumer.yml
     with:
       artifact_name: jade-vscode-extension
-      consumer_automation_ref: ${{ github.sha }}
