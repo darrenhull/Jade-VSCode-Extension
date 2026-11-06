@@ -76,6 +76,8 @@ These rules are not exhaustive. Review the complete change and its affected call
 - Check performance evidence and ensure ordinary navigation, single-file operations and paged lookups do not unexpectedly trigger expensive project-wide work.
 - Check release/update automation for unreviewed publication, unverified downloads, stale integrity and silently skipped failures.
 
+- Successful reviewed main builds publish new consumer versions automatically. Preserve immutable published releases, protected owner approval, single full PR validation and patch-version updates for native dependency PRs. Do not add duplicate feature-push builds or explicit PR workflow dispatch.
+
 ## Automated PR comments
 
 Post automated PR comments through GitHub Actions or an authorized GitHub App so they use the bot identity. Include attribution that Codex prepared the comment on behalf of @darrenhull. The user-authenticated GitHub connector posts as the user; do not use it for future automated comments or imply that it is a bot. If a bot-backed path is unavailable, report that limitation instead of impersonating a bot.

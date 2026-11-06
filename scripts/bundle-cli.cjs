@@ -4,6 +4,9 @@ function bundleCli(options={}){
  const root=path.resolve(__dirname,'..'),source=path.resolve(options.source||process.env.JADE_CLI_DISTRIBUTION||path.join(root,'packages/jade-cli-win-x64')),destination=path.resolve(options.destination||path.join(root,'extension/vendor/jade-tools-cli'));
  const manifest=JSON.parse(fs.readFileSync(path.join(source,'distribution.json'),'utf8'));
  if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
+ for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'])if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
+ const pinFile=options.pinFile||(!options.source?path.join(root,'packages/jade-cli-pin.json'):undefined);
+ if(pinFile)require('./NativePin.cjs').verifyNativePin(source,pinFile);
  const sourceRoot=fs.realpathSync(source),files=new Map();let total=0;
  for(const [relative,hash]of Object.entries({...manifest.runtimeFiles,'jade-cli.exe':manifest.executableSha256})){
   if(path.isAbsolute(relative)||relative.includes('\\')||relative.split('/').some(part=>!part||part==='.'||part==='..')||!/^([a-f0-9]{64})$/i.test(hash))throw Error('Invalid native runtime path or checksum: '+relative);

@@ -10,3 +10,4 @@ test('dependency update preparation verifies the native pin without duplicating 
  assert.match(workflow,/--auto --squash/);
  assert.doesNotMatch(workflow,/--admin/);
 });
+test('closed dependency pull requests do not suppress updates or force overwrite old branches',()=>{const workflow=fs.readFileSync(path.join(__dirname,'../../.github/workflows/update-consumer.yml'),'utf8');assert.match(workflow,/--state open/);assert.doesNotMatch(workflow,/--state all|push[^\n]*--force/);assert.match(workflow,/ls-remote/);assert.match(workflow,/NewGuid/);assert.match(workflow,/bump-consumer-version/);assert.match(workflow,/extension\/package.json/);assert.match(workflow,/git add -- \$paths/);});

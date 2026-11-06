@@ -118,7 +118,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
  if(Test-Path -LiteralPath $pin){
   $current=Get-Content -LiteralPath $pin -Raw|ConvertFrom-Json
   if($current.version -match '^\d+\.\d+\.\d+$' -and [version]$Version -lt [version]$current.version){throw 'Native CLI downgrade is forbidden.'}
-  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.sha256 -eq $ExpectedHash){return @{updated=$false;version=$Version;sha=$ExpectedHash}}
+  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.tag -eq ('v'+$Version) -and $current.sha256 -eq $ExpectedHash -and $current.distributionSha256 -match '^[a-fA-F0-9]{64}$' -and $current.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash){return @{updated=$false;version=$Version;sha=$ExpectedHash}}
  }
  $suffix=[guid]::NewGuid().ToString('N');$stage=Join-Path $packages ('.jade-native-'+$suffix+'.stage');$backup=Join-Path $packages ('.jade-native-'+$suffix+'.backup');$pinTemp=Join-Path $packages ('.jade-pin-'+$suffix+'.json');$installed=$false;$committed=$false
  try{
@@ -126,7 +126,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
   $new=Test-NativeDistribution $stage;if($new.packageVersion -ne $Version){throw 'Native CLI manifest version differs from the release tag.'}
   if(Test-Path -LiteralPath $destination){Move-Item -LiteralPath $destination -Destination $backup}
   Move-Item -LiteralPath $stage -Destination $destination;$installed=$true
-  [IO.File]::WriteAllText($pinTemp,(@{version=$Version;sha256=$ExpectedHash;tag='v'+$Version}|ConvertTo-Json));Move-Item -LiteralPath $pinTemp -Destination $pin -Force;$committed=$true
+  [IO.File]::WriteAllText($pinTemp,(@{version=$Version;sha256=$ExpectedHash;tag='v'+$Version;distributionSha256=(Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash.ToLowerInvariant()}|ConvertTo-Json));Move-Item -LiteralPath $pinTemp -Destination $pin -Force;$committed=$true
   return @{updated=$true;version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
  }finally{
   if(!$committed){
@@ -140,7 +140,10 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
 function Get-NativeRelease([string]$Tag){
  if($Tag -and $Tag -notmatch '^v\d+\.\d+\.\d+$'){throw 'Native CLI tag must be a stable semantic version.'}
  $endpoint=if($Tag){'tags/'+$Tag}else{'latest'}
- $release=Invoke-RestMethod -Uri ('https://api.github.com/repos/darrenhull/Jade-CLI/releases/'+$endpoint) -Headers @{'User-Agent'='Jade-Native-CLI-Updater'}
+ $headers=@{'User-Agent'='Jade-Native-CLI-Updater';Accept='application/vnd.github+json'}
+ if($env:GH_TOKEN){$headers.Authorization='Bearer '+$env:GH_TOKEN}
+ elseif($env:GITHUB_TOKEN){$headers.Authorization='Bearer '+$env:GITHUB_TOKEN}
+ $release=Invoke-RestMethod -Uri ('https://api.github.com/repos/darrenhull/Jade-CLI/releases/'+$endpoint) -Headers $headers
  if($release.draft -or $release.prerelease -or $release.tag_name -notmatch '^v\d+\.\d+\.\d+$'){throw 'Expected a stable official native CLI release.'}
  if($Tag -and $release.tag_name -ne $Tag){throw 'Native CLI release tag mismatch.'}
  $asset=@($release.assets|Where-Object name -eq 'jade-cli-win-x64.zip');$checks=@($release.assets|Where-Object name -eq 'SHA256SUMS')

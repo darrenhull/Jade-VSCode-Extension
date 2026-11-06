@@ -65,17 +65,23 @@ jobs:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         shell: pwsh
         run: |
-          $existing = gh pr list --head "$env:CLI_BRANCH" --state all --json url --jq '.[0].url // empty'
+          $existing = gh pr list --state open --json url,headRefName --jq ('.[] | select(.headRefName == "'+$env:CLI_BRANCH+'" or (.headRefName | startswith("'+$env:CLI_BRANCH+'-retry-"))) | .url')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($existing) {
             "A pull request already exists for this release: $existing" >> $env:GITHUB_STEP_SUMMARY
             exit 0
           }
+          $remote = git ls-remote --heads origin "refs/heads/$env:CLI_BRANCH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($remote) { $env:CLI_BRANCH += '-retry-' + [guid]::NewGuid().ToString('N') }
+          node .jade-automation/scripts/bump-consumer-version.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$env:CLI_BRANCH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git add -- package.json package-lock.json packages
+          $paths = @('package.json','package-lock.json','extension/package.json','packages') | Where-Object { Test-Path -LiteralPath $_ }
+          git add -- $paths
           git commit -m "Update Jade CLI to $env:CLI_TAG"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git push --set-upstream origin "$env:CLI_BRANCH"
