@@ -1,9 +1,13 @@
-# 0.13.2 — Reviewed release updates
+# 0.13.3 — Jade Tools and complete CLS indentation
 
-- Open automated changes and CLI dependency updates as Draft; request owner review only after validation is complete.
-- Keep the verified native CLI 0.3.1 bundle from the preceding update and preserve its exact manifest bytes through packaging.
-- Verify the extracted VSIX against the official CLI manifest receipt and runtime hashes before release.
-- Refresh automatic CLI release polling and document GitHub's best-effort scheduling and explicit recovery triggers.
+- Format class and property declarations, collection keys, database mappings, package sections and method source structure using your editor's tabs/spaces settings.
+- Format complete method bodies, including switch cases, multiline conditions and read-transaction blocks. Preserve literal text, Jade tokens and native metadata values.
+- Correct selected declaration lines without changing neighboring lines, and keep Format Document idempotent and undoable.
+- Present the extension as Jade Tools, with concise setup steps, supported features and commands in its Details page.
+
+# 0.13.2 — Extension update maintenance
+
+- Improve reliability checks when packaging and updating the extension.
 
 # 0.13.0 — Jade method formatting and inline diagnostics companion
 

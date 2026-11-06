@@ -18,7 +18,33 @@ async function run() {
     await vscode.commands.executeCommand('undo');assert.equal(document.getText(),source);
     await apply(await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',document.uri,options));
     editor.selection=new vscode.Selection(0,0,0,0);await document.save();
-    fs.writeFileSync(report,JSON.stringify({passed:true,version:extension.packageJSON.version,formatDocument:true,formatSelection:true,undo:true,idempotent:true,noDatabase:true,file},null,2));
+    const clsSource='jadeVersionNumber "25.0.02";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeHeaders\nCow subclassOf Object transient;\ntypeDefinitions\nCow completeDefinition\n(\nattributeDefinitions\n        name: String[50] number = 1;\n    dateOfBirth: Date number = 2;\njadeMethodDefinitions\ngetName() : String;\n)\ntypeSources\n    Cow (\n    jadeMethodSources\n    getName\n    {\n    getName() : String;\n    begin\nreturn self.name;\n    end;\n    }\n    )\n';
+    const clsFile=path.join(root,'Cow.cls');fs.writeFileSync(clsFile,clsSource);
+    const clsDocument=await vscode.workspace.openTextDocument(clsFile),clsEditor=await vscode.window.showTextDocument(clsDocument);
+    clsEditor.options={insertSpaces:true,tabSize:4};
+    await vscode.workspace.getConfiguration().update('[jade-nz]',{'editor.defaultFormatter':extension.id,'editor.tabSize':4,'editor.insertSpaces':true},vscode.ConfigurationTarget.Workspace);
+    const propertyStart=clsSource.indexOf('    dateOfBirth:'),propertyEnd=clsSource.indexOf('\n',propertyStart),propertyRange=new vscode.Range(clsDocument.positionAt(propertyStart),clsDocument.positionAt(propertyEnd));
+    const propertyEdits=await vscode.commands.executeCommand('vscode.executeFormatRangeProvider',clsDocument.uri,propertyRange,options);
+    assert.equal(propertyEdits.length,1);
+    const propertyEdit=new vscode.WorkspaceEdit();propertyEdit.set(clsDocument.uri,propertyEdits);assert.equal(await vscode.workspace.applyEdit(propertyEdit),true);
+    assert.equal(clsDocument.getText(),clsSource.replace('\n    dateOfBirth:','\n        dateOfBirth:'));
+    await vscode.commands.executeCommand('undo');assert.equal(clsDocument.getText(),clsSource);
+    clsEditor.selection=new vscode.Selection(10,4,10,4);clsEditor.revealRange(new vscode.Range(0,0,24,0));
+    if(process.env.JADE_FORMATTING_UI_HOLD==='1'){
+      fs.writeFileSync(path.resolve(root,'../formatting-before-ready.json'),JSON.stringify({file:clsFile}));
+      await new Promise(resolve=>setTimeout(resolve,45000));
+    }
+    await vscode.commands.executeCommand('editor.action.formatDocument');
+    const clsFormatted=clsDocument.getText();
+    assert.ok(clsFormatted.includes('\n        dateOfBirth: Date number = 2;'));
+    assert.ok(clsFormatted.includes('\n    Cow completeDefinition\n    (\n    attributeDefinitions'));
+    assert.ok(clsFormatted.includes('\nCow (\njadeMethodSources\ngetName\n{\ngetName() : String;\nbegin\n    return self.name;\nend;\n}\n)'));
+    assert.equal(clsFormatted.replace(/\s/g,''),clsSource.replace(/\s/g,''));
+    assert.equal((await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',clsDocument.uri,options)||[]).length,0);
+    await vscode.commands.executeCommand('undo');assert.equal(clsDocument.getText(),clsSource);
+    await vscode.commands.executeCommand('editor.action.formatDocument');assert.equal(clsDocument.getText(),clsFormatted);
+    await clsDocument.save();
+    fs.writeFileSync(report,JSON.stringify({passed:true,version:extension.packageJSON.version,formatDocument:true,formatSelection:true,undo:true,idempotent:true,wholeCls:true,propertySelection:true,noDatabase:true,file:clsFile},null,2));
     // An explicit visual-verification run can hold the real formatted editor
     // open briefly; normal host/CI runs exit as soon as the checks finish.
     if(process.env.JADE_FORMATTING_UI_HOLD==='1')await new Promise(resolve=>setTimeout(resolve,90000));

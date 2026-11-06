@@ -88,3 +88,17 @@ test('CLS source owners, method names, braces and signatures are formatted with 
  assert.equal(apply(source,{},undefined,'Fish.cls'),expected);
  assert.equal(apply(expected,{},undefined,'Fish.cls'),expected);
 });
+
+test('multiline conditions use continuation indentation without losing block nesting',()=>{
+ const source='run();\nbegin\nif value > 0\nand other < 42 then\nreturn;\nelseif value = 0\nor other = 1 then\nreturn;\nelse\nwhile value > 0\nand other < 10 do\nvalue := value - 1;\nendwhile;\nendif;\nend;';
+ const expected='run();\nbegin\n    if value > 0\n        and other < 42 then\n        return;\n    elseif value = 0\n        or other = 1 then\n        return;\n    else\n        while value > 0\n            and other < 10 do\n            value := value - 1;\n        endwhile;\n    endif;\nend;';
+ assert.equal(apply(source),expected);
+ assert.equal(apply(expected),expected);
+});
+
+test('opaque encrypted source bytes remain untouched while their native source envelope is aligned',()=>{
+ const source='    typeSources\n    Cow (\n    jadeMethodSources\n    hidden\n    {\n  __encrypted[6]AQAA\n     ABCDEF\n  __endEncrypted\n    }\n    )\n';
+ const expected='typeSources\nCow (\njadeMethodSources\nhidden\n{\n  __encrypted[6]AQAA\n     ABCDEF\n  __endEncrypted\n}\n)\n';
+ assert.equal(apply(source,{},undefined,'Cow.cls'),expected);
+ assert.equal(apply(expected,{},undefined,'Cow.cls'),expected);
+});

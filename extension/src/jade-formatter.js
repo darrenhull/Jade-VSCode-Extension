@@ -22,7 +22,7 @@ function methodRanges(text,uri,code) {
   if(/\.cls$/i.test(uri)) {
     return parseSource(text,uri).classes.flatMap(cls=>cls.members)
       .filter(member=>member.kind==='method'&&!member.declaration&&code[member.end-1]==='}')
-      .map(member=>({start:signatureEnd(code,member.bodyStart,member.end-1),end:member.end-1,label:member.start,signatureStart:member.bodyStart}))
+      .map(member=>({start:signatureEnd(code,member.bodyStart,member.end-1),end:member.end-1,signatureStart:member.bodyStart}))
       .filter(method=>method.start!==undefined);
   }
   if(uri&&!/\.jade$/i.test(uri))return [];
@@ -59,12 +59,12 @@ function formattingEdits(text,options={},selection,uri='') {
   }
   for(const method of methodRanges(text,uri,code)) {
     const pending=[],stack=[];let begun=false,finished=false,declarations=false,valid=true;
-    let anchor,balance=0;
+    let anchor,balance=0,condition;
     const incomplete=unclosed[firstAt(unclosed,method.start)];
     if(incomplete&&incomplete.start<method.end)continue;
     let signatureAnchor;
-    for(let at=Math.max(0,firstAt(lines,method.label??method.signatureStart)-1);at<lines.length&&lines[at].start<method.start;at++) {
-      const line=lines[at];if(line.end<(method.label??method.signatureStart)||line.inside)continue;
+    for(let at=Math.max(0,firstAt(lines,method.signatureStart)-1);at<lines.length&&lines[at].start<method.start;at++) {
+      const line=lines[at];if(line.end<=method.signatureStart||line.inside)continue;
       const value=code.slice(line.start,line.end).trim(),leading=/^[\t ]*/.exec(text.slice(line.start,line.end))[0];
       if(line.start>=method.signatureStart&&value&&signatureAnchor===undefined)signatureAnchor=columns(leading);
       prefixEdit(line,signatureAnchor===undefined?'':indent(Math.max(0,columns(leading)-signatureAnchor)),pending);
@@ -79,10 +79,17 @@ function formattingEdits(text,options={},selection,uri='') {
       const line=lines[at];if(line.end>method.end)continue;
       const raw=text.slice(line.start,line.end),value=code.slice(line.start,line.end).trim();
       const leading=/^[\t ]*/.exec(raw)[0],continued=anchor;
-      if(line.inside){expression(value,leading,stack.length);continue;} // Preserve literal/comment bytes, but observe an exposed closing semicolon.
+      if(line.inside&&!condition){expression(value,leading,stack.length);continue;} // Preserve literal/comment bytes, but observe an exposed closing semicolon.
       if(finished) {if(value)valid=false;continue;}
       let depth=stack.length||(declarations?1:0),control=false;
-      if(!continued) {
+      if(condition) {
+        control=true;
+        if(/^(?:end\w*|else|elseif|begin)\b/i.test(value)){valid=false;break;}
+        if(new RegExp('\\b'+condition.terminal+'$','i').test(value)) {
+          if(condition.kind!=='elseif')stack.push(condition.kind);
+          condition=undefined;anchor=undefined;
+        }
+      } else if(!continued) {
       if(/^(?:constants|vars)$/i.test(value)) {
         control=true;
         if(begun){valid=false;break;}declarations=true;depth=0;
@@ -119,28 +126,33 @@ function formattingEdits(text,options={},selection,uri='') {
         if(!match||stack.pop()!==expected[match[1].toLowerCase()]){valid=false;break;}depth=stack.length;
       } else if(/^(?:else|elseif)\b/i.test(value)) {
         control=true;
-        if(stack.at(-1)!=='if'||!(/^(?:else|elseif\b[\s\S]*\bthen)$/i.test(value))){valid=false;break;}
+        if(stack.at(-1)!=='if'||!(/^(?:else|elseif\b)/i.test(value))){valid=false;break;}
         depth=stack.length-1;
+        if(/^elseif\b/i.test(value)&&!/^elseif\b[\s\S]*\bthen$/i.test(value)) {
+          if(/;\s*$/.test(value)){valid=false;break;}
+          condition={kind:'elseif',terminal:'then'};anchor={original:columns(leading),formatted:depth*size,minimum:size};
+        }
       } else if(/^(?:if|while|foreach|for)\b/i.test(value)) {
         control=true;
-        const match=/^(if|while|foreach|for)\b[\s\S]*\b(then|do)$/i.exec(value);
-        if(!begun||!match||(match[1].toLowerCase()==='if')!==(match[2].toLowerCase()==='then')){valid=false;break;}
-        stack.push(match[1].toLowerCase());
+        const kind=/^(if|while|foreach|for)\b/i.exec(value)[1].toLowerCase(),terminal=kind==='if'?'then':'do';
+        if(!begun||/;\s*$/.test(value)){valid=false;break;}
+        if(new RegExp('\\b'+terminal+'$','i').test(value))stack.push(kind);
+        else {condition={kind,terminal};anchor={original:columns(leading),formatted:depth*size,minimum:size};}
       } else if(/^(?:select|try|catch|finally|repeat|until|rescue|prolog|end\w*)\b/i.test(value)) {
         valid=false;break;
       }
       }
       if(!control)expression(value,leading,depth);
       if(!valid)break;
+      if(line.inside)continue;
       if(!raw.trim())continue;
       // A selection never reaches outside its complete selected lines. An
       // end position at column zero excludes that following line naturally.
       if(selection&&(line.start<selection.start||line.end>selection.end||line.start>=selection.end))continue;
-      const indentation=continued?indent(Math.max(0,continued.formatted+columns(leading)-continued.original)):unit.repeat(depth);
+      const indentation=continued?indent(Math.max(0,continued.formatted+Math.max(continued.minimum??-Infinity,columns(leading)-continued.original))):unit.repeat(depth);
       if(leading!==indentation)pending.push({start:line.start,end:line.start+leading.length,text:indentation});
     }
-    if(valid&&begun&&finished&&!stack.length) {
-      if(method.label!==undefined)prefixEdit(lines[firstAt(lines,method.end+1)-1],'',pending);
+    if(valid&&begun&&finished&&!stack.length&&!condition) {
       edits.push(...pending);
     }
   }
