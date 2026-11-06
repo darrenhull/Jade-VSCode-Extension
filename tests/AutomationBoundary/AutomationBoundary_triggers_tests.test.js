@@ -1,10 +1,10 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..'),read=name=>fs.readFileSync(path.join(root,'.github/workflows',name),'utf8');
-test('full extension builds run on PR events, main pushes, manual requests and release tags only',()=>{
+test('full extension builds run on PR events, main pushes, manual requests only',()=>{
  const workflow=read('ci.yml');
  assert.match(workflow,/branches: \['main'\]/);
- assert.match(workflow,/pull_request:/);assert.match(workflow,/workflow_dispatch:/);assert.match(workflow,/tags: \['v\*'\]/);
+ assert.match(workflow,/pull_request:/);assert.match(workflow,/workflow_dispatch:/);assert.doesNotMatch(workflow,/tags:/);
  assert.doesNotMatch(workflow,/\n  open-agent-pr:/);
  assert.match(workflow,/\n  build:/);
 });

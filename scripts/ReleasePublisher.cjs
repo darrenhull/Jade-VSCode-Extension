@@ -1,5 +1,5 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
 
 /** Publishes verified consumer artifacts without changing an existing release. */
 class ReleasePublisher {
@@ -36,8 +36,21 @@ class ReleasePublisher {
     if(found.status===0)existing=JSON.parse(found.stdout);
     else if(!/\b404\b/.test((found.stderr||'')+(found.stdout||'')))throw Error(found.stderr||'Could not check the existing release.');
     if(existing&&existing.tag_name!==tag)throw Error('Unexpected release identity.');
-    if(existing&&!existing.draft)return {published:false,skipped:true,tag,reason:'This version is already published; its artifacts remain unchanged.'};
     const ref=this.run('git',['rev-parse','--verify','refs/tags/'+tag+'^{commit}']);
+    if(existing&&!existing.draft) {
+      if(ref.status!==0||this.run('git',['merge-base','--is-ancestor',ref.stdout.trim(),'origin/main']).status!==0)throw Error('Published release tag must belong to approved main.');
+      const required=this.assets(directory).map(file=>path.basename(file));
+      for(const name of required)if(!existing.assets?.some(asset=>asset.name===name))throw Error('Published release is missing required asset: '+name);
+      const downloaded=fs.mkdtempSync(path.join(os.tmpdir(),'jade-published-release-'));
+      try {
+        const args=['release','download',tag,'--repo',repository,'--dir',downloaded];
+        for(const name of required)args.push('--pattern',name);
+        this.command('gh',args);
+        const verified=new Set(this.assets(downloaded).map(file=>path.basename(file)));
+        for(const name of required)if(!verified.has(name))throw Error('Published release checksums are missing required asset: '+name);
+      } finally {fs.rmSync(downloaded,{recursive:true,force:true});}
+      return {published:false,skipped:true,tag,reason:'Existing approved release assets verified; published version remains immutable.'};
+    }
     if(ref.status===0&&ref.stdout.trim()!==sha)throw Error('The release tag points to a different commit.');
     if(existing&&ref.status!==0&&existing.target_commitish!==sha)throw Error('The draft release belongs to a different commit.');
     const assets=this.assets(directory);
