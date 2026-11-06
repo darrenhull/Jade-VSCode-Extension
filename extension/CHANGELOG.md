@@ -1,3 +1,10 @@
+# 0.11.1 — CI and release automation candidate
+
+- Build, test and package the VSIX in GitHub Actions; publish matching version tags only after the commit reaches the approved default branch.
+- Reuse shared CLI workflows for verified dependency update pull requests and release ancestry checks.
+- Pin CLI 0.1.1, including shared portable packaging and release validation support.
+- Include editable draw.io and exported SVG architecture diagrams.
+
 # 0.11.0 — Packaged Jade CLI
 
 - Separate the VS Code product into an independent Git workspace with standalone build and packaging tools.

@@ -9,7 +9,7 @@ function harness(handler){
   child.kill=()=>{queueMicrotask(()=>child.emit('close',0));return true;};
   children.push({child,exe,args,options});return child;
  };
- const session=new CliWorkingSession({entry:'/packed/cli/bin/jade-cli.js',spawn});
+ const session=new CliWorkingSession({entry:'/packed/cli/jade-cli.exe',spawn});
  return {session,children,requests};
 }
 test('build and test use one packaged CLI process with exact native reports and no unserialisable editor services',async()=>{
@@ -21,7 +21,7 @@ test('build and test use one packaged CLI process with exact native reports and 
   assert.equal(built.passed,true);assert.equal(tested.passed,false);assert.match(tested.report.results[0].message,/expected 2/);assert.equal(reports.length,1);
   assert.deepEqual(output,['Native output\n','Native output\n']);assert.equal(h.children.length,1);
   assert.equal(h.requests[0].command,'build');assert.equal(h.requests[1].command,'test');assert.equal(h.requests[0].config.testSession,undefined);assert.equal(h.requests[0].config.signal,undefined);
-  assert.equal(h.children[0].options.env.ELECTRON_RUN_AS_NODE,'1');
+  assert.equal(h.children[0].options.env.ELECTRON_RUN_AS_NODE,undefined);
  }finally{h.session.dispose();}
 });
 test('cancel addresses the original CLI operation and waits for its honest cancelled result',async()=>{
@@ -42,5 +42,5 @@ test('disconnect waits for CLI native ownership release rather than killing the 
 test('standalone CLI executables launch directly without Node arguments or Electron environment',()=>{
  const invocation=cliInvocation('C:/packed/bin/jade-cli.exe',['service','--stdio'],{env:{EXAMPLE:'kept',ELECTRON_RUN_AS_NODE:'1'}});
  assert.equal(invocation.executable,'C:/packed/bin/jade-cli.exe');assert.deepEqual(invocation.args,['service','--stdio']);assert.equal(invocation.options.env.ELECTRON_RUN_AS_NODE,undefined);assert.equal(invocation.options.env.EXAMPLE,'kept');
- const js=cliInvocation('/legacy/jade-cli.js',['service','--stdio'],{});assert.equal(js.executable,process.execPath);assert.deepEqual(js.args,['/legacy/jade-cli.js','service','--stdio']);assert.equal(js.options.env.ELECTRON_RUN_AS_NODE,'1');
+ assert.throws(()=>cliInvocation('/legacy/jade-cli.js',['service','--stdio'],{}),/native.*executable/i);
 });

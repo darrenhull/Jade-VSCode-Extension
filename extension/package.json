@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Native Runner - Working Database",
   "description": "Compile and test Jade source using native Jade tools in an isolated working database, without the Jade IDE.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"

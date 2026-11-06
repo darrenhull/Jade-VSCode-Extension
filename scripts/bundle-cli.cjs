@@ -1,14 +1,26 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path');
-function bundleCli(){
- const root=path.resolve(__dirname,'..'),source=path.join(root,'node_modules/jade-tools-cli'),destination=path.join(root,'extension/vendor/jade-tools-cli');
- if(!fs.existsSync(path.join(source,'bin/jade-cli.js'))||!fs.existsSync(path.join(source,'jade-cli.exe')))throw Error('Install the pinned standalone Jade CLI package with npm ci before packaging.');
- if(path.dirname(destination)!==path.join(root,'extension/vendor'))throw Error('Invalid generated CLI bundle destination.');
- fs.rmSync(destination,{recursive:true,force:true});fs.cpSync(source,destination,{recursive:true});
- // Legacy connected test controls use these ignored compatibility paths. The
- // activated extension launches the CLI's helpers; VSIX excludes these copies.
- const compatibility=path.join(root,'extension/native');fs.mkdirSync(compatibility,{recursive:true});
- for(const name of ['jade-native-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-test-helper.exe'])fs.copyFileSync(path.join(source,'sdk/native',name),path.join(compatibility,name));
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+function bundleCli(options={}){
+ const root=path.resolve(__dirname,'..'),source=path.resolve(options.source||process.env.JADE_CLI_DISTRIBUTION||path.join(root,'packages/jade-cli-win-x64')),destination=path.resolve(options.destination||path.join(root,'extension/vendor/jade-tools-cli'));
+ const manifest=JSON.parse(fs.readFileSync(path.join(source,'distribution.json'),'utf8'));
+ if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
+ for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'])if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
+ const pinFile=options.pinFile||(!options.source?path.join(root,'packages/jade-cli-pin.json'):undefined);
+ if(pinFile)require('./NativePin.cjs').verifyNativePin(source,pinFile);
+ const sourceRoot=fs.realpathSync(source),files=new Map();let total=0;
+ for(const [relative,hash]of Object.entries({...manifest.runtimeFiles,'jade-cli.exe':manifest.executableSha256})){
+  if(path.isAbsolute(relative)||relative.includes('\\')||relative.split('/').some(part=>!part||part==='.'||part==='..')||!/^([a-f0-9]{64})$/i.test(hash))throw Error('Invalid native runtime path or checksum: '+relative);
+  const file=path.join(source,relative),resolved=path.relative(sourceRoot,fs.realpathSync(file));
+  if(resolved==='..'||resolved.startsWith('..'+path.sep)||path.isAbsolute(resolved)||!fs.statSync(file).isFile())throw Error('Invalid native runtime path: '+relative);
+  total+=fs.statSync(file).size;if(total>256*1024*1024)throw Error('Native CLI runtime exceeds the 256 MiB size limit.');
+  const bytes=fs.readFileSync(file);if(crypto.createHash('sha256').update(bytes).digest('hex')!==hash)throw Error('Native CLI checksum mismatch: '+relative);
+  files.set(relative,bytes);
+ }
+ if(options.verifyOnly)return source;
+ if(source===destination||source.startsWith(destination+path.sep)||destination.startsWith(source+path.sep))throw Error('Native bundle source and destination must be separate.');
+ fs.rmSync(destination,{recursive:true,force:true});fs.mkdirSync(destination,{recursive:true});
+ for(const [relative,bytes]of files){const file=path.join(destination,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,bytes);}
+ fs.writeFileSync(path.join(destination,'distribution.json'),JSON.stringify(manifest,null,2)+'\n');
  return destination;
 }
 if(require.main===module)console.log(bundleCli());

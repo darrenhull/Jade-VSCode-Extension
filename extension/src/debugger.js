@@ -176,7 +176,7 @@ function registerDebugger(vscode, context, services) {
             );
             const abi = path.join(
                 context.extensionPath,
-                "native/debugger-abi.json",
+                "vendor/jade-tools-cli/native/debugger-abi.json",
               ),
               manifest = JSON.parse(fs.readFileSync(abi, "utf8"));
             for (const [name, digest] of Object.entries(manifest.libraries))
@@ -192,7 +192,7 @@ function registerDebugger(vscode, context, services) {
                   "Experimental debugging does not support this Jade DLL build: " +
                     name,
                 );
-            this.operation = require("./headless-runner").startWorking(
+            this.operation = services.startWorking(
               config,
               "compile",
               (text) => output.append(text),
@@ -204,7 +204,7 @@ function registerDebugger(vscode, context, services) {
               );
             this.assertActive();
             this.preparing =
-              require("./working-database").prepareWorkingDatabase(
+              services.prepareWorking(
                 config,
                 (text) => output.append(text),
               );
@@ -238,7 +238,7 @@ function registerDebugger(vscode, context, services) {
               }),
             );
             this.native = new NativeDebugger(
-              path.join(context.extensionPath, "native/jade-debug-helper.exe"),
+              path.join(context.extensionPath, "vendor/jade-tools-cli/native/jade-debug-helper.exe"),
               file,
             );
             this.native.on("output", (text) => {

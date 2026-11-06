@@ -3,7 +3,7 @@ const test = require("node:test"),
   assert = require("node:assert/strict"),
   { EventEmitter } = require("node:events");
 const { registerDebugger } = require("../extension/src/debugger");
-function setup(open) {
+function setup(open, overrides = {}) {
   let factory,
     busy = false;
   const changes = [],
@@ -35,6 +35,8 @@ function setup(open) {
       createOutputChannel: () => ({
         clear() {},
         show() {},
+        clear() {},
+        show() {},
         append() {},
         appendLine() {},
         dispose() {},
@@ -53,19 +55,32 @@ function setup(open) {
   };
   registerDebugger(
     vscode,
-    { subscriptions: [] },
+    { subscriptions: [], ...overrides.context },
     {
       isBusy: () => busy,
       setBusy: async (value) => {
         busy = value;
         changes.push(value);
       },
+      ...overrides.services,
     },
   );
   const adapter = factory.createDebugAdapterDescriptor().adapter;
   adapter.onDidSendMessage((m) => messages.push(m));
   return { adapter, messages, changes, busy: () => busy };
 }
+
+test('debug compilation delegates to the injected native CLI session without opening a legacy working base',async t=>{
+ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-debug-native-gateway-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const text=fs.readFileSync(path.join(__dirname,'fixtures/DebugDemo.cls'),'utf8'),file=path.join(root,'DebugDemo.cls');fs.writeFileSync(file,text);
+ const abi=path.join(root,'vendor/jade-tools-cli/native');fs.mkdirSync(abi,{recursive:true});fs.writeFileSync(path.join(abi,'debugger-abi.json'),JSON.stringify({libraries:{}}));
+ const method=require('../extension/src/debug-source').debugMethods(text,file)[0];let compiled=0;
+ const document={isDirty:false,uri:{fsPath:file,toString:()=>file},getText:()=>text};
+ const s=setup(async()=>document,{context:{extensionPath:root},services:{config:()=>({installPath:root,databasePath:path.join(root,'absent-source'),iniPath:path.join(root,'absent.ini'),storagePath:path.join(root,'storage'),workspaceRoots:[root],program:file,files:[file]}),workingFiles:async()=>{},startWorking:()=>{compiled++;return {completion:Promise.resolve({passed:false,code:6026,report:{error:'Native CLI rejected the test fixture'}}),stop(){}};},prepareWorking:()=>{throw Error('Do not prepare after a compiler failure');}}});
+ await s.adapter.handleMessage({seq:1,command:'launch',arguments:{program:file,method:method.name}});
+ assert.equal(compiled,1);assert.match(s.messages.find(message=>message.request_seq===1).message,/Native CLI rejected/);s.adapter.dispose();
+});
 test("disconnect while a launch awaits a document cancels before save, compile or database work", async () => {
   let resolve,
     saves = 0;

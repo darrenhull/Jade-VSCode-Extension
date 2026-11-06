@@ -1,4 +1,5 @@
 node_modules/
+.jade-automation/
 dist/
 **/build/
 evidence/
@@ -31,4 +32,3 @@ debug-sample-workspace/
 # Compatibility test copies are reconstructed from the pinned CLI dependency.
 /extension/native/*.exe
 /extension/media/architecture.png
-/extension/media/architecture.svg

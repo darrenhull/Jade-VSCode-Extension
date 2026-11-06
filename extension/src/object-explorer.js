@@ -2,7 +2,7 @@
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
-const { InspectionSession, inspectionTarget } = require("./object-session"),
+const { InspectionSession } = require("./object-session"),
   { InspectorTransport } = require("./object-transport");
 const { fieldText } = require("../media/object-page");
 const { ClassBrowserModel } = require("./class-browser-model");
@@ -80,7 +80,9 @@ function registerObjectExplorer(vscode, context, services) {
         throw Error(
           "Another Jade operation started while selecting database settings.",
         );
-      const target = inspectionTarget(config, selection);
+      const target = await services.inspectionTarget(config, selection);
+      if(generation !== session.generation)throw Error('Inspection connection was cancelled.');
+      if(services.isBusy())throw Error('Another Jade operation started while resolving the database target.');
       lockOwner = owner;
       await setLock(true);
       let client, file;
@@ -116,14 +118,14 @@ function registerObjectExplorer(vscode, context, services) {
           ? services.createTransport(
               path.join(
                 context.extensionPath,
-                "native/jade-inspect-helper.exe",
+                "vendor/jade-tools-cli/native/jade-inspect-helper.exe",
               ),
               file,
             )
           : new InspectorTransport(
               path.join(
                 context.extensionPath,
-                "native/jade-inspect-helper.exe",
+                "vendor/jade-tools-cli/native/jade-inspect-helper.exe",
               ),
               file,
             );
@@ -941,8 +943,7 @@ function registerObjectExplorer(vscode, context, services) {
               label: "Working database",
               description: "Isolated local build/test copy",
               detail: config
-                ? require("./working-database").workingLocation(config)
-                    .databasePath
+                ? (await services.workingLocation(config)).databasePath
                 : "",
               target: "working",
             },

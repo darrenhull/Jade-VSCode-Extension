@@ -1,9 +1,7 @@
-# Pinned Jade CLI release
+# Pinned native Jade CLI
 
-`jade-tools-cli-0.1.0.tgz` is the exact CLI release used by extension 0.11.0. It is intentionally committed so this repository builds independently, without a sibling CLI checkout or a separately installed Node runtime for end users.
+`jade-cli-win-x64/` contains the official native C++ CLI release pinned in `jade-cli-pin.json`. It is committed so this repository builds independently and end users do not need Node or a sibling CLI checkout.
 
-SHA-256: `CB4B0345DB5E9EFE97A40065093A70EC38099006C7B1BF081AE67B83C56CE7F4`.
+The pin records the release version/tag, the verified official ZIP SHA-256 and the SHA-256 of its exact extracted `distribution.json`. The archive checksum is an installation receipt. The raw manifest digest and declared executable/runtime hashes verify the installed payload; required helpers and debugger ABI metadata must be present.
 
-The archive contains `jade-cli.exe` with its runtime embedded, the shared SDK, owned native helpers, native helper sources and notices. Jade vendor DLLs, databases and private configuration are excluded. `package-lock.json` also pins the archive's integrity.
-
-`npm ci` installs this local archive. `npm run bundle:cli` copies its runtime into the extension, and `npm run package` includes that bundle in the VSIX. Update the archive and lockfile together when upgrading the CLI; do not edit generated vendor files.
+`node scripts/update-cli.cjs --verify-lock` validates this contract. Packaging copies only the verified native distribution into the VSIX. Vendor Jade DLLs, databases and private configuration are excluded. Future official CLI releases are proposed through reviewed dependency PRs; successful reviewed main builds publish a new consumer version. Published versions are never overwritten.

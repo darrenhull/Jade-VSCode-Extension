@@ -1,0 +1,107 @@
+name: Update a consumer's pinned Jade CLI
+
+on:
+  workflow_call:
+    inputs:
+      cli_tag:
+        type: string
+        default: ''
+      consumer_automation_ref:
+        type: string
+        required: true
+      update_script:
+        type: string
+        default: scripts/update-cli.cjs
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate immutable native automation reference
+        shell: pwsh
+        env:
+          AUTOMATION_REF: ${{ inputs.consumer_automation_ref }}
+        run: |
+          if ($env:AUTOMATION_REF -notmatch '^[a-f0-9]{40}$') { throw 'Pin consumer automation to an immutable commit.' }
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: darrenhull/Jade-VSCode-Extension
+          ref: ${{ inputs.consumer_automation_ref }}
+          path: .jade-automation
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Download and verify the CLI release
+        id: cli
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLI_TAG: ${{ inputs.cli_tag }}
+          UPDATE_SCRIPT: ${{ inputs.update_script }}
+          JADE_NATIVE_UPDATER_SCRIPT: ${{ github.workspace }}/.jade-automation/scripts/update-native-cli.ps1
+        run: node "$env:UPDATE_SCRIPT" "$env:CLI_TAG"
+      - name: Verify the committed native dependency
+        if: steps.cli.outputs.updated == 'true'
+        shell: pwsh
+        env:
+          UPDATE_SCRIPT: ${{ inputs.update_script }}
+          JADE_NATIVE_UPDATER_SCRIPT: ${{ github.workspace }}/.jade-automation/scripts/update-native-cli.ps1
+        run: node "$env:UPDATE_SCRIPT" --verify-lock
+      - name: Create reviewed dependency pull request
+        if: steps.cli.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CLI_BRANCH: ${{ steps.cli.outputs.branch }}
+          CLI_TAG: ${{ steps.cli.outputs.tag }}
+          CLI_SHA: ${{ steps.cli.outputs.sha }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: pwsh
+        run: |
+          $existing = gh pr list --state open --json url,headRefName --jq ('.[] | select(.headRefName == "'+$env:CLI_BRANCH+'" or (.headRefName | startswith("'+$env:CLI_BRANCH+'-retry-"))) | .url')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($existing) {
+            "A pull request already exists for this release: $existing" >> $env:GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          $remote = git ls-remote --heads origin "refs/heads/$env:CLI_BRANCH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($remote) { $env:CLI_BRANCH += '-retry-' + [guid]::NewGuid().ToString('N') }
+          node .jade-automation/scripts/bump-consumer-version.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$env:CLI_BRANCH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $paths = @('package.json','package-lock.json','extension/package.json','packages') | Where-Object { Test-Path -LiteralPath $_ }
+          git add -- $paths
+          git commit -m "Update Jade CLI to $env:CLI_TAG"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git push --set-upstream origin "$env:CLI_BRANCH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bodyFile = Join-Path $env:RUNNER_TEMP ('cli-update-pr-' + [guid]::NewGuid().ToString('N') + '.md')
+          @"
+          Update the committed native C++ CLI distribution and hash pin to $env:CLI_TAG.
+
+          SHA-256: $env:CLI_SHA
+
+          The official release URL, download/expanded-size limits, archive paths, version and native runtime hashes were verified. The normal PR workflow performs the full test, package and release validation once. GitHub may require the owner to approve the initial workflow run for a bot-created PR. This updates the native dependency for review; it does not publish a consumer release or modify a Jade database.
+          "@ | Set-Content -LiteralPath $bodyFile -Encoding utf8
+          gh pr create --base "$env:BASE_BRANCH" --head "$env:CLI_BRANCH" --title "Update Jade CLI to $env:CLI_TAG" --body-file "$bodyFile" --reviewer darrenhull
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $number = gh pr view "$env:CLI_BRANCH" --json number --jq .number
+          if ($LASTEXITCODE -ne 0 -or $number -notmatch '^[1-9][0-9]*$') { throw 'Could not verify the dependency pull request number.' }
+          $verifiedJson = gh api "repos/$env:GH_REPO/pulls/$number"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify the dependency pull request identity.' }
+          $verified = $verifiedJson | ConvertFrom-Json
+          if ($verified.user.login -ne 'github-actions[bot]' -or $verified.user.type -ne 'Bot' -or $verified.head.ref -ne $env:CLI_BRANCH -or $verified.head.repo.full_name -ne $env:GH_REPO -or $verified.base.ref -ne $env:BASE_BRANCH -or $verified.head.sha -notmatch '^[a-fA-F0-9]{40}$') { throw 'Unexpected dependency pull request identity.' }
+          if (@($verified.requested_reviewers | Where-Object login -eq 'darrenhull').Count -ne 1) { throw 'The dependency pull request must request human owner review.' }
+          gh pr merge "$number" --repo "$env:GH_REPO" --auto --squash --match-head-commit "$($verified.head.sha)"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not queue protected squash auto-merge.' }

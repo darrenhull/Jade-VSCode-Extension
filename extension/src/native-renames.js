@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {parseSource}=require('./source_symbols');
 const {startExtract,resolveExtractConfig}=require('./extract');
-const {nativeProcess}=require('./working-database');
+const {nativeProcess}=require('./native-utility');
 function readRenames(text,file){
  const version=/^\s*JadeVersionNumber\s+"?([\d.]+)"?\s*$/im.exec(text)?.[1];if(!/^\s*JadeCommandFile\b/i.test(text)||!version)throw Error('Invalid native command file: '+file);
  const operations=[];

@@ -89,3 +89,9 @@ npm run package
 Packaging reconstructs the CLI bundle from the pinned package artifact. Node modules, generated bundles, VSIX output, reports, databases and local research notes are ignored by Git. Use the separate CLI repository to develop or rebuild native helpers; changing an old local helper copy does not change the CLI artifact used by this extension.
 
 The default tests do not open Jade databases. Actual-host/native controls require explicit private fixture configuration. See the repository build scripts and test files for opt-in controls. Publishing this extension means packaging/installing its VSIX; it does not deploy source code into a Jade database.
+
+## Architecture diagram
+
+![Jade architecture](media/architecture.drawio.svg)
+
+[Editable draw.io source](media/architecture.drawio).
