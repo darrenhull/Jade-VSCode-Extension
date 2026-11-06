@@ -55,3 +55,22 @@ test('multiple CLS methods are isolated and an invalid body does not prevent a v
   const source=cls('run();\nbegin\nif true then\nreturn;\nend;').replace('\n}\n)', '\n}\nother\n{\nother();\nbegin\nreturn;\nend;\n}\n)');
   assert.equal(apply(source,{},undefined,'Fish.cls'),source.replace('other();\nbegin\nreturn;', 'other();\nbegin\n    return;'));
 });
+
+test('multiline calls, operators and comments retain their relative continuation indentation',()=>{
+  const source='run();\nbegin\n  value := method(\n      first,\n        nested(second),\n      third);\n  value := first +\n      second;\n  other := method(\n      // explain the argument\n      first\n  );\nend;';
+  const expected='run();\nbegin\n    value := method(\n        first,\n          nested(second),\n        third);\n    value := first +\n        second;\n    other := method(\n        // explain the argument\n        first\n    );\nend;';
+  assert.equal(apply(source),expected);
+  assert.equal(apply(expected),expected);
+  const start=source.indexOf('      first,'),end=start+'      first,'.length;
+  assert.equal(apply(source,{}, {start,end}),source.slice(0,start)+'        first,'+source.slice(end));
+});
+
+test('large extracted classes visit a bounded number of array entries instead of rescanning each method',()=>{
+  const methods=Array.from({length:400},(_,i)=>`method${i}\n{\nmethod${i}();\nbegin\n// explain\nreturn;\nend;\n}`).join('\n');
+  const source=cls('run();\nbegin\nreturn;\nend;').replace('\n}\n)', '\n}\n'+methods+'\n)');
+  const original=Array.prototype[Symbol.iterator];let visits=0,formatted;
+  Array.prototype[Symbol.iterator]=function*(){const iterator=original.call(this);for(let item=iterator.next();!item.done;item=iterator.next()){visits++;yield item.value;}};
+  try{formatted=apply(source,{},undefined,'ManyMethods.cls');}finally{Array.prototype[Symbol.iterator]=original;}
+  assert.equal((formatted.match(/\n    return;/g)||[]).length,401);
+  assert.ok(visits<200000,`Formatting visited ${visits} array entries for only 401 short methods.`);
+});
