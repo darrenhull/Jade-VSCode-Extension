@@ -25,6 +25,12 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 - Run focused tests first, then relevant regression/build/package checks. Default tests must not open a developer's Jade database; connected tests require explicit opt-in, disposable validated fixtures and cleanup of owned resources only.
 - Review the final diff for unintended files, secrets, stale comments and behavior changes. Document the final behavior, validation and practical limitations.
 
+## UI evidence
+
+- Every UI change must include a screenshot of the updated, running interface. Capture the actual implementation after the change, not a mockup or an earlier version.
+- Visually inspect the screenshot and include it in the PR and the user-facing completion report, with enough context to identify the changed view or control. Cover materially different changed states where one screenshot is insufficient.
+- If the UI cannot be run or captured, report the blocker explicitly and leave visual verification outstanding; do not claim it is complete.
+
 ## Correctness and compatibility
 
 - Preserve public commands, SDK/event/result contracts, native error codes, cancellation, diagnostics, source locations and individual test outcomes. Incomplete or failed operations must not appear successful.
