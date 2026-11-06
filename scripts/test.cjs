@@ -6,6 +6,8 @@ require('./bundle-cli.cjs').bundleCli();
 // inherited research-control environment variables from another workspace.
 const env={...process.env};
 for(const key of Object.keys(env))if(/^JADE_/.test(key)&&!['JADE_HOME','JADE_INSTALL'].includes(key))delete env[key];
-const files=fs.readdirSync(path.join(root,'test')).filter(name=>name.endsWith('.test.js')).sort().map(name=>path.join(root,'test',name));
+const files=[];
+function collect(directory){if(!fs.existsSync(directory))return;for(const entry of fs.readdirSync(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);if(entry.isDirectory())collect(file);else if(entry.name.endsWith('.test.js'))files.push(file);}}
+collect(path.join(root,'test'));collect(path.join(root,'tests'));files.sort();
 const result=spawnSync(process.execPath,['--test',...files],{cwd:root,env,stdio:'inherit'});
 process.exitCode=result.status??1;

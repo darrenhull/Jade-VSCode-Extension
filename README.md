@@ -1,6 +1,6 @@
 # Jade VS Code extension
 
-Independent development workspace for the Jade Native Runner extension. Version 0.11.0 routes native operations to the separately packaged Jade CLI while retaining the existing VS Code interface.
+Independent development workspace for the Jade Native Runner extension. Version 0.11.1 is a release candidate that routes native operations to the separately packaged Jade CLI while retaining the existing VS Code interface.
 
 This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
 
@@ -41,3 +41,18 @@ This repository can be cloned and built independently. No remote is configured b
 ## Migration acceptance
 
 The CLI migration is accepted only after standalone CLI compilation/testing and the actual VS Code extension paths produce equivalent native results, including compiler errors, failed assertions, cancellation, warm reuse and session handoff. Packaging and installation must verify that the extension contains the pinned CLI artifact and can run without the sibling CLI checkout.
+
+## GitHub Actions and releases
+
+The Build and release extension workflow runs the default tests and packages a Windows-tested VSIX on pushes, pull requests and manual runs. A version tag such as `v0.11.1` publishes that tested VSIX and `SHA256SUMS` to GitHub Releases. The tag, root package and extension manifest versions must match, and the tagged commit must be on the approved default branch. Tags on unmerged feature commits cannot publish. This does not publish to the VS Code Marketplace. Hosted CI does not run connected Jade tests or access a developer database.
+
+Update pinned Jade CLI checks the latest stable [CLI release](https://github.com/darrenhull/Jade-CLI/releases) hourly. It can also be run immediately from Actions with a `cli_tag`, or by a `jade-cli-released` repository-dispatch event. The shared CLI SDK updater verifies official release URLs, SHA-256, archive paths, package identity and version before changing the committed archive. The lockfile, tests and VSIX are verified before an update pull request is opened. The update never merges itself, publishes an extension, or modifies a Jade database.
+
+CI is explicitly dispatched on the update branch; validation does not depend on pull-request events created by `GITHUB_TOKEN`. The repository must allow Actions to create pull requests. Hourly updates use only this repository's scoped `GITHUB_TOKEN`, so no cross-repository secret is required. Immediate dispatch from a different repository requires a GitHub App or token with access to this repository; polling is the default link.
+
+After review and merge, publish a new extension release by bumping both package versions and the lockfile, commit the change, then push its matching version tag. The CLI is independently versioned and remains pinned in `packages/`; downloading a newer CLI does not silently replace the extension's backend.
+## Architecture diagram
+
+![Architecture](extension/media/architecture.drawio.svg)
+
+[Edit the diagram in draw.io](extension/media/architecture.drawio). The SVG is the rendered companion to the editable source.

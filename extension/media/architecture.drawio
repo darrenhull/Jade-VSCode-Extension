@@ -1,0 +1,155 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" version="26.0.0" type="device">
+  <diagram id="jade-architecture" name="Architecture">
+    <mxGraphModel dx="1500" dy="1150" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1500" pageHeight="1150" background="#f8fafc" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Jade for VS Code — connected architecture" style="text;html=1;align=left;fontSize=29;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="35" y="25" width="1430" height="40" />
+        </mxCell>
+        <mxCell id="subtitle" value="One shared native backend for the editor, terminal and MCP clients. Source files remain the versioned inputs." style="text;html=1;align=left;fontSize=14;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="35" y="70" width="1430" height="28" />
+        </mxCell>
+        <mxCell id="vscode" value="VS CODE / EXTENSION REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#eef5ff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="120" width="440" height="385" />
+        </mxCell>
+        <mxCell id="mcp" value="MCP CLIENTS / MCP REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f4efff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="500" y="120" width="300" height="385" />
+        </mxCell>
+        <mxCell id="cli" value="JADE CLI / SHARED SDK REPOSITORY" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#eaf8f2;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="830" y="120" width="640" height="385" />
+        </mxCell>
+        <mxCell id="jade" value="INSTALLED JADE — THE NATIVE COMPILER, OBJECT MANAGER AND DATABASE ENGINE" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#fff7e8;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="545" width="1440" height="230" />
+        </mxCell>
+        <mxCell id="github" value="GITHUB — SOURCE CONTROL, LINKED BUILDS AND RELEASES" style="swimlane;startSize=42;horizontal=1;container=1;collapsible=0;rounded=1;arcSize=8;html=1;verticalAlign=middle;align=left;spacingTop=14;spacingLeft=18;fontSize=14;fontStyle=1;fontColor=#334155;fillColor=#f2f5f9;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="820" width="1440" height="265" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.5135135135135135;exitY=1.0;entryX=0.20588235294117646;entryY=0.0;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="vscode" source="files" target="adapter">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.4864864864864865;exitY=1.0;entryX=0.7941176470588235;entryY=0.0;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="vscode" source="ui" target="adapter">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.16666666666666666;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="1" source="adapter" target="exe">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points">
+              <mxPoint x="485" y="410" />
+              <mxPoint x="485" y="515" />
+              <mxPoint x="815" y="515" />
+              <mxPoint x="815" y="205" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="MCP stdio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;entryX=0.5;entryY=0.0;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="mcp" source="copilot" target="server">
+          <mxGeometry as="geometry" relative="1" y="-14">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.6666666666666666;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="1" source="server" target="exe">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points">
+              <mxPoint x="810" y="410" />
+              <mxPoint x="810" y="265" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="cli" source="exe" target="broker">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;entryX=0.7565217391304347;entryY=0.0;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="cli" source="broker" target="helpers">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.23478260869565218;exitY=1.0;entryX=0.0;entryY=0.5043478260869565;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="1" source="helpers" target="dll">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points">
+              <mxPoint x="1000" y="525" />
+              <mxPoint x="45" y="525" />
+              <mxPoint x="45" y="668" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="build / test" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.5043478260869565;entryX=0.0;entryY=0.5043478260869565;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="jade" source="dll" target="working">
+          <mxGeometry as="geometry" relative="1" y="-14">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="seed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=0.0;exitY=0.5043478260869565;entryX=1.0;entryY=0.5043478260869565;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="jade" source="source" target="working">
+          <mxGeometry as="geometry" relative="1" y="-14">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="reviewed publish" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.6956521739130435;entryX=0.5;entryY=0.0;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="jade" source="dll" target="source">
+          <mxGeometry as="geometry" relative="1" y="-14">
+            <Array as="points">
+              <mxPoint x="425" y="145" />
+              <mxPoint x="425" y="45" />
+              <mxPoint x="1195" y="45" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.496;entryX=0.0;entryY=0.496;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="github" source="git" target="actions">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#475569;fontSize=12;exitX=1.0;exitY=0.496;entryX=0.0;entryY=0.496;exitPerimeter=0;entryPerimeter=0;labelBackgroundColor=#f8fafc;fontFamily=Segoe UI;" edge="1" parent="github" source="actions" target="releases">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="files" value="&lt;b&gt;Workspace source&lt;/b&gt;&lt;br&gt;CLS, SCM and native resources&lt;br&gt;jade.json / VS Code settings" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
+          <mxGeometry as="geometry" x="25" y="65" width="185" height="120" />
+        </mxCell>
+        <mxCell id="ui" value="&lt;b&gt;Editor and views&lt;/b&gt;&lt;br&gt;F5, Test Explorer, navigation,&lt;br&gt;collections and debugger UI" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
+          <mxGeometry as="geometry" x="230" y="65" width="185" height="120" />
+        </mxCell>
+        <mxCell id="adapter" value="&lt;b&gt;VS Code adapters&lt;/b&gt;&lt;br&gt;Commands, Problems, Testing, DAP and views&lt;br&gt;Call the pinned, bundled CLI executable" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#93b4e8;fontFamily=Segoe UI;" vertex="1" parent="vscode">
+          <mxGeometry as="geometry" x="50" y="235" width="340" height="110" />
+        </mxCell>
+        <mxCell id="copilot" value="&lt;b&gt;Copilot / MCP clients&lt;/b&gt;&lt;br&gt;Tools, resources and prompts" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
+          <mxGeometry as="geometry" x="30" y="65" width="240" height="100" />
+        </mxCell>
+        <mxCell id="server" value="&lt;b&gt;Jade MCP server&lt;/b&gt;&lt;br&gt;Official SDK and validated tools&lt;br&gt;Uses the same pinned CLI backend" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b49cdd;fontFamily=Segoe UI;" vertex="1" parent="mcp">
+          <mxGeometry as="geometry" x="30" y="235" width="240" height="110" />
+        </mxCell>
+        <mxCell id="exe" value="&lt;b&gt;jade-cli.exe&lt;/b&gt;&lt;br&gt;Command / service entry point&lt;br&gt;Embedded runtime; no Node install" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+          <mxGeometry as="geometry" x="35" y="65" width="260" height="120" />
+        </mxCell>
+        <mxCell id="broker" value="&lt;b&gt;Shared local broker&lt;/b&gt;&lt;br&gt;Serial jobs and database ownership&lt;br&gt;Warm native runtime and job results" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+          <mxGeometry as="geometry" x="330" y="65" width="280" height="120" />
+        </mxCell>
+        <mxCell id="helpers" value="&lt;b&gt;C++ helper boundary&lt;/b&gt;&lt;br&gt;Native loader / test runtime, read-only inspector and debugger&lt;br&gt;Thin integration with the installed Jade runtime" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#78bca2;fontFamily=Segoe UI;" vertex="1" parent="cli">
+          <mxGeometry as="geometry" x="35" y="235" width="575" height="110" />
+        </mxCell>
+        <mxCell id="dll" value="&lt;b&gt;Jade native DLLs&lt;/b&gt;&lt;br&gt;Compilation, object semantics,&lt;br&gt;loading, tests and debugging" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="jade">
+          <mxGeometry as="geometry" x="35" y="65" width="360" height="115" />
+        </mxCell>
+        <mxCell id="working" value="&lt;b&gt;Working database&lt;/b&gt;&lt;br&gt;Isolated build / test / debug state&lt;br&gt;Native inputs reused after success" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="jade">
+          <mxGeometry as="geometry" x="500" y="65" width="380" height="115" />
+        </mxCell>
+        <mxCell id="source" value="&lt;b&gt;Source database&lt;/b&gt;&lt;br&gt;Extraction and inspected source data&lt;br&gt;Publication requires explicit review" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#dfbb74;fontFamily=Segoe UI;" vertex="1" parent="jade">
+          <mxGeometry as="geometry" x="985" y="65" width="420" height="115" />
+        </mxCell>
+        <mxCell id="git" value="&lt;b&gt;Three Git repositories&lt;/b&gt;&lt;br&gt;Source, tests, diagrams and build rules&lt;br&gt;CLI / extension / MCP version separately" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
+          <mxGeometry as="geometry" x="35" y="75" width="360" height="125" />
+        </mxCell>
+        <mxCell id="actions" value="&lt;b&gt;GitHub Actions&lt;/b&gt;&lt;br&gt;Tests → Windows builds → release assets&lt;br&gt;CLI release checked by consumer updater" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
+          <mxGeometry as="geometry" x="500" y="75" width="380" height="125" />
+        </mxCell>
+        <mxCell id="releases" value="&lt;b&gt;Pinned consumer releases&lt;/b&gt;&lt;br&gt;Reviewed update PR commits CLI archive&lt;br&gt;VSIX and MCP bundle include that version" style="rounded=1;arcSize=12;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=15;fontSize=14;fontColor=#0f172a;fillColor=#ffffff;strokeColor=#b5c1cf;fontFamily=Segoe UI;" vertex="1" parent="github">
+          <mxGeometry as="geometry" x="985" y="75" width="420" height="125" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
