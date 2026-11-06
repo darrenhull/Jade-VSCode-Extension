@@ -42,6 +42,16 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+  open-agent-pr:
+    if: github.event_name == 'push' && github.actor == 'darrenhull' && github.repository_owner == 'darrenhull' && startsWith(github.ref, 'refs/heads/codex/agent/')
+    needs: build
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: darrenhull/Jade-CLI/.github/workflows/open-agent-pr.yml@7de4aa6a3a658b8b480181b918f91293bfe35b4b
+    with:
+      source_pr: ${{ github.ref == 'refs/heads/codex/agent/linked-cli-releases' && 1 || 0 }}
+
   release-guard:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: darrenhull/Jade-CLI/.github/workflows/release-ancestry.yml@fd723456490a67d04ce6f5cc27496b03601d7e74
