@@ -1,0 +1,606 @@
+{
+  "name": "jade-native-runner-cpp-preview",
+  "displayName": "Jade Native Runner - Working Database",
+  "description": "Compile and test Jade source using native Jade tools in an isolated working database, without the Jade IDE.",
+  "version": "0.11.0",
+  "publisher": "jade-local-tools",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Debuggers",
+    "Programming Languages"
+  ],
+  "main": "./src/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
+  "activationEvents": [
+    "workspaceContains:**/*.cls",
+    "onLanguage:jade-nz",
+    "onDebug:jade-native-experimental"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jadeNative",
+          "title": "Jade",
+          "icon": "media/jade.svg"
+        }
+      ]
+    },
+    "views": {
+      "jadeNative": [
+        {
+          "id": "jadeNative.classes",
+          "name": "Object Explorer"
+        },
+        {
+          "id": "jadeNative.objects",
+          "name": "Database Objects"
+        },
+        {
+          "id": "jadeNative.tools",
+          "name": "Jade Tools"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "jadeNative.browseSourceClasses",
+        "title": "Jade: Browse Workspace Classes",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jadeNative.browseDatabaseClasses",
+        "title": "Jade: Browse Database Classes",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jadeNative.findObjectClass",
+        "title": "Jade: Quick Find Database Class"
+      },
+      {
+        "command": "jadeNative.filterSourceClasses",
+        "title": "Jade: Filter Classes in Schema",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "jadeNative.disconnectTestRunner",
+        "title": "Jade: Disconnect Build and Test Runtime",
+        "icon": "$(debug-disconnect)",
+        "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.showCallHierarchy",
+        "title": "Jade: Show Call Hierarchy",
+        "icon": "$(call-incoming)"
+      },
+      {
+        "command": "jadeNative.debugApplication",
+        "title": "Jade: Debug Application",
+        "icon": "$(debug-start)",
+        "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.showReferences",
+        "title": "Jade: Find References",
+        "icon": "$(references)"
+      },
+      {
+        "command": "jadeNative.copyObjectOid",
+        "title": "Jade: Copy Object ID",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "jadeNative.openObjectClassSource",
+        "title": "Jade: Open Class Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jadeNative.findSourceClass",
+        "title": "Jade: Find Class in Object Explorer",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jadeNative.refreshClassView",
+        "title": "Jade: Refresh Object Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "jadeNative.previewClassMember",
+        "title": "Preview Member",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "jadeNative.showClassMember",
+        "title": "Open Original Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jadeNative.openOriginalSource",
+        "title": "Jade: Open Original Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jadeNative.selectInspectionDatabase",
+        "title": "Jade: Select Inspection Database",
+        "icon": "$(database)"
+      },
+      {
+        "command": "jadeNative.connectObjects",
+        "title": "Jade: Connect Database Objects",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "jadeNative.disconnectObjects",
+        "title": "Jade: Disconnect Database Objects",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "jadeNative.refreshObjects",
+        "title": "Jade: Refresh Database Objects",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "jadeNative.inspectObject",
+        "title": "Jade: Inspect Object by OID",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jadeNative.cancelObjectInspection",
+        "title": "Jade: Cancel Object Inspection",
+        "icon": "$(close)"
+      },
+      {
+        "command": "jadeNative.toggleSystemObjects",
+        "title": "Jade: Toggle System Schemas"
+      },
+      {
+        "command": "jadeNative.toggleObjectSubclasses",
+        "title": "Jade: Toggle Subclass Instances"
+      },
+      {
+        "command": "jadeNative.moreObjectInstances",
+        "title": "Jade: Load More Instances"
+      },
+      {
+        "command": "jadeNative.createKeyedCollection",
+        "title": "Jade: Create Keyed Collection",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "jadeNative.publishChangedFiles",
+        "title": "Jade: Publish All Changed Files",
+        "icon": "$(cloud-upload)",
+        "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.extractAllSources",
+        "title": "Jade: Extract All Sources",
+        "icon": "$(cloud-download)",
+        "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.openLastExtraction",
+        "title": "Jade: Show Source Folder"
+      },
+      {
+        "command": "jadeNative.changeExtractionFolder",
+        "title": "Jade: Change Extraction Folder"
+      },
+      {
+        "command": "jadeNative.discover",
+        "title": "Jade: Detect Runtime Settings"
+      },
+      {
+        "command": "jadeNative.checkFile",
+        "title": "Jade: Check Current Method"
+      },
+      {
+        "command": "jadeNative.publishClass",
+        "title": "Jade: Publish Current Class"
+      },
+      {
+        "command": "jadeNative.compileClass",
+        "title": "Jade: Compile Current Class"
+      },
+      {
+        "command": "jadeNative.runLocalTests",
+        "title": "Jade: Run Local Tests"
+      },
+      {
+        "command": "jadeNative.refreshTypeCache",
+        "title": "Jade: Refresh Type Cache"
+      },
+      {
+        "command": "jadeNative.showWorkingDatabase",
+        "title": "Jade: Show Working Database"
+      },
+      {
+        "command": "jadeNative.recreateWorkingDatabase",
+        "title": "Jade: Recreate Working Database"
+      },
+      {
+        "command": "jadeNative.refreshTests",
+        "title": "Jade: Refresh Tests"
+      },
+      {
+        "command": "jadeNative.createSchema",
+        "title": "Jade: Create Schema"
+      },
+      {
+        "command": "jadeNative.publishWorkspace",
+        "title": "Jade: Publish Workspace Schemas and Resources",
+        "icon": "$(cloud-upload)",
+        "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.verifyPulledTests",
+        "title": "Jade: Verify Pulled Tests"
+      },
+      {
+        "command": "jadeNative.addClassRename",
+        "title": "Jade: Add Class Rename Migration"
+      },
+      {
+        "command": "jadeNative.debugMethod",
+        "title": "Jade: Debug Current Method (Experimental)",
+        "icon": "$(debug-alt)",
+        "enablement": "!jadeNative.publishing"
+      }
+    ],
+    "languages": [
+      {
+        "id": "jade-nz",
+        "aliases": [
+          "Jade (NZ)"
+        ],
+        "extensions": [
+          ".cls",
+          ".scm",
+          ".jade",
+          ".sec",
+          ".jcf"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "jade-nz",
+        "scopeName": "source.jade-nz",
+        "path": "./syntaxes/jade.tmLanguage.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jadeNative.runLocalTests",
+        "key": "ctrl+f5",
+        "when": "editorTextFocus && resourceExtname == .cls && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.compileClass",
+        "key": "f5",
+        "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.publishClass",
+        "key": "shift+f5",
+        "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "jadeNative.copyObjectOid",
+          "when": "view == jadeNative.objects && viewItem == jadeObjectInstance",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.openObjectClassSource",
+          "when": "view == jadeNative.objects && (viewItem == jadeObjectInstance || viewItem == jadeObjectClass)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.showCallHierarchy",
+          "when": "view == jadeNative.classes && viewItem == jadeSourceMethod",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jadeNative.showReferences",
+          "when": "view == jadeNative.classes && (viewItem == jadeSourceMember || viewItem == jadeSourceMethod)",
+          "group": "navigation@4"
+        },
+        {
+          "command": "jadeNative.showClassMember",
+          "when": "view == jadeNative.classes && (viewItem == jadeSourceMember || viewItem == jadeSourceMethod)",
+          "group": "inline@1"
+        },
+        {
+          "command": "jadeNative.previewClassMember",
+          "when": "view == jadeNative.classes && (viewItem == jadeSourceMember || viewItem == jadeSourceMethod)",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/title": [],
+      "view/title": [
+        {
+          "command": "jadeNative.browseDatabaseClasses",
+          "when": "view == jadeNative.objects && jadeNative.inspecting",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.selectInspectionDatabase",
+          "when": "view == jadeNative.objects",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.connectObjects",
+          "when": "view == jadeNative.objects && !jadeNative.inspecting",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.disconnectObjects",
+          "when": "view == jadeNative.objects && jadeNative.inspecting",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.refreshObjects",
+          "when": "view == jadeNative.objects",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jadeNative.inspectObject",
+          "when": "view == jadeNative.objects",
+          "group": "navigation@4"
+        },
+        {
+          "command": "jadeNative.toggleSystemObjects",
+          "when": "view == jadeNative.objects",
+          "group": "objects@1"
+        },
+        {
+          "command": "jadeNative.toggleObjectSubclasses",
+          "when": "view == jadeNative.objects",
+          "group": "objects@2"
+        },
+        {
+          "command": "jadeNative.cancelObjectInspection",
+          "when": "view == jadeNative.objects && jadeNative.inspecting",
+          "group": "objects@3"
+        },
+        {
+          "command": "jadeNative.browseSourceClasses",
+          "when": "view == jadeNative.classes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.refreshClassView",
+          "when": "view == jadeNative.classes",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.extractAllSources",
+          "when": "view == jadeNative.tools",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.publishChangedFiles",
+          "when": "view == jadeNative.tools",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "jadeNative.runLocalTests",
+          "when": "resourceExtname == .cls",
+          "group": "navigation"
+        },
+        {
+          "command": "jadeNative.compileClass",
+          "when": "resourceExtname == .cls",
+          "group": "navigation"
+        },
+        {
+          "command": "jadeNative.publishClass",
+          "when": "resourceExtname == .cls",
+          "group": "navigation"
+        },
+        {
+          "command": "jadeNative.debugMethod",
+          "when": "resourceExtname == .cls",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Jade Native Runner",
+      "properties": {
+        "jadeNative.extractionDirectory": {
+          "type": "string",
+          "default": ".",
+          "scope": "resource",
+          "description": "Working source folder relative to the current workspace. Both src and /src mean <workspace>/src. Sources are written directly here, without timestamped directories. Use . for the workspace root. You can also change it using Jade: Change Extraction Folder."
+        },
+        "jadeNative.testTimeoutSeconds": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 1,
+          "maximum": 86400,
+          "scope": "resource",
+          "description": "Timeout in seconds for each native working-database utility process, including test execution."
+        },
+        "jadeNative.installPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Jade installation directory containing bin/jom.dll."
+        },
+        "jadeNative.databasePath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Jade database directory containing _control.dat."
+        },
+        "jadeNative.iniPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Jade INI file; defaults to jade.ini in the database directory."
+        },
+        "jadeNative.cacheDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "External C++ system cache and source-index storage. Empty uses extension global storage. A workspace location is rejected."
+        },
+        "jadeNative.schema": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Schema providing the classes/types used by method files."
+        },
+        "jadeNative.server": {
+          "type": "string",
+          "enum": [
+            "singleUser",
+            "multiUser"
+          ],
+          "default": "singleUser",
+          "scope": "resource"
+        },
+        "jadeNative.application": {
+          "type": "string",
+          "default": "RootSchemaApp",
+          "scope": "resource"
+        },
+        "jadeNative.cppHelperPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Optional native helper executable. Empty uses the packaged C++ helper."
+        },
+        "jadeNative.systemSnapshotPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Existing Jade metadata snapshot matching the installed DLL build. Used once to seed the external RootSchema system cache; application definitions come from workspace source."
+        },
+        "jadeNative.workingDatabaseDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "External directory dedicated to this workspace working database. Must not overlap the target database or source workspace. Empty uses extension global storage, with a separate base per workspace and target."
+        },
+        "jadeNative.testDependencyScope": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "dependencies",
+            "workspace"
+          ],
+          "default": "auto",
+          "scope": "resource",
+          "description": "Auto builds the complete native workspace when dynamic type lookup is detected; otherwise selects test dependencies. Workspace always builds all schemas/resources. Dependencies forces a static subset."
+        }
+      }
+    },
+    "debuggers": [
+      {
+        "type": "jade-native-experimental",
+        "label": "Jade Native (Experimental)",
+        "languages": [
+          "jade-nz"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "launchMode": {
+                "type": "string",
+                "enum": [
+                  "method",
+                  "application"
+                ],
+                "default": "method",
+                "description": "Debug a selected method/test, or start a stored Jade application through its native lifecycle."
+              },
+              "application": {
+                "type": "string",
+                "description": "Stored native application name used when launchMode is application."
+              },
+              "applicationParameter": {
+                "type": "string",
+                "description": "Optional String startup parameter passed to Jade's native application initializer."
+              },
+              "schema": {
+                "type": "string",
+                "description": "Application schema. Empty infers the schema from the selected CLS."
+              },
+              "program": {
+                "type": "string",
+                "description": "CLS containing a parameterless instance method.",
+                "default": "${file}"
+              },
+              "method": {
+                "type": "string",
+                "description": "Method to execute directly on a new transient instance. Empty prompts for a method.",
+                "default": ""
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "jade-native-experimental",
+            "request": "launch",
+            "name": "Jade: Debug Current Method (Experimental)",
+            "program": "${file}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Jade: Debug Application",
+            "body": {
+              "type": "jade-native-experimental",
+              "request": "launch",
+              "name": "Jade: Debug Application",
+              "program": "${file}",
+              "launchMode": "application",
+              "application": "${1:MyApplication}",
+              "applicationParameter": ""
+            }
+          },
+          {
+            "label": "Jade: Debug Current Method (Experimental)",
+            "body": {
+              "type": "jade-native-experimental",
+              "request": "launch",
+              "name": "Jade: Debug Current Method (Experimental)",
+              "program": "${file}"
+            }
+          }
+        ]
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "jade-nz"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test ../test/*.test.js",
+    "package": "node ../scripts/package.cjs"
+  }
+}

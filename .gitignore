@@ -1,0 +1,34 @@
+node_modules/
+dist/
+**/build/
+evidence/
+*.log
+*.tmp
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+.DS_Store
+planning/
+extension/docs/
+extension/vendor/jade-tools-cli/
+debugger/REMAINING-NATIVE-SUPPORT.md
+inspector/SECURITY.md
+debug-sample-workspace/
+**/*PLAN*.md
+**/*ROADMAP*.md
+**/*RESEARCH*.md
+
+# Native production source belongs to the independently versioned CLI package.
+/native-helper/
+/debugger/debug_host.cpp
+/inspector/inspector.cpp
+/test-runner/test_host.cpp
+/third_party/
+/scripts/build-native.cjs
+
+# Compatibility test copies are reconstructed from the pinned CLI dependency.
+/extension/native/*.exe
+/extension/media/architecture.png
+/extension/media/architecture.svg

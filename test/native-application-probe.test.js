@@ -1,0 +1,5 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process'),path=require('node:path'),fs=require('node:fs');
+test('public JOM application initializer receives a native string without the IDE',{skip:process.env.JADE_NATIVE_APP_PROBE!=='1',timeout:30000},()=>{
+ const config=path.resolve(__dirname,'../inspector/build/policy-config.json');const output=execFileSync(path.resolve(__dirname,'../inspector/build/application-launch-probe.exe'),[config,'from-native-launch'],{windowsHide:true,encoding:'utf8',timeout:20000});const result=JSON.parse(output);assert.equal(result.received,'from-native-launch');assert.equal(result.applicationType,'S');assert.equal(result.nativeInitialize,true);assert.equal(result.nativeFinalize,true);assert.equal(result.finalized,'from-native-launch:finalized');fs.writeFileSync(path.resolve(__dirname,'../evidence/native-application-initialize.json'),JSON.stringify({...result,databaseConfig:config},null,2));
+});

@@ -1,0 +1,22 @@
+{
+  "name": "Jade (NZ)",
+  "scopeName": "source.jade-nz",
+  "patterns": [
+    { "name": "comment.line.double-slash.jade", "begin": "//", "end": "$" },
+    { "name": "comment.block.jade", "begin": "/\\*", "end": "\\*/" },
+    { "name": "comment.block.documentation.jade", "begin": "`", "end": "`" },
+    { "name": "string.quoted.double.jade", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.jade", "match": "\"\"|\\\\." }] },
+    { "name": "string.quoted.single.jade", "begin": "'", "end": "'", "patterns": [{ "name": "constant.character.escape.jade", "match": "''|\\\\." }] },
+    { "match": "\\b([A-Za-z_]\\w*)\\s+(subclassOf)\\s+([A-Za-z_]\\w*)", "captures": { "1": { "name": "entity.name.type.class.jade" }, "2": { "name": "keyword.declaration.jade" }, "3": { "name": "entity.other.inherited-class.jade" } } },
+    { "name": "keyword.control.jade", "match": "(?i)\\b(begin|end|if|then|else|elseif|endif|while|do|endwhile|foreach|endforeach|for|to|step|endfor|in|reversed|repeat|until|return|continue|break|epilog|rescue|on|raise|retry|inheritMethod|create|delete|beginTransaction|commitTransaction|abortTransaction|beginTransientTransaction|commitTransientTransaction|abortTransientTransaction)\\b" },
+    { "name": "keyword.declaration.jade", "match": "(?i)\\b(schemaDefinition|typeHeaders|typeDefinitions|typeSources|attributeDefinitions|jadeMethodDefinitions|jadeMethodSources|methodDefinitions|constantDefinitions|referenceDefinitions|inverseDefinitions|databaseDefinitions|databaseFileDefinitions|classMapDefinitions|completeDefinition|partialDefinition|subschemaOf|vars|constants)\\b" },
+    { "name": "storage.modifier.jade", "match": "(?i)\\b(updating|protected|public|private|abstract|final|transient|persistent|sharedTransientAllowed|transientAllowed|persistentAllowed|subclassTransientAllowed|subclassSharedTransientAllowed|subclassPersistentAllowed|typeMethod|input|output|io|condition|webService|serverExecution|clientExecution)\\b" },
+    { "name": "support.type.jade", "match": "\\b(String|Integer|Integer64|Boolean|Object|Any|Class|Date|Time|TimeStamp|Timestamp|Decimal|Real|Binary|Byte|Character|MemoryAddress|StringArray|IntegerArray|ObjectArray|Exception|Process|Schema)\\b" },
+    { "name": "variable.language.jade", "match": "\\b(self|global|app|process|currentSchema|inheritMethod)\\b" },
+    { "name": "constant.language.jade", "match": "(?i)\\b(true|false|null)\\b" },
+    { "name": "constant.numeric.jade", "match": "\\b(?:#[0-9A-Fa-f]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b" },
+    { "name": "entity.name.function.jade", "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()" },
+    { "match": "(?m)^\\s*([A-Za-z_]\\w*)\\s*:", "captures": { "1": { "name": "variable.other.property.jade" } } },
+    { "name": "keyword.operator.jade", "match": ":=|<>|<=|>=|[+*/=&<>-]|\\b(?i:and|or|not|mod|div)\\b" }
+  ]
+}

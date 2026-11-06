@@ -1,0 +1,13 @@
+test/**
+scripts/**
+**/__pycache__/**
+**/*.pyc
+**/*.vsix
+.vscode/**
+python/**
+
+dist/**
+docs/**
+native/*.exe
+media/architecture.png
+media/architecture.svg
