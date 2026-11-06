@@ -81,7 +81,7 @@ jobs:
 
           The official release URL, download/expanded-size limits, archive paths, version and native runtime hashes were verified. The normal PR workflow performs the full test, package and release validation once. GitHub may require the owner to approve the initial workflow run for a bot-created PR. This updates the native dependency for review; it does not publish a consumer release or modify a Jade database.
           "@ | Set-Content -LiteralPath $bodyFile -Encoding utf8
-          gh pr create --base "$env:BASE_BRANCH" --head "$env:CLI_BRANCH" --title "Update Jade CLI to $env:CLI_TAG" --body-file "$bodyFile" --reviewer darrenhull
+          gh pr create --base "$env:BASE_BRANCH" --head "$env:CLI_BRANCH" --title "Update Jade CLI to $env:CLI_TAG" --body-file "$bodyFile" --draft
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $number = gh pr view "$env:CLI_BRANCH" --json number --jq .number
           if ($LASTEXITCODE -ne 0 -or $number -notmatch '^[1-9][0-9]*$') { throw 'Could not verify the dependency pull request number.' }
@@ -89,6 +89,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not verify the dependency pull request identity.' }
           $verified = $verifiedJson | ConvertFrom-Json
           if ($verified.user.login -ne 'github-actions[bot]' -or $verified.user.type -ne 'Bot' -or $verified.head.ref -ne $env:CLI_BRANCH -or $verified.head.repo.full_name -ne $env:GH_REPO -or $verified.base.ref -ne $env:BASE_BRANCH -or $verified.head.sha -notmatch '^[a-fA-F0-9]{40}$') { throw 'Unexpected dependency pull request identity.' }
-          if (@($verified.requested_reviewers | Where-Object login -eq 'darrenhull').Count -ne 1) { throw 'The dependency pull request must request human owner review.' }
-          gh pr merge "$number" --repo "$env:GH_REPO" --auto --squash --match-head-commit "$($verified.head.sha)"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not queue protected squash auto-merge.' }
+          if (-not $verified.draft) { throw 'The dependency pull request must remain Draft until validation and review fixes are complete.' }
+          'Draft dependency PR created; no owner review or auto-merge requested.' >> $env:GITHUB_STEP_SUMMARY
