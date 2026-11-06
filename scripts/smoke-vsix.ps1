@@ -1,5 +1,5 @@
 #requires -Version 7.0
-param([string]$Vsix)
+param([string]$Vsix,[string]$PinFile,[string]$ExpectedDistribution)
 $ErrorActionPreference='Stop'
 if(!$Vsix){$Vsix=(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '../dist') -Filter '*.vsix'|Sort-Object LastWriteTime -Descending|Select-Object -First 1).FullName}
 if(!$Vsix -or !(Test-Path -LiteralPath $Vsix -PathType Leaf)){throw 'A packaged VSIX is required.'}
@@ -9,6 +9,7 @@ try{
  [IO.Compression.ZipFile]::ExtractToDirectory([IO.Path]::GetFullPath($Vsix),$temporary)
  $extension=Join-Path $temporary 'extension';$cli=Join-Path $extension 'vendor/jade-tools-cli/jade-cli.exe'
  if(!(Test-Path -LiteralPath $cli -PathType Leaf)){throw 'The VSIX has no bundled native Jade CLI.'}
+ & (Join-Path $PSScriptRoot 'VerifyNativeDistribution.ps1') -Directory (Join-Path $extension 'vendor/jade-tools-cli') -PinFile $PinFile -ExpectedDistribution $ExpectedDistribution
  $workspace=Join-Path $temporary 'workspace';[IO.Directory]::CreateDirectory($workspace)|Out-Null
  [IO.File]::WriteAllText((Join-Path $workspace 'jade.json'),(@{workspaceRoots=@('.');schema='PortableSchema';databasePath=(Join-Path $temporary 'database-must-not-be-opened')}|ConvertTo-Json))
  [IO.File]::WriteAllText((Join-Path $workspace 'PortableTests.cls'),@'

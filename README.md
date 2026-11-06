@@ -22,7 +22,7 @@ npm test
 npm run package
 ```
 
-The default test command excludes native database opt-ins. Packaged VSIX output is written to `dist`, which is not committed. Actual-host and connected-native controls require explicit configuration and private fixture databases; see the test scripts and the release verification notes.
+The default test command excludes native database opt-ins. Packaged VSIX output is written to `dist`, which is not committed. The extracted VSIX smoke verifies the official native manifest receipt and all runtime hashes; staging preserves the manifest bytes exactly. For an explicit unreleased CLI candidate, pass `-ExpectedDistribution <candidate-directory>` to `scripts/smoke-vsix.ps1`; this verifies candidate bytes without claiming an official release pin. Actual-host and connected-native controls require explicit configuration and private fixture databases; see the test scripts and the release verification notes.
 
 Native development belongs to the independent Jade CLI repository. The pinned Windows x64 distribution lives in `packages/jade-cli-win-x64/`. Packaging verifies its native-runtime identity and every manifest checksum before copying the executable and declared helpers into the VSIX. It excludes the old JavaScript SDK and any undeclared runtime files. For explicit candidate validation, set `JADE_CLI_DISTRIBUTION` to a native distribution folder; normal independent builds use the committed package. There is no sibling-checkout search or JavaScript CLI fallback. Vendor Jade DLLs, vendor SDK headers and databases are not included.
 

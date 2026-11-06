@@ -1,7 +1,8 @@
 # 0.13.2 — Reviewed release updates
 
 - Open automated changes and CLI dependency updates as Draft; request owner review only after validation is complete.
-- Keep the verified native CLI 0.3.1 bundle from the preceding update.
+- Keep the verified native CLI 0.3.1 bundle from the preceding update and preserve its exact manifest bytes through packaging.
+- Verify the extracted VSIX against the official CLI manifest receipt and runtime hashes before release.
 - Refresh automatic CLI release polling and document GitHub's best-effort scheduling and explicit recovery triggers.
 
 # 0.13.0 — Jade method formatting and inline diagnostics companion
