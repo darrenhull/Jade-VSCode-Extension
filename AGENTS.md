@@ -2,7 +2,7 @@
 
 ## Architecture and responsibilities
 
-This repository owns editor commands, language/UI integration, Testing, views, DAP presentation and its pinned native CLI distribution. It adapts the native C++ CLI rather than implementing another compiler, broker or object manager. JavaScript belongs in VS Code presentation and thin protocol adapters; do not add a Node CLI/broker fallback.
+This repository owns editor commands, language/UI integration, Testing, views, DAP presentation and its pinned native CLI distribution. Its CI, release publisher and five-minute CLI release polling are local to this repository; do not import another consumer repository workflow or script. It adapts the native C++ CLI rather than implementing another compiler, broker or object manager. JavaScript belongs in VS Code presentation and thin protocol adapters; do not add a Node CLI/broker fallback.
 
 - Review activation, registration, settings, disposal and reload behavior. Use the bundled CLI and report startup failures; do not silently use legacy backends.
 - Preserve individual tests, outcomes, source locations and compiler Problems across cancellation and repeated runs.

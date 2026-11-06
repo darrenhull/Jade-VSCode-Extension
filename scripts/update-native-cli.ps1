@@ -69,6 +69,7 @@ function Test-NativeDistribution([string]$Directory){
  Assert-NativeContained $Directory $manifestFile
  $manifest=Get-Content -LiteralPath $manifestFile -Raw|ConvertFrom-Json -AsHashtable
  if($manifest.formatVersion -ne 2 -or $manifest.runtime -ne 'native-cpp' -or $manifest.platform -ne 'win32' -or $manifest.arch -ne 'x64' -or $manifest.executable -ne 'jade-cli.exe' -or $manifest.packageVersion -isnot [string] -or $manifest.packageVersion -notmatch '^\d+\.\d+\.\d+$' -or $manifest.runtimeFiles -isnot [Collections.IDictionary]){throw 'Invalid native C++ CLI distribution identity.'}
+ foreach($required in @('jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json')){if(!$manifest.runtimeFiles.Contains('native/'+$required)){throw ('Required native runtime asset is missing: '+$required)}}
  $expected=@{};foreach($entry in $manifest.runtimeFiles.GetEnumerator()){$expected[$entry.Key]=$entry.Value};$expected['jade-cli.exe']=$manifest.executableSha256
  foreach($relative in $expected.Keys){
   Assert-NativePath $relative;$file=Join-Path $Directory $relative;Assert-NativeContained $Directory $file
@@ -118,7 +119,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
  if(Test-Path -LiteralPath $pin){
   $current=Get-Content -LiteralPath $pin -Raw|ConvertFrom-Json
   if($current.version -match '^\d+\.\d+\.\d+$' -and [version]$Version -lt [version]$current.version){throw 'Native CLI downgrade is forbidden.'}
-  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.tag -eq ('v'+$Version) -and $current.sha256 -eq $ExpectedHash -and $current.distributionSha256 -match '^[a-fA-F0-9]{64}$' -and $current.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash){return @{updated=$false;version=$Version;sha=$ExpectedHash}}
+  if($old -and $old.packageVersion -eq $Version -and $current.version -eq $Version -and $current.tag -eq ('v'+$Version) -and $current.sha256 -eq $ExpectedHash -and $current.distributionSha256 -match '^[a-fA-F0-9]{64}$' -and $current.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash){return @{updated=$false;dependencyChanged=$false;version=$Version;sha=$ExpectedHash}}
  }
  $suffix=[guid]::NewGuid().ToString('N');$stage=Join-Path $packages ('.jade-native-'+$suffix+'.stage');$backup=Join-Path $packages ('.jade-native-'+$suffix+'.backup');$pinTemp=Join-Path $packages ('.jade-pin-'+$suffix+'.json');$installed=$false;$committed=$false
  try{
@@ -127,7 +128,7 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
   if(Test-Path -LiteralPath $destination){Move-Item -LiteralPath $destination -Destination $backup}
   Move-Item -LiteralPath $stage -Destination $destination;$installed=$true
   [IO.File]::WriteAllText($pinTemp,(@{version=$Version;sha256=$ExpectedHash;tag='v'+$Version;distributionSha256=(Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash.ToLowerInvariant()}|ConvertTo-Json));Move-Item -LiteralPath $pinTemp -Destination $pin -Force;$committed=$true
-  return @{updated=$true;version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
+  return @{updated=$true;dependencyChanged=(!$current -or $current.version -ne $Version -or $current.sha256 -ne $ExpectedHash);version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
  }finally{
   if(!$committed){
    if($installed -and (Test-Path -LiteralPath $destination)){Assert-NativeContained $packages $destination;Remove-Item -LiteralPath $destination -Recurse -Force}
@@ -155,15 +156,27 @@ function Update-NativeRelease([string]$Root,[string]$Tag){
  $metadata=Get-NativeRelease $Tag;$temporary=Join-Path ([IO.Path]::GetTempPath()) ('jade-native-download-'+[guid]::NewGuid().ToString('N'));[IO.Directory]::CreateDirectory($temporary)|Out-Null
  try{
   $checks=Join-Path $temporary 'SHA256SUMS';Save-NativeDownload -Url $metadata.checks.browser_download_url -File $checks -MaxBytes 65536
-  $matches=@([regex]::Matches([IO.File]::ReadAllText($checks),'(?m)^([a-fA-F0-9]{64})\s+\*?jade-cli-win-x64\.zip\r?$'))
-  if($matches.Count -ne 1){throw 'Native release ZIP checksum is missing or duplicated.'}
+  $checksumMatches=@([regex]::Matches([IO.File]::ReadAllText($checks),'(?m)^([a-fA-F0-9]{64})\s+\*?jade-cli-win-x64\.zip\r?$'))
+  if($checksumMatches.Count -ne 1){throw 'Native release ZIP checksum is missing or duplicated.'}
+  $version=$metadata.release.tag_name.Substring(1);$expectedHash=$checksumMatches[0].Groups[1].Value
+  $destination=Join-Path $Root 'packages/jade-cli-win-x64';$pinPath=Join-Path $Root 'packages/jade-cli-pin.json'
+  if(Test-Path -LiteralPath $pinPath){
+   Assert-NativeContained ([IO.Path]::GetFullPath($Root)) ([IO.Path]::GetFullPath($pinPath))
+   $pin=Get-Content -LiteralPath $pinPath -Raw|ConvertFrom-Json
+   if($pin.version -match '^\d+\.\d+\.\d+$' -and [version]$version -lt [version]$pin.version){throw 'Native CLI downgrade is forbidden.'}
+   if($pin.version -eq $version -and $pin.tag -eq $metadata.release.tag_name -and $pin.sha256 -eq $expectedHash -and $pin.distributionSha256 -match '^[a-fA-F0-9]{64}$'){
+    $valid=$false
+    try{$local=Test-NativeDistribution $destination;$valid=$local.packageVersion -eq $version -and $pin.distributionSha256 -eq (Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash}catch [Security.SecurityException]{throw}catch{$valid=$false}
+    if($valid){return @{updated=$false;dependencyChanged=$false;version=$version;sha=$expectedHash;tag=$metadata.release.tag_name}}
+   }
+  }
   $archive=Join-Path $temporary 'native.zip';Save-NativeDownload -Url $metadata.asset.browser_download_url -File $archive -MaxBytes 268435456
-  return Install-NativeRelease -Root $Root -Archive $archive -ExpectedHash $matches[0].Groups[1].Value -Version $metadata.release.tag_name.Substring(1)
+  return Install-NativeRelease -Root $Root -Archive $archive -ExpectedHash $checksumMatches[0].Groups[1].Value -Version $metadata.release.tag_name.Substring(1)
  }finally{Remove-Item -LiteralPath $temporary -Recurse -Force}
 }
 if($MyInvocation.InvocationName -ne '.'){
  try{
   if($VerifyOnly){Test-NativeDistribution (Join-Path $Root 'packages/jade-cli-win-x64')|Out-Null;Write-Output 'Native CLI distribution integrity verified.'}
-  else{$result=Update-NativeRelease -Root $Root -Tag $Tag;if($env:GITHUB_OUTPUT){foreach($key in @('updated','version','sha','tag','branch')){if($result.ContainsKey($key)){Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($key+'='+$result[$key].ToString().ToLowerInvariant())}}};$result|ConvertTo-Json -Compress}
+  else{$result=Update-NativeRelease -Root $Root -Tag $Tag;if($env:GITHUB_OUTPUT){foreach($key in @('updated','dependencyChanged','version','sha','tag','branch')){if($result.ContainsKey($key)){Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($key+'='+$result[$key].ToString().ToLowerInvariant())}}};$result|ConvertTo-Json -Compress}
  }catch{Write-Error $_;exit 1}
 }

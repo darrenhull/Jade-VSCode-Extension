@@ -7,6 +7,8 @@ try{
  $payload=Join-Path $root 'payload';[IO.Directory]::CreateDirectory($payload)|Out-Null
  [IO.File]::WriteAllText((Join-Path $payload 'jade-cli.exe'),'verified native payload')
  $manifest=@{formatVersion=2;runtime='native-cpp';platform='win32';arch='x64';packageVersion='0.2.0';executable='jade-cli.exe';executableSha256=(Get-FileHash (Join-Path $payload 'jade-cli.exe')).Hash.ToLowerInvariant();runtimeFiles=@{}}
+ [IO.Directory]::CreateDirectory((Join-Path $payload 'native'))|Out-Null
+ foreach($helper in @('jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json')){$relative='native/'+$helper;$file=Join-Path $payload $relative;[IO.File]::WriteAllText($file,'verified '+$helper);$manifest.runtimeFiles[$relative]=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()}
  [IO.File]::WriteAllText((Join-Path $payload 'distribution.json'),($manifest|ConvertTo-Json -Depth 5))
  $archive=Join-Path $root 'native.zip';Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $archive;$hash=(Get-FileHash $archive).Hash
  foreach($scenario in @('missing','tampered','missing-receipt')){
