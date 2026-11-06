@@ -374,6 +374,7 @@ function registerSidebar(vscode, context, options) {
           ? options.settings(folder).extractionDirectory || "."
           : undefined;
         return [
+          item("Scratch Pad", "jadeNative.newWorkspace", "notebook", "Run native Jade Workspace code"),
           item(
             "Disconnect Build/Test Runtime",
             "jadeNative.disconnectTestRunner",

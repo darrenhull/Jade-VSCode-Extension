@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.13.3",
+  "version": "0.14.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -27,7 +27,8 @@
   "activationEvents": [
     "workspaceContains:**/*.cls",
     "onLanguage:jade-nz",
-    "onDebug:jade-native-experimental"
+    "onDebug:jade-native-experimental",
+    "onNotebook:jade-workspace"
   ],
   "contributes": {
     "viewsContainers": {
@@ -258,6 +259,35 @@
         "title": "Jade: Debug Current Method (Experimental)",
         "icon": "$(debug-alt)",
         "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.newWorkspace",
+        "icon": "$(notebook)",
+        "enablement": "!jadeNative.publishing",
+        "title": "Jade: New Scratch Pad"
+      },
+      {
+        "command": "jadeNative.runWorkspace",
+        "icon": "$(play)",
+        "enablement": "!jadeNative.publishing",
+        "title": "Jade: Run Scratch Pad (Working)"
+      },
+      {
+        "command": "jadeNative.runWorkspaceSelection",
+        "icon": "$(play)",
+        "enablement": "!jadeNative.publishing",
+        "title": "Jade: Run Selection (Working)"
+      },
+      {
+        "command": "jadeNative.selectWorkspaceSchema",
+        "icon": "$(database)",
+        "enablement": "!jadeNative.publishing",
+        "title": "Jade: Select Scratch Pad Schema"
+      },
+      {
+        "command": "jadeNative.compareWorkspaceRuns",
+        "icon": "$(diff)",
+        "title": "Jade: Compare Previous Scratch Pad Run"
       }
     ],
     "languages": [
@@ -298,6 +328,11 @@
         "command": "jadeNative.publishClass",
         "key": "shift+f5",
         "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.scratchpadCompileInfo",
+        "key": "f5",
+        "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && resourceExtname == .jade && editorLangId == jade-nz))"
       }
     ],
     "menus": {
@@ -333,7 +368,18 @@
           "group": "navigation@2"
         }
       ],
-      "editor/title": [],
+      "editor/title": [
+        {
+          "when": "resourceExtname == .jade && editorLangId == jade-nz",
+          "command": "jadeNative.runWorkspace",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceExtname == .jade && editorLangId == jade-nz",
+          "command": "jadeNative.compareWorkspaceRuns",
+          "group": "navigation@2"
+        }
+      ],
       "view/title": [
         {
           "command": "jadeNative.browseDatabaseClasses",
@@ -421,6 +467,18 @@
           "command": "jadeNative.debugMethod",
           "when": "resourceExtname == .cls",
           "group": "navigation"
+        },
+        {
+          "command": "jadeNative.runWorkspaceSelection",
+          "when": "editorLangId == jade-nz && resourceExtname == .jade && editorHasSelection",
+          "group": "navigation@1"
+        }
+      ],
+      "notebook/toolbar": [
+        {
+          "when": "notebookType == jade-workspace",
+          "command": "jadeNative.selectWorkspaceSchema",
+          "group": "navigation@1"
         }
       ]
     },
@@ -600,10 +658,24 @@
       {
         "language": "jade-nz"
       }
+    ],
+    "notebooks": [
+      {
+        "type": "jade-workspace",
+        "selector": [
+          {
+            "filenamePattern": "*.jadeworkspace"
+          }
+        ],
+        "displayName": "Scratch Pad"
+      }
     ]
   },
   "scripts": {
     "test": "node --test ../test/*.test.js",
     "package": "node ../scripts/package.cjs"
+  },
+  "jadeNative": {
+    "minimumCliVersion": "0.4.0"
   }
 }

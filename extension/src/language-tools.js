@@ -5,9 +5,10 @@ const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
 const {registerFormatting}=require('./jade-formatter');
+const {parseSource}=require('./source_symbols');
 
 function registerLanguageTools(vscode,context){
-  const selector=[{language:'jade-nz',scheme:'file',pattern:'**/*.{cls,jade}'},{language:'jade-nz',scheme:'untitled'}];
+  const selector=[{language:'jade-nz',scheme:'file',pattern:'**/*.{cls,jade}'},{language:'jade-nz',scheme:'untitled'},{language:'jade-nz',scheme:'vscode-notebook-cell'}];
   registerFormatting(vscode,context,selector);
   const output=vscode.window.createOutputChannel('Jade Language Tools');let lastError,lastCache,lastProject;
   const supported=uri=>uri.scheme==='untitled'||/\.(cls|jade)$/i.test(uri.fsPath||'')||/[/\\]schemaDefinitions\.sec$/i.test(uri.fsPath||'');
@@ -23,7 +24,7 @@ function registerLanguageTools(vscode,context){
     for(const open of vscode.workspace.textDocuments)if(accepted(open.uri)&&(open.uri.scheme==='untitled'||vscode.workspace.getWorkspaceFolder(open.uri)||open===document))index.document(open);
     if(document&&accepted(document.uri))index.document(document);
     await index.ready();await index.flush();if(token?.isCancellationRequested)return false;
-    const resource=document?.uri||vscode.workspace.workspaceFolders?.[0]?.uri,folder=resource&&vscode.workspace.getWorkspaceFolder(resource),settings=vscode.workspace.getConfiguration('jadeNative',resource);
+    const resource=(document&&workspaceResource(document.uri))||document?.uri||vscode.workspace.workspaceFolders?.[0]?.uri,folder=resource&&vscode.workspace.getWorkspaceFolder(resource),settings=vscode.workspace.getConfiguration('jadeNative',resource);
     const installPath=expanded(settings.get('installPath'),folder)||process.env.JADE_INSTALL;
     const directory=expanded(settings.get('cacheDirectory'),folder);
     const storagePath=directory?path.resolve(folder?.uri.fsPath||process.cwd(),directory):path.join(context.globalStorageUri.fsPath,'native');
@@ -33,7 +34,14 @@ function registerLanguageTools(vscode,context){
     if(index.project!==lastProject||cache!==lastCache){index.project.setSystemCache(cache);lastProject=index.project;lastCache=cache;}
     return true;
   }
-  const model=document=>index.document(document);
+  let workspaceSchema=()=>undefined,workspaceResource=uri=>uri;
+  const model=document=>{
+    if(document.uri.scheme==='vscode-notebook-cell'||/\.jade$/i.test(document.uri.fsPath||'')) {
+      const source=parseSource(document.getText(),document.uri.toString());
+      if(document.uri.scheme==='vscode-notebook-cell'||/^\s*(?:vars|constants|begin)\b/.test(source.code))return {...source,workspace:true,schema:workspaceSchema(document.uri)||vscode.workspace.getConfiguration('jadeNative',document.uri).get('schema')||'RootSchema'};
+    }
+    return index.document(document);
+  };
   const documentation=symbol=>{const text=new vscode.MarkdownString();text.isTrusted=false;text.supportHtml=false;
     if(symbol.owner)text.appendText(`Declared in ${symbol.schema||''}${symbol.schema?'::':''}${symbol.owner}.`);
     if(symbol.documentation)text.appendText('\n\n'+symbol.documentation);return text;
@@ -71,6 +79,6 @@ function registerLanguageTools(vscode,context){
   );
   const watcher=vscode.workspace.createFileSystemWatcher('**/*.{cls,jade,sec}');
   context.subscriptions.push(watcher,watcher.onDidCreate(uri=>{if(accepted(uri))index.schedule(uri.toString());}),watcher.onDidChange(uri=>{if(accepted(uri))index.schedule(uri.toString());}),watcher.onDidDelete(uri=>{if(accepted(uri))index.remove(uri.toString());}));
-  return {index,model,ready};
+  return {index,model,ready,setWorkspaceSchemaResolver:resolver=>{workspaceSchema=resolver;},setWorkspaceResourceResolver:resolver=>{workspaceResource=resolver;}};
 }
 module.exports={registerLanguageTools};

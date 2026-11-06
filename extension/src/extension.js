@@ -192,6 +192,24 @@ function activate(context) {
     inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config),
     setBusy:async value=>{publishing=value;}
   });
+  const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
+    client:nativeTests,
+    configFor:(_document,scope)=>inspectionConfig({uri:scope.resource},scope.folder),
+    schemaChoices:async scope=>{
+      await language.index.ready();await language.index.flush();const schemas=new Map();
+      for(const model of language.index.project.models.values())if(model.schema&&vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(model.uri))?.uri.toString()===scope.folder.uri.toString())schemas.set(model.schema,{name:model.schema,parent:model.parentSchema});
+      return [...schemas.values()].sort((a,b)=>a.name.localeCompare(b.name));
+    },
+    beforeOperation:async()=>{
+      if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');
+      publishing=true;await vscode.commands.executeCommand('setContext','jadeNative.publishing',true);
+      try {await objectExplorer?.releaseForOperation();await nativeTests.release();}
+      catch(error){publishing=false;await vscode.commands.executeCommand('setContext','jadeNative.publishing',false);throw error;}
+    },
+    afterOperation:async()=>{publishing=false;await vscode.commands.executeCommand('setContext','jadeNative.publishing',false);}
+  });
+  language.setWorkspaceSchemaResolver(workspaces.schemaFor);
+  language.setWorkspaceResourceResolver(workspaces.resourceFor);
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
     vscode.commands.registerCommand('jadeNative.refreshTests', async () => {
@@ -403,7 +421,7 @@ function activate(context) {
     vscode.commands.registerCommand('jadeNative.discover', () => detectSettings().catch(error => vscode.window.showErrorMessage(error.message))),
     vscode.commands.registerCommand('jadeNative.checkFile', () => vscode.commands.executeCommand('jadeNative.compileClass'))
   );
-  return {classView,objectExplorer,testing,nativeTests};
+  return {classView,objectExplorer,testing,nativeTests,workspaces};
 }
 
 module.exports = { activate };

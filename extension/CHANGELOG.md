@@ -1,3 +1,12 @@
+# 0.14.0 — Scratch Pad
+
+- Run native Jade Workspace code in Working from a simple Scratch Pad under Tools, with optional notes, schema selection and per-run output.
+- Execute exact unsaved/selected code snapshots; show native diagnostics at original editor positions without publishing a class.
+- Compare previous/current executed source and output through VS Code's diff editor, using bounded in-memory history.
+- Preserve independent local variables per run and explicit persistent Working data semantics; stop Run All on failure or cancellation.
+- Support scratch-code completion/signatures through the existing schema-aware language model, and isolate multi-root connection selection.
+- Require native CLI 0.4.0+ when packaging; retain explicit candidate override verification.
+
 # 0.13.3 — Jade Tools and complete CLS indentation
 
 - Format class and property declarations, collection keys, database mappings, package sections and method source structure using your editor's tabs/spaces settings.
