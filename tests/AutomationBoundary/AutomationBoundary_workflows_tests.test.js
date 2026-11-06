@@ -8,7 +8,8 @@ test('consumer automation belongs to the extension and its own workflows call it
  assert.match(update,/consumer_automation_ref/);
  assert.match(read('update-cli.yml'),/uses: \.\/\.github\/workflows\/update-consumer\.yml/);
  const ci=read('ci.yml');
- for(const name of ['open-agent-pr','release-ancestry'])assert.ok(ci.includes('uses: ./.github/workflows/'+name+'.yml'));
+ assert.ok(read('agent-pr.yml').includes('uses: ./.github/workflows/open-agent-pr.yml'));
+ assert.ok(ci.includes('uses: ./.github/workflows/release-ancestry.yml'));
  assert.match(ci,/\n  build:/);
 });
 test('consumer review automation permits the two consumers and preserves real bot review checks',()=>{
