@@ -4,9 +4,11 @@ const {SourceIndex}=require('./workspace-index');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
+const {registerFormatting}=require('./jade-formatter');
 
 function registerLanguageTools(vscode,context){
   const selector=[{language:'jade-nz',scheme:'file',pattern:'**/*.{cls,jade}'},{language:'jade-nz',scheme:'untitled'}];
+  registerFormatting(vscode,context,selector);
   const output=vscode.window.createOutputChannel('Jade Language Tools');let lastError,lastCache,lastProject;
   const supported=uri=>uri.scheme==='untitled'||/\.(cls|jade)$/i.test(uri.fsPath||'')||/[/\\]schemaDefinitions\.sec$/i.test(uri.fsPath||'');
   const accepted=uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace);

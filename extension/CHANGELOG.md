@@ -1,3 +1,22 @@
+# 0.13.0 — Jade method formatting and inline diagnostics companion
+
+- Add Format Document and Format Selection for complete Jade method bodies, using editor tabs/spaces while preserving native declarations, metadata and literal contents.
+- Keep unsupported or incomplete control structures unchanged; selection edits stay inside complete selected lines.
+- Include Error Lens as an install-alongside companion that users can disable independently of Jade.
+- Document GitHub VSIX installation and manual updates.
+- Verify formatting through native before/after compilation/tests and the actual VS Code document/range/undo workflow.
+
+# 0.12.1 — Independent release updates
+
+- Bundle the official native CLI 0.3.0.
+- Own the extension's release and update automation locally; check official CLI releases every five minutes and open reviewed dependency updates.
+- Skip unchanged ZIP downloads after verifying the local runtime; repair corrupt payloads and patch-bump the consumer only for a new dependency.
+
+# 0.12.0 — Native C++ CLI
+
+- Replace the JavaScript CLI backend with the standalone native C++ CLI and helpers, without a separate end-user Node.js installation.
+- Preserve the existing editor, testing, inspection, publishing and debugger workflows through thin native CLI adapters.
+
 # 0.11.1 — CI and release automation candidate
 
 - Build, test and package the VSIX in GitHub Actions; publish matching version tags only after the commit reaches the approved default branch.

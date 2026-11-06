@@ -1,0 +1,57 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {formattingEdits}=require('../../extension/src/jade-formatter');
+function apply(text,options={},range,uri='example.jade') {
+  for(const edit of formattingEdits(text,{tabSize:4,insertSpaces:true,...options},range,uri).reverse())
+    text=text.slice(0,edit.start)+edit.text+text.slice(edit.end);
+  return text;
+}
+const cls=body=>`jadeVersionNumber "25.0.02";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeHeaders\n  Fish subclassOf Object transient;\ntypeDefinitions\nFish completeDefinition\n(\nattributeDefinitions\n   value: Integer number = 1;\n)\ntypeSources\nFish (\njadeMethodSources\nrun\n{\n${body}\n}\n)\n`;
+test('method formatting indents declarations, nested conditions, loops and epilog without changing tokens',()=>{
+  const source='run();\nvars\nx : Integer;\nbegin\nif x = 1 then\nwhile x > 0 do\nx := x - 1; // keep  this\nendwhile;\nelseif x = 2 then\nx := 3;\nelse\nx := 4;\nendif;\nepilog\nx := 0;\nend;';
+  const expected='run();\nvars\n    x : Integer;\nbegin\n    if x = 1 then\n        while x > 0 do\n            x := x - 1; // keep  this\n        endwhile;\n    elseif x = 2 then\n        x := 3;\n    else\n        x := 4;\n    endif;\nepilog\n    x := 0;\nend;';
+  assert.equal(apply(source),expected);
+  assert.equal(apply(expected),expected,'idempotent');
+  assert.equal(source.replace(/\s/g,''),expected.replace(/\s/g,''));
+});
+test('CLS formatting changes method whitespace only, preserving native headers and metadata',()=>{
+  const source=cls('run();\nbegin\nreturn;\nend;');
+  assert.equal(apply(source,{},undefined,'Fish.cls'),source.replace('\nreturn;','\n    return;'));
+});
+test('multiline signatures with grouped parameter semicolons are byte-preserved in method and CLS files',()=>{
+  const body='run(\n  first : Integer;\n       second : String) updating;\nbegin\nreturn;\nend;';
+  assert.equal(apply(body),body.replace('\nreturn;','\n    return;'));
+  assert.equal(apply(cls(body),{},undefined,'Fish.cls'),cls(body).replace('\nreturn;','\n    return;'));
+});
+test('tabs, CRLF, BOM and trailing whitespace outside indentation remain intact',()=>{
+  const source='\ufeffrun();\r\nbegin\r\n  return;  \r\nend;\r\n';
+  const expected='\ufeffrun();\r\nbegin\r\n\treturn;  \r\nend;\r\n';
+  assert.equal(apply(source,{insertSpaces:false,tabSize:8}),expected);
+});
+test('multiline strings, documentation and block comment contents remain byte-for-byte unchanged',()=>{
+  const source='run();\nbegin\nwrite "first\n  if dangerous then\nlast";\n/* comment\n     else\n  */\nwrite `documentation\n then\n`;\nreturn;\nend;';
+  const expected='run();\nbegin\n    write "first\n  if dangerous then\nlast";\n    /* comment\n     else\n  */\n    write `documentation\n then\n`;\n    return;\nend;';
+  assert.equal(apply(source),expected);
+});
+test('selection computes nesting from the full method but edits only complete selected lines',()=>{
+  const source='run();\nbegin\nif true then\nreturn;\nendif;\nend;';
+  const start=source.indexOf('return;'),end=start+'return;'.length;
+  assert.equal(apply(source,{}, {start,end}),source.replace('return;','        return;'));
+  assert.equal(apply(source,{}, {start:start+2,end}),source,'partial first line left intact');
+});
+test('end-exclusive selection does not touch the following line',()=>{
+  const source='run();\nbegin\nreturn;\nreturn;\nend;';
+  const start=source.indexOf('return;'),end=source.indexOf('return;',start+1);
+  assert.equal(apply(source,{}, {start,end}),source.slice(0,start)+'    '+source.slice(start));
+});
+test('incomplete methods, unsupported control structures and non-method native documents are left unchanged',()=>{
+  for(const source of ['run();\nbegin\nif true then\nreturn;\nend;', 'run();\nbegin\nreturn;', 'run();\nbegin\nswitch x;\nreturn;\nend;'])
+    assert.equal(apply(source),source);
+  const source='schemaDefinition\nDemo subschemaOf RootSchema;\nbegin\nreturn;\nend;';
+  assert.equal(apply(source,{},undefined,'Demo.scm'),source);
+});
+test('multiple CLS methods are isolated and an invalid body does not prevent a valid sibling formatting',()=>{
+  const source=cls('run();\nbegin\nif true then\nreturn;\nend;').replace('\n}\n)', '\n}\nother\n{\nother();\nbegin\nreturn;\nend;\n}\n)');
+  assert.equal(apply(source,{},undefined,'Fish.cls'),source.replace('other();\nbegin\nreturn;', 'other();\nbegin\n    return;'));
+});
