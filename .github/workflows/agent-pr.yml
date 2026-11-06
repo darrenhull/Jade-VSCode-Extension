@@ -15,6 +15,6 @@ jobs:
   open-agent-pr:
     if: github.actor == 'darrenhull' && github.repository_owner == 'darrenhull'
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     uses: ./.github/workflows/open-agent-pr.yml

@@ -1,17 +1,23 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
 
-function fixture(t,{existing=[],author='github-actions[bot]'}={}){
+function fixture(t,{existing=[],author='github-actions[bot]',autoMerge=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-agent-pr-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const repo='darrenhull/Jade-VSCode-Extension',head='codex/agent/cli-pipelines',base='main',marker=path.join(root,'must-not-execute');
  const originalBody='Existing review context with literal $(Set-Content -LiteralPath "'+marker+'" hacked), backticks ` and quotes " preserved.';
- const current={number:2,html_url:'https://github.com/'+repo+'/pull/2',user:{login:author,type:author==='github-actions[bot]'?'Bot':'User'},head:{ref:head,repo:{full_name:repo}},base:{ref:base},requested_reviewers:[]};
+ const current={number:2,html_url:'https://github.com/'+repo+'/pull/2',user:{login:author,type:author==='github-actions[bot]'?'Bot':'User'},head:{ref:head,sha:'b'.repeat(40),repo:{full_name:repo}},base:{ref:base},requested_reviewers:[],auto_merge:autoMerge};
  const config=path.join(root,'fixture.json'),calls=path.join(root,'calls.jsonl');fs.writeFileSync(config,JSON.stringify({Existing:existing,Current:current,Original:{number:1,title:'Build and test Jade tools',body:originalBody,html_url:'https://github.com/'+repo+'/pull/1'},Commit:{commit:{message:'Add a future Jade feature\n\n'+originalBody}}}));
  const workflow=fs.readFileSync(path.resolve(__dirname,'../../.github/workflows/open-agent-pr.yml'),'utf8').replace(/\r\n/g,'\n');
  const markerText='        run: |\n',start=workflow.indexOf(markerText);assert.notEqual(start,-1);
  const body=workflow.slice(start+markerText.length).split('\n').map(line=>line.replace(/^          /,'')).join('\n');
  const fake=String.raw`$script:Fixture = Get-Content -LiteralPath $env:AGENT_PR_FIXTURE -Raw | ConvertFrom-Json
 function gh {
+  if ($args[0] -eq 'pr' -and $args[1] -eq 'merge') {
+    $global:LASTEXITCODE=0
+    $call=@{Method='AUTO_MERGE';Endpoint='pulls/2';Payload=@{Arguments=@($args)}}
+    [IO.File]::AppendAllText($env:AGENT_PR_CALLS, (ConvertTo-Json -InputObject $call -Depth 30 -Compress) + [Environment]::NewLine)
+    return
+  }
   $global:LASTEXITCODE = 0
   $method = 'GET'
   $methodIndex = [array]::IndexOf($args, '--method')
@@ -42,3 +48,5 @@ test('open rejects an existing human PR rather than changing its ownership',t=>{
 test('open refuses untrusted actors, repositories and branch prefixes before any API call',t=>{for(const overrides of [{GITHUB_ACTOR:'someone-else'},{GITHUB_REPOSITORY:'another-owner/Jade-CLI'},{GITHUB_REPOSITORY:'darrenhull/unrelated'},{GITHUB_REF:'refs/heads/codex/ci-releases'}]){const f=fixture(t),result=f.run(overrides);assert.notEqual(result.status,0);assert.equal(f.calls().length,0);}});
 test('open fails if the newly created PR is not authored by the GitHub Actions bot',t=>{const f=fixture(t,{author:'darrenhull'}),result=f.run();assert.notEqual(result.status,0);assert.match(result.stderr,/bot author/);assert.equal(f.calls().filter(call=>call.Endpoint.endsWith('/requested_reviewers')).length,0);});
 test('open uses the final commit for future topics when no original PR is selected',t=>{const f=fixture(t),result=f.run({SOURCE_PR:'0'});assert.equal(result.status,0,result.stderr);const created=f.calls().find(call=>call.Method==='POST'&&call.Endpoint.endsWith('/pulls'));assert.equal(created.Payload.title,'Add a future Jade feature');assert.ok(created.Payload.body.includes(f.originalBody));assert.match(created.Payload.body,/actions\/runs\/12345/);assert.equal(f.calls().some(call=>call.Endpoint.endsWith('/pulls/1')),false);assert.equal(fs.existsSync(f.marker),false);});
+test('verified bot pull requests queue squash auto-merge for the exact reviewed head without bypassing protections',t=>{const f=fixture(t),result=f.run();assert.equal(result.status,0,result.stderr);const merge=f.calls().find(call=>call.Method==='AUTO_MERGE');assert.ok(merge,'Queue auto-merge after bot identity and reviewer verification.');assert.ok(merge.Payload.Arguments.includes('--auto'));assert.ok(merge.Payload.Arguments.includes('--squash'));assert.ok(!merge.Payload.Arguments.includes('--admin'));assert.ok(merge.Payload.Arguments.includes('--match-head-commit'));assert.ok(merge.Payload.Arguments.includes('b'.repeat(40)));});
+test('a pull request already queued for auto-merge is not queued again',t=>{const f=fixture(t,{autoMerge:{enabled_by:{login:'github-actions[bot]'}}}),result=f.run();assert.equal(result.status,0,result.stderr);assert.equal(f.calls().filter(call=>call.Method==='AUTO_MERGE').length,0);});

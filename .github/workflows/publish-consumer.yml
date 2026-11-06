@@ -1,0 +1,63 @@
+name: Publish a verified consumer version
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        type: string
+        required: true
+      consumer_automation_ref:
+        type: string
+        required: true
+      archive_name:
+        type: string
+        default: ''
+      executable_name:
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate immutable automation
+        env:
+          AUTOMATION_REF: ${{ inputs.consumer_automation_ref }}
+        run: '[[ "$AUTOMATION_REF" =~ ^[a-f0-9]{40}$ ]]'
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: darrenhull/Jade-VSCode-Extension
+          ref: ${{ inputs.consumer_automation_ref }}
+          path: .jade-automation
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: release
+      - name: Restore a standalone executable from its complete ZIP
+        if: inputs.executable_name != ''
+        working-directory: release
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+          EXECUTABLE_NAME: ${{ inputs.executable_name }}
+        run: |
+          [[ "$ARCHIVE_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]+\.zip$ ]]
+          [[ "$EXECUTABLE_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]+\.exe$ ]]
+          unzip -p "$ARCHIVE_NAME" "$EXECUTABLE_NAME" > "$EXECUTABLE_NAME"
+      - name: Publish a new approved version or retain the existing immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node .jade-automation/scripts/ReleasePublisher.cjs

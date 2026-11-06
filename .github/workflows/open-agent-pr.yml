@@ -16,7 +16,7 @@ on:
         value: ${{ jobs.open.outputs.number }}
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -109,6 +109,11 @@ jobs:
             } finally {
               if (Test-Path -LiteralPath $payload) { Remove-Item -LiteralPath $payload }
             }
+          }
+          if ($verified.head.sha -notmatch '^[a-fA-F0-9]{40}$') { throw 'A verified pull request head SHA is required before auto-merge can be queued.' }
+          if (-not $verified.auto_merge) {
+            gh pr merge "$number" --repo "$repository" --auto --squash --match-head-commit "$($verified.head.sha)"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not queue protected squash auto-merge.' }
           }
           "url=$($verified.html_url)" >> $env:GITHUB_OUTPUT
           "number=$number" >> $env:GITHUB_OUTPUT
