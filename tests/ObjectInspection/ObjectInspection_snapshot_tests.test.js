@@ -16,7 +16,7 @@ test("stored values distinguish null, empty, false, zero, unavailable and unload
   assert.equal(fieldText({ value: 0 }), "0");
   assert.equal(fieldText({ error: "Restricted" }), "Unavailable: Restricted");
   assert.equal(fieldText({ oid: "51.1", type: "Fish" }), "Not loaded · 51.1");
-  assert.equal(fieldText({}), "Unavailable");
+  assert.equal(fieldText({}), "Unavailable: no stored value supplied");
 });
 
 test("snapshot retains its target context after connection closes", () => usingFixture(async s => {
@@ -41,6 +41,7 @@ test("Back restores the prior page and scroll without another native object read
   const count = s.clients[0].requests.filter(request => request.command === "object").length;
   await panel.receive({ command: "back" });
   assert.equal(latest(panel).object.oid, oid(10));
+  assert.equal(panel.title, "Fish · " + oid(10));
   assert.equal(latest(panel).view.scrollY, 127);
   assert.equal(s.clients[0].requests.filter(request => request.command === "object").length, count);
 }));
@@ -127,3 +128,37 @@ test("older class-to-instances chooser cannot retarget a newer class request", (
   assert.equal((await older).cancelled, true);
   assert.equal(s.clients.length, 1);
 }));
+
+test("local source metadata stays separate from the database snapshot", async () => {
+  const s = setup({sourceContext: async identity => ({available:true,file:"file:///C:/workspace/Fish.cls",dirty:true,identity})});
+  try {
+    await s.connect();
+    await s.commands.get("jadeNative.inspectObject")(oid(10));
+    const data = latest(s.panels[0]);
+    assert.equal(data.source.dirty,true);
+    assert.equal(data.source.identity.schema,"Pets");
+    assert.equal(data.source.identity.projectRoot,data.connection.projectRoot);
+    assert.equal(data.object.source,undefined);
+  } finally { await s.cleanup(); }
+});
+
+test("unavailable inspection configuration offers settings while keeping local classes usable", async () => {
+  const s = setup({configError:"No database connection configured"});
+  try {
+    let actions; s.vscode.window.showErrorMessage=async (_message,...items)=>{actions=items;};
+    const result=await s.controller.browseInstances({schema:"Pets",className:"Fish",projectRoot:s.root});
+    assert.equal(result.available,false);
+    assert.match(result.reason,/No database connection/);
+    assert.ok(actions.includes("Open Jade settings"));
+    assert.equal(s.clients.length,0);
+  } finally { await s.cleanup(); }
+});
+
+test("missing class source offers the existing pull workflow only after explicit selection", async()=>{
+ let pulls=0;const s=setup({pullSource:async()=>{pulls++;}});
+ try{await s.connect();await s.commands.get("jadeNative.inspectObject")(oid(10));
+ s.commands.set("jadeNative.findSourceClass",async()=>({opened:false}));
+ s.vscode.window.showInformationMessage=async(_message,...choices)=>choices.includes("Pull source…")?"Pull source…":undefined;
+ assert.equal(pulls,0);await s.panels[0].receive({command:"source"});assert.equal(pulls,1);
+ }finally{await s.cleanup();}
+});

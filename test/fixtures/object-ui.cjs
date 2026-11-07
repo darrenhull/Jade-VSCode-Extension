@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -139,7 +139,9 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     extensionPath: root,
   };
   const controller = registerObjectExplorer(vscode, context, {
-    config: (doc, folder) => { configCalls.push({ doc, folder }); return config; },
+    sourceContext,
+    pullSource,
+    config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return config; },
     inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}),
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     isBusy: () => busy,

@@ -30,3 +30,8 @@ test('resolves inherited ownership within the selected project and keeps overrid
  const rows=value.groups.flatMap(g=>g.items);assert.equal(rows.filter(r=>r.name==='name').length,1);
  const inherited=rows.find(r=>r.name==='inherited');assert.equal(inherited.inherited,true);assert.equal(inherited.owner,'Base');assert.equal(inherited.file,'file:///one/Base.cls');
 });
+test('retains a resolved import identity without merging aliases into an unqualified class page',async()=>{
+ const {model}=setup({'file:///one/Fish.cls':source('Pets','Fish','Object')});
+ const first=await model.resolveClass({schema:'Pets',name:'Fish',file:'file:///one/Fish.cls',importIdentity:'PackageA::Fish',packageAlias:'Goldfish'});
+ assert.equal(first.importIdentity,'PackageA::Fish');assert.equal(first.packageAlias,'Goldfish');assert.equal(first.file,'file:///one/Fish.cls');
+});

@@ -45,8 +45,24 @@ async function withClassWorkspace(port, action, { predicate = 'Boolean(document.
       async key(key, code, modifiers = 0) {
         for (const type of ["keyDown", "keyUp"]) await client.request("Input.dispatchKeyEvent", { type, key, code: key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers }, frameSession);
       },
+      async keyInWindow(key, code, modifiers = 0) {
+        await client.request("Page.bringToFront", {}, pageSession);
+        for (const type of ["keyDown", "keyUp"]) await client.request("Input.dispatchKeyEvent", { type, key, code: key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers, ...(key === "Enter" && type === "keyDown" ? { text: "\r", unmodifiedText: "\r" } : {}) }, pageSession);
+      },
       async type(text) { await client.request("Input.insertText", { text }, frameSession); },
-      async viewport(width, height = 900) { await client.request("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, pageSession); },
+      async viewport(width, height = 900) {
+        // The desired width is the product webview, excluding Code's sidebars.
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const frameWidth = await this.evaluate("window.innerWidth");
+          if (Math.abs(frameWidth - width) <= 1) return;
+          const page = await client.request("Runtime.evaluate", { expression: "({width:window.innerWidth,scale:window.devicePixelRatio})", returnByValue: true }, pageSession);
+          const pageWidth = Math.round((page.result.value.width + width - frameWidth) * page.result.value.scale);
+          await client.request("Emulation.setDeviceMetricsOverride", { width: Math.max(width, pageWidth), height, deviceScaleFactor: 1, mobile: false }, pageSession);
+          await new Promise(resolve => setTimeout(resolve, 120));
+        }
+        const actual = await this.evaluate("window.innerWidth");
+        if (Math.abs(actual - width) > 1) throw Error("The private webview could not be sized to " + width + "px (actual " + actual + "px).");
+      },
       async screenshot(destination) {
         const result = await client.request("Page.captureScreenshot", { format: "png", captureBeyondViewport: false }, pageSession);
         fs.mkdirSync(path.dirname(destination), { recursive: true });

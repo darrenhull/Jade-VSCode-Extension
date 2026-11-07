@@ -33,7 +33,17 @@ async function run(){
   const completions=await sessions[0].services.completions(1);assert.ok(Array.isArray(completions.items));
   const collection=vscode.languages.createDiagnosticCollection('workspace-proof');owned.push(collection);const position=document.positionAt(sessions[0].binding.snapshot().start+1);collection.set(uri,[new vscode.Diagnostic(new vscode.Range(position,position.translate(0,4)),'proof diagnostic')]);assert.equal(sessions[0].services.diagnostics()[0].message,'proof diagnostic');
   assert.equal(vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==='jade.testClassWorkspace').length,2);
-  fs.writeFileSync(report,JSON.stringify({passed:true,sameTextDocument:true,twoClassesSameFile:true,separateEditorGroups:true,nativeUndoRedo:true,originalEditorSynchronization:true,save:true,cleanExternalReload:true,dirtyExternalRevisionsPreserved:true,crlfUnicode:true,completionBridge:true,diagnosticBridge:true,noDatabase:true},null,2));
+  const extension=vscode.extensions.getExtension('jade-local-tools.jade-native-runner-cpp-preview'),api=await extension.activate();
+  await vscode.commands.executeCommand('jadeNative.refreshClassView');
+  const schema=(await api.classView.provider.getChildren()).find(row=>row.name==='Pets');assert.ok(schema);
+  const classes=await api.classView.provider.getChildren(schema),fishRow=classes.find(row=>row.name==='Fish'),birdRow=classes.find(row=>row.name==='Bird');assert.ok(fishRow);assert.ok(birdRow);
+  const productionTabs=()=>vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==='jade.classWorkspace');
+  await vscode.commands.executeCommand('jadeNative.openClassWorkspace',fishRow);await wait(()=>productionTabs().some(tab=>tab.label==='Pets::Fish'),'production class controller and shell');
+  await vscode.commands.executeCommand('jadeNative.openClassWorkspace',fishRow);assert.equal(productionTabs().length,1,'same class must reuse its existing custom editor');
+  await vscode.commands.executeCommand('jadeNative.previewClassMember',{...fishRow,owner:'Fish',name:'name',kind:'method',file:uri.toString()});assert.equal(productionTabs().length,1);
+  await vscode.commands.executeCommand('jadeNative.openClassWorkspace',birdRow);await wait(()=>productionTabs().some(tab=>tab.label==='Pets::Bird'),'second production class sharing original source');assert.equal(productionTabs().length,2);
+  await vscode.commands.executeCommand('jadeNative.openOriginalSource');assert.strictEqual(vscode.window.activeTextEditor.document,document,'Public original-source command resolves the active class without an explicit row');
+  fs.writeFileSync(report,JSON.stringify({passed:true,sameTextDocument:true,twoClassesSameFile:true,separateEditorGroups:true,nativeUndoRedo:true,originalEditorSynchronization:true,save:true,cleanExternalReload:true,dirtyExternalRevisionsPreserved:true,crlfUnicode:true,completionBridge:true,diagnosticBridge:true,productionRegistrationAndController:true,productionClassReuse:true,productionMemberNavigation:true,noDatabase:true},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
  finally{if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
 }

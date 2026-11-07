@@ -9,6 +9,8 @@ const escape = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 function registerClassCatalogue(vscode, context, options) {
+  const stateKey='jade.classCatalogue.'+(options.scope||'workspace');
+  const saved=options.scope==='workspace'?context.workspaceState?.get(stateKey):undefined;
   let panel,
     ready = false,
     disposed = false,
@@ -22,10 +24,11 @@ function registerClassCatalogue(vscode, context, options) {
       label: options.label || "Jade classes",
     },
     model = new ClassBrowserModel({ scope: metadata.scope }),
-    filter = { query: "", offset: 0 },
-    selectedId = "", scrollTop = 0,
+    filter = { query: typeof saved?.filter?.query==='string'?saved.filter.query.slice(0,4096):"", ...(typeof saved?.filter?.schema==='string'?{schema:saved.filter.schema}:{}), offset: Number.isSafeInteger(saved?.filter?.offset)&&saved.filter.offset>=0?saved.filter.offset:0 },
+    selectedId = typeof saved?.selectedId==='string'?saved.selectedId:"", scrollTop = Number.isFinite(saved?.scrollTop)?Math.max(0,saved.scrollTop):0,
     lastPayload;
   const listeners = [];
+  function persist(){if(options.scope==='workspace')void Promise.resolve(context.workspaceState?.update(stateKey,{filter:{...filter},selectedId,scrollTop})).catch(()=>{});}
   function viewRow(row) {
     const parent = [
       row.parent,
@@ -130,6 +133,7 @@ function registerClassCatalogue(vscode, context, options) {
     };
     model.page(next);
     filter = next;
+    persist();
     return publish();
   }
   async function open(id) {
@@ -151,6 +155,7 @@ function registerClassCatalogue(vscode, context, options) {
     const row = model.find({ schema: identity[1], name: identity[2], projectId: identity[3] });
     if (!row || row.browserId !== id) throw Error("Unknown class identity");
     selectedId = id;
+    persist();
     return options.openClass(row, {
       scope: metadata.scope,
       generation: metadata.generation,

@@ -21,7 +21,7 @@ class MethodDocumentBinding {
 
   snapshot() {
     const selected = this.selection;
-    return selected ? { ...selected, version: this.document.version, uri: this.document.uri.toString(), text: selected.available ? this.document.getText().slice(selected.start, selected.end) : '', dirty: Boolean(this.document.isDirty) } : undefined;
+    return selected ? { ...selected, version: this.document.version, uri: this.document.uri.toString(), text: selected.available ? this.document.getText().slice(selected.start, selected.end) : '', dirty: Boolean(this.document.isDirty), readOnly: Boolean(this.readOnlyReason), reason: this.readOnlyReason || (!selected.available ? 'Method source is unavailable or no longer matches this declaration. Open Original Source to inspect it.' : undefined) } : undefined;
   }
 
   onDidChange(listener) {
@@ -58,6 +58,7 @@ class MethodDocumentBinding {
   async edit({ version, start, end, text, owner, member }) {
     const state = this.snapshot();
     if (!state?.available) throw new Error('The selected method source is no longer available.');
+    if (state.readOnly) throw new Error(state.reason);
     if (version !== this.document.version) throw new Error('Source changed; refresh the method before editing.');
     if ((owner !== undefined && owner !== state.owner) || (member !== undefined && member !== state.member)) throw new Error('The selected method changed before the edit was applied.');
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > state.text.length || typeof text !== 'string') throw new Error('Invalid method edit range.');

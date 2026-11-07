@@ -8,7 +8,7 @@
   function fieldText(field) {
     const value = field?.value;
     if (field?.error) return "Unavailable: " + field.error;
-    if (value === undefined) return field?.oid ? "Not loaded · " + field.oid : "Unavailable";
+    if (value === undefined) return field?.oid ? "Not loaded · " + field.oid : "Unavailable: no stored value supplied";
     if (value === null) return "null";
     if (value === "") return '""';
     return typeof value === "object" ? JSON.stringify(value) : String(value);

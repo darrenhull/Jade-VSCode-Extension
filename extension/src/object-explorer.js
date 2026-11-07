@@ -414,7 +414,15 @@ function registerObjectExplorer(vscode, context, services) {
       throw Error("Choose a workspace class with an explicit project and schema.");
     const version = ++browseVersion;
     const requestedRoot = path.resolve(value.projectRoot);
-    const config = await services.config(undefined, { name: path.basename(requestedRoot), uri: vscode.Uri.file(requestedRoot) });
+    const unavailable = async error => {
+      const reason = diagnostic(error);
+      const selected = await vscode.window.showErrorMessage(reason, "Open Jade settings");
+      if (selected === "Open Jade settings") await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:jade-local-tools.jade-native-runner-cpp-preview");
+      return { available: false, reason, projectRoot: requestedRoot, target: session.target };
+    };
+    let config;
+    try { config = await services.config(undefined, { name: path.basename(requestedRoot), uri: vscode.Uri.file(requestedRoot) }); }
+    catch (error) { return unavailable(error); }
     let workingPath;
     try { workingPath = (await services.workingLocation(config)).databasePath; } catch { workingPath = "Unavailable · compile first to create a working database"; }
     const choices = [
@@ -432,8 +440,10 @@ function registerObjectExplorer(vscode, context, services) {
     if (session.client && (!sameProject || session.target !== choice.target)) await session.disconnect();
     inspectionScope = requestedRoot;
     if (session.target !== choice.target) await session.select(choice.target);
-    if (!session.client) await connect();
-    if (!classBrowser) await loadCatalog();
+    try {
+      if (!session.client) await connect();
+      if (!classBrowser) await loadCatalog();
+    } catch (error) { return unavailable(error); }
     if (version !== browseVersion || disposed) return { cancelled: true };
     const row = classBrowser.rows.find(item => item.schema === value.schema && item.name === value.className);
     if (!row) {
@@ -685,14 +695,17 @@ function registerObjectExplorer(vscode, context, services) {
       schema,
       value?.projectRoot || value?.connection?.projectRoot,
     );
-    if (result?.opened === false)
-      void vscode.window.showInformationMessage?.(
+    if (result?.opened === false) {
+      const choice = await vscode.window.showInformationMessage?.(
         "No workspace source was found for " +
           schema +
           "::" +
           name +
           ". Pull the schema source to browse its definitions.",
+          ...(services.pullSource ? ["Pull source…"] : []),
       );
+      if (choice === "Pull source…") await services.pullSource?.({ schema, className: name, projectRoot: value?.connection?.projectRoot || value?.projectRoot });
+    }
     return result;
   }
   async function inspect(oid, record, visit = true, origin) {
@@ -712,6 +725,9 @@ function registerObjectExplorer(vscode, context, services) {
     if (validateObjectIdentity(object.oid))
       throw Error("Native inspector returned an invalid object identity.");
     oid = object.oid;
+    let source = { available: false, reason: "Local source metadata is unavailable." };
+    try { source = await services.sourceContext?.({ schema: object.schema, className: object.className, projectRoot: inspectionScope || currentConfig?.workspaceRoots?.[0] }) || source; }
+    catch (error) { source = { available: false, reason: diagnostic(error) }; }
     if (generation !== session.generation || recipient?.disposed) return;
     if (
       recipient
@@ -925,6 +941,7 @@ function registerObjectExplorer(vscode, context, services) {
       connection: currentConfig?.connectionName || currentConfig?.name || "Configured connection",
       session: generation, readOnly: true,
     });
+    record.source = source;
     record.origin = origin || (record.object?.oid === object.oid ? record.origin : undefined);
     record.object = object;
     record.readAt = new Date().toISOString();
@@ -947,7 +964,7 @@ function registerObjectExplorer(vscode, context, services) {
         record.error = diagnostic(error);
       }
     }
-    record.history.visit({ object, page: record.page, connection: record.connection, readAt: record.readAt, limit: record.limit, origin: record.origin, error: record.error });
+    record.history.visit({ object, source, page: record.page, connection: record.connection, readAt: record.readAt, limit: record.limit, origin: record.origin, error: record.error });
     record.panel.title = object.className + " · " + oid;
     record.panel.reveal();
     await sendObject(record);
@@ -960,6 +977,7 @@ function registerObjectExplorer(vscode, context, services) {
     record.readTicket = {};
     await releaseCursor(record);
     Object.assign(record, snapshot, { pendingAction: undefined });
+    record.panel.title = record.object.className + " · " + record.object.oid;
     // Native cursors were released on navigation. Restart explicitly with First.
     if (record.page) record.page = { ...record.page, hasMore: false, restartRequired: true };
     return sendObject(record);
@@ -969,6 +987,7 @@ function registerObjectExplorer(vscode, context, services) {
     return record.panel.webview.postMessage({
       command: "object",
       object: record.object,
+      source: record.source,
       page: record.page,
       error: record.error,
       stale: record.generation !== session.generation || !session.client,
@@ -1138,7 +1157,7 @@ function registerObjectExplorer(vscode, context, services) {
 }
 function objectHtml(csp, nonce, asset) {
   return `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${asset("elements-lite.css")}"><link rel="stylesheet" href="${asset("objects.css")}"></head><body>
-<header class="page-header"><div><div class="eyebrow">JADE / OBJECT EXPLORER</div><h1 id="title">Loading object…</h1><p id="schema"></p></div><span class="badge readonly-badge">Read-only</span></header>
+<header class="page-header"><div><div class="eyebrow">JADE / OBJECT EXPLORER</div><h1 id="title">Loading object…</h1><p id="schema"></p><p id="project" class="help"></p><p id="source-context" class="help"></p></div><span class="badge readonly-badge">Read-only</span></header>
 <section class="connection-bar" aria-label="Database connection"><button class="environment" id="database" title="Select Working or Source database"><span id="environment">Working database</span><span aria-hidden="true">⌄</span></button><span class="connection-status" id="connection-status"><span class="status-dot"></span><span id="status-label">Connecting</span></span><p id="connection" class="connection-path"></p><button class="quiet-button" id="focusExplorer" title="Show schemas, classes and instances in the sidebar">Database Objects ↗</button></section>
 <nav class="object-toolbar" aria-label="Object navigation"><div class="toolbar-group"><button class="vscode-button secondary" id="back" title="Previous inspected object (Alt+Left)">← Back</button><button class="vscode-button secondary" id="forward" title="Next inspected object (Alt+Right)">Forward →</button></div><div class="toolbar-group"><button class="vscode-button secondary" id="refresh" title="Retrieve the object's current database values">Refresh</button><details class="inspection-more" id="inspection-more" open><summary>More</summary><div class="more-actions"><label class="history-label"><span class="sr-only">Inspection history</span><select id="history" aria-label="Inspection history"><option>History</option></select></label><button class="vscode-button secondary" id="pin" aria-pressed="false" title="Keep this tab when opening other objects">Pin tab</button></div></details><button class="vscode-button secondary" id="source" title="Open this class in the workspace source browser">Open class source</button></div></nav>
 <div class="identity-bar"><p class="identity" id="identity"></p><button class="quiet-button" id="copyOid" title="Copy the complete object identifier (Ctrl+Shift+C)">Copy ID</button></div><p id="state" class="state" role="status"></p><p id="pin-help" class="help"></p><p id="origin" class="help"></p>

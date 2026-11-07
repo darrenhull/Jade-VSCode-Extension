@@ -12,7 +12,7 @@ async function run() {
   const report = path.resolve(workspace, "../host-report.json");
   const captures = process.env.JADE_CLASS_WORKSPACE_SCREENSHOTS;
   const owned = [], messages = [], selections = [], memento = new Map();
-  let document, saved;
+  let document, saved, binding;
   const source = ["schemaDefinition", "Pets subschemaOf RootSchema partialDefinition;", "typeHeaders", "Fish subclassOf Object transient;", "typeDefinitions", "Fish completeDefinition", "(", "attributeDefinitions", "name: String[50];", "jadeMethodDefinitions", "getName() : String;", ")", "typeSources", "Fish (", "jadeMethodSources", "getName", "{", "getName() : String;", "begin", ' return "Bubbles";', "end;", "}", ")"].join("\r\n");
   const file = path.join(workspace, "ClassWorkspaceFish.cls");
   fs.writeFileSync(file, source);
@@ -29,7 +29,7 @@ async function run() {
       preview:async (_row,id)=>({text:members.find(member=>member.id===id)?.detail || ""}),
     });
     owned.push(shell);
-    const provider=new ClassWorkspaceEditorProvider(vscode,session=>{document=session.document;saved=session.services.save;return shell.attach({...session,row});});
+    const provider=new ClassWorkspaceEditorProvider(vscode,session=>{document=session.document;saved=session.services.save;binding=session.binding;return shell.attach({...session,row});});
     owned.push(provider,vscode.window.registerCustomEditorProvider("jade.testClassWorkspace",provider,{supportsMultipleEditorsPerDocument:true,webviewOptions:{retainContextWhenHidden:true}}));
     await vscode.commands.executeCommand("vscode.openWith",uri,"jade.testClassWorkspace",{preview:false,viewColumn:vscode.ViewColumn.One});
     const evidence=await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{
@@ -45,19 +45,33 @@ async function run() {
       await browser.evaluate('document.getElementById("search").value="getName";document.getElementById("search").dispatchEvent(new Event("input",{bubbles:true}))');await browser.wait('document.querySelector("[role=treeitem]")?.textContent.includes("getName")',"method search");
       await browser.evaluate('document.querySelector("[role=treeitem]").click()');await browser.wait('document.querySelector(".cm-content")?.textContent.includes("Bubbles")',"real method editor");
       assert.equal(await browser.evaluate('document.getElementById("editor-region").hidden'),false);
-      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("End",35,2);await browser.type(" ");
-      for(let attempt=0;attempt<100&&!document.isDirty;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
+      const insertion=binding.snapshot().start;
+      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);
+      await Promise.all([..."// edited in class workspace"].map(character=>browser.type(character)));
+      await browser.key("Enter",13);
+      await browser.evaluate('document.getElementById("overview").click()');
+      const expected=source.slice(0,insertion)+"// edited in class workspace\r\n"+source.slice(insertion);
+      for(let attempt=0;attempt<100&&document.getText()!==expected;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
+      assert.equal(document.getText(),expected,"CodeMirror edits must reach the exact native source range once");
       assert.equal(document.isDirty,true,"CodeMirror edits must dirty the actual source document");
+      assert.equal(await browser.evaluate('document.getElementById("notice").hidden'),true,"normal edits must not show conflict notices");
+      await browser.wait('document.getElementById("detail-title").textContent==="Class overview"',"navigation drains pending source edits");
+      await browser.evaluate('document.querySelector("[role=treeitem]").click()');await browser.wait('document.querySelector(".cm-content")?.textContent.includes("edited in class workspace")',"persisted native method after return");
       const method=path.join(captures,"class-workspace-method.png");await browser.screenshot(method);
       await saved();assert.equal(document.isDirty,false);assert.equal(fs.readFileSync(file,"utf8"),document.getText());
       for(const width of [760,480,360]){
         await browser.viewport(width);assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),true,"shell fits "+width+"px");
-        if(width<760){await browser.evaluate('document.getElementById("member-picker").click()');assert.equal(await browser.evaluate('document.getElementById("member-picker").getAttribute("aria-expanded")'),"true");await browser.key("Escape",27);}
+        if(width<760){await browser.evaluate('document.getElementById("member-picker").click()');assert.equal(await browser.evaluate('document.getElementById("member-picker").getAttribute("aria-expanded")'),"true");await browser.key("Escape",27);if(await browser.evaluate('document.getElementById("member-picker").getAttribute("aria-expanded")==="true"'))await browser.key("Escape",27);assert.equal(await browser.evaluate('document.getElementById("member-picker").getAttribute("aria-expanded")'),"false");}
         await browser.screenshot(path.join(captures,"class-workspace-"+width+".png"));
       }
+      await vscode.workspace.getConfiguration("window").update("zoomLevel",Math.log(2)/Math.log(1.2),vscode.ConfigurationTarget.Global);
+      await new Promise(resolve=>setTimeout(resolve,400));await browser.viewport(360);
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),true,"shell fits 360px at 200% zoom");
+      await browser.screenshot(path.join(captures,"class-workspace-360-zoom200.png"));
+      await vscode.workspace.getConfiguration("window").update("zoomLevel",0,vscode.ConfigurationTarget.Global);
       await browser.viewport(1000);await browser.evaluate('document.getElementById("overview").click()');await browser.wait('document.getElementById("detail-title").textContent==="Class overview"',"overview recovery");
       await browser.evaluate('document.getElementById("original").click()');assert.equal(selections.length,1);
-      return {overview,method,bounded100:true,memberCount:10000,allMemberSearch:true,realDocumentEdit:true,save:true,responsive:[760,480,360],noDatabase:true};
+      return {overview,method,bounded100:true,memberCount:10000,allMemberSearch:true,realDocumentEdit:true,exactSourceRange:true,save:true,responsive:[760,480,360],zoom200:true,noDatabase:true};
     });
     fs.writeFileSync(report,JSON.stringify({passed:true,...evidence},null,2));
   } catch(error) {fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}

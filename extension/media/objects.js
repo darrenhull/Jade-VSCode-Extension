@@ -11,6 +11,8 @@ if (compact) {
 function saveView() {
   if (!current) return;
   vscode.postMessage({ command: "viewState", oid: current.object.oid, scrollY: window.scrollY,
+    propertiesScroll: $("properties").closest(".table-wrap").scrollTop,
+    entriesScroll: $("entries").closest(".table-wrap").scrollTop,
     selection: document.activeElement?.closest?.("tr")?.dataset.selection || current.view?.selection || "",
     propertiesFilter: $("properties-filter").value, entriesFilter: $("entries-filter").value,
     entriesSort: $("entries-sort").value });
@@ -63,7 +65,7 @@ function valueCell(row, field, index, section) {
     content.append(
       button(
         field.value ?? (field.type + " · " + field.oid),
-        "Inspect referenced object " + field.oid,
+        ((current.history.entries || []).some(item => item.oid === field.oid) ? "Previously inspected · Open referenced object " : "Inspect referenced object ") + field.oid,
         () => send("open", { oid: field.oid, section, index }),
         "reference",
       ),
@@ -94,6 +96,10 @@ function render() {
     object.schema +
     " schema" +
     (object.collection ? " · Collection" : " · Object");
+  $("project").textContent = (current.connection.connection || "Configured connection") + (current.connection.projectRoot ? " · " + current.connection.projectRoot : "");
+  $("source-context").textContent = current.source?.available
+    ? "Local source · " + (current.source.dirty ? "Unsaved changes" : "Saved file") + " · " + current.source.file + " · Deployment not verified"
+    : "Local source unavailable · " + (current.source?.reason || "No resolved local declaration.");
   $("identity").textContent = "OID " + object.oid;
   $("origin").textContent = current.origin ? "From " + current.origin.schema + "::" + current.origin.className + " · " + current.origin.oid + (current.origin.property ? " · " + current.origin.property : "") : "";
   $("environment").textContent = current.connection.name;
@@ -161,7 +167,9 @@ function render() {
   $("entries").replaceChildren();
   for (const { item, index } of entries) {
     const tr = document.createElement("tr"),
-      key = cell(tr, item.key ?? item.index, "key-column");
+      key = cell(tr, item.key ?? item.index ?? "Not supplied", "key-column");
+    tr.tabIndex = 0; tr.dataset.selection = "entry:" + index;
+    key.dataset.label = "Key / index";
     key.append(
       button(
         "Copy",
@@ -170,8 +178,10 @@ function render() {
         "quiet-button copy-value",
       ),
     );
-    cell(tr, item.type, "type-column type");
+    key.lastChild.disabled = item.key === undefined && item.index === undefined;
+    cell(tr, item.type, "type-column type").dataset.label = "Type";
     valueCell(tr, item, index, "entries");
+    tr.lastChild.dataset.label = "Value";
     $("entries").append(tr);
   }
   if (!entries.length)
@@ -201,12 +211,16 @@ for (const id of [
   "show-key",
   "show-type",
 ])
-  $(id).oninput = render;
+  $(id).oninput = () => { render(); saveView(); };
 $("clear-filter").onclick = () => {
   $("entries-filter").value = "";
   render();
+  saveView();
   $("entries-filter").focus();
 };
+let scrollTimer;
+window.addEventListener("scroll", () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(saveView, 80); }, true);
+window.addEventListener("blur", saveView);
 window.addEventListener("keydown", (event) => {
   if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
     event.preventDefault();
@@ -236,6 +250,8 @@ window.addEventListener("message", ({ data }) => {
     $("entries-sort").value = data.view?.entriesSort || "native";
     render();
     window.scrollTo(0, data.view?.scrollY || 0);
+    $("properties").closest(".table-wrap").scrollTop = data.view?.propertiesScroll || 0;
+    $("entries").closest(".table-wrap").scrollTop = data.view?.entriesScroll || 0;
     send("rendered");
   }
   if (data.command === "notice") $("state").textContent = data.message;

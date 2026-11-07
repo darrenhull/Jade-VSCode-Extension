@@ -6,6 +6,7 @@ const { classSections } = require("./class-view-model");
 const {createClassWorkspaceModel,memberId}=require('./class-workspace-model');
 const {createClassWorkspaces}=require('./class-workspace');
 const {registerClassWorkspaces}=require('./class-workspace-controller');
+const {createClassDiscoveryRows}=require('./class-discovery-rows');
 const { ClassBrowserModel } = require("./class-browser-model"),
   { pickClass } = require("./class-browser-ui");
 const { registerClassCatalogue } = require("./class-catalogue");
@@ -33,30 +34,21 @@ function registerClassView(vscode, context, language, options={}) {
     return { doc, text: doc.getText() };
   };
   const model=createClassWorkspaceModel({vscode,language,readSource:source});
+  async function openOriginal(row,id){
+    const member=id&&await model.preview(row,id);
+    if(member?.file)return vscode.commands.executeCommand('jadeNative.showClassMember',member);
+    const identity=await model.resolveClass(row);return vscode.window.showTextDocument(vscode.Uri.parse(identity.file),{preview:false});
+  }
   const shell=createClassWorkspaces(vscode,context,{
     load:model.load,preview:model.preview,
-    onOriginal:async(row,id)=>{
-      const member=id&&await model.preview(row,id);
-      if(member?.file)return vscode.commands.executeCommand('jadeNative.showClassMember',member);
-      const identity=await model.resolveClass(row);return vscode.window.showTextDocument(vscode.Uri.parse(identity.file),{preview:false});
-    },
+    onOriginal:openOriginal,
     onInstances:row=>options.onInstances?.({schema:row.schema,className:row.name,projectRoot:row.projectRoot,sourceUri:row.file}),
     onBack:(_row,origin)=>catalogue.show(origin?.scope==='workspace'?{restore:origin}:{}),
-    onDeclaringClass:member=>previewController.open({name:member.owner,schema:member.schema,file:member.file}),
+    onDeclaringClass:(_row,member)=>previewController.open({name:member.owner,schema:member.schema,file:member.file}),
   });
-  const previewController=registerClassWorkspaces(vscode,context,{model,shell});
-  const allClasses = () =>
-    [...language.index.project.groups.values()].flatMap(entries=>{
-      const projects=new Map();
-      for(const entry of entries){const folder=vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(entry.model.uri)),projectId=folder?.uri.toString()||'';if(!projects.has(projectId))projects.set(projectId,{entries:[],folder});projects.get(projectId).entries.push(entry);}
-      return [...projects].map(([projectId,{entries,folder}])=>({
-        kind: "class",
-        name: entries[0].cls.name,
-        schema: entries[0].model.schema,
-        parent: entries[0].cls.parent,
-        entries,projectId,projectRoot:folder?.uri.fsPath,projectName:folder?.name,
-      }));})
-      .filter((c) => c.schema);
+  const previewController=registerClassWorkspaces(vscode,context,{model,shell,onOriginal:openOriginal});
+  const classRows=createClassDiscoveryRows(uri=>vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(uri)));
+  const allClasses=()=>classRows(language.index.project.groups);
   async function syncBrowser() {
     await language.index.ready();
     await language.index.flush();
@@ -65,7 +57,11 @@ function registerClassView(vscode, context, language, options={}) {
       project !== browserProject ||
       project.generation !== browserGeneration
     ) {
-      browser.setClasses(allClasses());
+      const rows=allClasses();
+      const identity=row=>JSON.stringify([row.projectId,row.schema,row.name]);
+      const previous=new Map(browser.rows.map(row=>[identity(row),row]));
+      if(rows.length!==previous.size||rows.some(row=>!previous.has(identity(row))))browser.setClasses(rows);
+      else for(const row of rows)Object.assign(previous.get(identity(row)),row);
       browserProject = project;
       browserGeneration = project.generation;
     }
@@ -398,13 +394,14 @@ function registerClassView(vscode, context, language, options={}) {
       previewController.open(row,{selectedId:memberId({...row,kind:row.typeMethod?'typeMethod':row.kind})}),
     ),
     vscode.commands.registerCommand("jadeNative.openOriginalSource", (row) =>
-      vscode.commands.executeCommand('jadeNative.showClassMember',row),
+      row?vscode.commands.executeCommand('jadeNative.showClassMember',row):previewController.openOriginal(),
     ),
     vscode.commands.registerCommand(
       "jadeNative.findSourceClass",
       async (name, schema, projectRoot) => {
         await syncBrowser();
         const projectId=projectRoot&&vscode.workspace.workspaceFolders?.find(folder=>folder.uri.fsPath===projectRoot||folder.uri.toString()===projectRoot)?.uri.toString();
+        if(projectRoot&&!projectId)return {opened:false,reason:'The originating project is not open in this workspace.'};
         let selected = name && schema ? browser.find({ name, schema,projectId }) : undefined;
         if (name && !selected && schema) {
           const seen = new Set();
@@ -416,6 +413,7 @@ function registerClassView(vscode, context, language, options={}) {
           }
         }
         if (!selected) {
+          if(name&&projectId)return {opened:false,reason:'No matching source class exists in the originating project.'};
           const matches = name ? browser.search(name, { schema }) : undefined;
           if (name && matches.total === 1 && matches.items[0].name === name)
             selected = matches.items[0];
@@ -457,6 +455,7 @@ function registerClassView(vscode, context, language, options={}) {
       events.fire();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      classRows.invalidate();
       resources = undefined;
       events.fire();
     }),

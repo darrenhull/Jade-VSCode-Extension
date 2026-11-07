@@ -15,9 +15,10 @@ class ClassWorkspaceEditorProvider {
       return vscode.workspace.applyEdit(edit);
     });
     const disposables = [];
-    const session = { document, panel, binding, services: this.services(document, binding) };
+    const session = { document, panel, binding, services: this.services(document, binding, panel) };
     this.views.add(session);
     let closed = false;
+    session.isClosed = () => closed;
     const close = () => {
       if (closed) return;
       closed = true; this.views.delete(session); binding.dispose();
@@ -28,6 +29,14 @@ class ClassWorkspaceEditorProvider {
       if (event.document === document) binding.changed(event.contentChanges);
     }));
     try {
+      if (vscode.workspace.fs.isWritableFileSystem(document.uri.scheme) === false) binding.readOnlyReason = 'The original source filesystem is read-only.';
+      else if (vscode.workspace.fs.stat) {
+        try {
+          const stat = await vscode.workspace.fs.stat(document.uri);
+          if (stat.permissions & (vscode.FilePermission?.Readonly || 1)) binding.readOnlyReason = 'The original source file is read-only.';
+        } catch (error) { binding.readOnlyReason = 'Original source access could not be verified: ' + error.message; }
+      }
+      if (closed) return;
       const view = await this.createView(session);
       if (view?.dispose) { if (closed) view.dispose(); else disposables.push(view); }
     } catch (error) {
@@ -36,14 +45,15 @@ class ClassWorkspaceEditorProvider {
     }
   }
 
-  services(document, binding) {
+  services(document, binding, panel) {
     const vscode = this.vscode;
     const position = offset => document.positionAt(binding.toDocumentOffset(offset));
+    const requireActive=()=>{if(document.isClosed||panel?.active!==true)throw new Error('Select this class workspace before undo, redo or source navigation.');};
     const range = value => value ? { start: Math.max(0, document.offsetAt(value.start) - binding.snapshot().start), end: Math.min(binding.snapshot().text.length, document.offsetAt(value.end) - binding.snapshot().start) } : undefined;
     return {
       save: () => document.save(),
-      undo: () => vscode.commands.executeCommand('undo'),
-      redo: () => vscode.commands.executeCommand('redo'),
+      undo: () => {requireActive();return vscode.commands.executeCommand('undo');},
+      redo: () => {requireActive();return vscode.commands.executeCommand('redo');},
       openOriginal: () => vscode.window.showTextDocument(document, { preview: false, selection: new vscode.Range(position(0), position(0)) }),
       async completions(offset, trigger) {
         const selected = binding.snapshot();
@@ -60,9 +70,10 @@ class ClassWorkspaceEditorProvider {
         })), incomplete: Boolean(result?.isIncomplete) };
       },
       async definition(offset) {
+        requireActive();
         const selected = binding.snapshot();
         const locations = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', document.uri, position(offset));
-        if (document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner) return false;
+        if (panel?.active!==true || document.isClosed || document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner) return false;
         const first = locations?.[0];
         if (!first) return false;
         const uri = first.targetUri || first.uri, targetRange = first.targetSelectionRange || first.range;

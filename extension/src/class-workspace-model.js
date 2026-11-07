@@ -45,7 +45,7 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
     if(!entries.length)throw Error('Workspace class source is missing. Refresh Classes or open its original source.');
     if(entries.filter(entry=>!entry.cls.partial).length>1)throw Error('Ambiguous class: multiple complete declarations exist in this project.');
     const primary=entries.find(entry=>!entry.cls.partial)||entries[0],folder=folderOf(primary.model.uri);
-    return {qualifiedName:schema+'::'+name,name,schema,projectId:projects[0],projectRoot:folder?.uri.fsPath,projectName:folder?.name||'Workspace',file:primary.model.uri,superclass:primary.cls.parent,entries};
+    return {qualifiedName:schema+'::'+name,name,schema,projectId:projects[0],projectRoot:folder?.uri.fsPath,projectName:folder?.name||'Workspace',file:primary.model.uri,superclass:primary.cls.parent,importIdentity:typeof row.importIdentity==='string'?row.importIdentity:undefined,packageAlias:typeof row.packageAlias==='string'?row.packageAlias:undefined,entries};
   }
   async function snapshot(row,includeInherited){
     const identity=await resolveClass(row),local=await classData(identity.entries,identity.name);

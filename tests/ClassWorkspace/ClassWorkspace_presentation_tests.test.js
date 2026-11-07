@@ -15,3 +15,9 @@ test("overview distinguishes unknown metadata from valid zero and false values",
 test("arrow selection wraps and empty collections remain unselected",()=>{
  assert.equal(ui.nextIndex(0,-1,3),2); assert.equal(ui.nextIndex(2,1,3),0); assert.equal(ui.nextIndex(0,1,0),-1);
 });
+test("source labels are readable workspace-relative paths with native path tooltip data",()=>{
+ assert.equal(ui.sourceLabel({file:"file:///C%3A/repos/Pets/schemas/Pets/types/Fish.cls",projectRoot:"C:/repos/Pets"}),"schemas/Pets/types/Fish.cls");
+ assert.equal(ui.sourceLabel({file:"file:///C%3A/repos/Pets/Fish.cls",projectRoot:"C:\\repos\\Pets"}),"Fish.cls");
+ assert.equal(ui.sourceLabel({file:"file:///C:/other/Fish.cls"}),"Fish.cls");
+ assert.equal(ui.sourcePath("file:///C:/path/a%20b.cls"),"C:/path/a b.cls");
+});

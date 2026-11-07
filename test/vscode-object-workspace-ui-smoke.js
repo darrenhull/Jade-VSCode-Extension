@@ -59,14 +59,18 @@ async function run() {
       for (const text of ['""', "false", "null", "0", "Unavailable:"]) assert.equal(await browser.evaluate('document.getElementById("properties").textContent.includes('+JSON.stringify(text)+')'), true);
       const objectScreenshot = path.join(captures, "object-snapshot.png");
       await browser.screenshot(objectScreenshot);
-      await browser.evaluate('document.getElementById("properties-filter").value="children";document.getElementById("properties-filter").dispatchEvent(new Event("input"));document.querySelector(".reference").focus()');
-      await browser.key("Enter", 13);
+      await browser.evaluate('document.getElementById("properties-filter").value="children";document.getElementById("properties-filter").dispatchEvent(new Event("input"));window.focus();document.querySelector(".reference").focus()');
+      await browser.keyInWindow("Enter", 13);
       await browser.wait('document.getElementById("title").textContent==="FishByName"', "keyboard reference opening");
       assert.equal(await browser.evaluate('document.getElementById("origin").textContent.includes("children")'), true);
       await browser.evaluate('document.getElementById("page-size").value="25";document.getElementById("page-size").dispatchEvent(new Event("change"))');
       await browser.wait('document.getElementById("entries").children.length===25', "collection page size");
       const collectionScreenshot = path.join(captures, "collection-page.png");
       await browser.screenshot(collectionScreenshot);
+      await browser.viewport(360);
+      assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'), true, "collection fits360px");
+      await browser.screenshot(path.join(captures, "collection-360.png"));
+      await browser.viewport(760);
       await browser.evaluate('document.getElementById("entries-filter").value="Tank 1";document.getElementById("entries-filter").dispatchEvent(new Event("input"))');
       assert.equal(await browser.evaluate('document.getElementById("display-note").textContent.includes("this page only")'), true);
       await browser.evaluate('document.getElementById("clear-filter").click();document.getElementById("next").click()');
@@ -84,7 +88,7 @@ async function run() {
         if (width <= 480) {
           assert.equal(await browser.evaluate('getComputedStyle(document.querySelector("#object-properties td")).display'), "block");
           await browser.evaluate('document.querySelector("#inspection-more summary").focus()');
-          await browser.key("Enter", 13);
+          await browser.keyInWindow("Enter", 13);
           assert.equal(await browser.evaluate('document.getElementById("inspection-more").open'), true);
           await browser.evaluate('document.getElementById("inspection-more").open=false');
         }

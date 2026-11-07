@@ -22,6 +22,8 @@ class InspectionHistory {
   saveView(view) {
     if (this.current()) this.current().view = {
       scrollY: Math.max(0, Math.min(10000000, Number(view.scrollY) || 0)),
+      propertiesScroll: Math.max(0, Math.min(10000000, Number(view.propertiesScroll) || 0)),
+      entriesScroll: Math.max(0, Math.min(10000000, Number(view.entriesScroll) || 0)),
       selection: typeof view.selection === "string" ? view.selection.slice(0, 500) : "",
       propertiesFilter: String(view.propertiesFilter || "").slice(0, 1000),
       entriesFilter: String(view.entriesFilter || "").slice(0, 1000),

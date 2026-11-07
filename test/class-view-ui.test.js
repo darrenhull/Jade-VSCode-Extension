@@ -190,6 +190,7 @@ function setup() {
       },
       createTreeView: () => ({ reveal: async () => {}, dispose() {} }),
       showTextDocument: async (document) => {
+        if(!document.uri)document=docs.get(document.toString());
         const editor = { document, revealRange() {} };
         vscode.window.activeTextEditor = editor;
         return editor;
@@ -211,7 +212,8 @@ function setup() {
       },
     },
   };
-  const context = { subscriptions: [], extensionPath: "/extension",extensionUri:Uri.file('/extension') },
+  const stored=new Map();
+  const context = { subscriptions: [], extensionPath: "/extension",extensionUri:Uri.file('/extension'),workspaceState:{get:key=>stored.get(key),update:async(key,value)=>stored.set(key,value)} },
     api = registerClassView(vscode, context, { index });
   return {
     api,
@@ -261,6 +263,32 @@ test("class member tree identities remain stable when preceding source text shif
   } finally {
     s.dispose();
   }
+});
+test('source lookup cannot fall through to another project when runtime context names a project',async()=>{
+ const s=setup();try{
+   const first={uri:s.vscode.Uri.file('/workspace/arbitrary'),name:'One'},second={uri:s.vscode.Uri.file('/workspace/different'),name:'Two'};
+   s.vscode.workspace.workspaceFolders=[first,second];
+   s.vscode.workspace.getWorkspaceFolder=uri=>uri.fsPath.startsWith(first.uri.fsPath)?first:second;
+   const result=await s.commands.get('jadeNative.findSourceClass')('Fish','Pets',second.uri.fsPath);
+   assert.equal(result.opened,false);assert.equal(s.panels.length,0);
+ }finally{s.dispose();}
+});
+test('method-only edits retain the warm class catalogue instead of rebuilding and sorting it',async()=>{
+ const s=setup();try{
+   await s.api.syncBrowser();const before=s.api.browser.rows;
+   s.first.text=s.first.text.replace('"one"','"changed"');s.first.version=2;s.index.document(s.first);
+   await s.api.syncBrowser();assert.equal(s.api.browser.rows,before);
+   assert.equal(s.api.browser.rows.find(row=>row.schema==='Pets').entries[0].model.text,s.first.text);
+ }finally{s.dispose();}
+});
+test('Open Original Source without a tree argument uses the active class workspace',async()=>{
+ const s=setup();try{
+   const schema=(await s.api.provider.getChildren()).find(row=>row.name==='Pets');
+   const row=(await s.api.provider.getChildren(schema))[0];
+   await s.commands.get('jadeNative.openClassWorkspace')(row);
+   await s.commands.get('jadeNative.openOriginalSource')();
+   assert.equal(s.vscode.window.activeTextEditor.document.uri.toString(),s.first.uri.toString());
+ }finally{s.dispose();}
 });
 test("two schema-qualified member previews both update after interleaved unsaved edits", async () => {
   const s = setup();

@@ -53,3 +53,7 @@ test('notifies subscribers with real document revision and disposes subscription
  let state=binding.snapshot();await binding.edit({version:state.version,start:0,end:0,text:'// one\n'});assert.equal(events.length,1);assert.equal(events[0].version,2);
  disposable.dispose();state=binding.snapshot();await binding.edit({version:state.version,start:0,end:0,text:'// two\n'});assert.equal(events.length,1);
 });
+test('reports a known read-only source before accepting an edit',async()=>{
+ const {document,binding}=fixture();binding.readOnlyReason='The original source file is read-only.';const selected=binding.select('Fish','name'),original=document.getText();assert.equal(selected.readOnly,true);assert.match(selected.reason,/read-only/);
+ await assert.rejects(binding.edit({version:selected.version,start:0,end:0,text:'unsafe'}),/read-only/);assert.equal(document.getText(),original);
+});

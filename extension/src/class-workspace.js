@@ -3,7 +3,7 @@ const crypto = require("node:crypto");
 const KINDS = new Set(["all", "property", "reference", "method", "typeMethod", "constant", "key", "base"]);
 const STATE_KEY = "jade.classWorkspaces.v1";
 function classIdentity(row) {
-  return JSON.stringify([String(row.projectId || row.projectRoot || row.workspaceRoot || row.project || ""), String(row.schema || ""), String(row.owner || row.className || row.name || ""), String(row.importIdentity || row.packageAlias || "")]);
+  return JSON.stringify([String(row.projectId || row.projectRoot || row.workspaceRoot || row.project || ""), String(row.schema || ""), String(row.owner || row.className || row.name || ""), String(row.importIdentity || ""), String(row.packageAlias || "")]);
 }
 function normalizeState(value = {}) {
   return {
@@ -47,6 +47,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     const send = message => { if (record.ready && !record.closed) return Promise.resolve(panel.webview.postMessage(message)).catch(() => {}); };
     async function load() {
       const revision = ++record.revision;
+      const lastSelected = selectedMember();
       send({ command: "loading", revision });
       try {
         const input = { ...record.state };
@@ -59,7 +60,8 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           record.state.selectedId = "";
           await send({ command: "notice", message: "The selected member is no longer available. Showing the class overview." });
         }
-        record.snapshot = { ...snapshot, groups, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
+        const retainedSelected = document?.isDirty && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
+        record.snapshot = { ...snapshot, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
         if (!snapshot.inheritedAvailable) record.state.includeInherited = false;
         record.snapshot.state = { ...record.state };
         persist(record);
@@ -69,7 +71,14 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         if (current(revision)) await send({ command: "error", revision, message: error?.message || String(error) });
       }
     }
-    function selectedMember() { return record.snapshot?.groups?.flatMap(group => group.items).find(member => member.id === record.state.selectedId) || record.snapshot?.selected; }
+    function selectedMember() {
+      if (!record.state.selectedId) return undefined;
+      return record.snapshot?.groups?.flatMap(group => group.items).find(member => member.id === record.state.selectedId) || (record.snapshot?.selected?.id === record.state.selectedId ? record.snapshot.selected : undefined);
+    }
+    function localMethod() {
+      const member = selectedMember();
+      return member && ["method", "typeMethod"].includes(member.kind) && !member.system && (!member.file || member.file === document?.uri?.toString()) ? member : undefined;
+    }
     async function select(id) {
       if (record.closed || id && !record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) && record.snapshot?.selected?.id !== id) return;
       record.state.selectedId = id;
@@ -84,8 +93,12 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         const snapshot = foreign
           ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : "This member belongs to another source document. Open its declaring class to edit it with its own undo and save history.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: !member.system }
           : binding.select(member.owner || member.declaringClass || row.owner, member.name);
-        await send({ command: "editorSnapshot", snapshot });
+        const prepared = services.draftRecovery?.prepare && !foreign ? await services.draftRecovery.prepare(snapshot) : snapshot;
+        if (record.closed || record.state.selectedId !== id) return;
+        record.editorEditable = prepared.available === true;
+        await send({ command: "editorSnapshot", snapshot: prepared });
         await send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] });
+        if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() });
       } else if (member && adapters.preview) {
         const revision = record.revision, selectedId = id;
         const preview = await adapters.preview(row, id, document);
@@ -96,7 +109,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.command !== "string" || record.closed) return;
       try {
         switch (value.command) {
-          case "ready": record.ready = true; await load(); if (record.state.selectedId) await select(record.state.selectedId); break;
+          case "ready": record.ready = true; await load(); if (record.state.selectedId) await select(record.state.selectedId); if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); break;
           case "search": if (typeof value.query !== "string") return; record.state = normalizeState({ ...record.state, query: value.query, offset: 0 }); await load(); break;
           case "filter": record.state = normalizeState({ ...record.state, kind: value.kind, includeInherited: value.includeInherited === true && record.snapshot?.inheritedAvailable === true, offset: 0 }); await load(); break;
           case "page": if (!Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > Math.max(0, (record.snapshot?.total || 0) - 1)) return; record.state = normalizeState({ ...record.state, offset: value.offset }); await load(); break;
@@ -107,14 +120,31 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "openDeclaring": { const member = selectedMember(); if (member?.inherited && !member.system) await adapters.onDeclaringClass?.(row, member); break; }
           case "backToClasses": await adapters.onBack?.(row, record.origin); break;
           case "retry": await load(); break;
-          case "editorEdit": if (binding) { const snapshot = await binding.edit(value.edit); await send({ command: "editorSnapshot", snapshot }); } break;
+          case "editorDraft": if (services.draftRecovery) await services.draftRecovery.save(value.draft); break;
+          case "editorEdit": if (binding) {
+            const member = localMethod();
+            if (!member || record.editorEditable === false || value.edit?.owner !== (member.owner || row.owner) || value.edit?.member !== member.name) throw Error("This edit no longer belongs to an editable selected local method. Your draft was retained.");
+            if (services.draftRecovery && value.draft) await services.draftRecovery.save(value.draft);
+            const snapshot = await binding.edit(value.edit); await send({ command: "editorSnapshot", snapshot });
+            if (await services.draftRecovery?.acknowledge(snapshot)) await send({ command: "editorDraftRecovery", draft: undefined });
+          } break;
+          case "copyDraft": if (services.draftRecovery) { await services.draftRecovery.copy(); await send({ command: "notice", message: "Recovered method draft copied. The source document has not changed." }); } break;
+          case "discardDraft": if (services.draftRecovery) {
+            const answer = await vscode.window.showWarningMessage("Discard the recovered method draft? The source document will not change.", { modal: true }, "Discard draft");
+            if (answer === "Discard draft") { await services.draftRecovery.discard(); if (binding?.snapshot()) await send({ command: "editorSnapshot", snapshot: binding.snapshot(), reset: true }); await send({ command: "editorDraftRecovery", draft: undefined }); }
+          } break;
+          case "restoreDraft": if (services.draftRecovery && localMethod()) {
+            const answer = await vscode.window.showWarningMessage("Replace the selected method with its recovered draft? Review the source and draft before restoring. Saving still writes the entire source document.", { modal: true }, "Restore draft");
+            if (answer === "Restore draft") { const snapshot = await services.draftRecovery.restore(); await send({ command: "editorSnapshot", snapshot, reset: true }); await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); }
+          } break;
           case "editorSave": if (await services.save?.() === false) await send({ command: "notice", message: "The source document was not saved. Your edits remain in the document." }); break;
           case "editorUndo": await services.undo?.(); break;
           case "editorRedo": await services.redo?.(); break;
           case "editorConflict": await send({ command: "notice", message: "Source changed while an edit was pending. Your method draft is preserved; open original source to resolve it." }); break;
-          case "editorDefinition": if (Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= (binding?.snapshot()?.text?.length || 0)) await services.definition?.(value.offset); break;
+          case "editorNotice": await send({ command: "notice", message: "Method draft is too large for protected editing. Open Original Source to edit this method." }); break;
+          case "editorDefinition": if (localMethod() && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= (binding?.snapshot()?.text?.length || 0)) await services.definition?.(value.offset); break;
           case "editorCompletions": {
-            if (!Number.isSafeInteger(value.id) || !Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > (binding?.snapshot()?.text?.length || 0) || value.version !== binding?.snapshot()?.version) return;
+            if (!localMethod() || !Number.isSafeInteger(value.id) || !Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > (binding?.snapshot()?.text?.length || 0) || value.version !== binding?.snapshot()?.version) return;
             const version = value.version, member = binding.snapshot()?.member;
             const result = await services.completions?.(value.offset, typeof value.trigger === "string" ? value.trigger.slice(0, 1) : undefined);
             if (!record.closed && binding.snapshot()?.version === version && binding.snapshot()?.member === member) await send({ command: "editorCompletions", id: value.id, result: result || { items: [] } });
@@ -123,7 +153,10 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           default: if (value.command.startsWith("editor")) await services.onEditorMessage?.(value, { binding, document, send });
         }
       } catch (error) {
-        if (value.command === "editorEdit") await send({ command: "editorRejected", message: error?.message || String(error) });
+        if (value.command === "editorEdit" || value.command === "editorDraft") {
+          await send({ command: "editorRejected", message: error?.message || String(error) });
+          if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() });
+        }
         await send({ command: "notice", message: error?.message || String(error) });
       }
     }
@@ -136,7 +169,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const subscription of record.subscriptions) subscription?.dispose(); }
     record.subscriptions.push(panel.onDidDispose(close));
     record.refresh = load;
-    return { dispose: close, refresh: load, select: async id => {
+    return { dispose: close, refresh: load, setOrigin: value => { record.origin = value; }, select: async id => {
       if (!record.ready) { record.state.selectedId = typeof id === "string" ? id : ""; persist(record); return; }
       await send({ command: "prepareSelection", id });
     }, state: () => ({ ...record.state }), identity: record.key };

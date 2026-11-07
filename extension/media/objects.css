@@ -421,11 +421,13 @@ button, input, select { max-width: 100%; }
   .toolbar-group { flex-wrap: wrap; min-width: 0; }
   .filter-label { min-width: 0 !important; width: 100%; }
   #object-properties table, #object-properties tbody, #object-properties tr,
-  #object-properties td { display: block; width: 100%; }
-  #object-properties thead { display: none; }
-  #object-properties tr { margin: 8px 0; border: 1px solid var(--vscode-panel-border); }
-  #object-properties td::before { content: attr(data-label); display: block;
+  #object-properties td, #collection table, #collection tbody, #collection tr,
+  #collection td { display: block; width: 100%; min-width: 0; }
+  #object-properties thead, #collection thead { display: none; }
+  #object-properties tr, #collection tr { margin: 8px 0; border: 1px solid var(--vscode-panel-border); }
+  #object-properties td::before, #collection td::before { content: attr(data-label); display: block;
     font-size: 10px; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+  #collection td[hidden] { display: none; }
   .history-label { max-width: 100%; }
   .table-wrap { max-width: 100%; overflow-x: auto; }
   .inspection-more > summary { display: list-item; }
@@ -461,3 +463,6 @@ button, input, select { max-width: 100%; }
     scroll-behavior: auto;
   }
 }
+
+.page-header > div { min-width: 0; flex: 1; }
+#project, #source-context { overflow-wrap: anywhere; }
