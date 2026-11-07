@@ -1,6 +1,6 @@
 "use strict";
 const { readCollectionDefinition } = require("./collection-definition");
-const { resolveKeyProperty } = require("./collections");
+const { resolveKeyProperty, normalizeCollectionComparisons } = require("./collections");
 const { lifetimeMetadata } = require("./creation-lifetime-metadata");
 const bases = Object.freeze({ memberDictionary: "MemberKeyDictionary", externalDictionary: "ExtKeyDictionary", objectArray: "ObjectArray", objectSet: "ObjectSet" });
 const families = Object.fromEntries(Object.entries(bases).map(([family, name]) => ["RootSchema::" + name, family]));
@@ -114,6 +114,7 @@ function createCollectionRules(project, { systemCache, catalogProvider } = {}) {
     return { status: "nativeRequired", limit: 512, message: "This combination needs native validation. No unproved UTF-8, Binary, mixed-type or member-key conversion formula is applied." };
   }
   function validate(request) {
+    request = normalizeCollectionComparisons(request, catalogProvider);
     const parent = resolve(request.superclass || (request.type === "class" ? "Object" : bases[familyFor(request)]), request.schema, true);
     function reject(field, message, details) { const error = Error(message); error.field = field; Object.assign(error, details); throw error; }
     function mismatch(index, expected, attribute, reason) {

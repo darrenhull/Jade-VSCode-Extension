@@ -1,4 +1,5 @@
 "use strict";
+const { normalizeKeyComparison } = require("./collection-comparison");
 // Pure native-source model: no VS Code, database or filesystem dependency.
 function collectionCatalog(project) {
   const bySchema = new Map(project.schemas.map((s) => [s.name, s]));
@@ -118,7 +119,15 @@ function collectionCatalog(project) {
       }),
   };
 }
+function normalizeCollectionComparisons(request, catalogSource) {
+  if (!Array.isArray(request.keys) || request.keys.every(key => key.comparison === undefined || key.comparison === "native")) return request;
+  const memberKind = request.collectionFamily ? request.collectionFamily === "memberDictionary" : request.kind === "member";
+  const catalog = memberKind && (typeof catalogSource === "function" ? catalogSource() : catalogSource);
+  const member = memberKind && catalog?.schemas.find(schema => schema.name === request.schema)?.members.find(value => value.id === request.membership || value.schema + "::" + value.name === request.membership || value.name === request.membership);
+  return { ...request, keys: request.keys.map((key, index) => normalizeKeyComparison(key, memberKind ? member && resolveKeyProperty(member, key.name, catalog, request.schema)?.type : key.type, index)) };
+}
 function generateCollection(request, catalog) {
+  request = normalizeCollectionComparisons(request, catalog);
   const schema = catalog.schemas.find((s) => s.name === request.schema);
   if (!schema) throw Error("Choose an existing user schema.");
   if (
@@ -336,5 +345,6 @@ module.exports = {
   collectionCatalog,
   generateCollection,
   resolveKeyProperty,
+  normalizeCollectionComparisons,
   collectionKeyChoices,
 };
