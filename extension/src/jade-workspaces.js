@@ -61,8 +61,11 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   }
   function updateDiagnostics(document,snapshot,result,stale,schema) {
     const report=result.report;
+    // A captured snapshot does not mean Jade compiled it. Failed setup,
+    // cancellation and stale runs cannot retire existing compiler Problems.
+    if(stale||!(result.passed===true||report?.compiled===true||report?.executed===true||(Array.isArray(report?.diagnostics)&&report.diagnostics.length)))return;
     const key=document.uri.toString(),groups=new Map();
-    if(!stale)for(const item of report?.diagnostics||[]) {
+    for(const item of report?.diagnostics||[]) {
       let uri=document.uri,range;
       if(!item.source||item.source===key) {
         const offsets=diagnosticOffsets(snapshot,item);range=new vscode.Range(document.positionAt(offsets.start),document.positionAt(offsets.end));

@@ -194,7 +194,7 @@ function activate(context) {
   });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
     client:nativeTests,
-    configFor:(_document,scope)=>inspectionConfig({uri:scope.resource},scope.folder),
+    configFor:(_document,scope)=>inspectionConfig({uri:scope.configurationResource},scope.folder),
     schemaChoices:async scope=>{
       await language.index.ready();await language.index.flush();const schemas=new Map();
       for(const model of language.index.project.models.values())if(model.schema&&vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(model.uri))?.uri.toString()===scope.folder.uri.toString())schemas.set(model.schema,{name:model.schema,parent:model.parentSchema});
