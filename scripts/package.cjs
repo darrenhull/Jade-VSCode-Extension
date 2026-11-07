@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:
 const root=path.resolve(__dirname,'..'),extension=path.join(root,'extension');
 const {name,version}=JSON.parse(fs.readFileSync(path.join(extension,'package.json'),'utf8'));
 const vsce=require.resolve('@vscode/vsce/vsce');
+require('./build-method-editor.cjs').buildMethodEditor();
 require('./bundle-cli.cjs').bundleCli({minimumVersion:JSON.parse(fs.readFileSync(path.join(extension,'package.json'),'utf8')).jadeNative.minimumCliVersion});
 fs.mkdirSync(path.join(root,'dist'),{recursive:true});
 const result=spawnSync(process.execPath,[vsce,'package','--no-dependencies','--allow-missing-repository','--no-rewrite-relative-links','--skip-license','--out',path.join(root,'dist',name+'-'+version+'.vsix')],{cwd:extension,stdio:'inherit'});

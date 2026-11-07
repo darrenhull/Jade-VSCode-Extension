@@ -1,6 +1,6 @@
 {
   "name": "jade-vscode-extension-workspace",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "description": "Standalone build and test workspace for Jade Native Runner VS Code extension",
   "engines": {
@@ -10,9 +10,18 @@
     "test": "node scripts/test.cjs",
     "package": "node scripts/package.cjs",
     "test:host": "node scripts/host-test.cjs",
-    "bundle:cli": "node scripts/bundle-cli.cjs"
+    "bundle:cli": "node scripts/bundle-cli.cjs",
+    "build:editor": "node scripts/build-method-editor.cjs"
   },
   "devDependencies": {
-    "@vscode/vsce": "4.1.0"
+    "@codemirror/autocomplete": "6.20.4",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
+    "@vscode/vsce": "4.1.0",
+    "esbuild": "0.28.2"
   }
 }

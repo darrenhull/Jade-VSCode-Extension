@@ -5,6 +5,7 @@ const fs = require("node:fs"),
 const { InspectionSession } = require("./object-session"),
   { InspectorTransport } = require("./object-transport");
 const { validateObjectIdentity } = require("./NativeObjectIdentity");
+const { InspectionHistory } = require("./inspection-history");
 const { fieldText } = require("../media/object-page");
 const { ClassBrowserModel } = require("./class-browser-model");
 const { pickClass } = require("./class-browser-ui");
@@ -32,7 +33,9 @@ function registerObjectExplorer(vscode, context, services) {
     catalogRequest,
     pageVersion = 0,
     credentials,
-    pendingUnpinnedRead;
+    pendingUnpinnedRead,
+    inspectionScope,
+    browseVersion = 0;
   const setLock = async (value) => {
     lock = value;
     await services.setBusy(value);
@@ -43,6 +46,7 @@ function registerObjectExplorer(vscode, context, services) {
     );
   };
   async function configuration() {
+    if (inspectionScope) return services.config(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
     let doc = vscode.window.activeTextEditor?.document;
     if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath)) {
       const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri),
@@ -200,9 +204,11 @@ function registerObjectExplorer(vscode, context, services) {
       record.cursor = undefined;
       void record.panel.webview.postMessage({
         command: "disconnected",
-        target: session.target,
+        target: record.connection?.target,
+        connection: record.connection,
+        object: record.object,
         message:
-          "Inspection connection changed or closed. Reconnect and open this object again.",
+          "Disconnected · Last retrieved values are retained. Reconnect explicitly and reopen this object to resume inspection.",
       });
     }
   }
@@ -402,6 +408,45 @@ function registerObjectExplorer(vscode, context, services) {
     const target = classChildren(schema).find(item => item.kind === "class" && item.name === row.name);
     await view.reveal(target, { select: true, focus: true, expand: false });
     return { schema: row.schema, name: row.name, offset: position.offset, readOnly: true };
+  }
+  async function browseInstances(value) {
+    if (!value || typeof value.schema !== "string" || typeof value.className !== "string" || typeof value.projectRoot !== "string")
+      throw Error("Choose a workspace class with an explicit project and schema.");
+    const version = ++browseVersion;
+    const requestedRoot = path.resolve(value.projectRoot);
+    const config = await services.config(undefined, { name: path.basename(requestedRoot), uri: vscode.Uri.file(requestedRoot) });
+    let workingPath;
+    try { workingPath = (await services.workingLocation(config)).databasePath; } catch { workingPath = "Unavailable · compile first to create a working database"; }
+    const choices = [
+      { label: "Working database", target: "working", description: value.schema + "::" + value.className,
+        detail: workingPath },
+      { label: "Source database", target: "source", description: value.schema + "::" + value.className,
+        detail: config.databasePath },
+    ];
+    const choice = await vscode.window.showQuickPick(choices, {
+      title: "Browse instances · " + value.schema + "::" + value.className,
+      placeHolder: "Choose the database for " + requestedRoot + " · read-only",
+    });
+    if (version !== browseVersion || disposed || !choice || !["working", "source"].includes(choice.target)) return { cancelled: true };
+    const sameProject = currentConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+    if (session.client && (!sameProject || session.target !== choice.target)) await session.disconnect();
+    inspectionScope = requestedRoot;
+    if (session.target !== choice.target) await session.select(choice.target);
+    if (!session.client) await connect();
+    if (!classBrowser) await loadCatalog();
+    if (version !== browseVersion || disposed) return { cancelled: true };
+    const row = classBrowser.rows.find(item => item.schema === value.schema && item.name === value.className);
+    if (!row) {
+      const message = value.schema + "::" + value.className + " is not installed in the selected " + choice.label + ". Local source remains available. Publish explicitly to add it, or choose another inspection database.";
+      const configure = await vscode.window.showInformationMessage?.(message, "Choose database");
+      if (configure === "Choose database") await vscode.commands.executeCommand("jadeNative.selectInspectionDatabase");
+      return { available: false, reason: message, target: session.target, databasePath: currentTarget?.databasePath, projectRoot: requestedRoot };
+    }
+    const revealed = await revealClass(row);
+    const node = classNode(row);
+    await classPage(node);
+    await view.reveal(node, { select: true, focus: true, expand: true });
+    return { ...revealed, available: true, target: session.target, databasePath: currentTarget.databasePath, projectRoot: requestedRoot };
   }
   async function findClass(value) {
     if (!session.client) await connect();
@@ -615,7 +660,7 @@ function registerObjectExplorer(vscode, context, services) {
     }
   }
   async function releaseCursor(record) {
-    if (record.cursor && session.client) {
+    if (record.cursor && session.client && record.generation === session.generation) {
       const cursor = record.cursor;
       record.cursor = undefined;
       try {
@@ -638,6 +683,7 @@ function registerObjectExplorer(vscode, context, services) {
       "jadeNative.findSourceClass",
       name,
       schema,
+      value?.projectRoot || value?.connection?.projectRoot,
     );
     if (result?.opened === false)
       void vscode.window.showInformationMessage?.(
@@ -649,7 +695,7 @@ function registerObjectExplorer(vscode, context, services) {
       );
     return result;
   }
-  async function inspect(oid, record, visit = true) {
+  async function inspect(oid, record, visit = true, origin) {
     if (validateObjectIdentity(oid))
       throw Error(validateObjectIdentity(oid));
     if (!session.client) await connect();
@@ -666,7 +712,7 @@ function registerObjectExplorer(vscode, context, services) {
     if (validateObjectIdentity(object.oid))
       throw Error("Native inspector returned an invalid object identity.");
     oid = object.oid;
-    if (generation !== session.generation) return;
+    if (generation !== session.generation || recipient?.disposed) return;
     if (
       recipient
         ? recipient.readTicket !== ticket
@@ -696,7 +742,7 @@ function registerObjectExplorer(vscode, context, services) {
             ],
           },
         );
-        record = { panel, generation, pinned: false };
+        record = { panel, generation, pinned: false, history: new InspectionHistory() };
         record.rendered = new Promise((resolve, reject) => {
           record.renderResolve = resolve;
           record.renderReject = reject;
@@ -734,13 +780,17 @@ function registerObjectExplorer(vscode, context, services) {
                 return vscode.commands.executeCommand(
                   "jadeNative.objects.focus",
                 );
-              if (record.generation !== session.generation) return;
+              if (record.generation !== session.generation && !["copyOid", "copyValue", "copyKey", "source", "pin", "viewState", "ready", "rendered"].includes(message?.command)) return;
               if (message?.command === "rendered") {
                 clearTimeout(record.renderTimer);
                 record.renderResolve();
                 return;
               }
               if (message?.command === "ready") return sendObject(record);
+              if (message?.command === "viewState") {
+                if (message.oid === record.object?.oid) record.history.saveView(message);
+                return;
+              }
               if (message?.command === "copyOid") {
                 await copyOid(record.object);
                 return record.panel.webview.postMessage({
@@ -771,7 +821,7 @@ function registerObjectExplorer(vscode, context, services) {
                   text =
                     message.command === "copyKey"
                       ? String(item.key ?? item.index ?? "")
-                      : fieldText(item);
+                      : item.value === "" ? "" : fieldText(item);
                 await vscode.env.clipboard.writeText(text);
                 return record.panel.webview.postMessage({
                   command: "notice",
@@ -782,41 +832,23 @@ function registerObjectExplorer(vscode, context, services) {
                 });
               }
               if (message?.command === "source")
-                return openClassSource(record.object);
+                return openClassSource({ ...record.object, connection: record.connection });
               if (message?.command === "open")
                 return inspect(
                   message.oid,
                   record.pinned ? undefined : record,
                   true,
+                  { oid: record.object.oid, schema: record.object.schema, className: record.object.className, property: message.section === "properties" && record.object.properties?.[message.index]?.name, connection: record.connection },
                 );
-              if (message?.command === "back") {
-                const previous = session.back();
-                if (previous) return inspect(previous.oid, record, false);
-              }
-              if (message?.command === "forward") {
-                const next = session.forward();
-                if (next) return inspect(next.oid, record, false);
-              }
+              if (message?.command === "back") return restoreSnapshot(record, record.history.back());
+              if (message?.command === "forward") return restoreSnapshot(record, record.history.forward());
               if (message?.command === "refresh")
                 return inspect(record.object.oid, record, false);
               if (message?.command === "pin") {
                 record.pinned = !record.pinned;
                 return sendObject(record);
               }
-              if (message?.command === "history") {
-                if (
-                  !Number.isInteger(message.index) ||
-                  message.index < 0 ||
-                  message.index >= session.history.length
-                )
-                  return;
-                session.position = message.index;
-                return inspect(
-                  session.history[message.index].oid,
-                  record,
-                  false,
-                );
-              }
+              if (message?.command === "history") return restoreSnapshot(record, record.history.select(message.index));
               if (
                 ["next", "first", "pageSize"].includes(message?.command) &&
                 record.object.collection
@@ -833,6 +865,7 @@ function registerObjectExplorer(vscode, context, services) {
                   oid = record.object.oid,
                   token = {};
                 record.pendingAction = token;
+                record.error = undefined;
                 await sendObject(record);
                 try {
                   const cursor =
@@ -851,8 +884,12 @@ function registerObjectExplorer(vscode, context, services) {
                     return;
                   }
                   record.page = page;
+                  Object.assign(record.history.current(), { page, limit: record.limit });
                   record.cursor = page.cursor;
                   record.readAt = new Date().toISOString();
+                  Object.assign(record.history.current(), { readAt: record.readAt });
+                } catch (error) {
+                  if (record.revision === revision && generation === session.generation) record.error = diagnostic(error);
                 } finally {
                   if (record.pendingAction === token) {
                     record.pendingAction = undefined;
@@ -863,6 +900,9 @@ function registerObjectExplorer(vscode, context, services) {
             }),
         );
         panel.onDidDispose(() => {
+          record.disposed = true;
+          record.revision = (record.revision || 0) + 1;
+          record.readTicket = {};
           clearTimeout(record.renderTimer);
           record.renderReject(Error("Object inspection was cancelled."));
           listener.dispose();
@@ -878,10 +918,20 @@ function registerObjectExplorer(vscode, context, services) {
     if (record.revision !== revision || generation !== session.generation)
       throw Error("Object inspection was cancelled by newer navigation.");
     record.generation = generation;
+    record.connection = Object.freeze({
+      name: session.target === "working" ? "Working database" : "Source database",
+      path: currentTarget?.databasePath, target: session.target,
+      projectRoot: inspectionScope || currentConfig?.workspaceRoots?.[0],
+      connection: currentConfig?.connectionName || currentConfig?.name || "Configured connection",
+      session: generation, readOnly: true,
+    });
+    record.origin = origin || (record.object?.oid === object.oid ? record.origin : undefined);
     record.object = object;
     record.readAt = new Date().toISOString();
     record.page = undefined;
+    record.error = undefined;
     if (object.collection) {
+      try {
       const page = await session.request("collection", {
         oid,
         limit: record.limit || 100,
@@ -892,34 +942,48 @@ function registerObjectExplorer(vscode, context, services) {
       }
       record.page = page;
       record.cursor = page.cursor;
+      } catch (error) {
+        if (generation !== session.generation || record.disposed || record.revision !== revision) return;
+        record.error = diagnostic(error);
+      }
     }
+    record.history.visit({ object, page: record.page, connection: record.connection, readAt: record.readAt, limit: record.limit, origin: record.origin, error: record.error });
     record.panel.title = object.className + " · " + oid;
     record.panel.reveal();
     await sendObject(record);
     await record.rendered;
     return { oid, className: object.className, readOnly: true };
   }
+  async function restoreSnapshot(record, snapshot) {
+    if (!snapshot) return;
+    record.revision = (record.revision || 0) + 1;
+    record.readTicket = {};
+    await releaseCursor(record);
+    Object.assign(record, snapshot, { pendingAction: undefined });
+    // Native cursors were released on navigation. Restart explicitly with First.
+    if (record.page) record.page = { ...record.page, hasMore: false, restartRequired: true };
+    return sendObject(record);
+  }
   async function sendObject(record) {
-    if (!record.object) return;
+    if (!record.object || record.disposed) return;
     return record.panel.webview.postMessage({
       command: "object",
       object: record.object,
       page: record.page,
+      error: record.error,
+      stale: record.generation !== session.generation || !session.client,
       pinned: record.pinned,
       readAt: record.readAt,
       busy: Boolean(record.pendingAction),
       limit: record.limit || 100,
-      connection: {
-        name:
-          session.target === "working" ? "Working database" : "Source database",
-        path: currentTarget?.databasePath,
-        readOnly: true,
-      },
+      connection: record.connection,
+      origin: record.origin,
+      view: record.history.current()?.view,
       history: {
-        entries: session.history,
-        position: session.position,
-        back: session.position > 0,
-        forward: session.position < session.history.length - 1,
+        entries: record.history.entries.map(item => item.object),
+        position: record.history.position,
+        back: record.history.position > 0,
+        forward: record.history.position < record.history.entries.length - 1,
       },
     });
   }
@@ -1058,6 +1122,7 @@ function registerObjectExplorer(vscode, context, services) {
     provider,
     view,
     classCatalogue,
+    browseInstances,
     ownsLock: () => lock,
     releaseForOperation: async () => {
       if (session.client || lock) {
@@ -1075,8 +1140,8 @@ function objectHtml(csp, nonce, asset) {
   return `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${asset("elements-lite.css")}"><link rel="stylesheet" href="${asset("objects.css")}"></head><body>
 <header class="page-header"><div><div class="eyebrow">JADE / OBJECT EXPLORER</div><h1 id="title">Loading object…</h1><p id="schema"></p></div><span class="badge readonly-badge">Read-only</span></header>
 <section class="connection-bar" aria-label="Database connection"><button class="environment" id="database" title="Select Working or Source database"><span id="environment">Working database</span><span aria-hidden="true">⌄</span></button><span class="connection-status" id="connection-status"><span class="status-dot"></span><span id="status-label">Connecting</span></span><p id="connection" class="connection-path"></p><button class="quiet-button" id="focusExplorer" title="Show schemas, classes and instances in the sidebar">Database Objects ↗</button></section>
-<nav class="object-toolbar" aria-label="Object navigation"><div class="toolbar-group"><button class="vscode-button secondary" id="back" title="Previous inspected object (Alt+Left)">← Back</button><button class="vscode-button secondary" id="forward" title="Next inspected object (Alt+Right)">Forward →</button><label class="history-label"><span class="sr-only">Inspection history</span><select id="history" aria-label="Inspection history"><option>History</option></select></label></div><div class="toolbar-group"><button class="vscode-button secondary" id="refresh" title="Retrieve the object's current database values">Refresh</button><button class="vscode-button secondary" id="pin" aria-pressed="false" title="Keep this tab when opening other objects">Pin tab</button><button class="vscode-button secondary" id="source" title="Open this class in the workspace source browser">Open class source</button></div></nav>
-<div class="identity-bar"><p class="identity" id="identity"></p><button class="quiet-button" id="copyOid" title="Copy the complete object identifier (Ctrl+Shift+C)">Copy ID</button></div><p id="state" class="state" role="status"></p><p id="pin-help" class="help"></p>
+<nav class="object-toolbar" aria-label="Object navigation"><div class="toolbar-group"><button class="vscode-button secondary" id="back" title="Previous inspected object (Alt+Left)">← Back</button><button class="vscode-button secondary" id="forward" title="Next inspected object (Alt+Right)">Forward →</button></div><div class="toolbar-group"><button class="vscode-button secondary" id="refresh" title="Retrieve the object's current database values">Refresh</button><details class="inspection-more" id="inspection-more" open><summary>More</summary><div class="more-actions"><label class="history-label"><span class="sr-only">Inspection history</span><select id="history" aria-label="Inspection history"><option>History</option></select></label><button class="vscode-button secondary" id="pin" aria-pressed="false" title="Keep this tab when opening other objects">Pin tab</button></div></details><button class="vscode-button secondary" id="source" title="Open this class in the workspace source browser">Open class source</button></div></nav>
+<div class="identity-bar"><p class="identity" id="identity"></p><button class="quiet-button" id="copyOid" title="Copy the complete object identifier (Ctrl+Shift+C)">Copy ID</button></div><p id="state" class="state" role="status"></p><p id="pin-help" class="help"></p><p id="origin" class="help"></p>
 <section class="card" id="object-properties"><div class="section-heading"><h2>Properties <span class="count" id="property-count"></span></h2><label class="filter-label"><span class="sr-only">Filter properties</span><input class="vscode-textfield" type="search" id="properties-filter" placeholder="Find a property or value…" aria-label="Filter property names, types and values"></label></div><div class="table-wrap"><table><caption class="sr-only">Object properties and values</caption><thead><tr><th scope="col">Property</th><th scope="col">Type</th><th scope="col">Value</th></tr></thead><tbody id="properties"></tbody></table></div></section>
 <section class="card" id="collection" hidden><div class="collection-heading"><div><h2>Collection entries <span class="count" id="entry-count"></span></h2><p class="help">Native keys and indexes. Open a reference to inspect its object.</p></div><div class="pager"><label class="page-size-label">Page size<select id="page-size" aria-label="Entries per page"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select></label><button class="vscode-button secondary" id="first" title="Restart collection traversal at its first entry">First</button><button class="vscode-button secondary" id="next" title="Retrieve the next page in native collection order">Next →</button></div></div>
 <div class="filters"><label class="filter-label"><span class="sr-only">Filter entries on this page</span><input class="vscode-textfield" type="search" id="entries-filter" placeholder="Filter this page…" aria-label="Filter entries on the current page"></label><label class="sort-label">Display order<select id="entries-sort"><option value="native">Native order</option><option value="key-asc">Key / index ↑</option><option value="key-desc">Key / index ↓</option><option value="value-asc">Value A → Z</option><option value="value-desc">Value Z → A</option><option value="type-asc">Type A → Z</option></select></label><details class="column-picker"><summary>Columns</summary><div><label><input id="show-key" type="checkbox" checked> Key / index</label><label><input id="show-type" type="checkbox" checked> Type</label></div></details></div><p class="help" id="display-note">Filtering and display order apply to this page only. Native collection order is unchanged.</p>

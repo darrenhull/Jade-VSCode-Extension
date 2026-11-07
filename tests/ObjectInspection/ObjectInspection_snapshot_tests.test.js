@@ -1,0 +1,129 @@
+"use strict";
+const test = require("node:test"), assert = require("node:assert/strict"), path = require("node:path");
+const { fieldText } = require("../../extension/media/object-page");
+const { setup, oid } = require("../../test/fixtures/object-ui.cjs");
+const turn = () => new Promise(resolve => setImmediate(resolve));
+const latest = panel => panel.messages.filter(message => message.command === "object").at(-1);
+async function usingFixture(run) {
+  const fixture = setup();
+  try { await run(fixture); } finally { await fixture.cleanup(); }
+}
+
+test("stored values distinguish null, empty, false, zero, unavailable and unloaded references", () => {
+  assert.equal(fieldText({ value: null }), "null");
+  assert.equal(fieldText({ value: "" }), '\"\"');
+  assert.equal(fieldText({ value: false }), "false");
+  assert.equal(fieldText({ value: 0 }), "0");
+  assert.equal(fieldText({ error: "Restricted" }), "Unavailable: Restricted");
+  assert.equal(fieldText({ oid: "51.1", type: "Fish" }), "Not loaded · 51.1");
+  assert.equal(fieldText({}), "Unavailable");
+});
+
+test("snapshot retains its target context after connection closes", () => usingFixture(async s => {
+  await s.connect();
+  await s.commands.get("jadeNative.inspectObject")(oid(10));
+  const panel = s.panels[0], before = latest(panel);
+  assert.equal(before.connection.target, "source");
+  assert.ok(before.connection.projectRoot);
+  s.clients[0].finishClose();
+  await turn();
+  assert.equal(panel.messages.at(-1).command, "disconnected");
+  assert.equal(panel.messages.at(-1).connection.path, before.connection.path);
+  assert.equal(panel.messages.at(-1).object.oid, oid(10));
+}));
+
+test("Back restores the prior page and scroll without another native object read", () => usingFixture(async s => {
+  await s.connect();
+  await s.commands.get("jadeNative.inspectObject")(oid(10));
+  const panel = s.panels[0];
+  await panel.receive({ command: "viewState", oid: oid(10), scrollY: 127, selection: "name" });
+  await panel.receive({ command: "open", oid: oid(11) });
+  const count = s.clients[0].requests.filter(request => request.command === "object").length;
+  await panel.receive({ command: "back" });
+  assert.equal(latest(panel).object.oid, oid(10));
+  assert.equal(latest(panel).view.scrollY, 127);
+  assert.equal(s.clients[0].requests.filter(request => request.command === "object").length, count);
+}));
+
+test("class-to-instances bridge selects the exact declared schema and reports absent local classes", () => usingFixture(async s => {
+  await s.connect();
+  const identity = { schema: "Pets", className: "Fish", projectRoot: path.join(s.root, "source") };
+  const result = await s.controller.browseInstances(identity);
+  assert.equal(result.name, "Fish");
+  assert.equal(result.target, "source");
+  assert.ok(result.databasePath);
+  const missing = await s.controller.browseInstances({ ...identity, schema: "Other" });
+  assert.equal(missing.available, false);
+  assert.equal(s.controller.session.target, "source");
+}));
+
+test("disposed inspection tabs ignore a late native object result", () => usingFixture(async s => {
+  await s.connect();
+  await s.commands.get("jadeNative.inspectObject")(oid(10));
+  const panel = s.panels[0], client = s.clients[0], request = client.request;
+  let finish;
+  client.request = (command, args) => command === "object"
+    ? new Promise(resolve => { finish = () => resolve({ oid: args.oid, className: "Fish", schema: "Pets", properties: [] }); })
+    : request(command, args);
+  const pending = s.commands.get("jadeNative.inspectObject")(oid(11));
+  await turn();
+  panel.dispose();
+  const count = panel.messages.length;
+  finish();
+  await pending;
+  assert.equal(panel.messages.length, count);
+  assert.equal(s.panels.length, 1);
+}));
+
+test("disconnected snapshot supports copy and source navigation without reconnecting", () => usingFixture(async s => {
+  await s.connect();
+  await s.commands.get("jadeNative.inspectObject")(oid(10));
+  const panel = s.panels[0];
+  s.clients[0].finishClose();
+  await turn();
+  await panel.receive({ command: "copyOid" });
+  assert.equal(s.copied.at(-1), oid(10));
+  let source;
+  s.commands.set("jadeNative.findSourceClass", (...args) => { source = args; });
+  await panel.receive({ command: "source" });
+  assert.equal(source[0], "Fish");
+  assert.equal(source[1], "Pets");
+  assert.ok(source[2]);
+  assert.equal(s.clients.length, 1);
+}));
+
+test("collection failure retains the object identity and surfaces a retryable page error", () => usingFixture(async s => {
+  await s.connect();
+  const client = s.clients[0], request = client.request;
+  client.request = async (command, args) => {
+    if (command === "object") return { oid: args.oid, className: "FishList", schema: "Pets", collection: true, properties: [] };
+    if (command === "collection") throw Error("Cursor read denied");
+    return request(command, args);
+  };
+  await s.commands.get("jadeNative.inspectObject")(oid(20));
+  const data = latest(s.panels[0]);
+  assert.equal(data.object.oid, oid(20));
+  assert.equal(data.error, "Cursor read denied");
+  assert.equal(data.page, undefined);
+}));
+
+test("cancelled class instance target selection never starts a database session and resolves the requested project", () => usingFixture(async s => {
+  s.vscode.window.showQuickPick = async () => undefined;
+  const project = path.join(s.root, "different-project");
+  const result = await s.controller.browseInstances({ schema: "Pets", className: "Fish", projectRoot: project });
+  assert.equal(result.cancelled, true);
+  assert.equal(s.clients.length, 0);
+  assert.equal(s.configCalls.at(-1).folder.uri.fsPath, project);
+}));
+
+test("older class-to-instances chooser cannot retarget a newer class request", () => usingFixture(async s => {
+  let resolve, count = 0;
+  s.vscode.window.showQuickPick = async () => ++count === 1 ? new Promise(done => { resolve = done; }) : { target: "source" };
+  const identity = { schema: "Pets", className: "Fish", projectRoot: path.join(s.root, "source") };
+  const older = s.controller.browseInstances(identity);
+  await turn();
+  await s.controller.browseInstances(identity);
+  resolve({ target: "source" });
+  assert.equal((await older).cancelled, true);
+  assert.equal(s.clients.length, 1);
+}));

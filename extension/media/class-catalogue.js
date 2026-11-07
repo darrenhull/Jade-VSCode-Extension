@@ -86,6 +86,7 @@
         schema: "Schema",
         parent: "Base class",
         kind: "Kind",
+        projectName: "Project",
       }[key];
       header.append(cell);
     }
@@ -102,14 +103,19 @@
           button.textContent = row.name;
           button.title = "Explore " + row.schema + "::" + row.name;
           button.addEventListener("click", () =>
-            vscode.postMessage({ command: "open", id: row.browserId }),
+            vscode.postMessage({ command: "open", id: row.browserId, scrollTop: document.scrollingElement.scrollTop }),
           );
           cell.append(button);
         } else cell.textContent = row[key] || "—";
         tr.append(cell);
       }
       rows.append(tr);
+      if (row.browserId === value.selectedId) {
+        tr.setAttribute('aria-selected','true');
+        tr.classList.add('selected');
+      }
     }
+    if (Number.isFinite(value.scrollTop)) document.scrollingElement.scrollTop=value.scrollTop;
     previous.disabled = value.loading || !page.hasPrevious;
     next.disabled = value.loading || !page.hasMore;
     document.getElementById("empty").hidden =

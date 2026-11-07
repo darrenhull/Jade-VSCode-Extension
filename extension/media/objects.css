@@ -405,6 +405,34 @@ tr:focus-within .copy-value {
   background: var(--vscode-badge-background);
   color: var(--vscode-badge-foreground);
 }
+tr:focus-visible, tr.selected {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+  background: var(--vscode-list-inactiveSelectionBackground);
+}
+button, input, select { max-width: 100%; }
+.connection-path, .identity, .value-content { overflow-wrap: anywhere; }
+.inspection-more { position: relative; }
+.inspection-more > summary { display: none; cursor: pointer; padding: 6px 10px; }
+.more-actions { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 480px) {
+  body { padding: 14px; min-width: 0; }
+  .page-header, .object-toolbar, .collection-heading, .identity-bar { flex-wrap: wrap; }
+  .toolbar-group { flex-wrap: wrap; min-width: 0; }
+  .filter-label { min-width: 0 !important; width: 100%; }
+  #object-properties table, #object-properties tbody, #object-properties tr,
+  #object-properties td { display: block; width: 100%; }
+  #object-properties thead { display: none; }
+  #object-properties tr { margin: 8px 0; border: 1px solid var(--vscode-panel-border); }
+  #object-properties td::before { content: attr(data-label); display: block;
+    font-size: 10px; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+  .history-label { max-width: 100%; }
+  .table-wrap { max-width: 100%; overflow-x: auto; }
+  .inspection-more > summary { display: list-item; }
+  .inspection-more[open] > .more-actions { position: absolute; right: 0; top: 32px;
+    z-index: 5; min-width: 200px; max-width: 85vw; padding: 10px; flex-direction: column;
+    background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-panel-border); }
+}
 @media (max-width: 760px) {
   .section-heading,
   .filters {

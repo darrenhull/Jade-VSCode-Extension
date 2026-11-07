@@ -1,3 +1,10 @@
+# 0.17.0 — Class and object workspaces
+
+- Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.
+- Edit local methods in the class workspace with the original source document's save and undo history, completion and compiler diagnostics.
+- Browse instances through an explicit Source or Working choice, retaining class and project identity.
+- Navigate read-only object and collection snapshots with retained history, page state and clear disconnected status.
+
 # 0.16.0 — Collection families and native rules
 
 - Create ordered object arrays and unique object sets alongside keyed dictionaries.

@@ -23,6 +23,7 @@ function registerClassCatalogue(vscode, context, options) {
     },
     model = new ClassBrowserModel({ scope: metadata.scope }),
     filter = { query: "", offset: 0 },
+    selectedId = "", scrollTop = 0,
     lastPayload;
   const listeners = [];
   function viewRow(row) {
@@ -36,6 +37,7 @@ function registerClassCatalogue(vscode, context, options) {
       browserId: row.browserId,
       name: row.name,
       schema: row.schema,
+      projectName: row.projectName,
       ...(parent ? { parent } : {}),
       ...(typeof row.kind === "string" && row.kind ? { kind: row.kind } : {}),
       position: row.position,
@@ -50,6 +52,7 @@ function registerClassCatalogue(vscode, context, options) {
             .items.map(viewRow)
         : [];
     const columns = ["name", "schema"];
+    if (model.rows.some(row => row.projectName)) columns.push("projectName");
     if (model.rows.some((row) => viewRow(row).parent)) columns.push("parent");
     else if (model.rows.some((row) => viewRow(row).kind)) columns.push("kind");
     lastPayload = {
@@ -59,6 +62,7 @@ function registerClassCatalogue(vscode, context, options) {
       scope: metadata.scope,
       loading,
       filter: { ...filter },
+      selectedId, scrollTop,
       schemas: model.schemas(),
       columns,
       page: { ...page, items: page.items.map(viewRow) },
@@ -140,15 +144,17 @@ function registerClassCatalogue(vscode, context, options) {
     }
     if (
       !Array.isArray(identity) ||
-      identity.length !== 3 ||
+      ![3,4].includes(identity.length) ||
       identity[0] !== metadata.scope
     )
       throw Error("Unknown class identity");
-    const row = model.find({ schema: identity[1], name: identity[2] });
+    const row = model.find({ schema: identity[1], name: identity[2], projectId: identity[3] });
     if (!row || row.browserId !== id) throw Error("Unknown class identity");
+    selectedId = id;
     return options.openClass(row, {
       scope: metadata.scope,
       generation: metadata.generation,
+      filter: { ...filter }, selectedId, scrollTop,
     });
   }
   async function receive(message) {
@@ -163,7 +169,10 @@ function registerClassCatalogue(vscode, context, options) {
         offset: message.offset,
       });
     else if (message?.command === "refresh") await refresh();
-    else if (message?.command === "open") await open(message.id);
+    else if (message?.command === "open") {
+      if (Number.isFinite(message.scrollTop)) scrollTop = Math.max(0, Math.min(10000000,message.scrollTop));
+      await open(message.id);
+    }
     else if (
       message?.command === "rendered" &&
       message.revision === revision &&
@@ -223,6 +232,12 @@ function registerClassCatalogue(vscode, context, options) {
     const reused = !!panel;
     if (!panel) create();
     else panel.reveal(vscode.ViewColumn.Active);
+    if (value.restore) {
+      const restore=value.restore;
+      await setFilter(restore.filter || {});
+      selectedId=typeof restore.selectedId==='string'?restore.selectedId:'';
+      scrollTop=Number.isFinite(restore.scrollTop)?Math.max(0,restore.scrollTop):0;
+    }
     if (Object.hasOwn(value, "schema"))
       filter = { query: "", schema: value.schema || undefined, offset: 0 };
     await refresh();

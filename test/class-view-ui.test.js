@@ -34,6 +34,7 @@ function setup() {
     static file(value) {
       return new Uri("file", value);
     }
+    static joinPath(uri,...parts){return new Uri(uri.scheme,uri.path+'/'+parts.join('/'));}
     static from(value) {
       return new Uri(value.scheme, value.path, value.query);
     }
@@ -58,10 +59,12 @@ function setup() {
     changes = new Emitter(),
     closes = new Emitter(),
     disposable = { dispose() {} };
-  let contentProvider;
+  let contentProvider,customProvider;
+  const panels=[];
   function doc(uri, text) {
     const value = {
       uri,
+      fileName: uri.fsPath, version:1,
       text,
       getText() {
         return this.text;
@@ -116,6 +119,7 @@ function setup() {
     ViewColumn: { Active: 1, Beside: 2 },
     Uri,
     workspace: {
+      fs:{isWritableFileSystem:()=>true},
       findFiles: async () => [],
       workspaceFolders: [],
       getWorkspaceFolder: () => undefined,
@@ -145,12 +149,14 @@ function setup() {
       }),
     },
     window: {
+      registerCustomEditorProvider:(_type,provider)=>{customProvider=provider;return disposable;},
       createWebviewPanel: (type, title, column) => {
         let receive, dispose;
         const panel = {
           title,
           type,
           column,
+          viewColumn:column,messages:[],
           active: true,
           webview: {
             cspSource: "vscode:",
@@ -161,6 +167,7 @@ function setup() {
               return disposable;
             },
             postMessage: async (message) => {
+              panel.messages.push(message);
               if (message.command === "member")
                 queueMicrotask(() =>
                   receive({ command: "rendered", revision: message.revision }),
@@ -178,6 +185,7 @@ function setup() {
             dispose?.();
           },
         };
+        panels.push(panel);
         return panel;
       },
       createTreeView: () => ({ reveal: async () => {}, dispose() {} }),
@@ -188,16 +196,22 @@ function setup() {
       },
       showQuickPick: async (options) => options[0],
     },
-    languages: { setTextDocumentLanguage: async (doc) => doc },
+    languages: { setTextDocumentLanguage: async (doc) => doc,getDiagnostics:()=>[],onDidChangeDiagnostics:()=>disposable },
     commands: {
       registerCommand: (name, fn) => {
         commands.set(name, fn);
         return disposable;
       },
-      executeCommand: async (name, ...args) => commands.get(name)(...args),
+      executeCommand: async (name, ...args) => {
+        if(name==='vscode.openWith'){
+          const document=docs.get(args[0].toString()),panel=vscode.window.createWebviewPanel('jade.classWorkspace','Class workspace',args[2].viewColumn);
+          await customProvider.resolveCustomTextEditor(document,panel);return;
+        }
+        return commands.get(name)(...args);
+      },
     },
   };
-  const context = { subscriptions: [], extensionPath: "/extension" },
+  const context = { subscriptions: [], extensionPath: "/extension",extensionUri:Uri.file('/extension') },
     api = registerClassView(vscode, context, { index });
   return {
     api,
@@ -209,6 +223,7 @@ function setup() {
     vscode,
     changes,
     doc,
+    panels,
     dispose() {
       for (const value of context.subscriptions) value.dispose?.();
       index.dispose();
@@ -262,27 +277,25 @@ test("two schema-qualified member previews both update after interleaved unsaved
     const previews = [];
     for (const row of rows) {
       await s.commands.get("jadeNative.previewClassMember")(row);
-      previews.push(
-        s.api.previewController.records.get(row.schema + "::" + row.owner),
-      );
+      previews.push(s.panels.at(-1));
     }
-    assert.notEqual(previews[0].key, previews[1].key);
+    assert.notEqual(previews[0].title, previews[1].title);
     s.first.text = s.first.text.replace('"one"', '"changed one"');
     s.index.document(s.first);
-    s.changes.fire({ document: s.first });
+    s.changes.fire({ document: s.first,contentChanges:[] });
     s.second.text = s.second.text.replace('"two"', '"changed two"');
     s.index.document(s.second);
-    s.changes.fire({ document: s.second });
+    s.changes.fire({ document: s.second,contentChanges:[] });
     for (
       let i = 0;
       i < 25 &&
-      (!previews.some((p) => p.content.text.includes("changed one")) ||
-        !previews.some((p) => p.content.text.includes("changed two")));
+      (!previews.some((p) => JSON.stringify(p.messages).includes("changed one")) ||
+        !previews.some((p) => JSON.stringify(p.messages).includes("changed two")));
       i++
     )
       await new Promise((r) => setTimeout(r, 20));
-    assert.ok(previews.some((p) => p.content.text.includes("changed one")));
-    assert.ok(previews.some((p) => p.content.text.includes("changed two")));
+    assert.ok(previews.some((p) => JSON.stringify(p.messages).includes("changed one")));
+    assert.ok(previews.some((p) => JSON.stringify(p.messages).includes("changed two")));
   } finally {
     s.dispose();
   }
@@ -295,7 +308,7 @@ test("clicking a method or property opens its focused preview while explicit ori
       ),
       cls = (await s.api.provider.getChildren(schema))[0],
       groups = await s.api.provider.getChildren(cls);
-    assert.equal(s.api.provider.getTreeItem(cls).command, undefined);
+    assert.equal(s.api.provider.getTreeItem(cls).command.command, 'jadeNative.openClassWorkspace');
     for (const label of ["Methods", "Properties"]) {
       const row = groups.find((group) => group.label === label).items[0],
         item = s.api.provider.getTreeItem(row);
@@ -304,13 +317,10 @@ test("clicking a method or property opens its focused preview while explicit ori
         item.command.command,
         ...item.command.arguments,
       );
-      const preview = s.api.previewController.records.get(
-        row.schema + "::" + row.owner,
-      );
-      assert.equal(preview.panel.type, "jadeSourceMember");
-      assert.ok(preview.content.text.includes(row.name));
-      assert.ok(!preview.content.text.includes("typeHeaders"));
-      await s.commands.get("jadeNative.openOriginalSource")();
+      const preview = s.panels.at(-1);
+      assert.equal(preview.type, "jade.classWorkspace");
+      assert.ok(!preview.webview.html.includes('typeHeaders'));
+      await s.commands.get("jadeNative.openOriginalSource")(row);
       assert.equal(
         s.vscode.window.activeTextEditor.document.uri.toString(),
         s.first.uri.toString(),

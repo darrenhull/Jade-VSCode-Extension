@@ -68,7 +68,7 @@ function activate(context) {
   const language=require('./language-tools').registerLanguageTools(vscode,context);
   require('./navigation').registerNavigation(context,language);
   require('./impact-navigation').registerImpactNavigation(vscode,context,language);
-  const classView=require('./class-view').registerClassView(vscode,context,language);
+  const classView=require('./class-view').registerClassView(vscode,context,language,{onInstances:row=>objectExplorer?.browseInstances(row)});
   const diagnostics = vscode.languages.createDiagnosticCollection('jade-native');
   const publishOutput = vscode.window.createOutputChannel('Jade Publish');
   const compileOutput = vscode.window.createOutputChannel('Jade Compile');

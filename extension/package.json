@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -31,6 +31,12 @@
     "onNotebook:jade-workspace"
   ],
   "contributes": {
+    "customEditors": [{
+      "viewType": "jade.classWorkspace",
+      "displayName": "Class Workspace",
+      "selector": [{"filenamePattern": "*.cls"}],
+      "priority": "option"
+    }],
     "viewsContainers": {
       "activitybar": [
         {
@@ -127,6 +133,11 @@
         "command": "jadeNative.previewClassMember",
         "title": "Preview Member",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "jadeNative.openClassWorkspace",
+        "title": "Jade: Open Class Workspace",
+        "icon": "$(symbol-class)"
       },
       {
         "command": "jadeNative.showClassMember",
