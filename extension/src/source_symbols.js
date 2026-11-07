@@ -4,6 +4,7 @@ const {lexSource,signature}=require('./source-lex');
 function maskTrivia(text) {
   return lexSource(text).code;
 }
+const {topLevelMatches}=require('./source-context');
 
 function parseSource(text, uri = '') {
   const {code,excluded} = lexSource(text);
@@ -40,7 +41,7 @@ function parseSource(text, uri = '') {
         end: definition.index + match.index + match[0].length, declaration: true });
     }
   }
-  const sources = [...code.matchAll(/^\s*([A-Za-z_]\w*)\s*\(\s*\r?\n\s*jadeMethodSources\s*$/gm)];
+  const sources = topLevelMatches(code,/^\s*([A-Za-z_]\w*)\s*\(\s*\r?\n\s*jadeMethodSources\s*$/gm);
   for (let i = 0; i < sources.length; i++) {
     const header = sources[i];
     const cls = classByName.get(header[1]);
@@ -49,7 +50,7 @@ function parseSource(text, uri = '') {
     const end = sources[i + 1]?.index ?? code.length;
     cls.regions.push([header.index, end]);
     cls.end = Math.max(cls.end, end);
-    const bodies=[...code.slice(start,end).matchAll(/^\s*([A-Za-z_]\w*)\s*\r?\n\s*\{/gm)];
+    const bodies=topLevelMatches(code.slice(start,end),/^\s*([A-Za-z_]\w*)\s*\r?\n\s*\{/gm);
     for (const match of bodies) {
       const selection = start + match.index + match[0].indexOf(match[1]);
       const bodyStart=start+match.index+match[0].length;let depth=1,bodyEnd=bodyStart;for(;bodyEnd<end;bodyEnd++){if(code[bodyEnd]==='{')depth++;else if(code[bodyEnd]==='}'&&!--depth){bodyEnd++;break;}}

@@ -192,3 +192,27 @@ test('only actual leading metadata directives are outdented through header comme
  const expected=source.replace('\uFEFF    jadeVersionNumber','\uFEFFjadeVersionNumber').replace('    jadePatchRelease','jadePatchRelease');
  assert.equal(apply(source),expected);assert.equal(apply(expected),expected);assert.equal(apply(source,{}, {start:source.indexOf('    jadePatchRelease'),end:source.indexOf('\nschemaDefinition')}),source.replace('    jadePatchRelease','jadePatchRelease'));
 });
+
+test('section names used in method arguments or method labels cannot become source boundaries',()=>{
+ const names=['typeSources','externalFunctionSources','schemaDefinition','typeDefinitions','typeHeaders','constantDefinitions','databaseDefinitions','attributeDefinitions','referenceDefinitions','jadeMethodDefinitions','jadeMethodSources','externalMethodSources','webServicesMethodSources'];
+ for(const name of names){
+  const source=`typeHeaders\n    Probe subclassOf Object transient;\ntypeSources\n    Probe (\n    jadeMethodSources\n    ${name}\n    {\n    ${name}();\n    begin\n  consume(\n      ${name}\n  );\n    end;\n    }\n    )\n`;
+  const edits=formattingEdits(source,{tabSize:4,insertSpaces:true},undefined,'Probe.cls');for(let i=1;i<edits.length;i++)assert.ok(edits[i-1].end<=edits[i].start,`${name}: overlapping edits`);
+  const formatted=apply(source);assert.ok(formatted.includes(`\n        ${name}\n`),name);assert.equal(apply(formatted),formatted,name);
+  const start=source.indexOf(`      ${name}\n`),end=source.indexOf('\n',start);const selected=apply(source,{}, {start,end});assert.equal(apply(selected,{}, {start,end:selected.indexOf('\n',start)}),selected,`${name}: selected continuation drift`);
+ }
+});
+test('source boundary names in split declaration identifiers do not truncate their owner',()=>{
+ for(const name of ['typeSources','externalFunctionSources']){
+  const source=`typeHeaders\nCow subclassOf Object;\ntypeDefinitions\nCow completeDefinition\n(\nattributeDefinitions\n  ${name}\n      : Integer;\n  other: Integer;\n)\ntypeSources\n`;
+  const formatted=apply(source);assert.ok(formatted.includes(`\n        ${name}\n`));assert.ok(formatted.includes('\n        other: Integer;'));assert.equal(apply(formatted),formatted);
+ }
+});
+test('selected declaration continuations do not drift when their anchor is outside the range',()=>{
+ const source='typeDefinitions\nCow completeDefinition\n(\njadeMethodDefinitions\nsetValues(\n    first: Integer;\n    second: String) updating;\n)\ntypeSources\n',start=source.indexOf('    first:'),end=source.indexOf('\n',start);
+ const formatted=apply(source,{}, {start,end});assert.equal(apply(formatted,{}, {start,end:formatted.indexOf('\n',start)}),formatted);
+});
+test('definition-label identifiers inside continued declarations do not become metadata sections',()=>{
+ const source='typeDefinitions\nCow completeDefinition\n(\njadeMethodDefinitions\nsetValues(\n    typeDefinitions\n        : Integer) updating;\n)\ntypeSources\n';
+ const formatted=apply(source);assert.ok(formatted.includes('\n            typeDefinitions\n'));assert.equal(apply(formatted),formatted);
+});

@@ -62,7 +62,7 @@ test('multiline calls, operators and comments retain their relative continuation
   assert.equal(apply(source),expected);
   assert.equal(apply(expected),expected);
   const start=source.indexOf('      first,'),end=start+'      first,'.length;
-  assert.equal(apply(source,{}, {start,end}),source.slice(0,start)+'        first,'+source.slice(end));
+  assert.equal(apply(source,{}, {start,end}),source,'A continuation keeps its unchanged out-of-range anchor.');
 });
 
 test('large extracted classes visit a bounded number of array entries instead of rescanning each method',()=>{
@@ -101,4 +101,13 @@ test('opaque encrypted source bytes remain untouched while their native source e
  const expected='typeSources\nCow (\njadeMethodSources\nhidden\n{\n  __encrypted[6]AQAA\n     ABCDEF\n  __endEncrypted\n}\n)\n';
  assert.equal(apply(source,{},undefined,'Cow.cls'),expected);
  assert.equal(apply(expected,{},undefined,'Cow.cls'),expected);
+});
+
+test('signature and expression continuation range formatting remains stable without the anchor line',()=>{
+ for(const source of ['    run(\n        first: Integer) updating;\nbegin\nreturn;\nend;','run();\nbegin\n  consume(\n      value\n  );\nend;']){
+  const line=source.includes('first:')?'        first: Integer) updating;':'      value',start=source.indexOf(line),range={start,end:start+line.length};let once=source;
+  for(const e of formattingEdits(source,{tabSize:4,insertSpaces:true},range,'method.jade').reverse())once=once.slice(0,e.start)+e.text+once.slice(e.end);
+  let twice=once;for(const e of formattingEdits(once,{tabSize:4,insertSpaces:true},{start,end:once.indexOf('\n',start)},'method.jade').reverse())twice=twice.slice(0,e.start)+e.text+twice.slice(e.end);
+  assert.equal(twice,once);
+ }
 });

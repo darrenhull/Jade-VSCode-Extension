@@ -1,6 +1,7 @@
 'use strict';
 const {lexSource}=require('./source-lex');
 const {parseSource}=require('./source_symbols');
+const {lineContexts}=require('./source-context');
 const {declarationEdits}=require('./cls-declaration-formatter');
 const {sourceContainerEdits}=require('./cls-source-formatter');
 
@@ -47,6 +48,8 @@ function linesOf(text,excluded) {
 }
 function formattingEdits(text,options={},selection,uri='') {
   const {code,excluded}=lexSource(text),lines=linesOf(text,excluded),edits=[];
+  const contexts=/\.cls$/i.test(uri)?lineContexts(code,lines):undefined;
+  const selected=line=>!selection||line.start>=selection.start&&line.end<=selection.end&&line.start<selection.end;
   const size=Math.max(1,Math.min(16,Number(options.tabSize)||4)),spaces=options.insertSpaces!==false;
   const unit=spaces?' '.repeat(size):'\t',unclosed=excluded.filter(range=>!range.closed&&range.kind!=='comment');
   const columns=leading=>{let width=0;for(const ch of leading)width=ch==='\t'?width+size-width%size:width+1;return width;};
@@ -62,24 +65,24 @@ function formattingEdits(text,options={},selection,uri='') {
     let anchor,balance=0,condition;
     const incomplete=unclosed[firstAt(unclosed,method.start)];
     if(incomplete&&incomplete.start<method.end)continue;
-    let signatureAnchor;
+    let signatureAnchor,signatureTarget;
     for(let at=Math.max(0,firstAt(lines,method.signatureStart)-1);at<lines.length&&lines[at].start<method.start;at++) {
       const line=lines[at];if(line.end<=method.signatureStart||line.inside)continue;
       const value=code.slice(line.start,line.end).trim(),leading=/^[\t ]*/.exec(text.slice(line.start,line.end))[0];
-      if(line.start>=method.signatureStart&&value&&signatureAnchor===undefined)signatureAnchor=columns(leading);
-      prefixEdit(line,signatureAnchor===undefined?'':indent(Math.max(0,columns(leading)-signatureAnchor)),pending);
+      if(line.start>=method.signatureStart&&value&&signatureAnchor===undefined){signatureAnchor=columns(leading);signatureTarget=selected(line)?0:signatureAnchor;}
+      prefixEdit(line,signatureAnchor===undefined?'':indent(Math.max(0,signatureTarget+columns(leading)-signatureAnchor)),pending);
     }
-    function expression(value,leading,depth) {
+    function expression(value,leading,depth,line) {
       if(!value)return;
       for(const ch of value){if(ch==='('||ch==='[')balance++;else if(ch===')'||ch===']')balance--;if(balance<0){valid=false;return;}}
-      if(balance||!/;\s*$/.test(value))anchor??={original:columns(leading),formatted:depth*size};
+      if(balance||!/;\s*$/.test(value))anchor??={original:columns(leading),formatted:selected(line)?depth*size:columns(leading)};
       else anchor=undefined;
     }
     for(let at=firstAt(lines,method.start);at<lines.length&&lines[at].start<method.end;at++) {
       const line=lines[at];if(line.end>method.end)continue;
       const raw=text.slice(line.start,line.end),value=code.slice(line.start,line.end).trim();
       const leading=/^[\t ]*/.exec(raw)[0],continued=anchor;
-      if(line.inside&&!condition){expression(value,leading,stack.length);continue;} // Preserve literal/comment bytes, but observe an exposed closing semicolon.
+      if(line.inside&&!condition){expression(value,leading,stack.length,line);continue;} // Preserve literal/comment bytes, but observe an exposed closing semicolon.
       if(finished) {if(value)valid=false;continue;}
       let depth=stack.length||(declarations?1:0),control=false;
       if(condition) {
@@ -130,19 +133,19 @@ function formattingEdits(text,options={},selection,uri='') {
         depth=stack.length-1;
         if(/^elseif\b/i.test(value)&&!/^elseif\b[\s\S]*\bthen$/i.test(value)) {
           if(/;\s*$/.test(value)){valid=false;break;}
-          condition={kind:'elseif',terminal:'then'};anchor={original:columns(leading),formatted:depth*size,minimum:size};
+          condition={kind:'elseif',terminal:'then'};anchor={original:columns(leading),formatted:selected(line)?depth*size:columns(leading),minimum:size};
         }
       } else if(/^(?:if|while|foreach|for)\b/i.test(value)) {
         control=true;
         const kind=/^(if|while|foreach|for)\b/i.exec(value)[1].toLowerCase(),terminal=kind==='if'?'then':'do';
         if(!begun||/;\s*$/.test(value)){valid=false;break;}
         if(new RegExp('\\b'+terminal+'$','i').test(value))stack.push(kind);
-        else {condition={kind,terminal};anchor={original:columns(leading),formatted:depth*size,minimum:size};}
+        else {condition={kind,terminal};anchor={original:columns(leading),formatted:selected(line)?depth*size:columns(leading),minimum:size};}
       } else if(/^(?:select|try|catch|finally|repeat|until|rescue|prolog|end\w*)\b/i.test(value)) {
         valid=false;break;
       }
       }
-      if(!control)expression(value,leading,depth);
+      if(!control)expression(value,leading,depth,line);
       if(!valid)break;
       if(line.inside)continue;
       if(!raw.trim())continue;
@@ -157,8 +160,8 @@ function formattingEdits(text,options={},selection,uri='') {
     }
   }
   if(/\.cls$/i.test(uri)) {
-    edits.push(...declarationEdits(text,{code,lines},{unit,size,columns,indent},selection));
-    edits.push(...sourceContainerEdits(text,{code,lines},selection));
+    edits.push(...declarationEdits(text,{code,lines,contexts},{unit,size,columns,indent},selection));
+    edits.push(...sourceContainerEdits(text,{code,lines,contexts},selection));
   }
   return edits.sort((a,b)=>a.start-b.start);
 }

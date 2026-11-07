@@ -44,14 +44,17 @@ async function run() {
     await vscode.commands.executeCommand('undo');assert.equal(clsDocument.getText(),clsSource);
     await vscode.commands.executeCommand('editor.action.formatDocument');assert.equal(clsDocument.getText(),clsFormatted);
     await clsDocument.save();
-    const identifiers=clsSource.replace('dateOfBirth: Date','jadeVersionNumber: Integer').replace('    getName() : String;\n    begin','    getName() : String;\n    vars\n jadePatchRelease: Integer;\n    begin\n jadePatchRelease := 1;');
+    const identifiers=clsSource.replace('dateOfBirth: Date','jadeVersionNumber: Integer').replace('    getName() : String;\n    begin','    getName() : String;\n    vars\n jadePatchRelease: Integer;\n    begin\n jadePatchRelease := 1;\n  consume(\n      typeSources\n  );\n  consume(\n      jadeMethodSources\n  );');
     const identifierFile=path.join(root,'HeaderIdentifiers.cls');fs.writeFileSync(identifierFile,identifiers);
     const identifierDocument=await vscode.workspace.openTextDocument(identifierFile);await vscode.window.showTextDocument(identifierDocument);
     const identifierEdits=await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',identifierDocument.uri,options);
     const identifierEdit=new vscode.WorkspaceEdit();identifierEdit.set(identifierDocument.uri,identifierEdits);assert.equal(await vscode.workspace.applyEdit(identifierEdit),true);
-    const identifierFormatted=identifierDocument.getText();assert.ok(identifierFormatted.includes('\n        jadeVersionNumber: Integer'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease: Integer;'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease := 1;'));
+    const identifierFormatted=identifierDocument.getText();assert.ok(identifierFormatted.includes('\n        jadeVersionNumber: Integer'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease: Integer;'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease := 1;'));assert.ok(identifierFormatted.includes('\n        typeSources\n'));assert.ok(identifierFormatted.includes('\n        jadeMethodSources\n'));
     assert.equal((await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',identifierDocument.uri,options)||[]).length,0);
     await vscode.commands.executeCommand('undo');assert.equal(identifierDocument.getText(),identifiers);await identifierDocument.save();
+    const rangeSource='    run(\n        first: Integer) updating;\nbegin\nreturn;\nend;',rangeFile=path.join(root,'ContinuationRange.jade');fs.writeFileSync(rangeFile,rangeSource);
+    const rangeDocument=await vscode.workspace.openTextDocument(rangeFile),rangeStart=rangeSource.indexOf('        first:'),continuationRange=new vscode.Range(rangeDocument.positionAt(rangeStart),rangeDocument.positionAt(rangeSource.indexOf('\n',rangeStart)));
+    for(let repeat=0;repeat<2;repeat++)assert.equal((await vscode.commands.executeCommand('vscode.executeFormatRangeProvider',rangeDocument.uri,continuationRange,options)||[]).length,0,'An unchanged out-of-range anchor cannot progressively shift a selected continuation.');
     fs.writeFileSync(report,JSON.stringify({passed:true,version:extension.packageJSON.version,formatDocument:true,formatSelection:true,undo:true,idempotent:true,wholeCls:true,propertySelection:true,headerIdentifiers:true,noDatabase:true,file:clsFile},null,2));
     // An explicit visual-verification run can hold the real formatted editor
     // open briefly; normal host/CI runs exit as soon as the checks finish.
