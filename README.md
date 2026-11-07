@@ -105,6 +105,6 @@ Default tests do not opt in to a developer database. Connected/native and actual
 
 Pull requests target **main** and require owner approval and passing checks. CI validates a PR and its reviewed merge to main; feature pushes run only lightweight PR automation. Successful reviewed main builds publish a new version to GitHub Releases. Existing versions and release artifacts are immutable; documentation-only merges do not overwrite an existing release.
 
-CLI release polling opens Draft dependency-update PRs with verified packages and a consumer version update. Implementation, integrity, CI and review findings must be complete before requesting owner review. GitHub scheduling is best-effort. Extension, CLI and MCP are independently versioned products.
+CLI release polling opens Draft dependency-update PRs with verified packages and a consumer version update. Implementation, integrity, CI and review findings must be complete before requesting owner review. GitHub's five-minute scheduling is best-effort, not a five-minute delivery guarantee; delayed or dropped runs can postpone detection. The workflow's Actions history distinguishes automatic schedule runs from explicit workflow_dispatch recovery runs. Extension, CLI and MCP are independently versioned products.
 
 Jade Tools is independent third-party tooling and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
