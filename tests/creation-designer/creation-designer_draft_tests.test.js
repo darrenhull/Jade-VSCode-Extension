@@ -1,6 +1,18 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const { moveKey, definitionRequest, describeDraft, canSave } = require("../../extension/media/creation-designer");
+const { moveKey, definitionRequest, describeDraft, canSave, choicePresentation, diagnosticPresentation } = require("../../extension/media/creation-designer");
+test("imported choices show alias, exporter and importing context without replacing their qualified identity", () => {
+  const row = { id: "Consumer::Zoo::Fish", label: "Consumer::Zoo::Fish", name: "Zoo::Fish", nativeName: "Zoo::Fish", imported: true, originSchema: "Provider", metadataStatus: "known" };
+  const presentation = choicePresentation(row, "ConsumerChild");
+  assert.equal(presentation.label, row.id); assert.match(presentation.detail, /Zoo::Fish/); assert.match(presentation.detail, /Provider/); assert.match(presentation.detail, /Consumer/); assert.match(presentation.detail, /ConsumerChild/);
+  assert.equal(presentation.disabled, false); assert.equal(row.id, "Consumer::Zoo::Fish");
+});
+test("missing imported metadata is presented separately from an invalid schema selection", () => {
+  const unknown = diagnosticPresentation({ code: "JADE_IMPORT_METADATA_UNAVAILABLE", message: "Exported properties were not extracted", metadataStatus: "nativeRequired" });
+  const invalid = diagnosticPresentation({ code: "JADE_TYPE_NOT_VISIBLE", message: "The selected type is not visible", metadataStatus: "known" });
+  assert.equal(unknown.kind, "metadata-unavailable"); assert.match(unknown.message, /Metadata unavailable/); assert.match(unknown.message, /Exported properties/);
+  assert.equal(invalid.kind, "invalid-selection"); assert.notEqual(unknown.kind, invalid.kind);
+});
 test("implicit form submission is permitted only from the reviewed source step", () => {
   const reviewed = { receipt: "receipt", validPreview: true, saving: false };
   assert.equal(canSave({ ...reviewed, step: 0 }), false);

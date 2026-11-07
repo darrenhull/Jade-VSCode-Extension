@@ -50,10 +50,20 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
         saving = true;
         try {
           const freshModel = await modelProvider(project);
-          const checked = await freshModel.preview(approved.request);
+          if (disposed || current !== project) return;
+          // Keep the active catalogue fresh even when this receipt is rejected.
+          // Otherwise every subsequent preview would repeat the stale plan.
+          model = freshModel;
+          let checked;
+          try { checked = await freshModel.preview(approved.request); }
+          catch (error) { if (review === approved) review = undefined; throw error; }
           if (disposed) return;
           if (review !== approved) throw Error("The definition changed during save preparation. Review the current source before saving.");
-          if (fingerprint(checked) !== approved.fingerprint) throw Error("Source definitions changed since review. Review the updated source before saving.");
+          if (fingerprint(checked) !== approved.fingerprint) {
+            review = undefined;
+            await reply({ command: "catalogUpdated", project: project.id, page: freshModel.schemas({ limit: 50 }), notice: freshModel.notice });
+            throw Error("Source definitions changed since review. Review the updated source before saving.");
+          }
           const result = await save(project.root, approved.generated, { dirtyPaths: dirtyPaths() });
           review = undefined;
           let notice;
@@ -77,7 +87,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
     } catch (error) {
       if (fresh()) {
         const text = error.message || String(error), field = error.field || message.field || (/name|already exists/i.test(text) ? "name" : /member/i.test(text) ? "member" : /superclass/i.test(text) ? "superclass" : /schema/i.test(text) ? "schema" : undefined);
-        return reply({ command: "error", sequence, operation: command, field, message: text });
+        return reply({ command: "error", sequence, operation: command, field, message: text, ...(error.code !== undefined ? { code: error.code } : {}), ...(error.metadataStatus ? { metadataStatus: error.metadataStatus } : {}) });
       }
     }
   }
@@ -97,12 +107,12 @@ function designerHtml({ nonce, cspSource, asset }) {
   <label class="not-schema">Lifetime<select id="lifetime"><option value="transient">Transient</option><option value="persistent">Persistent</option></select></label>
   <label class="collection-only" hidden>Dictionary<select id="dictionary"><option value="member">Member-key dictionary</option><option value="external">External-key dictionary</option></select></label>
   <label class="collection-only choice" hidden>Member class<input id="member" data-test="member" autocomplete="off" aria-describedby="member-help"><span class="results" id="member-results" role="listbox" hidden></span><small id="member-help">Search visible schema-qualified classes.</small></label>
-  <label class="not-schema choice">Superclass<input id="superclass" value="Object" autocomplete="off"><span class="results" id="superclass-results" role="listbox" hidden></span></label>
+  <label class="not-schema choice">Superclass<input id="superclass" value="Object" autocomplete="off" aria-describedby="superclass-help"><span class="results" id="superclass-results" role="listbox" hidden></span><small id="superclass-help">Imported package classes can be collection members; native Jade does not permit subclassing imported classes.</small></label>
   </div><p class="hint">Choices follow schema visibility. A folder name does not identify a Jade type.</p></section>
   <section class="card" id="rules" hidden><h2>Keys &amp; rules</h2><p>Keys run from top to bottom. Use the arrow buttons to change priority.</p><div id="keys"></div><button id="add-key" type="button" class="secondary">＋ Add key</button>
   <details><summary>Advanced settings</summary><label class="check"><input type="checkbox" id="duplicates">Allow duplicate keys</label><label> Btree load factor (%)<input id="load-factor" type="number" min="1" max="100" placeholder="Jade default"></label><p class="hint">Positive text locale IDs and ignore-case settings are supported. Binary/Latin1 modes and further collection families are not available in this flow yet.</p></details></section>
   <section class="card" id="review" hidden><h2>Review native source</h2><p>Saving creates source files only. Use Build or Publish separately.</p><div id="files"></div></section>
-  </main><aside class="card"><div class="eyebrow">YOUR DEFINITION</div><h2 id="summary" data-test="summary">Start with a project and a schema.</h2><p id="status" role="status" aria-live="polite">Loading projects…</p><div id="error" data-test="error" role="alert" hidden></div><p id="catalog-notice" class="hint"></p><details id="live-source-details"><summary>Native source preview</summary><pre id="live-source" tabindex="0">Complete the definition to preview native source.</pre></details><p class="hint">Jade’s native compiler remains the authority. No database instances are created here.</p></aside></div>
+  </main><aside class="card"><div class="eyebrow">YOUR DEFINITION</div><h2 id="summary" data-test="summary">Start with a project and a schema.</h2><p id="status" role="status" aria-live="polite">Loading projects…</p><div id="error" data-test="error" role="alert" hidden></div><button id="refresh-choices" type="button" class="secondary">Refresh source choices</button><p id="catalog-notice" class="hint"></p><details id="live-source-details"><summary>Native source preview</summary><pre id="live-source" tabindex="0">Complete the definition to preview native source.</pre></details><p class="hint">Jade’s native compiler remains the authority. No database instances are created here.</p></aside></div>
   <footer><button id="cancel" type="button" class="secondary">Cancel</button><span class="spacer"></span><button id="back" data-test="back" type="button" class="secondary" hidden>Back</button><button id="next" data-test="next" type="button">Review source →</button><button id="save" data-test="save" type="submit" hidden disabled>Save source files</button></footer></form>
   <script nonce="${nonce}" src="${asset("creation-designer.js")}"></script></body></html>`;
 }
@@ -139,7 +149,7 @@ function registerCreationDesigner(vscode, context, options = {}) {
         catch (error) { notice = "System type cache unavailable: " + error.message + ". Refresh the Jade type cache to restore system choices."; }
         if (!cache && !notice) notice = "System type cache not found. Refresh the Jade type cache for full RootSchema choices. Workspace classes and the supported base types remain available.";
         const model = createCreationModel(scanned, { sourceRoot, systemCache: cache });
-        model.notice = (notice ? notice + " " : "") + "Choices follow schema ancestry; imported-package aliases are not resolved by this source catalogue.";
+        model.notice = [notice, "Choices follow schema ancestry and extracted package visibility.", model.importsNotice].filter(Boolean).join(" ");
         return model;
       },
       save: writeCreation, dirtyPaths: () => vscode.workspace.textDocuments.filter(d => d.isDirty && ["file", "untitled"].includes(d.uri.scheme) && path.isAbsolute(d.uri.fsPath)).map(d => d.uri.fsPath),

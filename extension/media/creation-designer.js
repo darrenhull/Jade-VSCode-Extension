@@ -11,6 +11,22 @@
   }
   function definitionRequest(draft) { const request = JSON.parse(JSON.stringify(draft)); for (const key of request.keys || []) delete key._type; return request; }
   function canSave({ step, receipt, validPreview, saving }) { return step === 2 && Boolean(receipt) && validPreview === true && saving !== true; }
+  function choicePresentation(row, contextSchema) {
+    const label = row.label || (row.schema ? row.schema + "::" : "") + row.name + (row.type ? " : " + row.type : "");
+    let detail = "";
+    if (row.imported) {
+      const declaration = row.importingSchema || row.declarationSchema || row.id?.split("::")[0] || "Unknown importing schema", usage = row.usedInSchema || contextSchema;
+      detail = "Exported by " + (row.originSchema || "unknown schema") + " · imported as " + (row.nativeName || row.name) + " in " + declaration + (usage && usage !== declaration ? " · used from " + usage : "");
+      if (row.metadataStatus === "nativeRequired") detail += " · exported member/property metadata unavailable";
+    }
+    if (row.disabled && row.reason) detail += (detail ? " · " : "") + row.reason;
+    return { label, detail, disabled: row.disabled === true };
+  }
+  function diagnosticPresentation(data) {
+    if (data.code === "JADE_IMPORT_METADATA_UNAVAILABLE" || data.metadataStatus === "nativeRequired") return { kind: "metadata-unavailable", message: "Metadata unavailable: " + data.message };
+    if (data.code === "JADE_TYPE_NOT_VISIBLE") return { kind: "invalid-selection", message: "Type unavailable in this schema: " + data.message };
+    return { kind: "validation", message: data.message || "" };
+  }
   function describeDraft(draft) {
     if (draft.type === "schema") return "Schema " + (draft.name || "…") + " inheriting " + (draft.parent || "RootSchema");
     if (draft.type === "class") return "A " + draft.lifetime + " class " + (draft.name || "…") + " inheriting " + (draft.superclass || "Object");
@@ -27,15 +43,16 @@
     const send = message => vscode.postMessage(message);
     const option = (value, text = value) => { const o = document.createElement("option"); o.value = value; o.textContent = text; return o; };
     function persist() { vscode.setState({ draft, step, projectId }); }
-    function error(message, field) {
-      $("error").hidden = !message; $("error").textContent = message || "";
+    function error(message, field, details = {}) {
+      const diagnostic = diagnosticPresentation({ ...details, message });
+      $("error").hidden = !message; $("error").textContent = diagnostic.message; $("error").dataset.kind = diagnostic.kind;
       for (const el of document.querySelectorAll(".field-error")) el.textContent = "";
       for (const el of document.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
       if (field && $(field)) {
         const control = $(field), id = field === "name" ? "name-error" : "field-error-" + field;
         let detail = $(id);
         if (!detail) { detail = document.createElement("small"); detail.id = id; detail.className = "field-error"; control.parentElement.append(detail); const ids = new Set((control.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean)); ids.add(id); control.setAttribute("aria-describedby", [...ids].join(" ")); }
-        detail.textContent = message || ""; control.setAttribute("aria-invalid", "true");
+        detail.textContent = diagnostic.message; control.setAttribute("aria-invalid", "true");
       }
     }
     function updateSteps() {
@@ -79,13 +96,14 @@
       let rows = [], active = -1, page, query = "", hideTimer, searchTimer, closed = false;
       input.setAttribute("role", "combobox"); input.setAttribute("aria-autocomplete", "list"); input.setAttribute("aria-controls", list.id); input.setAttribute("aria-expanded", "false");
       const close = () => { list.hidden = true; input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant"); };
-      function select(row) { choose(row); close(); input.focus(); }
+      function select(row) { if (row.disabled) return; choose(row); close(); input.focus(); }
       function render(value) {
         if (closed || document.activeElement !== input && !list.contains(document.activeElement)) return;
         page = value; rows = value.items || []; active = -1;
         list.replaceChildren(...rows.map((row, index) => {
           const b = document.createElement("button"); b.type = "button"; b.role = "option"; b.tabIndex = -1; b.id = list.id + "-" + index;
-          b.textContent = row.label || (row.schema ? row.schema + "::" : "") + row.name + (row.type ? " : " + row.type : "");
+          const presentation = choicePresentation(row, draft.schema); b.textContent = presentation.label; b.disabled = presentation.disabled; b.setAttribute("aria-disabled", String(presentation.disabled));
+          if (presentation.detail) { const context = document.createElement("small"); context.className = "choice-context"; context.textContent = presentation.detail; b.append(context); b.title = presentation.detail; }
           b.onmousedown = event => event.preventDefault(); b.onclick = () => select(row); return b;
         }));
         if (!rows.length) { const empty = document.createElement("span"); empty.className = "empty"; empty.textContent = "No matching choices"; list.append(empty); }
@@ -160,6 +178,7 @@
     $("cancel").onclick = () => send({ command: "cancel" });
     $("designer").onsubmit = event => { event.preventDefault(); if (!canSave({ step, receipt, validPreview, saving })) return; saving = true; $("save").disabled = true; send({ command: "save", sequence: previewSequence, receipt }); };
     $("project").onchange = () => { projectId = $("project").value; receipt = undefined; validPreview = false; $("save").disabled = true; projectSequence = ++sequence; pending.clear(); for (const c of combos.values()) c.close(); send({ command: "project", project: projectId, sequence: projectSequence }); };
+    $("refresh-choices").onclick = () => $("project").onchange();
     root.addEventListener("message", ({ data }) => {
       if (!data || disposed) return;
       if (data.command === "projects") { $("project").replaceChildren(...data.projects.map(p => option(p.id, p.name))); const state = savedState; if (state?.draft && data.projects.some(p => p.id === state.projectId)) { draft = state.draft; step = state.step || 0; $("project").value = state.projectId; for (const [id, prop] of [["schema", "schema"], ["name", "name"], ["parent", "parent"], ["version", "version"], ["member", "membership"], ["superclass", "superclass"], ["kind", "type"], ["dictionary", "kind"], ["lifetime", "lifetime"]]) $(id).value = draft[prop] || ""; $("duplicates").checked = Boolean(draft.duplicatesAllowed); $("load-factor").value = draft.loadFactor ?? ""; } reflectKind(); $("project").onchange(); return; }
@@ -168,10 +187,10 @@
       if (["search", "schemas", "properties"].includes(data.command)) { if (pending.get(data.field) !== data.sequence) return; let page = data.page; if (data.field === "parent" && !page.offset && !page.items.some(r => r.name === "RootSchema") && (!$("parent").value || "rootschema".includes($("parent").value.toLowerCase()))) page = { ...page, items: [{ name: "RootSchema" }, ...page.items] }; combos.get(data.field)?.render(page); return; }
       if (data.command === "preview") { if (data.sequence !== previewSequence) return; receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); $("files").replaceChildren(...data.files.map(file => { const section = document.createElement("section"), title = document.createElement("h3"), source = document.createElement("pre"); title.textContent = file.relativePath; source.textContent = file.text; source.tabIndex = 0; section.append(title, source); return section; })); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)."; error(""); updateSteps(); return; }
       if (data.command === "saved") { saving = false; validPreview = false; receipt = undefined; $("save").disabled = true; $("status").textContent = "Saved " + data.files.join(", ") + ". Build or publish separately."; if (data.notice) error(data.notice); return; }
-      if (data.command === "error") { if (data.operation === "preview" && data.sequence !== previewSequence) return; if (["search", "schemas", "properties"].includes(data.operation) && pending.get(data.field) !== data.sequence) return; saving = false; validPreview = false; receipt = undefined; error(data.message, data.field); $("status").textContent = "Your choices are preserved. Correct the definition to continue."; updateSteps(); if (data.operation === "save") { $("error").tabIndex = -1; $("error").focus(); } }
+      if (data.command === "error") { if (data.operation === "preview" && data.sequence !== previewSequence) return; if (["search", "schemas", "properties"].includes(data.operation) && pending.get(data.field) !== data.sequence) return; saving = false; validPreview = false; receipt = undefined; error(data.message, data.field, data); $("status").textContent = diagnosticPresentation(data).kind === "metadata-unavailable" ? "Your choices are preserved. Supply the missing exported package definitions, then refresh source choices." : "Your choices are preserved. Correct the definition to continue."; updateSteps(); if (data.operation === "save") { $("error").tabIndex = -1; $("error").focus(); } }
     });
     root.addEventListener("unload", () => { disposed = true; clearTimeout(timer); pending.clear(); for (const c of combos.values()) c.dispose(); });
     reflectKind(); send({ command: "ready" });
   }
-  return { moveKey, definitionRequest, describeDraft, canSave, mount };
+  return { moveKey, definitionRequest, describeDraft, canSave, choicePresentation, diagnosticPresentation, mount };
 });
