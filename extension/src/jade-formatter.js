@@ -67,7 +67,7 @@ function formattingEdits(text,options={},selection,uri='') {
     if(incomplete&&incomplete.start<method.end)continue;
     let signatureAnchor,signatureTarget;
     for(let at=Math.max(0,firstAt(lines,method.signatureStart)-1);at<lines.length&&lines[at].start<method.start;at++) {
-      const line=lines[at];if(line.end<=method.signatureStart||line.inside)continue;
+      const line=lines[at];if(line.start<method.signatureStart||line.inside)continue;
       const value=code.slice(line.start,line.end).trim(),leading=/^[\t ]*/.exec(text.slice(line.start,line.end))[0];
       if(line.start>=method.signatureStart&&value&&signatureAnchor===undefined){signatureAnchor=columns(leading);signatureTarget=selected(line)?0:signatureAnchor;}
       prefixEdit(line,signatureAnchor===undefined?'':indent(Math.max(0,signatureTarget+columns(leading)-signatureAnchor)),pending);

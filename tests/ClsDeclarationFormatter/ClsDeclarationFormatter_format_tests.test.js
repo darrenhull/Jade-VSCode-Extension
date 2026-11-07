@@ -216,3 +216,10 @@ test('definition-label identifiers inside continued declarations do not become m
  const source='typeDefinitions\nCow completeDefinition\n(\njadeMethodDefinitions\nsetValues(\n    typeDefinitions\n        : Integer) updating;\n)\ntypeSources\n';
  const formatted=apply(source);assert.ok(formatted.includes('\n            typeDefinitions\n'));assert.equal(apply(formatted),formatted);
 });
+test('comments and trailing whitespace after method opening braces cannot overlap container edits',()=>{
+ for(const suffix of ['  ',' // keep this comment']){
+  const source=cow.replace('\n{\n','\n    {'+suffix+'\n'),edits=formattingEdits(source,{tabSize:4,insertSpaces:true},undefined,'Cow.cls');
+  for(let i=1;i<edits.length;i++)assert.ok(edits[i-1].end<=edits[i].start,'container/signature edit overlap');
+  const formatted=apply(source);assert.equal(apply(formatted),formatted);assert.ok(formatted.includes('\n{'+suffix+'\n'));
+ }
+});
