@@ -34,7 +34,7 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 
 ## User workflows retained
 
-- F5 compiles local native source in an isolated working database.
+- F5 saves native source buffers in the active file's project and builds its new and changed files in Working, including unrelated changed classes. An unchanged repeat skips loading. **Jade: Compile Current File** keeps the focused check available; publishing remains separate.
 - Test Explorer, CodeLens and Ctrl+F5 run native Jade tests and report individual failures.
 - Shift+F5 and the publish controls retain explicit target review and confirmation.
 - Object Explorer provides schema/class/member navigation and reusable focused previews.

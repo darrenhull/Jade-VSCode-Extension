@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.14.0",
+  "version": "0.14.2",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -288,6 +288,10 @@
         "command": "jadeNative.compareWorkspaceRuns",
         "icon": "$(diff)",
         "title": "Jade: Compare Previous Scratch Pad Run"
+      },
+      {
+        "command": "jadeNative.buildWorkspace",
+        "title": "Jade: Build New and Changed Files"
       }
     ],
     "languages": [
@@ -320,7 +324,7 @@
         "when": "editorTextFocus && resourceExtname == .cls && !inDebugMode && !jadeNative.publishing"
       },
       {
-        "command": "jadeNative.compileClass",
+        "command": "jadeNative.buildWorkspace",
         "key": "f5",
         "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
       },
@@ -472,6 +476,11 @@
           "command": "jadeNative.runWorkspaceSelection",
           "when": "editorLangId == jade-nz && resourceExtname == .jade && editorHasSelection",
           "group": "navigation@1"
+        },
+        {
+          "command": "jadeNative.buildWorkspace",
+          "when": "resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf",
+          "group": "navigation"
         }
       ],
       "notebook/toolbar": [

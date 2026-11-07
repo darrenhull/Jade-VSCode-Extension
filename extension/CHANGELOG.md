@@ -1,3 +1,9 @@
+# 0.14.2 — Build changed workspace files with F5
+
+- Press F5 from a Jade source file to build new and changed files across its workspace, including classes you have not opened.
+- Save native source buffers before building and skip loading when nothing changed.
+- Keep **Jade: Compile Current File** for a focused check. Publishing remains a separate action.
+
 # 0.14.0 — Scratch Pad
 
 - Try Jade code from Scratch Pad under Tools without publishing a class.
