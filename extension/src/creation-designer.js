@@ -17,7 +17,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
     const fresh = () => !disposed && latest.get(channel) === token;
     try {
       if (command === "ready") return reply({ command: "projects", projects: projects.map(p => ({ id: p.id, name: p.name })) });
-      if (command === "invalidate") { review = undefined; latest.delete("preview"); return; }
+      if (command === "invalidate") { if (message.project !== undefined && message.project !== current?.id) return; review = undefined; latest.delete("preview"); return; }
       if (command === "project") {
         if (saving) throw Error("Wait for the current save to finish.");
         const selected = projects.find(p => p.id === message.project);
@@ -30,6 +30,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
         return reply({ command: "project", sequence, project: selected.id, page: model.schemas({ limit: 50 }), notice: model.notice });
       }
       if (!current || !model) throw Error("Choose a project first.");
+      if (message.project !== undefined && message.project !== current.id) throw Error("The active project changed. Choose the project again before continuing.");
       const project = current, activeModel = model;
       if (command === "search" || command === "schemas" || command === "properties") {
         const request = { schema: String(message.schema || ""), query: String(message.query || "").slice(0, 256), kind: message.kind === "member" ? "member" : "superclass", membership: String(message.membership || ""), collectionKind: message.collectionKind, offset: Math.max(0, Math.min(100000, Number(message.offset) || 0)), limit: Math.max(1, Math.min(50, Number(message.limit) || 50)) };
