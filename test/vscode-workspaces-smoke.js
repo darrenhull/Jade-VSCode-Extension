@@ -9,6 +9,7 @@ async function run() {
   if(nativeContext) {
     const relative=path.relative(fs.realpathSync(os.tmpdir()),fs.realpathSync(nativeContext.databasePath));
     assert.ok(!relative.startsWith('..')&&!path.isAbsolute(relative)&&relative.startsWith('jade-cli-integration-seed-'),'Native Workspace host requires a disposable private integration seed.');
+    require('./PrivateNativeFixture').assertPrivateIniPaths(nativeContext.databasePath,fs.readFileSync(nativeContext.iniPath,'utf8'));
     const fixture=require('./cli-integration-fixture').createFixture(path.dirname(root));nativeContext={...nativeContext,schema:fixture.schema};
   }
   const config=vscode.workspace.getConfiguration('jadeNative');
