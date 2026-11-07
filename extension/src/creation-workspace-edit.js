@@ -82,7 +82,13 @@ async function applyCreationWorkspaceEdit(vscode, root, generated, { dirtyPaths 
     const edit = new vscode.WorkspaceEdit();
     for (const item of prepared) {
       if (item.update) edit.replace(item.uri, new vscode.Range(item.document.positionAt(0), item.document.positionAt(item.expectedText.length)), item.text);
-      else { edit.createFile(item.uri, { overwrite: false, ignoreIfExists: false }); edit.insert(item.uri, new vscode.Position(0, 0), item.text); }
+      else {
+        edit.createFile(item.uri, { overwrite: false, ignoreIfExists: false });
+        // Insertions are normalised to the document's EOL by VS Code. Set the
+        // reviewed source's EOL in the same edit so files.eol cannot change it.
+        const eol = item.text.includes("\r\n") ? vscode.EndOfLine.CRLF : vscode.EndOfLine.LF;
+        edit.set(item.uri, [vscode.TextEdit.insert(new vscode.Position(0, 0), item.text), vscode.TextEdit.setEndOfLine(eol)]);
+      }
     }
     if (!await vscode.workspace.applyEdit(edit)) throw Error("VS Code could not apply every reviewed source edit.");
     for (const item of prepared) {

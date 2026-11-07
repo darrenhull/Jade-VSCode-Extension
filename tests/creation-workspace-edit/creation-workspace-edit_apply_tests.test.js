@@ -2,7 +2,7 @@
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), os = require("node:os"), crypto = require("node:crypto");
 const { applyCreationWorkspaceEdit } = require("../../extension/src/creation-workspace-edit");
 const digest = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
-function fixture() {
+function fixture({ defaultEol = 2 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-workspace-edit-test-")), file = path.join(root, "databaseDefinitions.sec"), newFile = path.join(root, "FishArray.cls");
   const original = "databaseDefinitions\r\nPetsDb\r\n(\r\n)\r\n", updated = original.replace(")", "classMapDefinitions\r\nFishArray in \"pets\";\r\n)");
   const originalBytes = Buffer.concat([Buffer.from([255, 254]), Buffer.from(original, "utf16le")]); fs.writeFileSync(file, originalBytes);
@@ -10,14 +10,28 @@ function fixture() {
   function document(file) {
     if (docs.has(file)) return docs.get(file);
     const bytes = fs.readFileSync(file), utf16 = bytes[0] === 255 && bytes[1] === 254;
-    const doc = { uri: { fsPath: file, scheme: "file", toString: () => file }, version: 1, isDirty: false, text: utf16 ? bytes.subarray(2).toString("utf16le") : bytes.toString("utf8"), getText() { return this.text; }, positionAt(offset) { return { offset }; }, async save() { calls.push(["save", file]); if (file === failSave) return false; fs.writeFileSync(file, utf16 ? Buffer.concat([Buffer.from([255, 254]), Buffer.from(this.text, "utf16le")]) : Buffer.from(this.text)); this.isDirty = false; return true; } };
+    const text = utf16 ? bytes.subarray(2).toString("utf16le") : bytes.toString("utf8");
+    const doc = { uri: { fsPath: file, scheme: "file", toString: () => file }, version: 1, isDirty: false, eol: text.includes("\r\n") ? 2 : text.includes("\n") ? 1 : defaultEol, text, getText() { return this.text; }, positionAt(offset) { return { offset }; }, async save() { calls.push(["save", file]); if (file === failSave) return false; fs.writeFileSync(file, utf16 ? Buffer.concat([Buffer.from([255, 254]), Buffer.from(this.text, "utf16le")]) : Buffer.from(this.text)); this.isDirty = false; return true; } };
     docs.set(file, doc); return doc;
   }
-  class WorkspaceEdit { constructor() { this.edits = []; } createFile(uri, options) { this.edits.push({ type: "create", uri, options }); } insert(uri, at, text) { this.edits.push({ type: "insert", uri, at, text }); } replace(uri, range, text) { this.edits.push({ type: "replace", uri, range, text }); } }
-  const vscode = { Uri: { file: fsPath => ({ fsPath, scheme: "file", toString: () => fsPath }) }, WorkspaceEdit, Position: class { constructor(line, character) { this.line = line; this.character = character; } }, Range: class { constructor(start, end) { this.start = start; this.end = end; } }, workspace: { get textDocuments() { return [...docs.values()]; }, openTextDocument: async uri => document(uri.fsPath), async applyEdit(edit) { calls.push(["apply", edit]); for (const e of edit.edits) { if (e.type === "create") { fs.writeFileSync(e.uri.fsPath, "", { flag: "wx" }); continue; } const doc = document(e.uri.fsPath); doc.text = e.text; doc.version++; doc.isDirty = true; } if (applyHook) await applyHook(); return true; } } };
+  class WorkspaceEdit { constructor() { this.edits = []; } createFile(uri, options) { this.edits.push({ type: "create", uri, options }); } insert(uri, at, text) { this.edits.push({ type: "insert", uri, at, text }); } replace(uri, range, text) { this.edits.push({ type: "replace", uri, range, text }); } set(uri, edits) { for (const edit of edits) this.edits.push({ ...edit, uri }); } }
+  const vscode = { EndOfLine: { LF: 1, CRLF: 2 }, TextEdit: { insert: (at, text) => ({ type: "insert", at, text }), setEndOfLine: eol => ({ type: "eol", eol }) }, Uri: { file: fsPath => ({ fsPath, scheme: "file", toString: () => fsPath }) }, WorkspaceEdit, Position: class { constructor(line, character) { this.line = line; this.character = character; } }, Range: class { constructor(start, end) { this.start = start; this.end = end; } }, workspace: { get textDocuments() { return [...docs.values()]; }, openTextDocument: async uri => document(uri.fsPath), async applyEdit(edit) { calls.push(["apply", edit]); for (const e of edit.edits) { if (e.type === "create") { fs.writeFileSync(e.uri.fsPath, "", { flag: "wx" }); continue; } const doc = document(e.uri.fsPath); if (e.type === "eol") doc.eol = e.eol; doc.text = (e.type === "eol" ? doc.text : e.text).replace(/\r\n|\r|\n/g, doc.eol === 2 ? "\r\n" : "\n"); doc.version++; doc.isDirty = true; } if (applyHook) await applyHook(); return true; } } };
   const plan = { files: [{ file: newFile, text: "native class source\r\n" }, { file, text: updated, operation: "update", expectedHash: digest(originalBytes), expectedText: original, encoding: "utf16le", bom: true }] };
   return { root, file, newFile, plan, vscode, calls, docs, document, setApplyHook(value) { applyHook = value; }, setFailSave(value) { failSave = value; }, cleanup() { fs.rmSync(root, { recursive: true, force: true }); } };
 }
+for (const [sourceEol, configuredEol] of [["\r\n", 1], ["\n", 2]]) test("reviewed source preserves " + JSON.stringify(sourceEol) + " with the opposite configured editor EOL", async () => {
+  const f = fixture({ defaultEol: configuredEol }); try {
+    f.plan.files[0].text = "native class source" + sourceEol + "// café" + sourceEol;
+    const result = await applyCreationWorkspaceEdit(f.vscode, f.root, f.plan);
+    assert.deepEqual(result.files, [f.newFile, f.file]);
+    assert.equal(fs.readFileSync(f.newFile, "utf8"), f.plan.files[0].text);
+    assert.equal(f.document(f.newFile).eol, sourceEol === "\r\n" ? 2 : 1);
+    assert.equal(f.document(f.file).eol, 2);
+    assert.equal(f.document(f.file).getText(), f.plan.files[1].text);
+    assert.equal(f.calls.filter(call => call[0] === "apply").length, 1);
+  } finally { f.cleanup(); }
+});
+
 test("reviewed existing metadata uses one native WorkspaceEdit and preserves its editor encoding and undo boundary", async () => {
   const f = fixture(); try {
     const result = await applyCreationWorkspaceEdit(f.vscode, f.root, f.plan);

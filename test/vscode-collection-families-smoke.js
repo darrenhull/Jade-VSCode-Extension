@@ -11,6 +11,7 @@ async function run(){
   fs.writeFileSync(path.join(types,'NumericDesignerItem.cls'),head+'typeHeaders\nNumericDesignerItem subclassOf Object transient;\ntypeDefinitions\nNumericDesignerItem completeDefinition\n(\nattributeDefinitions\nname: Integer;\n)\ndatabaseDefinitions\ntypeSources\n');
   fs.writeFileSync(path.join(types,'ParentByName.cls'),head+'typeHeaders\nParentByName subclassOf MemberKeyDictionary transient;\nmembershipDefinitions\nParentByName of DesignerItem;\ntypeDefinitions\nParentByName completeDefinition\n(\n)\nmemberKeyDefinitions\nParentByName completeDefinition\n(\nname;\n)\ndatabaseDefinitions\ntypeSources\n');
   const mapFile=path.join(folder,'databaseDefinitions.sec');fs.writeFileSync(mapFile,fs.readFileSync(mapFile,'utf8').replace('databaseFileDefinitions','databaseFileDefinitions\n "alternate";'));
+  await vscode.workspace.getConfiguration('files').update('eol','\n',vscode.ConfigurationTarget.Workspace);
   const commands=await vscode.commands.getCommands(true);if(commands.includes('workbench.action.closeAuxiliaryBar'))await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');await vscode.commands.executeCommand('workbench.action.toggleSidebarVisibility');
   assert.equal((await vscode.commands.executeCommand('jadeNative.createDefinition')).opened,true);
   const {withPrivateDesigner}=require('./creation-ui-capture.cjs');
