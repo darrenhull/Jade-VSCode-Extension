@@ -7,6 +7,7 @@ const inside = (root, file) => {
 const identity = file => path.resolve(file).toLowerCase();
 function canonicalIdentity(file) {
   file = path.resolve(file);
+  if (fs.existsSync(file)) return identity(fs.realpathSync(file));
   let ancestor = path.dirname(file);
   while (!fs.existsSync(ancestor)) {
     const parent = path.dirname(ancestor);
@@ -78,4 +79,4 @@ function writeCreation(root, generated, { dirtyFiles = [], dirtyPaths = [] } = {
   }
   return { files: files.map(entry => entry.file), ...(generated.header ? { header: generated.header } : {}) };
 }
-module.exports = { writeCreation, saveCreation: writeCreation };
+module.exports = { writeCreation, saveCreation: writeCreation, canonicalIdentity };

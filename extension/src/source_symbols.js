@@ -28,9 +28,9 @@ function parseSource(text, uri = '') {
     cls.end = Math.max(cls.end, end);
     const section = code.slice(definition.index, end);
     const fields=section.split(/\bjadeMethodDefinitions\b/)[0];
-    for (const match of fields.matchAll(/^\s*([A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)\])?([^;]*);/gm)) {
+    for (const match of fields.matchAll(/^\s*([A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)(?:\s*,\s*(\d+))?\])?([^;]*);/gm)) {
       const selection = definition.index + match.index + match[0].indexOf(match[1]);
-      cls.members.push({ name: match[1], type: match[2], length:match[3]?Number(match[3]):undefined,access:/\bprotected\b/i.test(match[4])?2:/\breadOnly\b/i.test(match[4])?1:0,subaccess:/\bsubschemaHidden\b/i.test(match[4])?3:0,kind: 'property', start: selection,
+      cls.members.push({ name: match[1], type: match[2], length:match[3] && match[2] !== 'Decimal'?Number(match[3]):undefined,precision:match[3] && match[2] === 'Decimal'?Number(match[3]):undefined,scale:match[4]?Number(match[4]):undefined,access:/\bprotected\b/i.test(match[5])?2:/\breadOnly\b/i.test(match[5])?1:0,subaccess:/\bsubschemaHidden\b/i.test(match[5])?3:0,kind: 'property', start: selection,
         selection, end: definition.index + match.index + match[0].length });
     }
     for (const match of section.matchAll(/^\s*([A-Za-z_]\w*)\s*\([^)]*\)\s*(?::\s*\w+(?:\[\d+\])?)?[^;]*;/gm)) {
