@@ -14,19 +14,24 @@ function minimalSchema(name,parent,version){
  if(!/^\d+\.\d+\.\d+$/.test(version))throw Error('Invalid Jade version.');
  return `jadeVersionNumber "${version}";\r\nschemaDefinition\r\n${name} subschemaOf ${parent} completeDefinition;\r\n`;
 }
-async function scaffoldSchema(root,name,parent,version,bases={app:'RootSchemaApp',global:'RootSchemaGlobal',session:'RootSchemaSession'}){
+function planSchema(root,name,parent,version,bases={app:'RootSchemaApp',global:'RootSchemaGlobal',session:'RootSchemaSession'}){
  const header=minimalSchema(name,parent,version),schemas=path.join(root,'schemas'),folder=path.join(schemas,name),file=path.join(schemas,name+'.scm');
- if(fs.existsSync(folder)||fs.existsSync(file))throw Error('Schema files already exist: '+name);
  for(const value of Object.values(bases))if(!/^[A-Za-z_]\w*$/.test(value))throw Error('Invalid runtime superclass.');
- await fs.promises.mkdir(path.join(folder,'applications'),{recursive:true});await fs.promises.mkdir(path.join(folder,'types'));
- const files=[file];fs.writeFileSync(file,header,{flag:'wx'});
+ const files=[{file,text:header}];
  for(const [owner,base,group] of [[name,bases.app,'applications'],['G'+name,bases.global,'types'],['S'+name,bases.session,'types']]){
   const text=`jadeVersionNumber "${version}";\r\nschemaDefinition\r\n\t${name} subschemaOf ${parent} partialDefinition;\r\ntypeHeaders\r\n\t${owner} subclassOf ${base} transient, sharedTransientAllowed, transientAllowed, subclassSharedTransientAllowed, subclassTransientAllowed;\r\ntypeDefinitions\r\n\t${owner} completeDefinition\r\n\t(\r\n\t)\r\ndatabaseDefinitions\r\ntypeSources\r\n`;
-  const target=path.join(folder,group,owner+'.cls');fs.writeFileSync(target,text,{flag:'wx'});files.push(target);
+  const target=path.join(folder,group,owner+'.cls');files.push({file:target,text});
  }
  const map=path.join(folder,'databaseDefinitions.sec'),db=name.length<=24?name.toLowerCase():name.toLowerCase().slice(0,16)+'_'+hash(Buffer.from(name)).slice(0,8);
- fs.writeFileSync(map,`databaseDefinitions\r\n${name}Db\r\n(\r\ndatabaseFileDefinitions\r\n"${db}";\r\ndefaultFileDefinition "${db}";\r\nclassMapDefinitions\r\n${name} in "_usergui";\r\nG${name} in "${db}";\r\nS${name} in "_environ";\r\n)\r\n`,{flag:'wx'});files.push(map);
+ files.push({file:map,text:`databaseDefinitions\r\n${name}Db\r\n(\r\ndatabaseFileDefinitions\r\n"${db}";\r\ndefaultFileDefinition "${db}";\r\nclassMapDefinitions\r\n${name} in "_usergui";\r\nG${name} in "${db}";\r\nS${name} in "_environ";\r\n)\r\n`});
  return {name,header:file,folder,files};
+}
+async function scaffoldSchema(root,name,parent,version,bases){
+ const planned=planSchema(root,name,parent,version,bases);
+ if(fs.existsSync(planned.folder)||fs.existsSync(planned.header))throw Error('Schema files already exist: '+name);
+ fs.mkdirSync(root,{recursive:true});
+ const saved=require('./creation-files').writeCreation(root,planned);
+ return {...planned,files:saved.files};
 }
 async function scanProject(root){
  root=path.resolve(root);const paths=[];
@@ -118,4 +123,4 @@ async function stageProject(project,destination,{signal}={}){
  }
  return {...project,directory:destination,schemas};
 }
-module.exports={scanProject,stageProject,minimalSchema,scaffoldSchema,joinDdx,decode,hash,indexes};
+module.exports={scanProject,stageProject,minimalSchema,planSchema,scaffoldSchema,joinDdx,decode,hash,indexes};
