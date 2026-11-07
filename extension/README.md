@@ -25,6 +25,8 @@ GitHub VSIX updates are installed manually. Installing a newer VSIX updates the 
 
 **Format Document:** `Shift+Alt+F` on Windows. **Format Selection:** `Ctrl+K`, then `Ctrl+F`. Formatting changes indentation; it does not fix syntax errors. Incomplete or unknown structures and encrypted source contents are preserved.
 
+For a wrapped statement or declaration, include its first line in the selection so the following lines can be indented together.
+
 **Error Lens** is installed alongside Jade Tools when Marketplace access is available. It displays compiler diagnostics beside their source lines and can be disabled or uninstalled independently. Offline users can install its VSIX separately.
 
 ## Browse and create
