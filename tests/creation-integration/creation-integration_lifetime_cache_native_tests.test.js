@@ -1,0 +1,28 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const {HostTestArtifacts}=require('../../scripts/HostTestArtifacts.cjs');
+const {createCreationModel}=require('../../extension/src/creation-model');
+const {writeCreation}=require('../../extension/src/creation-files');
+const {scanProject}=require('../../extension/src/native-project');
+const {startCpp}=require('../../extension/src/cpp-runner');
+const {service}=require('../../test/cli-integration-fixture');
+test('native RootSchema cache lifetime flags match six public metadata properties and keep class defaults separate',{skip:process.env.JADE_CREATION_NATIVE!=='1',timeout:180000},async()=>{
+ const source=process.env.JADE_CREATION_NATIVE_SOURCE,ini=process.env.JADE_CREATION_NATIVE_INI;assert.ok(source&&ini,'Explicit Source backup paths required; never publish.');
+ const base=path.resolve(__dirname,'../..'),artifacts=new HostTestArtifacts({evidencePath:path.join(base,'evidence/creation-lifetime-cache-native.json')});
+ await artifacts.run(async stage=>{
+  const root=path.join(stage,'workspace');fs.mkdirSync(root);const runtime=path.join(stage,'extension/vendor/jade-tools-cli');fs.mkdirSync(path.dirname(runtime),{recursive:true});fs.cpSync(process.env.JADE_CREATION_NATIVE_CLI_DIST||path.join(base,'extension/vendor/jade-tools-cli'),runtime,{recursive:true});const entry=path.join(runtime,'jade-cli.exe'),manifest=JSON.parse(fs.readFileSync(path.join(runtime,'distribution.json'),'utf8'));artifacts.nativeSha256=crypto.createHash('sha256').update(fs.readFileSync(entry)).digest('hex');assert.equal(manifest.executableSha256,artifacts.nativeSha256);
+  const schema='LifetimeCacheProof'+Date.now().toString(36);writeCreation(root,createCreationModel(await scanProject(root)).preview({type:'schema',name:schema,parent:'RootSchema',version:'25.0.02'}));let model=createCreationModel(await scanProject(root));const generated=model.preview({type:'class',schema,name:'LifetimeProbe',superclass:'Object',lifetime:'transient'});writeCreation(root,generated);
+  const config={installPath:process.env.JADE_CREATION_NATIVE_INSTALL||'C:/Jade2025',databasePath:source,iniPath:ini,server:'singleUser',workspaceRoots:[root],storagePath:path.join(stage,'state'),schema,program:generated.files[0].file,projectBuild:true,timeoutMilliseconds:120000},client=service(entry,path.join(stage,'broker')),proof={jadeVersion:'25.0.02',cliVersion:manifest.packageVersion,sourcePublished:false,results:[]};
+  try{
+   const built=await client.request('build',config);assert.equal(built.passed,true,JSON.stringify(built));const working=(await client.request('working.location',config)).working;await client.request('disconnect',{});
+   const cacheResult=await startCpp({...config,databasePath:working.databasePath,iniPath:working.iniPath,helperPath:path.join(runtime,'native/jade-native-helper.exe'),storagePath:path.join(stage,'cache')},'cache.refresh',()=>{},()=>{},{spawn:require('node:child_process').spawn}).completion;assert.equal(cacheResult.passed,true,JSON.stringify(cacheResult));const cache=JSON.parse(fs.readFileSync(cacheResult.report.path,'utf8'));assert.ok(cache.metadataCapabilities.includes('subclassLifetime'));
+   const fields={persistent_allowed:'persistentAllowed',transient_allowed:'transientAllowed',shared_transient_allowed:'sharedTransientAllowed',subclass_persistent_allowed:'subclassPersistentAllowed',subclass_transient_allowed:'subclassTransientAllowed',subclass_shared_transient_allowed:'subclassSharedTransientAllowed'},types=cache.types.filter(type=>Object.keys(fields).every(field=>typeof type[field]==='boolean')),selected=new Map();
+   for(const field of Object.keys(fields))for(const value of [false,true]){const type=types.find(type=>type[field]===value);assert.ok(type,'Native snapshot must contain '+field+'='+value);selected.set(type.name,type);}
+   selected.set('Object',types.find(type=>type.name==='Object'));selected.set('Application',types.find(type=>type.name==='Application'));
+   const statements=[...selected.keys()].map(name=>` value := rootSchema.getClass("${name}");\n write "${name}|" & ${Object.values(fields).map(field=>`value.getPropertyValue("${field}").Boolean.String`).join(' & "|" & ')} & "|" & value.getPropertyValue("transient").Boolean.String;`).join('\n');
+   const ran=await client.request('workspace.run',config,{source:path.join(root,'lifetime-public-properties.jade'),sourceText:'vars\n value:Class;\nbegin\n'+statements+'\nend;'});assert.equal(ran.passed,true,JSON.stringify(ran));
+   const lines=ran.report.output.trim().split(/\r?\n/);assert.equal(lines.length,selected.size);for(const line of lines){const [name,...values]=line.split('|'),type=selected.get(name);assert.ok(type,name);assert.equal(values.length,7,line);for(const [index,field]of Object.keys(fields).entries())assert.equal(values[index],String(type[field]),name+'.'+field);assert.ok(['true','false'].includes(values[6]));proof.results.push({name,flags:Object.fromEntries(Object.keys(fields).map((field,index)=>[field,values[index]==='true'])),defaultTransient:values[6]==='true'});}
+   assert.ok(proof.results.some(type=>!type.defaultTransient&&!type.flags.persistent_allowed),'Persistent default must remain distinct from persistentAllowed flag.');proof.readOnlySnapshot=true;proof.cacheTypes=cache.types.length;proof.allSixFlagsCompared=true;proof.trueAndFalseForEveryFlag=true;proof.defaultLifetimeKeptSeparate=true;proof.passed=true;fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify(proof,null,2));
+  }finally{try{await client.request('shutdown',{});}finally{await client.close();}}
+ });
+});
