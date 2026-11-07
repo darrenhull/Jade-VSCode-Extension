@@ -178,3 +178,17 @@ test('many native owners are traversed with a bounded shared source pass',()=>{
  assert.ok(visits<200000,`Formatting traversed ${visits} array entries for 500 simple types.`);
  assert.equal(apply(formatted),formatted);
 });
+
+test('header-like property and local names retain their declaration and method indentation without overlapping edits',()=>{
+ const source='jadeVersionNumber "25.0.02";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeHeaders\nProbe subclassOf Object transient;\ntypeDefinitions\nProbe completeDefinition\n(\nattributeDefinitions\n jadeVersionNumber: Integer;\n jadePatchRelease: Integer;\njadeMethodDefinitions\nrun();\n)\ntypeSources\nProbe (\njadeMethodSources\nrun\n{\nrun();\nvars\n jadeVersionNumber: Integer;\n jadePatchRelease: Integer;\nbegin\n jadeVersionNumber := 1;\n jadePatchRelease := jadeVersionNumber;\nend;\n}\n)\n';
+ const edits=formattingEdits(source,{tabSize:4,insertSpaces:true},undefined,'Probe.cls');
+ for(let i=1;i<edits.length;i++)assert.ok(edits[i-1].end<=edits[i].start,'formatter edits must not overlap');
+ const formatted=apply(source);assert.ok(formatted.includes('\n        jadeVersionNumber: Integer;'));assert.ok(formatted.includes('\n    jadeVersionNumber: Integer;'));assert.ok(formatted.includes('\n    jadePatchRelease := jadeVersionNumber;'));assert.equal(apply(formatted),formatted);
+ const start=source.indexOf(' jadeVersionNumber := 1;'),end=source.indexOf('\n',start),selected=apply(source,{}, {start,end});
+ assert.equal(selected,source.slice(0,start)+'    jadeVersionNumber := 1;'+source.slice(end));
+});
+test('only actual leading metadata directives are outdented through header comments and BOM',()=>{
+ const source='\uFEFF    jadeVersionNumber "25.0.02";\n// keep header comment\n/* keep\n   comment */\n    jadePatchRelease "0";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeSources\n';
+ const expected=source.replace('\uFEFF    jadeVersionNumber','\uFEFFjadeVersionNumber').replace('    jadePatchRelease','jadePatchRelease');
+ assert.equal(apply(source),expected);assert.equal(apply(expected),expected);assert.equal(apply(source,{}, {start:source.indexOf('    jadePatchRelease'),end:source.indexOf('\nschemaDefinition')}),source.replace('    jadePatchRelease','jadePatchRelease'));
+});

@@ -44,7 +44,15 @@ async function run() {
     await vscode.commands.executeCommand('undo');assert.equal(clsDocument.getText(),clsSource);
     await vscode.commands.executeCommand('editor.action.formatDocument');assert.equal(clsDocument.getText(),clsFormatted);
     await clsDocument.save();
-    fs.writeFileSync(report,JSON.stringify({passed:true,version:extension.packageJSON.version,formatDocument:true,formatSelection:true,undo:true,idempotent:true,wholeCls:true,propertySelection:true,noDatabase:true,file:clsFile},null,2));
+    const identifiers=clsSource.replace('dateOfBirth: Date','jadeVersionNumber: Integer').replace('    getName() : String;\n    begin','    getName() : String;\n    vars\n jadePatchRelease: Integer;\n    begin\n jadePatchRelease := 1;');
+    const identifierFile=path.join(root,'HeaderIdentifiers.cls');fs.writeFileSync(identifierFile,identifiers);
+    const identifierDocument=await vscode.workspace.openTextDocument(identifierFile);await vscode.window.showTextDocument(identifierDocument);
+    const identifierEdits=await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',identifierDocument.uri,options);
+    const identifierEdit=new vscode.WorkspaceEdit();identifierEdit.set(identifierDocument.uri,identifierEdits);assert.equal(await vscode.workspace.applyEdit(identifierEdit),true);
+    const identifierFormatted=identifierDocument.getText();assert.ok(identifierFormatted.includes('\n        jadeVersionNumber: Integer'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease: Integer;'));assert.ok(identifierFormatted.includes('\n    jadePatchRelease := 1;'));
+    assert.equal((await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider',identifierDocument.uri,options)||[]).length,0);
+    await vscode.commands.executeCommand('undo');assert.equal(identifierDocument.getText(),identifiers);await identifierDocument.save();
+    fs.writeFileSync(report,JSON.stringify({passed:true,version:extension.packageJSON.version,formatDocument:true,formatSelection:true,undo:true,idempotent:true,wholeCls:true,propertySelection:true,headerIdentifiers:true,noDatabase:true,file:clsFile},null,2));
     // An explicit visual-verification run can hold the real formatted editor
     // open briefly; normal host/CI runs exit as soon as the checks finish.
     if(process.env.JADE_FORMATTING_UI_HOLD==='1')await new Promise(resolve=>setTimeout(resolve,90000));
