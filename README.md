@@ -41,10 +41,21 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 - Format Document/Selection indents native CLS headers, declaration sections, collection keys, database mappings and complete method bodies while preserving Jade tokens, literal contents and line endings.
 - Database Objects provides read-only Source/Working inspection and paged collections.
 - The keyed collection designer creates native source; compilation and publication remain separate actions.
+- **Create Schema, Class or Collection** provides a shared creation flow with searchable schema-qualified choices, a live definition summary and explicit native source review/save. The existing creation commands remain available; the initial unified flow covers ordinary classes and the dictionary settings already supported by the collection designer.
 - **Scratch Pad** under Jade's Tools opens native Jade Workspace code in a simple runnable editor, with output beside the code and a previous-run comparison.
 - The experimental debugger retains its existing pinned native-runtime capabilities and limitations.
 
 See the [extension's detailed documentation](extension/README.md) and [changelog](extension/CHANGELOG.md) for the existing feature scope. Repository separation does not add the missing array/set/index designers or general debugger features.
+
+## Shared source designer
+
+Open **Jade: Create Schema, Class or Collection** from the Command Palette or Jade Tools. The first release combines schema scaffolding, ordinary classes and existing member/external dictionary options. Search choices are bounded and schema-qualified; the reviewed native files are saved exclusively without compiling or publishing. Type choices use source ancestry and the existing verified system cache; imported-package aliases and further collection families remain outside this first phase.
+
+Actual running VS Code designer, with source review before saving:
+
+![Shared Jade source designer](docs/images/unified-creation-definition.png)
+
+![Reviewing native Jade collection source](docs/images/unified-creation-review.png)
 
 Actual VS Code formatting verification (document/selection formatting, undo and idempotence):
 

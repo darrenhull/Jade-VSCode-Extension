@@ -376,6 +376,12 @@ function registerSidebar(vscode, context, options) {
         return [
           item("Scratch Pad", "jadeNative.newWorkspace", "notebook", "Run native Jade Workspace code"),
           item(
+            "Create Schema, Class or Collection",
+            "jadeNative.createDefinition",
+            "new-file",
+            "Review and save native source",
+          ),
+          item(
             "Disconnect Build/Test Runtime",
             "jadeNative.disconnectTestRunner",
             "debug-disconnect",
