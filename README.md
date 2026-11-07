@@ -32,6 +32,17 @@ GitHub releases require manual VSIX installation. A new CLI release opens a revi
 
 See the [user guide](extension/README.md), [collection coverage and limits](docs/COLLECTION-COVERAGE.md) and [changelog](extension/CHANGELOG.md).
 
+### Everyday shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| F5 | Save native source inputs and build changed project files in Working. |
+| Ctrl+F5 | Run the current class's native tests in Working. |
+| Shift+F5 | Review and confirm publication to Source. |
+| Shift+Alt+F | Format Document on Windows. |
+
+Build and test shortcuts apply in their supported source-editor context. Use the Command Palette or Testing view for explicit operations when another editor has focus.
+
 ## Architecture
 
 ![Jade Tools runtime architecture](architecture/jade-tools.drawio.svg)
