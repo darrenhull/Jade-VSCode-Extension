@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -555,7 +555,7 @@
       "notebook/cell/title": [
         {
           "command": "jadeNative.editScratchPadWithCopilot",
-          "when": "notebookType == jade-workspace && notebookCellType == code",
+          "when": "notebookType == jade-workspace && (notebookCellType == code || notebookCellType == markup)",
           "group": "inline@1"
         },
         {
@@ -575,6 +575,11 @@
         }
       ],
       "notebook/toolbar": [
+        {
+          "when": "notebookType == jade-workspace",
+          "command": "jadeNative.editScratchPadWithCopilot",
+          "group": "navigation/execute@-3"
+        },
         {
           "when": "notebookType == jade-workspace",
           "command": "jadeNative.previewScratchMarkdown",
