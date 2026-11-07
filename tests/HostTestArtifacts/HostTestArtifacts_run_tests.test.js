@@ -5,6 +5,39 @@ function fixture(t,options={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-artifact-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  return {root,artifacts:new HostTestArtifacts({root,minimumFreeBytes:1024,freeBytes:()=>4096,waitMilliseconds:5,pollMilliseconds:1,...options})};
 }
+function brokerOwner(directory,record){
+ const owner=path.join(directory,'broker/owner.json');fs.mkdirSync(path.dirname(owner),{recursive:true});fs.writeFileSync(owner,JSON.stringify(record));return owner;
+}
+
+test('a real closed child broker with the native zero-PID sentinel permits cleanup without probing PID zero or launching a CLI',async t=>{
+ const {artifacts}=fixture(t,{isAlive:pid=>{assert.notEqual(pid,0);return false;},runNative:async()=>assert.fail('A stopped broker must not launch another CLI')});let stage;
+ await artifacts.run(async directory=>{stage=directory;const owner=brokerOwner(directory,{brokerPID:123,nativePIDs:[]});
+  const child=require('node:child_process').spawn(process.execPath,['-e',"require('node:fs').writeFileSync(process.argv[1],JSON.stringify({brokerPID:0,nativePIDs:[]}));",owner],{windowsHide:true});
+  await artifacts.wait(child);
+ });assert.equal(fs.existsSync(stage),false);
+});
+
+for(const brokerPID of [0,90])test('does not start a broker when brokerPID '+brokerPID+' is stopped but an owned native process is still alive',async t=>{
+ let calls=0;const {artifacts}=fixture(t,{isAlive:pid=>{assert.notEqual(pid,0);return pid===91;},runNative:async()=>{calls++;}});let stage;
+ await assert.rejects(artifacts.run(async directory=>{stage=directory;brokerOwner(directory,{brokerPID,nativePIDs:[91]});}),/still running/i);
+ assert.equal(calls,0);assert.equal(fs.existsSync(stage),true);
+});
+
+test('waits for an orphaned native process to exit naturally without launching or killing a broker',async t=>{
+ let probes=0;const {artifacts}=fixture(t,{isAlive:pid=>{assert.equal(pid,91);return ++probes<3;},runNative:async()=>assert.fail('No live broker exists')});let stage;
+ await artifacts.run(async directory=>{stage=directory;brokerOwner(directory,{brokerPID:0,nativePIDs:[91]});});
+ assert.ok(probes>=3);assert.equal(fs.existsSync(stage),false);
+});
+
+test('a stopped broker with already-exited native process IDs permits cleanup',async t=>{
+ const {artifacts}=fixture(t,{isAlive:pid=>{assert.equal(pid,91);return false;},runNative:async()=>assert.fail('No live broker exists')});let stage;
+ await artifacts.run(async directory=>{stage=directory;brokerOwner(directory,{brokerPID:0,nativePIDs:[91]});});assert.equal(fs.existsSync(stage),false);
+});
+
+for(const record of [{brokerPID:-1,nativePIDs:[]},{brokerPID:1.5,nativePIDs:[]},{brokerPID:0,nativePIDs:[0]},{brokerPID:0,nativePIDs:['91']},{brokerPID:0,nativePIDs:false}])test('rejects invalid broker process metadata '+JSON.stringify(record),async t=>{
+ const {artifacts}=fixture(t,{isAlive:()=>assert.fail('Invalid metadata must not probe processes'),runNative:async()=>assert.fail('Invalid metadata must not execute a CLI')});let stage;
+ await assert.rejects(artifacts.run(async directory=>{stage=directory;brokerOwner(directory,record);}),/process identity/i);assert.equal(fs.existsSync(stage),true);
+});
 for(const mode of ['closed','cancelled','timed out','startup error'])test('owned child lifecycle settles and cleans after '+mode,async t=>{
  const {artifacts}=fixture(t),child=new EventEmitter(),controller=new AbortController();let kills=0,stage;
  child.kill=()=>{kills++;queueMicrotask(()=>child.emit('close',1));return true;};

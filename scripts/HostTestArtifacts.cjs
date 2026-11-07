@@ -41,9 +41,13 @@ class HostTestArtifacts{
    const state=this.contained(path.join(this.stage,name)),owner=this.contained(path.join(state,'owner.json'));
    if(!fs.existsSync(owner))continue;
    if(fs.statSync(owner).size>65536)throw Error('Invalid owned broker metadata.');
-   const record=JSON.parse(fs.readFileSync(owner,'utf8')),pids=[record.brokerPID,...(record.nativePIDs||[])];
-   if(!pids.every(pid=>Number.isSafeInteger(pid)&&pid>0))throw Error('Invalid owned broker process identity.');
+   const record=JSON.parse(fs.readFileSync(owner,'utf8')),nativePids=record.nativePIDs===undefined?[]:record.nativePIDs;
+   if(!Number.isSafeInteger(record.brokerPID)||record.brokerPID<0||!Array.isArray(nativePids)||!nativePids.every(pid=>Number.isSafeInteger(pid)&&pid>0))throw Error('Invalid owned broker process identity.');
+   // Native graceful shutdown writes brokerPID=0. Never probe that sentinel
+   // or launch a fresh broker just to shut down one which already exited.
+   const pids=[...(record.brokerPID?[record.brokerPID]:[]),...nativePids];
    if(!pids.some(pid=>this.isAlive(pid)))continue;
+   if(!record.brokerPID||!this.isAlive(record.brokerPID)){await this.waitClosed(nativePids);continue;}
    if(!fs.existsSync(executable))throw Error('Cannot gracefully close owned broker: native CLI is missing.');
    if(!/^[a-f0-9]{64}$/.test(this.nativeSha256||'')||crypto.createHash('sha256').update(fs.readFileSync(executable)).digest('hex')!==this.nativeSha256)throw Error('Owned native CLI hash changed; shutdown was not executed.');
    await this.runNative(executable,['shutdown','--json'],{...process.env,JADE_TOOLS_STATE_DIRECTORY:state,JADE_TOOLS_CONNECTIONS_FILE:path.join(this.stage,'connections.json')});
