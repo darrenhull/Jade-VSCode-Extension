@@ -1,0 +1,46 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vscode=require('vscode');
+async function run(){
+ const root=vscode.workspace.workspaceFolders[0].uri.fsPath,report=process.env.JADE_HEADLESS_HOST_REPORT||path.resolve(root,'../host-report.json');
+ try{
+  const ext=vscode.extensions.getExtension('jade-local-tools.jade-native-runner-cpp-preview');await ext.activate();
+  const {scaffoldSchema}=require('../src/native-project');await scaffoldSchema(root,'CreationDesignerSchema','RootSchema','25.0.02');
+  const file=path.join(root,'schemas/CreationDesignerSchema/types/DesignerItem.cls');
+  fs.writeFileSync(file,'jadeVersionNumber "25.0.02";\nschemaDefinition\nCreationDesignerSchema subschemaOf RootSchema partialDefinition;\ntypeHeaders\nDesignerItem subclassOf Object transient;\ntypeDefinitions\nDesignerItem completeDefinition\n(\nattributeDefinitions\nname: String[50];\nrank: Integer;\n)\ntypeSources\n');
+  for(let index=0;index<120;index++){const name='PagingItem'+String(index).padStart(3,'0');fs.writeFileSync(path.join(path.dirname(file),name+'.cls'),`jadeVersionNumber "25.0.02";\nschemaDefinition\nCreationDesignerSchema subschemaOf RootSchema partialDefinition;\ntypeHeaders\n${name} subclassOf Object transient;\ntypeDefinitions\n${name} completeDefinition\n(\n)\ntypeSources\n`);}
+  const before=fs.readFileSync(file,'utf8');
+  const commands=await vscode.commands.getCommands(true);assert.ok(commands.includes('jadeNative.createDefinition'),'Unified designer command must be registered.');
+  if(commands.includes('workbench.action.closeAuxiliaryBar'))await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
+  await vscode.commands.executeCommand('workbench.action.toggleSidebarVisibility');
+  const result=await vscode.commands.executeCommand('jadeNative.createDefinition');assert.equal(result?.opened,true,JSON.stringify(result));
+  assert.equal(fs.readFileSync(file,'utf8'),before,'Opening the designer must not alter existing source.');
+  if(process.env.JADE_CREATION_DEBUG_PORT){
+   const {withPrivateDesigner}=require('./creation-ui-capture.cjs');
+   await withPrivateDesigner(Number(process.env.JADE_CREATION_DEBUG_PORT),async designer=>{
+    const execute=code=>designer.evaluate(`(async()=>{const $=id=>document.getElementById(id);const input=(id,value)=>{const el=$(id);el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));};const change=(id,value)=>{const el=$(id);el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));};const wait=async predicate=>{for(let i=0;i<60;i++){if(predicate())return;await new Promise(r=>setTimeout(r,50));}throw Error('UI condition timed out: '+predicate.toString()+'; '+$('error').textContent);};${code}})()`);
+    await execute(`await wait(()=>$('project').options.length&&$('schema').value);change('kind','collection');input('name','DesignerByName');$('member').focus();input('member','PagingItem');await wait(()=>!$('member-results').hidden&&$('member-results').textContent.includes('PagingItem000'));if($('member-results').querySelectorAll('[role="option"]').length!==50)throw Error('Autocomplete did not bound first page');[...$('member-results').querySelectorAll('button')].find(b=>b.textContent.includes('More results')).click();await wait(()=>$('member-results').textContent.includes('PagingItem050'));if($('member-results').querySelectorAll('[role="option"]').length!==50)throw Error('Autocomplete did not bound next page');input('member','');return true;`);
+    await designer.type('DesignerItem');
+    await execute(`await wait(()=>!$('member-results').hidden&&[...$('member-results').querySelectorAll('button')].some(b=>b.textContent.includes('DesignerItem')));return true;`);
+    await designer.key('ArrowDown',40);await designer.key('Enter',13);
+    await execute(`await wait(()=>$('member').value==='CreationDesignerSchema::DesignerItem');return true;`);
+    assert.equal(await designer.evaluate('document.getElementById("name-label").textContent'),'Collection class name');
+    await designer.screenshot(path.join(process.env.JADE_CREATION_SCREENSHOTS,'unified-creation-definition.png'));
+    await execute(`$('next').click();$('key-0').focus();input('key-0','name');await wait(()=>!$('key-results-0').hidden&&[...$('key-results-0').querySelectorAll('button')].some(b=>b.textContent==='name'));[...$('key-results-0').querySelectorAll('button')].find(b=>b.textContent==='name').click();$('add-key').click();$('key-1').focus();input('key-1','rank');await wait(()=>!$('key-results-1').hidden&&[...$('key-results-1').querySelectorAll('button')].some(b=>b.textContent==='rank'));[...$('key-results-1').querySelectorAll('button')].find(b=>b.textContent==='rank').click();const direction=$('key-1').closest('fieldset').querySelector('select');direction.value='desc';direction.dispatchEvent(new Event('change',{bubbles:true}));$('back').click();if($('member').value!=='CreationDesignerSchema::DesignerItem')throw Error('Member choice lost after Back');$('next').click();if($('key-0').value!=='name'||$('key-1').value!=='rank')throw Error('Key choices lost after Back');document.querySelector('[aria-label="Up key 2"]').click();if($('key-0').value!=='rank'||$('key-1').value!=='name')throw Error('Key ordering failed');document.querySelector('[aria-label="Down key 1"]').click();$('next').click();await wait(()=>!$('save').disabled);return true;`);
+    const summary=await designer.evaluate('document.getElementById("summary").textContent');assert.match(summary,/name ascending, then rank descending/);
+    await designer.screenshot(path.join(process.env.JADE_CREATION_SCREENSHOTS,'unified-creation-review.png'));
+    for(const [theme,bodyClass]of [['Default Light Modern','vscode-light'],['Default High Contrast','vscode-high-contrast'],['Default Dark Modern','vscode-dark']]){await vscode.workspace.getConfiguration('workbench').update('colorTheme',theme,vscode.ConfigurationTarget.Global);await execute(`await wait(()=>document.body.classList.contains(${JSON.stringify(bodyClass)}));if(getComputedStyle($('save')).display==='none')throw Error('Save control hidden by theme');return true;`);}
+    await execute(`$('save').click();await wait(()=>$('status').textContent.startsWith('Saved '));return true;`);
+    const collection=path.join(root,'schemas/CreationDesignerSchema/types/DesignerByName.cls');assert.match(fs.readFileSync(collection,'utf8'),/name;\r\n\s*rank descending;/);
+    await vscode.commands.executeCommand('workbench.action.previousEditor');
+    await execute(`$('back').click();$('back').click();change('kind','class');input('name','DesignerOrdinary');$('next').click();await wait(()=>!$('save').disabled);$('save').click();await wait(()=>$('status').textContent.startsWith('Saved '));return true;`);
+    assert.match(fs.readFileSync(path.join(root,'schemas/CreationDesignerSchema/types/DesignerOrdinary.cls'),'utf8'),/DesignerOrdinary subclassOf Object transient;/);
+    await vscode.commands.executeCommand('workbench.action.previousEditor');
+    await execute(`$('back').click();change('kind','schema');input('name','DesignerNewSchema');input('version','25.0.02');$('next').click();await wait(()=>!$('save').disabled);$('save').click();await wait(()=>$('status').textContent.startsWith('Saved '));return true;`);
+    assert.match(fs.readFileSync(path.join(root,'schemas/DesignerNewSchema.scm'),'utf8'),/DesignerNewSchema subschemaOf RootSchema completeDefinition;/);
+   });
+  }
+  assert.equal(fs.readFileSync(file,'utf8'),before);
+  fs.writeFileSync(report,JSON.stringify({passed:true,version:ext.packageJSON.version,commandRegistered:true,webviewRendered:true,existingSourceUnchanged:true,noDatabase:true,actualWebviewFlows:!!process.env.JADE_CREATION_DEBUG_PORT,memberAutocomplete:true,keyboardSelection:true,boundedMemberPaging:true,propertyAutocomplete:true,keyOrdering:true,backPreservesChoices:true,lightAndHighContrast:true,reviewedDictionarySave:true,reviewedClassSave:true,reviewedSchemaSave:true},null,2));
+ }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
+}
+module.exports={run};

@@ -1,0 +1,7 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {createCdpConnection}=require('../../scripts/creation-ui-capture.cjs');
+function fakeSocket(){const listeners=new Map();return {readyState:1,addEventListener(name,fn){listeners.set(name,fn);},send(text){this.last=JSON.parse(text);},close(){this.closed=true;listeners.get('close')?.({});},emit(data){listeners.get('message')?.({data:JSON.stringify(data)});}};}
+test('CDP requests route responses and retain target session identity',async()=>{const socket=fakeSocket(),client=createCdpConnection(socket);const pending=client.request('Runtime.evaluate',{expression:'1+1'},'private-webview');assert.equal(socket.last.sessionId,'private-webview');socket.emit({id:socket.last.id,result:{result:{value:2}}});assert.equal((await pending).result.value,2);client.close();assert.equal(socket.closed,true);});
+test('CDP errors and closed sockets fail pending work instead of reporting success',async()=>{const socket=fakeSocket(),client=createCdpConnection(socket);const first=client.request('Page.captureScreenshot');socket.emit({id:socket.last.id,error:{message:'Target closed'}});await assert.rejects(first,/Target closed/);const second=client.request('Runtime.evaluate');client.close();await assert.rejects(second,/closed/i);});
+test('CDP request timeout bounds unavailable webview operations',async()=>{const socket=fakeSocket(),client=createCdpConnection(socket,{timeoutMilliseconds:10});await assert.rejects(client.request('Runtime.evaluate'),/timed out/);client.close();});
