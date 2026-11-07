@@ -2,6 +2,7 @@
 
 - Create a schema, ordinary class or keyed dictionary from one designer under Jade Tools.
 - Search schema-qualified superclasses and member classes, choose ordered dictionary keys and adjust supported advanced settings.
+- Choose imported collection members by package alias and exporting schema, with key choices limited to exported properties.
 - Review a plain-language definition and the exact native source before explicitly saving new files.
 - Keep compilation and publication as separate actions; existing schema and collection commands remain available.
 

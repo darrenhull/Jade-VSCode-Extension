@@ -49,7 +49,7 @@ See the [extension's detailed documentation](extension/README.md) and [changelog
 
 ## Shared source designer
 
-Open **Jade: Create Schema, Class or Collection** from the Command Palette or Jade Tools. The first release combines schema scaffolding, ordinary classes and existing member/external dictionary options. Search choices are bounded and schema-qualified; the reviewed native files are saved exclusively without compiling or publishing. Type choices use source ancestry and the existing verified system cache; imported-package aliases and further collection families remain outside this first phase.
+Open **Jade: Create Schema, Class or Collection** from the Command Palette or Jade Tools. The first release combines schema scaffolding, ordinary classes and existing member/external dictionary options. Search choices are bounded and schema-qualified; the reviewed native files are saved exclusively without compiling or publishing. Type choices use source ancestry, extracted package declarations and the existing verified system cache. Imported members retain their package alias and exporting-schema context; member keys expose only the exported interface. Missing export metadata is shown as unavailable, and imported classes are excluded from superclass choices. Further collection families remain in the separate follow-up.
 
 Actual running VS Code designer, with source review before saving:
 
