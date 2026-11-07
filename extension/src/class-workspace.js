@@ -205,7 +205,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     record.subscriptions.push(panel.onDidDispose(close));
     record.refresh = load;
     record.close = close;
-    return { dispose: close, refresh: load, viewId: record.viewId, flushPendingEdits: () => {
+    return { dispose: close, isClosed: () => record.closed, refresh: load, viewId: record.viewId, flushPendingEdits: () => {
       if (!record.ready || record.closed) return Promise.reject(Error("The method editor is not ready to flush its pending changes."));
       return new Promise((resolve, reject) => { const requestId = crypto.randomUUID(), timer = setTimeout(() => { record.flushes.delete(requestId); reject(Error("The method editor did not acknowledge its pending changes. Try again after resolving the draft.")); }, 15000); record.flushes.set(requestId, { resolve, reject, timer }); void send({ command: "flushPendingEdits", requestId }); });
     }, setOrigin: value => { record.origin = value; }, select: async id => {

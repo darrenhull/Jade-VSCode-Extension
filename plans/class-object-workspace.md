@@ -20,6 +20,8 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 - [x] Reproduce and fix synchronous disposed-webview sends and stale-panel reuse; verify native close-class/open-another-class/reopen behaviour in the final host run.
 - [x] Fix Scratch Pad's idle-inspector ownership handover with lease/race regressions and show complete native diagnostics. An isolated native proof compiled/executed the Hello script and returned 6027 for invalid code; its private broker/processes and Working database were removed after shutdown. User source remains unchanged.
 - [x] Present the language as **Jade** in language selection and syntax metadata.
+- [x] Bundle Jade language, Mermaid and draw.io skills, validate them and install them in the current project. Trusted-project installation uses one shared implementation with independent receipts, preserves custom/dirty files and does not initiate a source scan.
+- [x] Give Markdown cells native Edit/Preview controls, keep Jade Run for code, and wrap Mermaid text in fenced Markdown before rendering through VS Code's built-in renderer. The actual Notebook proof verified SVG rendering, source preservation and both requested introduction paragraphs. Native Run Cells In Section remains a separate VS Code action.
 
 ### Acceptance evidence checkpoint
 
@@ -30,14 +32,14 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 | Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
 | Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
 | Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
-| Default regression | Final local check: 730 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
-| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 128 product files matched the source checkout |
+| Default regression | Final local check: 753 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
+| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 134 product files matched the source checkout |
 | Recovery and current-file sources | Rejected-edit/reopen recovery, exact Copy, confirmed Restore/Discard and native undo have working UI proofs. Regressions protect reopened/recreated recovery from fresh edits and preserve independent method permissions. Declared members stay in the current file; automatic cross-file transitions have been removed |
 | Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
 
 The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
 
-The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The final candidate VSIX SHA256 is `37ffc5f5701d5818219fa8363b3d20bc569a7570e714529bed8a8c8a3d62fc6d`. Native distribution checks and all 128 packaged product files were verified against the checkout. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The final candidate VSIX SHA256 is `a2449438325926b4e944c16a0f098ebf5b373f69ddabe6baf5fafb8688f882b5`. Native distribution checks and all 134 packaged product files were verified against the checkout and installed extension (ignoring VS Code installation metadata). The exact final Notebook proof also verified all four auto-installed skill files against the packaged bytes. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
 
 The installed candidate also passed native execution of the supplied Integer sum script in the configured Working database: compiler/execution success, no diagnostics, output `The sum of x and y is: 30`, 2756 ms. Source was not published. Its saved-file preparation remains project-wide; a syntax error in another saved class can prevent scratch execution.
 

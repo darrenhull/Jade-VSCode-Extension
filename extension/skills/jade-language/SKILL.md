@@ -1,0 +1,37 @@
+---
+name: jade-language
+description: Write, explain and correct native Jade class source, method bodies and Scratch Pad Workspace code, using Jade types, expressions, strings and native compiler diagnostics. Use for Jade application development, not Pug templates or jadelang.org.
+---
+
+# Jade language
+
+Use the project's installed Jade version and native compiler as the authority. The references below target Jade 2025. Check the matching version before relying on newer features.
+
+## Before writing code
+
+- Resolve class names through their schema and the current project's source. Check existing method signatures, property declarations and package aliases instead of inventing APIs.
+- Distinguish a signature-free Scratch Pad/Workspace body from a named method or a complete native CLS file. A method has a signature; a Workspace body starts with optional declarations and `begin`.
+- Preserve native schema headers, identifiers, class/property numbers and meaningful file structure. Change the requested member rather than rewriting an extracted file.
+- Use exact type names such as `Integer`, `String`, `Boolean`, `Decimal`, `Real`, `Date`, `Time` and `TimeStamp`. Language keywords such as `vars`, `begin`, `if`, `then` and `end` are lowercase.
+- Assignment uses `:=`; equality tests use `=`. Terminate declarations and instructions with semicolons. `write` accepts one expression, not a comma-separated argument list.
+- Construct dynamic strings with `&` and explicit primitive conversion such as `(x + y).String`. Do not assume C#, JavaScript or Python interpolation, or a `String::format` API. Verify any project-specific formatting helper before calling it.
+
+For examples and type/syntax links, read [the language reference](references/language-reference.md). Its string section covers dynamic messages, primitive conversions, typed date/time formatting and parameterized translatable strings.
+
+## Check the result
+
+Use available Jade Tools commands, the native CLI or the project's Jade MCP tools to compile and, when requested, execute the intended code. Report native error codes and source locations. A snippet or AI suggestion is not evidence of a successful compile.
+
+Keep local saving, compilation and publication distinct. Build/test/Scratch Pad use Working; publishing changes Source and needs the user's publication instruction. Working can retain data committed by executed code; it is not an operating-system sandbox.
+
+Scratch Pad currently prepares saved workspace definitions before executing its body. If preparation fails in another CLS file, identify that file and explain that the scratch code did not execute. Do not rewrite unrelated user source to hide the failure.
+
+Copilot's agent can select this skill for authoring tasks. Inline ghost-text/Tab suggestions use a different context path; installing this skill does not guarantee their syntax.
+
+## Official references
+
+- [Jade language syntax](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_syntax.htm)
+- [Encyclopaedia of Primitive Types](https://secure.jadeworld.com/developer-centre/JADE2025/Docs/EncycloPrim.pdf)
+- [String methods](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/string_type/string_methods.htm)
+
+These are language references, not permission to publish, alter stored data or run unrelated application code.

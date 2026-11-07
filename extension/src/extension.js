@@ -66,6 +66,7 @@ async function detectSettings() {
 function activate(context) {
   void require('./legacy-member-tabs').retireLegacyMemberTabs(vscode,context);
   const language=require('./language-tools').registerLanguageTools(vscode,context);
+  for(const name of ['jade-language','mermaid','drawio'])new (require('./ProjectSkillInstaller').ProjectSkillInstaller)({name,bundle:path.join(context.extensionPath,'skills',name),state:context.workspaceState,isTrusted:()=>vscode.workspace.isTrusted===true}).start(vscode,context,language.index);
   require('./navigation').registerNavigation(context,language);
   require('./impact-navigation').registerImpactNavigation(vscode,context,language);
   const classView=require('./class-view').registerClassView(vscode,context,language,{onInstances:row=>objectExplorer?.browseInstances(row)});

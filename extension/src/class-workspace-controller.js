@@ -133,10 +133,11 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();
     for(const [key,value] of views){
       if(value.row.file!==uri.toString()&&!(project&&value.row.projectId===project))continue;
+      if(value.view.isClosed?.()){if(views.get(key)===value)views.delete(key);continue;}
       try{
         if((value.panel.active||value.binding?.snapshot?.())&&await value.view.flushPendingEdits?.()===false)return false;
       }catch(error){
-        if(!/webview is disposed/i.test(error?.message||''))throw error;
+        if(value.view.isClosed?.()!==true&&!/webview is disposed/i.test(error?.message||''))throw error;
         // A native close can precede the extension-host disposal event. Its
         // stale canvas must not prevent flushing the remaining live sources.
         if(views.get(key)===value)views.delete(key);

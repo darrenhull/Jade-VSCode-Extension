@@ -4,6 +4,7 @@ const {JadeWorkspaceRunner}=require('./JadeWorkspaceRunner');
 const {WorkspaceRunHistory}=require('./WorkspaceRunHistory');
 const {WorkspaceDiagnostics}=require('./WorkspaceDiagnostics');
 const {WorkspaceContext}=require('./WorkspaceContext');
+const {ScratchPadMarkdown}=require('./ScratchPadMarkdown');
 const notebookType='jade-workspace';
 
 async function runSequential(cells,execute) {
@@ -115,11 +116,15 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     return result;
   }
   controller.executeHandler=async(cells,notebook)=>{
-    const schema=notebook.metadata.schema||await selectSchema(notebook,notebook.uri);if(!schema)return;
-    return runSequential(cells,cell=>runCell(cell,schema));
+    let schema=notebook.metadata.schema;
+    return runSequential(cells,async cell=>{
+      if(cell.kind===vscode.NotebookCellKind.Markup)return markdown.preview(cell);
+      schema=schema||await selectSchema(notebook,notebook.uri);if(!schema)return {passed:false,cancelled:true};
+      return runCell(cell,schema);
+    });
   };
   async function newWorkspace() {
-    const markup='# Scratch Pad\n\nChoose a schema, edit the code and click **Run**. Native Jade executes Workspace code in **Working**; nothing is published.\n\nEach run starts with fresh local variables. Committed Working data can survive runs. After editing and running again, use **Compare previous run** to see what changed. Application definitions use saved source files.';
+    const markup='# Scratch Pad\n\nChoose a schema, edit the code and click **Run**. Jade executes code in the local database. Nothing is published.\n\nEach run starts with fresh variables. Changes your code commits to the local database can remain between runs. After running twice, use **Compare Previous Run** to compare the code and results. Class definitions come from your saved project files.';
     const data=new vscode.NotebookData([
       new vscode.NotebookCellData(vscode.NotebookCellKind.Markup,markup,'markdown'),
       new vscode.NotebookCellData(vscode.NotebookCellKind.Code,'begin\n    write "Hello from Jade";\nend;','jade-nz')
@@ -153,6 +158,7 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     return vscode.commands.executeCommand('vscode.diff',previous,current,'Scratch Pad · Previous ↔ Current · Working',{preview:true});
   }
   const safe=action=>(...args)=>Promise.resolve().then(()=>action(...args)).catch(error=>{void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};});
+  const markdown=new ScratchPadMarkdown(vscode);
   context.subscriptions.push(output,diagnostics,changes,controller,
     vscode.workspace.registerNotebookSerializer(notebookType,serializer,{transientOutputs:true}),
     vscode.workspace.registerTextDocumentContentProvider('jade-workspace-run',{provideTextDocumentContent:uri=>history.text(uri.path.slice(1))}),
@@ -163,6 +169,9 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
       const items=[status];if(history.pair(cell.document.uri.toString())){const diff=new vscode.NotebookCellStatusBarItem('$(diff) Compare previous run',vscode.NotebookCellStatusBarAlignment.Left);diff.command={command:'jadeNative.compareWorkspaceRuns',title:'Compare exact executed source and output',arguments:[cell]};items.push(diff);}return items;
     }}),
     vscode.commands.registerCommand('jadeNative.newWorkspace',safe(newWorkspace)),
+    vscode.commands.registerCommand('jadeNative.editScratchMarkdown',safe(value=>markdown.edit(value))),
+    vscode.commands.registerCommand('jadeNative.previewScratchMarkdown',safe(value=>markdown.preview(value))),
+    vscode.commands.registerCommand('jadeNative.insertScratchMermaid',safe(value=>markdown.insertMermaid(value))),
     vscode.commands.registerCommand('jadeNative.runWorkspace',safe(options=>runEditor(false,options?.schema))),
     vscode.commands.registerCommand('jadeNative.runWorkspaceSelection',safe(options=>runEditor(true,options?.schema))),
     vscode.commands.registerCommand('jadeNative.scratchpadCompileInfo',()=>{void vscode.window.showInformationMessage('Scratch Pad code is compiled when you choose Run. F5 does not execute it. Class files still use F5 for compile-only checks.');return {compiled:false,executed:false};}),

@@ -34,9 +34,17 @@ For a wrapped statement or declaration, include its first line in the selection 
 
 Choose **New Scratch Pad** under Tools, select a schema, type Jade code and press **Run**. Save the page to keep its code and optional notes in source control; run output is not saved with it. After two runs, use **Compare Previous Scratch Pad Run** to compare the code and results.
 
+Markdown cells have **Edit Markdown** and **Preview** actions. To show a diagram, put it in a fenced `mermaid` block, or use **Insert Mermaid Diagram** to wrap raw diagram text. Rendering uses the installed Markdown renderer; current VS Code has built-in Mermaid support. The native **Run Cells In Section** action is different: it executes code cells below a heading.
+
 Each run has separate local variables. Changes your code commits to Working data can remain for later runs. Interactive input is unavailable, and F5 does not execute scratch code.
 
 Before execution, Jade prepares the saved workspace definitions. A compiler error in those files can prevent the scratch code from running; the result includes the native diagnostic and reported source location. Idle Database Objects inspection is released automatically before a run. An active build or test retains ownership until it finishes or is cancelled.
+
+## Project skills
+
+In trusted local Jade projects, Jade Tools installs three bundled agent skills under `.github/skills/`: **jade-language**, **mermaid** and **drawio**. Detection uses `jade.json`, known native source or opened class headers. Jade language guidance includes types, syntax, advanced string construction, typed date/time formatting and official references. The diagram skills cover fenced Markdown previews and editable diagrams with exports. These are project files you can keep in source control.
+
+The extension preserves customised skills and unsaved skill edits. It updates only unchanged files it manages, and does not install into untrusted workspaces. Copilot's agent can select the skill for Jade authoring; inline Tab suggestions use a different context path and are not guaranteed by the skill.
 
 ## Browse and create
 

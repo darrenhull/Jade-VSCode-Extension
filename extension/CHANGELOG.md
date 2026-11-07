@@ -8,6 +8,8 @@
 - Filter the current instance page with the same autocomplete and grid controls as class search.
 - Navigate read-only object and collection snapshots with retained history, page state and clear disconnected status.
 - See complete Scratch Pad compiler diagnostics and automatically hand over idle inspection connections before execution.
+- Install Jade language, Mermaid and draw.io project skills with tested language examples, diagram guidance and official references, preserving project customisations.
+- Switch Scratch Pad notes between Markdown source and preview, and insert Mermaid diagrams using VS Code's renderer.
 
 # 0.16.0 — Collection families and native rules
 

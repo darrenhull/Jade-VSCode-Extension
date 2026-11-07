@@ -49,3 +49,30 @@ test('instance search tabs are bounded and closing one permits another without s
  for(let i=0;i<13;i++)await s.commands.get('jadeNative.filterObjectInstances')({...row,oid:'9050.'+i,name:'Fish'+i});
  assert.equal(s.panels.length,12);assert.match(s.errors.at(-1),/12 tabs maximum/);s.panels[0].dispose();await new Promise(r=>setImmediate(r));await s.commands.get('jadeNative.filterObjectInstances')({...row,oid:'9050.12',name:'Fish12'});assert.equal(s.panels.length,13);
 }));
+for(const command of ['nativeFirst','refresh'])test('closing instance grid cancels late '+command+' cursor without retaining it',()=>fixture(async s=>{
+ const {row,panel}=await open(s),client=s.clients[0],original=client.request;let resolve;
+ client.request=async(name,args)=>{if(name==='instances'){client.requests.push({command:name,args});return new Promise(r=>resolve=r);}return original(name,args);};
+ await panel.receive({command});assert.equal(typeof resolve,'function');panel.dispose();resolve({items:[{oid:'9002.999',className:'Fish',schema:'Pets'}],cursor:'late-after-close',hasMore:true});
+ for(let i=0;i<4;i++)await new Promise(r=>setImmediate(r));assert.ok(client.requests.some(x=>x.command==='release'&&x.args.cursor==='late-after-close'));
+ client.request=original;assert.equal(s.controller.instanceCatalogue(row),undefined);const rows=await s.controller.provider.getChildren(row);assert.equal(rows.filter(x=>x.kind==='object').length,100);
+}));
+test('closing grid preserves an in-flight native page still owned by the tree',()=>fixture(async s=>{
+ const {row,panel}=await open(s),client=s.clients[0],original=client.request;let resolve;
+ client.request=async(name,args)=>{if(name==='instances'){client.requests.push({command:name,args});return new Promise(r=>resolve=r);}return original(name,args);};
+ await panel.receive({command:'nativeFirst'});const tree=s.controller.provider.getChildren(row);panel.dispose();resolve({items:[{oid:'9002.999',className:'Fish',schema:'Pets'}],cursor:'tree-owned',hasMore:true});const rows=await tree;
+ assert.equal(rows.find(x=>x.kind==='object').oid,'9002.999');assert.equal(client.requests.some(x=>x.command==='release'&&x.args.cursor==='tree-owned'),false);client.request=original;
+}));
+test('late closed-grid page cannot replace a reopened instance grid',()=>fixture(async s=>{
+ const {row,panel}=await open(s),client=s.clients[0],original=client.request,resolvers=[];
+ client.request=async(name,args)=>{if(name==='instances'){client.requests.push({command:name,args});return new Promise(r=>resolvers.push(r));}return original(name,args);};
+ await panel.receive({command:'nativeFirst'});panel.dispose();const reopen=s.commands.get('jadeNative.filterObjectInstances')(row);await new Promise(r=>setImmediate(r));assert.equal(resolvers.length,2);
+ resolvers[1]({items:[{oid:'9002.777',className:'Fish',schema:'Pets'}],cursor:'new-grid',hasMore:true});await reopen;const fresh=s.controller.instanceCatalogue(row);await s.panels.at(-1).receive({command:'ready'});
+ resolvers[0]({items:[{oid:'9002.999',className:'Fish',schema:'Pets'}],cursor:'old-grid',hasMore:true});for(let i=0;i<4;i++)await new Promise(r=>setImmediate(r));
+ assert.equal(fresh.snapshot().page.items[0].name,'9002.777');assert.ok(client.requests.some(x=>x.command==='release'&&x.args.cursor==='old-grid'));assert.equal(client.requests.some(x=>x.command==='release'&&x.args.cursor==='new-grid'),false);client.request=original;
+}));
+test('closing a grid does not cancel its pending Next when the native tree joins that request',()=>fixture(async s=>{
+ const {row,panel}=await open(s),client=s.clients[0],original=client.request;let resolve;
+ client.request=async(name,args)=>{if(name==='instances'){client.requests.push({command:name,args});return new Promise(r=>resolve=r);}return original(name,args);};
+ await panel.receive({command:'nativeNext'});const tree=s.commands.get('jadeNative.moreObjectInstances')(row);panel.dispose();assert.equal(client.requests.filter(x=>x.command==='release'&&x.args.cursor==='next-100').length,0);
+ resolve({items:[{oid:'9002.999',className:'Fish',schema:'Pets'}],cursor:'tree-next',hasMore:true});await tree;const rows=await s.controller.provider.getChildren(row);assert.equal(rows.find(x=>x.kind==='object').oid,'9002.999');assert.equal(client.requests.some(x=>x.command==='release'&&x.args.cursor==='tree-next'),false);client.request=original;
+}));

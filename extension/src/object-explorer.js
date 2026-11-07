@@ -17,6 +17,8 @@ function registerObjectExplorer(vscode, context, services) {
     pages = new Map(),
     instanceCatalogues = new Map(),
     pageLoads = new Map(),
+    pageConsumers = new WeakMap(),
+    treeConsumer = {},
     classVersions = new Map(),
     classOffsets = new Map(),
     schemaNodes = new Map();
@@ -284,8 +286,15 @@ function registerObjectExplorer(vscode, context, services) {
     catalogRequest = request;
     return request;
   }
-  function classPage(row, next = false) {
-    if (pageLoads.has(row.oid)) return pageLoads.get(row.oid);
+  function cancelPageConsumer(oid, owner) {
+    const pending=pageLoads.get(oid),consumers=pending && pageConsumers.get(pending);
+    if(!consumers)return;
+    consumers.delete(owner);
+    if(!consumers.size){classVersions.set(oid,(classVersions.get(oid)||0)+1);pageLoads.delete(oid);}
+  }
+  function classPage(row, next = false, owner = treeConsumer) {
+    if (pageLoads.has(row.oid)) { const pending=pageLoads.get(row.oid);pageConsumers.get(pending)?.add(owner);return pending; }
+    const consumers=new Set([owner]);
     const generation = session.generation,
       version = pageVersion,
       classVersion = classVersions.get(row.oid) || 0,
@@ -300,6 +309,7 @@ function registerObjectExplorer(vscode, context, services) {
       })
       .then(async (page) => {
         if (
+          consumers.size === 0 ||
           generation !== session.generation ||
           version !== pageVersion ||
           classVersion !== (classVersions.get(row.oid) || 0)
@@ -319,6 +329,7 @@ function registerObjectExplorer(vscode, context, services) {
       .finally(() => {
         if (pageLoads.get(row.oid) === request) pageLoads.delete(row.oid);
       });
+    pageConsumers.set(request,consumers);
     pageLoads.set(row.oid, request);
     return request;
   }
@@ -684,8 +695,9 @@ function registerObjectExplorer(vscode, context, services) {
       if(existing){await existing.controller.show();return existing.controller;}
       if(instanceCatalogues.size>=12){await discardClassPage(row.oid);throw Error('Close an instance search tab before opening another (12 tabs maximum).');}
       const connection={target:session.target,path:currentTarget?.databasePath};
-      record={page,generation,oid:row.oid};
-      const active=()=>!disposed && generation===session.generation && !!session.client;
+      record={page,generation,oid:row.oid,closed:false};
+      const connected=()=>!disposed && generation===session.generation && !!session.client;
+      const active=()=>connected() && !record.closed;
       record.controller=registerClassCatalogue(vscode,context,{
         scope:'instances:'+key, label:row.schema+'::'+row.name+' · Instances',
         presentation:{instance:true,title:row.schema+'::'+row.name+' · Instances', intro:'Filter the current native page of up to 100 instances. Search Object ID, class or schema. First and Next load native pages; filtering does not scan the database or read object properties.', searchLabel:'Object ID, class or schema · current page',placeholder:'Filter current page'},
@@ -693,10 +705,19 @@ function registerObjectExplorer(vscode, context, services) {
           label:row.schema+'::'+row.name+' · '+connection.target+' · '+connection.path+' · Read-only',
           rows:record.page.items.map(item=>({...item,schema:item.schema||row.schema,name:item.oid,className:item.className||row.name,searchText:item.className||row.name})),
           nativePaging:{number:record.page.number||1,hasMore:!!record.page.hasMore && pages.get(row.oid)===record.page,stale:!active(),cursorReleased:active() && pages.get(row.oid)!==record.page}}),
-        nativePage:async next=>{ if(!active())return; if(!next)await discardClassPage(row.oid); if(!active())return; const page=await classPage(row,next); if(page&&active()){record.page=page;events.fire(row);} },
-        refreshPage:async()=>{if(!active())return;await discardClassPage(row.oid);if(!active())return;const page=await classPage(row);if(page&&active()){record.page=page;events.fire(row);}},
+        nativePage:async next=>{ if(!active())return; if(!next)await discardClassPage(row.oid); if(!active())return; const page=await classPage(row,next,record); if(page&&active()){record.page=page;events.fire(row);} },
+        refreshPage:async()=>{if(!active())return;await discardClassPage(row.oid);if(!active())return;const page=await classPage(row,false,record);if(page&&active()){record.page=page;events.fire(row);}},
         openClass:item=>{if(!active())throw Error('The instance snapshot is disconnected.');return inspect(item.oid);},
-        onClose:()=>{instanceCatalogues.delete(key);if(active() && pages.get(row.oid)===record.page)void discardClassPage(row.oid).catch(()=>{});record.page={items:[],number:1,hasMore:false};},
+        onClose:()=>{
+          record.closed=true;
+          if(instanceCatalogues.get(key)===record)instanceCatalogues.delete(key);
+          if(connected()){
+            cancelPageConsumer(row.oid,record);
+            const pending=pageLoads.get(row.oid);
+            if(!pending && pages.get(row.oid)===record.page)void discardClassPage(row.oid).catch(()=>{});
+          }
+          record.page={items:[],number:1,hasMore:false};
+        },
       });
       instanceCatalogues.set(key,record);
     }
