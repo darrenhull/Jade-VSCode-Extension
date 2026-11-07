@@ -32,7 +32,8 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     // second native metadata interpretation in the authoring UI.
     const language = new LanguageModel();
     language.setSystemCache(systemCache);
-    const root = { name: "RootSchema", header: { text: "" }, entries: [], classes: [...language.system.values()].map(cls => ({ owner: cls.name, model: { classes: [cls] } })) };
+    const classNames = new Set(systemCache.types.filter(type => !type.primitive && ![6, 7, 8].includes(type.category)).map(type => type.name));
+    const root = { name: "RootSchema", header: { text: "" }, entries: [], classes: [...language.system.values()].map(cls => ({ owner: cls.name, selectable: classNames.has(cls.name), model: { classes: [cls] } })) };
     project = { ...project, schemas: [...project.schemas.filter(schema => schema.name !== "RootSchema"), root] };
   }
   const schemasByName = new Map(project.schemas.map(schema => [schema.name, schema]));
@@ -51,7 +52,7 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     while (current && !seen.has(current.name)) {
       seen.add(current.name);
       for (const entry of current.classes) {
-        if (entry.model.classes.find(cls => cls.name === entry.owner)?.primitive) continue;
+        if (entry.selectable === false || entry.model.classes.find(cls => cls.name === entry.owner)?.primitive) continue;
         const key = folded(entry.owner);
         if (!found.has(key)) found.set(key, { name: entry.owner, schema: current.name, id: current.name + "::" + entry.owner, label: current.name + "::" + entry.owner });
       }
