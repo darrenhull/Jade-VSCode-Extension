@@ -162,3 +162,40 @@ test("missing class source offers the existing pull workflow only after explicit
  assert.equal(pulls,0);await s.panels[0].receive({command:"source"});assert.equal(pulls,1);
  }finally{await s.cleanup();}
 });
+
+test("late native class reveal cannot steal selection from a newer instance request",async()=>{
+ const s=setup();try{await s.connect();let resume;const reveals=[];s.controller.view.reveal=async row=>{reveals.push(row);if(reveals.length===1)await new Promise(resolve=>{resume=resolve;});};
+ const identity={schema:"Pets",className:"Fish",projectRoot:require("node:path").join(s.root,"source")};
+ const older=s.controller.browseInstances(identity);await turn();
+ await s.controller.browseInstances(identity);const count=reveals.length;resume();
+ assert.equal((await older).cancelled,true);assert.equal(reveals.length,count);
+ }finally{await s.cleanup();}
+});
+
+test("manual database switch cancels pending class reveal before stale native instance lookup",async()=>{
+ const s=setup();try{await s.connect();let resume;s.controller.view.reveal=()=>new Promise(resolve=>{resume=resolve;});
+ const pending=s.controller.browseInstances({schema:"Pets",className:"Fish",projectRoot:require("node:path").join(s.root,"source")});await turn();
+ const switched=s.controller.session.select("working");s.clients[0].finishClose();await switched;resume();
+ assert.equal((await pending).cancelled,true);assert.equal(s.clients[0].requests.filter(request=>request.command==="instances").length,0);
+ }finally{await s.cleanup();}
+});
+
+test("database tree class source resolves within the selected inspection project",async()=>{
+ const s=setup();try{await s.connect();let source;s.commands.set("jadeNative.findSourceClass",(...args)=>{source=args;});
+ await s.commands.get("jadeNative.openObjectClassSource")({name:"Fish",schema:"Pets"});
+ assert.equal(source[2],require("node:path").join(s.root,"source"));
+ }finally{await s.cleanup();}
+});
+
+test("pinning a snapshot while a reference loads prevents late replacement",async()=>{
+ const s=setup();try{await s.connect();await s.commands.get("jadeNative.inspectObject")(oid(10));const panel=s.panels[0],client=s.clients[0],request=client.request;let finish;
+ client.request=(command,args)=>command==="object"?new Promise(resolve=>{finish=()=>resolve({oid:args.oid,className:"Fish",schema:"Pets",properties:[]});}):request(command,args);
+ await panel.receive({command:"open",oid:oid(11)});await panel.receive({command:"pin"});finish();await turn();
+ assert.equal(latest(panel).object.oid,oid(10));assert.equal(latest(panel).pinned,true);
+ }finally{await s.cleanup();}
+});
+
+test("inspection status bar follows explicit native session target changes",async()=>{
+ const s=setup();try{await s.connect();const changing=s.controller.session.select("working");s.clients[0].finishClose();await changing;assert.match(s.statuses[0].text,/Working/);
+ }finally{await s.cleanup();}
+});

@@ -38,7 +38,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
   }
   function attach({ panel, document, binding, row: suppliedRow, origin, selectedId, services = {} }) {
     const row = suppliedRow || services.row || { file: document?.uri?.fsPath, ...services.identity };
-    const record = { panel, row, binding, key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
+    const record = { panel, row, binding, viewId: crypto.randomUUID(), sourceSwitches: new Map(), key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
     records.add(record);
     const asset = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", name));
     panel.webview.options = { ...panel.webview.options, enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")] };
@@ -61,7 +61,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           await send({ command: "notice", message: "The selected member is no longer available. Showing the class overview." });
         }
         const retainedSelected = document?.isDirty && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
-        record.snapshot = { ...snapshot, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
+        record.snapshot = { ...snapshot, viewId: record.viewId, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
         if (!snapshot.inheritedAvailable) record.state.includeInherited = false;
         record.snapshot.state = { ...record.state };
         persist(record);
@@ -81,6 +81,12 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     }
     async function select(id) {
       if (record.closed || id && !record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) && record.snapshot?.selected?.id !== id) return;
+      const nextMember = record.snapshot?.groups?.flatMap(group => group.items).find(member => member.id === id) || (record.snapshot?.selected?.id === id ? record.snapshot.selected : undefined);
+      const editOwningSource = adapters.onEditOwningSource || adapters.onOwningSource;
+      if (nextMember && ["method", "typeMethod"].includes(nextMember.kind) && !nextMember.system && nextMember.owner === (row.owner || row.name) && nextMember.file && document?.uri && nextMember.file !== document.uri.toString() && editOwningSource) {
+        const result = await editOwningSource(row, nextMember);
+        if (result?.opened || result?.cancelled || record.closed) return;
+      }
       record.state.selectedId = id;
       persist(record);
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
@@ -90,8 +96,9 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
         const preview = foreign && adapters.preview ? await adapters.preview(row, id, document) : undefined;
         if (record.closed || record.state.selectedId !== id) return;
+        const sameOwner = member.owner === (row.owner || row.name);
         const snapshot = foreign
-          ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : "This member belongs to another source document. Open its declaring class to edit it with its own undo and save history.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: !member.system }
+          ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : sameOwner ? "This method is in another source file for this class. Edit its owning source to use its own undo and save history." : "This member belongs to another source document. Open its declaring class to edit it with its own undo and save history.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: !member.system && !sameOwner, canEditOwningSource: !member.system && sameOwner && Boolean(editOwningSource) }
           : binding.select(member.owner || member.declaringClass || row.owner, member.name);
         const prepared = services.draftRecovery?.prepare && !foreign ? await services.draftRecovery.prepare(snapshot) : snapshot;
         if (record.closed || record.state.selectedId !== id) return;
@@ -117,7 +124,14 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "layout": record.state = normalizeState({ ...record.state, railWidth: value.railWidth, scrollTop: value.scrollTop }); persist(record); break;
           case "openOriginal": await adapters.onOriginal?.(row, record.state.selectedId); break;
           case "instances": await adapters.onInstances?.(row); break;
+          case "superclass": if (record.snapshot?.overview?.superclassIdentity) await adapters.onSuperclass?.(row, record.snapshot.overview.superclassIdentity); break;
           case "openDeclaring": { const member = selectedMember(); if (member?.inherited && !member.system) await adapters.onDeclaringClass?.(row, member); break; }
+          case "editOwningSource": { const member = selectedMember(); if (member && !member.system && member.file && member.owner === (row.owner || row.name)) await (adapters.onEditOwningSource || adapters.onOwningSource)?.(row, member); break; }
+          case "sourceSwitchReady": {
+            const request = typeof value.requestId === "string" ? record.sourceSwitches.get(value.requestId) : undefined;
+            if (request) { clearTimeout(request.timer); record.sourceSwitches.delete(value.requestId); value.ok === true ? request.resolve(true) : request.reject(Error("Resolve the pending method draft before switching its source document.")); }
+            break;
+          }
           case "backToClasses": await adapters.onBack?.(row, record.origin); break;
           case "retry": await load(); break;
           case "editorDraft": if (services.draftRecovery) await services.draftRecovery.save(value.draft); break;
@@ -166,14 +180,18 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (member && ["method", "typeMethod"].includes(member.kind) && member.name === snapshot.member && (member.owner || row.owner) === snapshot.owner && (!member.file || member.file === document?.uri?.toString())) send({ command: "editorSnapshot", snapshot });
     }));
     if (services.onDiagnostics) record.subscriptions.push(services.onDiagnostics(() => send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] })));
-    function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const subscription of record.subscriptions) subscription?.dispose(); }
+    function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const request of record.sourceSwitches.values()) { clearTimeout(request.timer); request.reject(Error("The class workspace closed before its method edits were acknowledged.")); } record.sourceSwitches.clear(); for (const subscription of record.subscriptions) subscription?.dispose(); }
     record.subscriptions.push(panel.onDidDispose(close));
     record.refresh = load;
-    return { dispose: close, refresh: load, setOrigin: value => { record.origin = value; }, select: async id => {
+    record.close = close;
+    return { dispose: close, refresh: load, viewId: record.viewId, prepareSourceSwitch: () => {
+      if (!record.ready || record.closed) return Promise.reject(Error("The method editor is not ready to switch source documents."));
+      return new Promise((resolve, reject) => { const requestId = crypto.randomUUID(), timer = setTimeout(() => { record.sourceSwitches.delete(requestId); reject(Error("The method editor did not acknowledge its pending changes. Try again after resolving the draft.")); }, 15000); record.sourceSwitches.set(requestId, { resolve, reject, timer }); void send({ command: "prepareSourceSwitch", requestId }); });
+    }, setOrigin: value => { record.origin = value; }, select: async id => {
       if (!record.ready) { record.state.selectedId = typeof id === "string" ? id : ""; persist(record); return; }
       await send({ command: "prepareSelection", id });
     }, state: () => ({ ...record.state }), identity: record.key };
   }
-  return { attach, refresh: async () => Promise.all([...records].map(record => record.refresh())), dispose() { disposed = true; for (const record of [...records]) { record.closed = true; for (const subscription of record.subscriptions) subscription?.dispose(); } records.clear(); } };
+  return { attach, refresh: async () => Promise.all([...records].map(record => record.refresh())), dispose() { disposed = true; for (const record of [...records]) record.close(); records.clear(); } };
 }
 module.exports = { createClassWorkspaces, normalizeState, classIdentity, workspaceHtml };

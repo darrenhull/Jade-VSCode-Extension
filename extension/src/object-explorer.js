@@ -24,6 +24,7 @@ function registerObjectExplorer(vscode, context, services) {
     classCatalogue,
     currentConfig,
     currentTarget,
+    status,
     lock = false,
     lockOwner,
     showSystem = false,
@@ -173,6 +174,7 @@ function registerObjectExplorer(vscode, context, services) {
     },
   });
   function refreshDescription() {
+    if (status) status.text = "$(database) Jade Inspect: " + (session.target === "working" ? "Working" : "Source") + " · Read-only";
     if (!view) return;
     const label =
       session.target === "working" ? "Working database" : "Source database";
@@ -394,7 +396,8 @@ function registerObjectExplorer(vscode, context, services) {
         command: "jadeNative.pageObjectClasses", args: [schema.name, page.nextOffset] }] : []),
     ];
   }
-  async function revealClass(selected, generation = session.generation) {
+  async function revealClass(selected, generation = session.generation, isCurrent = () => true) {
+    if (!isCurrent()) return;
     if (generation !== session.generation || !session.client || !classBrowser)
       throw Error("Database changed or inspection was cancelled.");
     const row = classBrowser.find(selected), schema = schemaNodes.get(selected.schema);
@@ -405,6 +408,7 @@ function registerObjectExplorer(vscode, context, services) {
     events.fire(schema);
     await view.reveal(schema, { select: false, focus: false, expand: true });
     if (generation !== session.generation) throw Error("Database changed or inspection was cancelled.");
+    if (!isCurrent()) return;
     const target = classChildren(schema).find(item => item.kind === "class" && item.name === row.name);
     await view.reveal(target, { select: true, focus: true, expand: false });
     return { schema: row.schema, name: row.name, offset: position.offset, readOnly: true };
@@ -452,9 +456,14 @@ function registerObjectExplorer(vscode, context, services) {
       if (configure === "Choose database") await vscode.commands.executeCommand("jadeNative.selectInspectionDatabase");
       return { available: false, reason: message, target: session.target, databasePath: currentTarget?.databasePath, projectRoot: requestedRoot };
     }
-    const revealed = await revealClass(row);
+    const generation = session.generation;
+    let revealed;
+    try { revealed = await revealClass(row, generation, () => version === browseVersion && generation === session.generation && !disposed); }
+    catch (error) { if (generation !== session.generation || version !== browseVersion || disposed) return { cancelled: true }; throw error; }
+    if (!revealed || version !== browseVersion || generation !== session.generation || disposed) return { cancelled: true };
     const node = classNode(row);
     await classPage(node);
+    if (version !== browseVersion || generation !== session.generation || disposed) return { cancelled: true };
     await view.reveal(node, { select: true, focus: true, expand: true });
     return { ...revealed, available: true, target: session.target, databasePath: currentTarget.databasePath, projectRoot: requestedRoot };
   }
@@ -638,7 +647,7 @@ function registerObjectExplorer(vscode, context, services) {
       }),
     );
   refreshDescription();
-  const status = vscode.window.createStatusBarItem(
+  status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     45,
   );
@@ -689,11 +698,12 @@ function registerObjectExplorer(vscode, context, services) {
     const name = value?.className || value?.name,
       schema = value?.schema;
     if (!name || !schema) throw Error("Select an object or class first.");
+    const projectRoot = value?.connection?.projectRoot || value?.projectRoot || inspectionScope || currentConfig?.workspaceRoots?.[0];
     const result = await vscode.commands.executeCommand(
       "jadeNative.findSourceClass",
       name,
       schema,
-      value?.projectRoot || value?.connection?.projectRoot,
+      projectRoot,
     );
     if (result?.opened === false) {
       const choice = await vscode.window.showInformationMessage?.(
@@ -704,7 +714,7 @@ function registerObjectExplorer(vscode, context, services) {
           ". Pull the schema source to browse its definitions.",
           ...(services.pullSource ? ["Pull source…"] : []),
       );
-      if (choice === "Pull source…") await services.pullSource?.({ schema, className: name, projectRoot: value?.connection?.projectRoot || value?.projectRoot });
+      if (choice === "Pull source…") await services.pullSource?.({ schema, className: name, projectRoot });
     }
     return result;
   }
@@ -861,6 +871,7 @@ function registerObjectExplorer(vscode, context, services) {
               if (message?.command === "refresh")
                 return inspect(record.object.oid, record, false);
               if (message?.command === "pin") {
+                record.readTicket = {};
                 record.pinned = !record.pinned;
                 return sendObject(record);
               }

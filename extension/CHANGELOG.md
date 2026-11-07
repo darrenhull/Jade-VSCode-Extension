@@ -2,6 +2,7 @@
 
 - Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.
 - Edit local methods in the class workspace with the original source document's save and undo history, completion and compiler diagnostics.
+- Move between partial source files with native save/cancel protection, and recover rejected method edits after reopening the workspace.
 - Browse instances through an explicit Source or Working choice, retaining class and project identity.
 - Navigate read-only object and collection snapshots with retained history, page state and clear disconnected status.
 

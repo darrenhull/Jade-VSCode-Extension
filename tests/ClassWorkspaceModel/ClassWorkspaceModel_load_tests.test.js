@@ -27,11 +27,23 @@ test('searches and pages all metadata while reading only selected class source',
 test('resolves inherited ownership within the selected project and keeps overrides declared',async()=>{
  const {model}=setup({'file:///one/Base.cls':source('Pets','Base','Object','inherited: String;\nname: String;'),'file:///one/Fish.cls':source('Pets','Fish','Base','name: String;')});
  const value=await model.load({schema:'Pets',name:'Fish'},{includeInherited:true});
+ assert.equal(value.inheritedAvailable,true,'known local ancestors remain browsable if the optional root cache is absent');
  const rows=value.groups.flatMap(g=>g.items);assert.equal(rows.filter(r=>r.name==='name').length,1);
+ assert.equal(value.overview.superclassIdentity.name,'Base');assert.equal(value.overview.superclassIdentity.file,'file:///one/Base.cls');
  const inherited=rows.find(r=>r.name==='inherited');assert.equal(inherited.inherited,true);assert.equal(inherited.owner,'Base');assert.equal(inherited.file,'file:///one/Base.cls');
 });
 test('retains a resolved import identity without merging aliases into an unqualified class page',async()=>{
  const {model}=setup({'file:///one/Fish.cls':source('Pets','Fish','Object')});
  const first=await model.resolveClass({schema:'Pets',name:'Fish',file:'file:///one/Fish.cls',importIdentity:'PackageA::Fish',packageAlias:'Goldfish'});
  assert.equal(first.importIdentity,'PackageA::Fish');assert.equal(first.packageAlias,'Goldfish');assert.equal(first.file,'file:///one/Fish.cls');
+});
+test('keeps the exact secondary partial-file method ownership for explicit original-source navigation',async()=>{
+ const primary='file:///one/Fish.cls',secondary='file:///one/Fish-extra.cls';
+ const partial='schemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ntypeDefinitions\nFish partialDefinition\n(\njadeMethodDefinitions\nextra() : String;\n)\ntypeSources\nFish (\njadeMethodSources\nextra\n{\nextra() : String;\nbegin\n return "extra";\nend;\n}\n)';
+ const {model}=setup({[primary]:source('Pets','Fish','Object','','extra() : String;'),[secondary]:partial});
+ const page=await model.load({name:'Fish',schema:'Pets',file:secondary},{});assert.equal(page.identity.file,primary);
+ const member=page.groups.flatMap(group=>group.items).find(member=>member.name==='extra');assert.ok(member);assert.equal(member.file,secondary);
+  assert.equal(page.groups.flatMap(group=>group.items).filter(member=>member.name==='extra').length,1,'Declaration metadata and the one real method source must form one navigation row');
+ const detail=await model.preview(page.identity,member.id);assert.equal(detail.file,secondary);assert.match(detail.text,/return "extra"/);
+  const owning=await model.resolveMemberSource(page.identity,member.id);assert.equal(owning.file,secondary);assert.equal(owning.identity.file,primary);assert.equal(owning.identity.superclass,'Object');
 });

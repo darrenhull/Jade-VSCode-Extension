@@ -23,10 +23,11 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
       const cls=value.classes.find(cls=>cls.name===name);
       for(const group of cls?.groups||[])for(const member of group.items){
         const kind=group.label==='Type methods'?'typeMethod':member.kind;
-        groups.get(group.label)?.push({...member,kind,id:memberId({...member,kind}),declaringClass:name,declaringSchema:entry.model.schema,inherited:false});
+        const items=groups.get(group.label),id=memberId({...member,kind});
+        items?.push({...member,kind,id,declaringClass:name,declaringSchema:entry.model.schema,inherited:false});
       }
     }
-    return {document,groups:[...groups].map(([label,items])=>({label,items})),entries};
+    return {document,groups:[...groups].map(([label,items])=>{const sourceIds=new Set(items.filter(item=>item.bodyStart!==undefined).map(item=>item.id));return {label,items:items.filter(item=>item.bodyStart!==undefined||!['method','typeMethod'].includes(item.kind)||!sourceIds.has(item.id))};}),entries};
   }
   async function resolveClass(row){
     await ready();
@@ -50,7 +51,7 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
   async function snapshot(row,includeInherited){
     const identity=await resolveClass(row),local=await classData(identity.entries,identity.name);
     const groups=new Map(local.groups.map(group=>[group.label,[...group.items]])),known=new Set(local.groups.flatMap(g=>g.items).filter(m=>m.kind!=='base').map(m=>m.name));
-    let inheritedAvailable=true,inheritedReason='',parent=identity.superclass,schema=identity.schema;
+    let inheritedAvailable=true,inheritedReason='',parent=identity.superclass,schema=identity.schema,superclassIdentity,resolvedAncestors=0;
     const seen=new Set([schema+'::'+identity.name]);
     while(parent){
       let entries=entriesFor(parent,schema,identity.projectId),resolvedSchema=schema;
@@ -65,25 +66,39 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
       if(entries.length){
         if(entries.filter(e=>!e.cls.partial).length>1){inheritedAvailable=false;inheritedReason='Superclass source has ambiguous declarations.';break;}
         const base=entries.find(e=>!e.cls.partial)||entries[0];
+        resolvedAncestors++;
+        if(!superclassIdentity&&seen.size===2)superclassIdentity={name:parent,schema:base.model.schema,file:base.model.uri,projectId:identity.projectId,projectRoot:identity.projectRoot};
         if(includeInherited){const data=await classData(entries,parent);for(const group of data.groups)for(const member of group.items){if(member.kind==='base'||known.has(member.name))continue;known.add(member.name);groups.get(group.label).push({...member,inherited:true});}}
         parent=base.cls.parent;schema=base.model.schema;
       }else{
         const system=language.index.project.system.get(parent);
-        if(!system){inheritedAvailable=false;inheritedReason='Superclass metadata is unavailable. Declared members remain available.';break;}
+        if(!system){inheritedAvailable=resolvedAncestors>0;inheritedReason=resolvedAncestors?'Showing only resolved ancestors; metadata for '+parent+' is unavailable.':'Superclass metadata is unavailable. Declared members remain available.';break;}
+        resolvedAncestors++;
         if(includeInherited)for(const member of system.members||[]){if(known.has(member.name))continue;known.add(member.name);const kind=member.typeMethod?'typeMethod':member.kind;const label=kind==='typeMethod'?'Type methods':kind==='method'?'Methods':'Properties';groups.get(label).push({...member,kind,id:memberId({...member,kind,owner:system.name,schema:'RootSchema'}),owner:system.name,schema:'RootSchema',declaringClass:system.name,declaringSchema:'RootSchema',inherited:true,system:true});}
         parent=system.parent;schema='RootSchema';
       }
     }
     const {entries,...publicIdentity}=identity;
-    return {identity:{...publicIdentity,dirty:local.document?.isDirty||false},groups:[...groups].map(([label,items])=>({label,items:items.sort((a,b)=>a.name.localeCompare(b.name))})),inheritedAvailable,inheritedReason};
+    return {identity:{...publicIdentity,dirty:local.document?.isDirty||false},groups:[...groups].map(([label,items])=>({label,items:items.sort((a,b)=>a.name.localeCompare(b.name))})),inheritedAvailable,inheritedReason,superclassIdentity,superclassReason:superclassIdentity?undefined:'No unambiguous local superclass source is available.'};
   }
   async function load(row,state={}){
     const data=await snapshot(row,state.includeInherited===true),all=data.groups.flatMap(group=>group.items),query=(state.query||'').trim().toLowerCase();
     const matching=all.filter(member=>(!state.kind||state.kind==='all'||member.kind===state.kind)&&(!query||[member.name,member.detail,member.type].filter(Boolean).join(' ').toLowerCase().includes(query)));
     const limit=100,total=matching.length,offset=Math.min(Math.max(0,Number.isSafeInteger(state.offset)?state.offset:0),total?Math.floor((total-1)/limit)*limit:0),page=new Set(matching.slice(offset,offset+limit).map(m=>m.id));
-    return {...data,groups:data.groups.map(group=>({...group,total:group.items.length,items:group.items.filter(member=>page.has(member.id))})),total,offset,hasMore:offset+limit<total,selected:all.find(member=>member.id===state.selectedId),overview:{counts:data.groups.map(group=>({label:group.label,count:group.items.length})),source:data.identity.file,superclass:data.identity.superclass}};
+    return {...data,groups:data.groups.map(group=>({...group,total:group.items.length,items:group.items.filter(member=>page.has(member.id))})),total,offset,hasMore:offset+limit<total,selected:all.find(member=>member.id===state.selectedId),overview:{counts:data.groups.map(group=>({label:group.label,count:group.items.length})),source:data.identity.file,superclass:data.identity.superclass,superclassIdentity:data.superclassIdentity,superclassReason:data.superclassReason}};
   }
   async function preview(row,id){const data=await snapshot(row,true),member=data.groups.flatMap(g=>g.items).find(m=>m.id===id);if(!member)return;const value=parsed.get(member.file);return {...member,text:value?value.text.slice(member.bodyStart??member.start,member.bodyStart===undefined?member.end:member.end-1).trim():member.detail||member.name};}
-  return {resolveClass,load,members:load,preview};
+  async function resolveMemberSource(row,id){
+    const identity=await resolveClass(row),data=await snapshot(identity,true),candidates=data.groups.flatMap(group=>group.items).filter(member=>member.id===id&&['method','typeMethod'].includes(member.kind)&&!member.system&&member.bodyStart!==undefined&&typeof member.file==='string'&&member.file.startsWith('file:'));
+    const unique=new Map(candidates.map(member=>[member.file+':'+member.bodyStart,member]));
+    if(unique.size!==1)throw Error(unique.size?'Method source ownership is ambiguous. Resolve duplicate definitions before editing.':'A resolved local method source is required before editing.');
+    const member=[...unique.values()][0];
+    if(projectOf(member.file)!==identity.projectId)throw Error('The owning method source does not belong to this project.');
+    const loaded=await readSource(member.file),text=loaded.text??loaded.doc.getText();
+    const current=classSections(text,member.file).filter(cls=>cls.name===member.owner).flatMap(cls=>cls.groups.flatMap(group=>group.items)).filter(item=>item.name===member.name&&item.bodyStart!==undefined&&text[item.end-1]==='}');
+    if(current.length!==1)throw Error('The owning method source changed or is incomplete. Refresh the class before switching source files.');
+    return {identity,member:{...member,...current[0],id:member.id},file:member.file};
+  }
+  return {resolveClass,load,members:load,preview,resolveMemberSource};
 }
 module.exports={createClassWorkspaceModel,memberId};

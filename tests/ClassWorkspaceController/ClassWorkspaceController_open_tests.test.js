@@ -3,7 +3,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {registerClassWorkspaces}=require('../../extension/src/class-workspace-controller');
 const {safeContext}=require('../../extension/src/class-workspace-controller');
 test('persists source navigation identity without live session or credential metadata',()=>{
- const value=safeContext({row:{name:'Fish',schema:'Pets',projectId:'file:///project',file:'file:///project/Fish.cls',packageAlias:'ImportedPets',password:'secret'},column:1,origin:{scope:'workspace',session:'live',token:'secret',filter:{query:'fish',password:'secret'},selectedId:'Fish',scrollTop:80}});
+ const value=safeContext({row:{name:'Fish',schema:'Pets',projectId:'file:///project',file:'file:///project/Fish.cls',packageAlias:'ImportedPets',password:'secret'},column:1,origin:{scope:'workspace',kind:'quickpick',session:'live',token:'secret',filter:{query:'fish',password:'secret'},selectedId:'Fish',scrollTop:80}});
+ assert.equal(value.origin.kind,'quickpick');
  assert.equal(value.row.packageAlias,'ImportedPets');assert.equal(value.origin.filter.query,'fish');assert.equal(value.origin.scrollTop,80);assert.doesNotMatch(JSON.stringify(value),/secret|session|password|token/);
  assert.equal(safeContext({row:{name:'Fish',schema:'Pets',projectId:'file:///project',file:'https://source/Fish.cls'}}),undefined);
 });

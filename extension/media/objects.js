@@ -152,7 +152,7 @@ function render() {
       $("properties"),
       properties.length
         ? "No properties match this filter."
-        : "No declared properties.",
+        : "No stored properties in this snapshot.",
     );
   $("object-properties").hidden =
     Boolean(object.collection) && !properties.length;

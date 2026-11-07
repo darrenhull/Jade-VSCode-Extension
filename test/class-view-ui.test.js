@@ -180,6 +180,7 @@ function setup() {
             return disposable;
           },
           onDidChangeViewState: () => disposable,
+          receive: message => receive(message),
           reveal() {},
           dispose() {
             dispose?.();
@@ -273,6 +274,18 @@ test('source lookup cannot fall through to another project when runtime context 
    assert.equal(result.opened,false);assert.equal(s.panels.length,0);
  }finally{s.dispose();}
 });
+test('same-schema classes in different projects have distinct visible labels and group identities',async()=>{
+ const s=setup();try{
+   s.second.text=fixture('Pets','Fish','two');
+   const first={uri:s.vscode.Uri.file('/workspace/arbitrary'),name:'One'},second={uri:s.vscode.Uri.file('/workspace/different'),name:'Two'};
+   s.vscode.workspace.workspaceFolders=[first,second];s.vscode.workspace.getWorkspaceFolder=uri=>uri.fsPath.startsWith(first.uri.fsPath)?first:second;
+   const schema=(await s.api.provider.getChildren())[0],classes=await s.api.provider.getChildren(schema);
+   assert.equal(classes.length,2);
+   const labels=classes.map(row=>s.api.provider.getTreeItem(row).description);assert.deepEqual(new Set(labels),new Set(['One','Two']));
+   const a=await s.api.provider.getChildren(classes[0]),b=await s.api.provider.getChildren(classes[1]);
+   assert.notEqual(s.api.provider.getTreeItem(a[0]).id,s.api.provider.getTreeItem(b[0]).id);
+ }finally{s.dispose();}
+});
 test('method-only edits retain the warm class catalogue instead of rebuilding and sorting it',async()=>{
  const s=setup();try{
    await s.api.syncBrowser();const before=s.api.browser.rows;
@@ -288,6 +301,29 @@ test('Open Original Source without a tree argument uses the active class workspa
    await s.commands.get('jadeNative.openClassWorkspace')(row);
    await s.commands.get('jadeNative.openOriginalSource')();
    assert.equal(s.vscode.window.activeTextEditor.document.uri.toString(),s.first.uri.toString());
+ }finally{s.dispose();}
+});
+test('Back to Classes restores the tree filter instead of opening another catalogue tab',async()=>{
+ const s=setup();try{
+   s.vscode.window.showInputBox=async()=> 'Fish';
+   await s.commands.get('jadeNative.filterSourceClasses')({schema:'Pets'});
+   const schema=(await s.api.provider.getChildren()).find(row=>row.name==='Pets'),row=(await s.api.provider.getChildren(schema))[0];
+   await s.commands.get('jadeNative.openClassWorkspace')(row);
+   s.vscode.window.showInputBox=async()=> 'not-a-class';await s.commands.get('jadeNative.filterSourceClasses')({schema:'Pets'});
+   assert.equal((await s.api.provider.getChildren(schema)).length,0);
+   await s.panels[0].receive({command:'backToClasses'});
+   assert.equal((await s.api.provider.getChildren(schema))[0].name,'Fish');assert.equal(s.panels.length,1);
+ }finally{s.dispose();}
+});
+test('Back to Classes reopens native class search with the accepted query',async()=>{
+ const s=setup(),pickers=[];try{
+   s.vscode.window.createQuickPick=()=>{const picker={selectedItems:[],onDidChangeValue(fn){this.change=fn;return {dispose(){}};},onDidAccept(fn){this.accept=fn;return {dispose(){}};},onDidHide(fn){this.hide=fn;return {dispose(){}};},show(){pickers.push(this);},dispose(){}};return picker;};
+   const opening=s.commands.get('jadeNative.findSourceClass')();
+   for(let i=0;i<100&&!pickers.length;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(pickers.length,1);
+   pickers[0].value='Pets::Fish';pickers[0].change(pickers[0].value);pickers[0].selectedItems=[pickers[0].items[0]];pickers[0].accept();await opening;
+   const returning=s.panels[0].receive({command:'backToClasses'});
+   for(let i=0;i<100&&pickers.length<2;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(pickers.length,2);
+   assert.equal(pickers[1].value,'Pets::Fish');pickers[1].hide();await returning;assert.equal(s.panels.length,1);
  }finally{s.dispose();}
 });
 test("two schema-qualified member previews both update after interleaved unsaved edits", async () => {

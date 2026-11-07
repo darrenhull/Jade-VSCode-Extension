@@ -50,6 +50,7 @@ class ClassWorkspaceEditorProvider {
     const position = offset => document.positionAt(binding.toDocumentOffset(offset));
     const requireActive=()=>{if(document.isClosed||panel?.active!==true)throw new Error('Select this class workspace before undo, redo or source navigation.');};
     const range = value => value ? { start: Math.max(0, document.offsetAt(value.start) - binding.snapshot().start), end: Math.min(binding.snapshot().text.length, document.offsetAt(value.end) - binding.snapshot().start) } : undefined;
+    const inMethod=value=>!value||(document.offsetAt(value.start)>=binding.snapshot().start&&document.offsetAt(value.end)<=binding.snapshot().end);
     return {
       save: () => document.save(),
       undo: () => {requireActive();return vscode.commands.executeCommand('undo');},
@@ -66,7 +67,7 @@ class ClassWorkspaceEditorProvider {
           kind: item.kind,
           range: range(item.range?.replacing || item.range),
           // Additional edits/commands must remain with the original provider; do not silently lose them.
-          complex: Boolean(item.additionalTextEdits?.length || item.command || (item.insertText && typeof item.insertText !== 'string')),
+          complex: Boolean(item.additionalTextEdits?.length || item.command || (item.insertText && typeof item.insertText !== 'string') || !inMethod(item.range?.replacing || item.range)),
         })), incomplete: Boolean(result?.isIncomplete) };
       },
       async definition(offset) {

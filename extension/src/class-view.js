@@ -29,10 +29,16 @@ function registerClassView(vscode, context, language, options={}) {
       pendingFiles.clear();
     }, 60);
   }
+  const systemReadyProjects=new Set();
   const source = async (uri) => {
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+    const project=vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.toString()||'';
+    if(language.ready&&!systemReadyProjects.has(project)){
+      await language.ready(doc);systemReadyProjects.add(project);
+    }
     return { doc, text: doc.getText() };
   };
+  if(vscode.workspace.onDidChangeConfiguration)context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event=>{if(event.affectsConfiguration('jadeNative'))systemReadyProjects.clear();}));
   const model=createClassWorkspaceModel({vscode,language,readSource:source});
   async function openOriginal(row,id){
     const member=id&&await model.preview(row,id);
@@ -43,8 +49,10 @@ function registerClassView(vscode, context, language, options={}) {
     load:model.load,preview:model.preview,
     onOriginal:openOriginal,
     onInstances:row=>options.onInstances?.({schema:row.schema,className:row.name,projectRoot:row.projectRoot,sourceUri:row.file}),
-    onBack:(_row,origin)=>catalogue.show(origin?.scope==='workspace'?{restore:origin}:{}),
+    onBack:restoreDiscovery,
     onDeclaringClass:(_row,member)=>previewController.open({name:member.owner,schema:member.schema,file:member.file}),
+    onSuperclass:(_row,identity)=>previewController.open(identity),
+    onEditOwningSource:(row,member)=>previewController.openOwningSource(row,member.id),
   });
   const previewController=registerClassWorkspaces(vscode,context,{model,shell,onOriginal:openOriginal});
   const classRows=createClassDiscoveryRows(uri=>vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(uri)));
@@ -159,7 +167,7 @@ function registerClassView(vscode, context, language, options={}) {
       item.description =
         row.kind === "schema"
           ? classPage(row.schema).label
-          : row.description || row.detail;
+          : row.description || row.detail || (row.kind==='class'?row.projectName:undefined);
       item.iconPath = new vscode.ThemeIcon(
         {
           schema: "database",
@@ -212,6 +220,7 @@ function registerClassView(vscode, context, language, options={}) {
           (row.owner || row.name) +
           (row.owner ? "::" + (row.name || row.label) : "")
         : row.label;
+      if(row.kind==='class'&&row.projectName)item.tooltip+=' · '+row.projectName;
       return item;
     },
     async getChildren(row) {
@@ -291,7 +300,7 @@ function registerClassView(vscode, context, language, options={}) {
           label,
           schema: row.schema,
           owner: row.name,
-          id: row.schema + "::" + row.name + "::" + label,
+          id: (row.browserId||JSON.stringify([row.projectId,row.schema,row.name])) + "::" + label,
           description: String(items.length),
           items,
         }));
@@ -310,7 +319,7 @@ function registerClassView(vscode, context, language, options={}) {
     treeDataProvider: provider,
     showCollapseAll: true,
   });
-  async function revealClass(selected) {
+  async function revealClass(selected,{focus=false,preserveFilter=false}={}) {
     await syncBrowser();
     selected = browser.find({ schema: selected.schema, name: selected.name,projectId:selected.projectId });
     if (!selected)
@@ -318,15 +327,15 @@ function registerClassView(vscode, context, language, options={}) {
         "This class is no longer in the workspace. Refresh the catalogue.",
       );
     const schema = selected.schema;
-    classFilters.delete(schema);
+    if(!preserveFilter)classFilters.delete(schema);
     const position = browser.positionOf(
       { schema, name: selected.name,projectId:selected.projectId },
-      { schema },
+      { schema,query:preserveFilter?classFilters.get(schema)||'':'' },
     );
     if (position) classPages.set(schema, position.offset);
     parents.set(selected, { kind: "schema", name: schema, schema });
     events.fire();
-    await view.reveal(selected, { expand: true, focus: false }).catch(() => {});
+    await view.reveal(selected, { expand: true, focus }).catch(() => {});
     return { schema, name: selected.name };
   }
   const catalogue = registerClassCatalogue(vscode, context, {
@@ -338,6 +347,20 @@ function registerClassView(vscode, context, language, options={}) {
     },
     openClass: async(row,origin)=>{await revealClass(row);return previewController.open(row,{origin});},
   });
+  function treeOrigin(row){return {scope:'workspace',kind:'tree',filter:{schema:row.schema,query:classFilters.get(row.schema)||'',offset:classPages.get(row.schema)||0},selectedId:row.browserId||''};}
+  async function restoreDiscovery(row,origin){
+    if(origin?.kind==='quickpick'){
+      await syncBrowser();let query=origin.filter?.query||'';
+      const selected=await pickClass(vscode,browser,{schema:origin.filter?.schema,query,onAccept:(_row,state)=>{query=state.query;}});
+      if(selected){await revealClass(selected);return previewController.open(selected,{origin:{...origin,filter:{...origin.filter,query},selectedId:selected.browserId}});}
+      return;
+    }
+    if(origin?.kind==='tree'){
+      classFilters.set(row.schema,origin.filter?.query||'');classPages.set(row.schema,origin.filter?.offset||0);
+      return revealClass(row,{focus:true,preserveFilter:true});
+    }
+    return catalogue.show(origin?.scope==='workspace'?{restore:origin}:{});
+  }
   context.subscriptions.push(
     events,
     view,
@@ -368,7 +391,7 @@ function registerClassView(vscode, context, language, options={}) {
       },
     ),
     previewController,
-    vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>previewController.open(row)),
+    vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>previewController.open(row,{origin:treeOrigin(row)})),
     vscode.commands.registerCommand(
       "jadeNative.showClassMember",
       async (row) => {
@@ -391,7 +414,7 @@ function registerClassView(vscode, context, language, options={}) {
       },
     ),
     vscode.commands.registerCommand("jadeNative.previewClassMember", (row) =>
-      previewController.open(row,{selectedId:memberId({...row,kind:row.typeMethod?'typeMethod':row.kind})}),
+      previewController.open(row,{origin:treeOrigin(row),selectedId:memberId({...row,kind:row.typeMethod?'typeMethod':row.kind})}),
     ),
     vscode.commands.registerCommand("jadeNative.openOriginalSource", (row) =>
       row?vscode.commands.executeCommand('jadeNative.showClassMember',row):previewController.openOriginal(),
@@ -400,6 +423,7 @@ function registerClassView(vscode, context, language, options={}) {
       "jadeNative.findSourceClass",
       async (name, schema, projectRoot) => {
         await syncBrowser();
+        let origin;
         const projectId=projectRoot&&vscode.workspace.workspaceFolders?.find(folder=>folder.uri.fsPath===projectRoot||folder.uri.toString()===projectRoot)?.uri.toString();
         if(projectRoot&&!projectId)return {opened:false,reason:'The originating project is not open in this workspace.'};
         let selected = name && schema ? browser.find({ name, schema,projectId }) : undefined;
@@ -422,19 +446,21 @@ function registerClassView(vscode, context, language, options={}) {
               schema,
               title: "Find Jade class in workspace",
               query: name || "",
+              onAccept:(row,state)=>{origin={scope:'workspace',kind:'quickpick',filter:{schema:state.schema,query:state.query,offset:0},selectedId:row.browserId};},
             });
         }
         if (selected) {
           await revealClass(selected);
         }
         if (selected) {
-          return previewController.open(selected,{origin:{scope:'workspace'}});
+          return previewController.open(selected,{origin:origin||treeOrigin(selected)});
         }
         return { opened: false };
       },
     ),
     vscode.commands.registerCommand("jadeNative.refreshClassView", async () => {
       resources = undefined;
+      systemReadyProjects.clear();
       await language.index.rescan();
       if (catalogue.panel) await catalogue.refresh();
       events.fire();
@@ -456,6 +482,7 @@ function registerClassView(vscode, context, language, options={}) {
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       classRows.invalidate();
+      systemReadyProjects.clear();
       resources = undefined;
       events.fire();
     }),

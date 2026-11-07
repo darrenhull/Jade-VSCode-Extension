@@ -115,6 +115,29 @@ test("recovery replacement and discard require explicit modal confirmation",asyn
   shell.attach({panel:h.panel,row,services:{draftRecovery:recovery}});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});await h.message({command:"restoreDraft"});await h.message({command:"discardDraft"});
   assert.equal(prompts.length,2);assert.ok(prompts.every(prompt=>prompt.options.modal));assert.deepEqual(calls,[]);
 });
+test("source switching waits for the exact mounted editor acknowledgement",async()=>{
+  const h=host(),shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot}),view=shell.attach({panel:h.panel,row});
+  await assert.rejects(view.prepareSourceSwitch(),/not ready/);await h.message({command:"ready"});
+  const result=view.prepareSourceSwitch(),request=h.sent.at(-1);assert.equal(request.command,"prepareSourceSwitch");
+  await h.message({command:"sourceSwitchReady",requestId:"unknown",ok:true});
+  await h.message({command:"sourceSwitchReady",requestId:request.requestId,ok:true});assert.equal(await result,true);
+});
+test("conflicted and disposed method canvases cannot close their source document",async()=>{
+  const h=host(),shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot}),view=shell.attach({panel:h.panel,row});await h.message({command:"ready"});
+  const conflicted=view.prepareSourceSwitch(),rejected=assert.rejects(conflicted,/pending method draft/);await h.message({command:"sourceSwitchReady",requestId:h.sent.at(-1).requestId,ok:false});await rejected;
+  const pending=view.prepareSourceSwitch(),closed=assert.rejects(pending,/closed/);shell.dispose();await closed;
+});
+test("cancelling an owning-source transition preserves previous class selection",async()=>{
+  const h=host(),document={uri:{toString:()=>row.file},isDirty:true},foreign={id:"part",name:"secondary",owner:row.owner,kind:"method",file:"C:/part.cls"},calls=[];
+  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,groups:[{label:"Methods",items:[...snapshot.groups[0].items,foreign]}]}),onEditOwningSource:async(...args)=>{calls.push(args);return{opened:false,cancelled:true};}});
+  const view=shell.attach({panel:h.panel,row,document});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});await h.message({command:"select",id:"part"});
+  assert.equal(view.state().selectedId,"m1");assert.equal(calls.length,1);assert.equal(calls[0][1].file,"C:/part.cls");
+});
+test("superclass navigation uses only resolved adapter identity",async()=>{
+  const h=host(),calls=[],base={name:"Base",schema:"Shop",file:"C:/base.cls",projectId:row.projectId};
+  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,overview:{superclassIdentity:base}}),onSuperclass:async(...args)=>calls.push(args)});
+  shell.attach({panel:h.panel,row});await h.message({command:"ready"});await h.message({command:"superclass",identity:{file:"C:/attacker.cls"}});assert.deepEqual(calls[0],[row,base]);
+});
 
 test("reused class workspace Back restores its latest discovery origin",async()=>{
  const h=host(),origins=[],shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot,onBack:(_row,origin)=>origins.push(origin)});

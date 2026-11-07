@@ -12,12 +12,13 @@ async function main(){
  const base=path.resolve(__dirname,'..'),repository=base,extension=path.join(stage,'extension'),workspace=path.join(stage,'workspace');
  let creationPort;
  if(creation||classWorkspaceUi||objectWorkspaceUi){const server=require('node:net').createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});creationPort=server.address().port;await new Promise(resolve=>server.close(resolve));}
- if(creation&&process.env.JADE_CREATION_VSIX){
+ const packagedVsix=creation?process.env.JADE_CREATION_VSIX:objectWorkspaceUi?process.env.JADE_OBJECT_WORKSPACE_VSIX:classWorkspaceUi?process.env.JADE_CLASS_WORKSPACE_VSIX:undefined;
+ if(packagedVsix){
   // Exercise the packaged product, then append the private test entry point.
   // .NET validates ZIP destination containment; reject non-product entries and
   // links before extraction so no test owner marker can be overwritten.
   const script=`$ErrorActionPreference='Stop';$zip=[IO.Compression.ZipFile]::OpenRead($env:JADE_CREATION_VSIX);try{$total=0;if($zip.Entries.Count -gt 4096){throw 'VSIX entry limit exceeded'};foreach($entry in $zip.Entries){$total+=$entry.Length;if($total -gt 268435456){throw 'VSIX size limit exceeded'};if($entry.FullName -notmatch '^(extension/|extension.vsixmanifest$|\\[Content_Types\\]\\.xml$)' -or $entry.FullName.Contains('..') -or $entry.FullName.Contains('\\') -or (($entry.ExternalAttributes -shr 16) -band 61440) -eq 40960){throw 'Unsafe VSIX entry'}}}finally{$zip.Dispose()};[IO.Compression.ZipFile]::ExtractToDirectory($env:JADE_CREATION_VSIX,$env:JADE_CREATION_STAGE)`;
-  execFileSync('pwsh',['-NoProfile','-NonInteractive','-Command',script],{env:{...process.env,JADE_CREATION_VSIX:path.resolve(process.env.JADE_CREATION_VSIX),JADE_CREATION_STAGE:stage},windowsHide:true,stdio:'pipe'});
+  execFileSync('pwsh',['-NoProfile','-NonInteractive','-Command',script],{env:{...process.env,JADE_CREATION_VSIX:path.resolve(packagedVsix),JADE_CREATION_STAGE:stage},windowsHide:true,stdio:'pipe'});
   require('./bundle-cli.cjs').bundleCli({source:path.join(extension,'vendor/jade-tools-cli'),pinFile:path.join(base,'packages/jade-cli-pin.json'),verifyOnly:true});
  }else fs.cpSync(path.join(base,'extension'),extension,{recursive:true,filter:source=>!['dist','.vscode'].includes(path.relative(path.join(base,'extension'),source).split(path.sep)[0])});
  fs.mkdirSync(path.join(extension,'test'));fs.copyFileSync(path.join(base,'test/'+(nativeOids?'vscode-native-oids-smoke.js':incremental?'vscode-incremental-build-smoke.js':workspaces?'vscode-workspaces-smoke.js':formatting?'vscode-formatting-smoke.js':cliIntegration?'vscode-cli-smoke.js':alternating?'vscode-alternating-tests-smoke.js':perf?'vscode-performance-smoke.js':testDebug?'vscode-test-debug-smoke.js':impact?'vscode-impact-smoke.js':objects?'vscode-objects-smoke.js':classes?'vscode-class-view-smoke.js':collections?'vscode-collections-smoke.js':debug?'vscode-debug-smoke.js':pull?'vscode-pull-smoke.js':project?'vscode-project-smoke.js':'vscode-headless-smoke.js')),path.join(extension,'test/implementation.js'));
@@ -25,7 +26,26 @@ async function main(){
  fs.writeFileSync(path.join(extension,'test/smoke.js'),"const fs=require('node:fs');exports.run=async()=>{fs.writeFileSync(process.env.JADE_HOST_PROCESS_FILE,JSON.stringify({pid:process.pid,nonce:process.env.JADE_HOST_OWNER}));return require('./implementation').run();};");
  if(creation){fs.copyFileSync(path.join(base,collectionFamilies?'test/vscode-collection-families-smoke.js':'test/vscode-creation-smoke.js'),path.join(extension,'test/implementation.js'));fs.copyFileSync(path.join(base,'scripts/creation-ui-capture.cjs'),path.join(extension,'test/creation-ui-capture.cjs'));fs.copyFileSync(path.join(base,'test/vscode-creation-project-smoke.js'),path.join(extension,'test/vscode-creation-project-smoke.js'));fs.cpSync(path.join(base,'test/fixtures/creation-imports'),path.join(extension,'test/fixtures/creation-imports'),{recursive:true});}
  if(classWorkspaceUi){fs.copyFileSync(path.join(base,'scripts/creation-ui-capture.cjs'),path.join(extension,'test/creation-ui-capture.cjs'));fs.copyFileSync(path.join(base,'test/vscode-class-workspace-ui-smoke.js'),path.join(extension,'test/implementation.js'));fs.copyFileSync(path.join(base,'scripts/class-workspace-ui-capture.cjs'),path.join(extension,'test/class-workspace-ui-capture.cjs'));}
- if(objectWorkspaceUi){for(const [source,target] of [['test/vscode-object-workspace-ui-smoke.js','implementation.js'],['scripts/creation-ui-capture.cjs','creation-ui-capture.cjs'],['scripts/class-workspace-ui-capture.cjs','class-workspace-ui-capture.cjs']])fs.copyFileSync(path.join(base,source),path.join(extension,'test',target));}
+ if(classWorkspaceUi){
+  // VS Code intentionally suppresses modal dialogs under extensionTestsPath.
+  // The private development host runs the same staged product normally, so
+  // native Save/Discard/Cancel and source-recovery confirmation are real UI.
+  const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+  manifest.main='./test/ui-main.js';manifest.activationEvents=[...new Set([...(manifest.activationEvents||[]),'onStartupFinished'])];
+  fs.writeFileSync(manifestPath,JSON.stringify(manifest));
+  fs.writeFileSync(path.join(extension,'test/ui-main.js'),[
+   "'use strict';",
+   "const fs=require('node:fs'),vscode=require('vscode'),original=require('../src/extension');",
+   "exports.activate=async context=>{",
+   " fs.writeFileSync(process.env.JADE_HOST_PROCESS_FILE,JSON.stringify({pid:process.pid,nonce:process.env.JADE_HOST_OWNER}));",
+   " let api;try{api=await original.activate(context);}catch(error){fs.writeFileSync(process.env.JADE_HEADLESS_HOST_REPORT,JSON.stringify({passed:false,error:error.stack}));await vscode.commands.executeCommand('workbench.action.quit');return;}",
+   " setTimeout(async()=>{try{await require('./implementation').run();}catch(error){if(!fs.existsSync(process.env.JADE_HEADLESS_HOST_REPORT))fs.writeFileSync(process.env.JADE_HEADLESS_HOST_REPORT,JSON.stringify({passed:false,error:error.stack}));}finally{await vscode.commands.executeCommand('workbench.action.quit');}},100);",
+   " return api;",
+   "};",
+   "exports.deactivate=()=>original.deactivate?.();",
+  ].join('\n'));
+ }
+ if(objectWorkspaceUi){for(const [source,target] of [['test/vscode-object-workspace-ui-smoke.js','implementation.js'],['scripts/creation-ui-capture.cjs','creation-ui-capture.cjs'],['scripts/class-workspace-ui-capture.cjs','class-workspace-ui-capture.cjs']])fs.copyFileSync(path.join(base,source),path.join(extension,'test',target));const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));manifest.main='./test/object-fixture-owner.cjs';manifest.contributes.views.jadeNative.push({id:'jade.testInspectionInstances',name:'Database Objects'});fs.writeFileSync(manifestPath,JSON.stringify(manifest));fs.writeFileSync(path.join(extension,'test/object-fixture-owner.cjs'),'exports.activate=()=>{};');}
  if(cliIntegration||workspaces||incremental||nativeOids)fs.copyFileSync(path.join(base,'test/PrivateNativeFixture.js'),path.join(extension,'test/PrivateNativeFixture.js'));
  if(cliIntegration||workspaces||incremental)fs.copyFileSync(path.join(base,'test/cli-integration-fixture.js'),path.join(extension,'test/cli-integration-fixture.js'));
  if(alternating)fs.copyFileSync(path.join(base,'inspector/application-probe.ddx'),path.join(extension,'test/application-probe.ddx'));
@@ -46,7 +66,7 @@ async function main(){
  if(creation){hostEnv.JADE_CREATION_DEBUG_PORT=String(creationPort);hostEnv.JADE_CREATION_SCREENSHOTS=path.join(base,'docs/images');artifacts.evidencePath=path.join(base,collectionFamilies?'evidence/vscode-collection-families-host.json':'evidence/vscode-creation-host.json');}
  if(classWorkspaceUi){hostEnv.JADE_CLASS_WORKSPACE_DEBUG_PORT=String(creationPort);hostEnv.JADE_CLASS_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/class-workspace');artifacts.evidencePath=path.join(base,'evidence/vscode-class-workspace-ui-host.json');}
  if(objectWorkspaceUi){hostEnv.JADE_OBJECT_WORKSPACE_DEBUG_PORT=String(creationPort);hostEnv.JADE_OBJECT_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/object-workspace');artifacts.evidencePath=path.join(base,'evidence/vscode-object-workspace-ui-host.json');}
- const child=spawn(code,[...((creation||classWorkspaceUi||objectWorkspaceUi)?['--remote-debugging-port='+creationPort]:[]),'--new-window','--user-data-dir',path.join(stage,'vscode-data'),'--extensions-dir',path.join(stage,'extensions'),'--extensionDevelopmentPath='+extension,'--extensionTestsPath='+path.join(extension,'test/smoke.js'),'--disable-workspace-trust','--skip-welcome','--skip-release-notes',workspace],{env:hostEnv,windowsHide:!creation&&!classWorkspaceUi&&!workspaces&&!incremental&&!nativeOids&&process.env.JADE_FORMATTING_UI_HOLD!=='1',stdio:'inherit'});
+ const child=spawn(code,[...((creation||classWorkspaceUi||objectWorkspaceUi)?['--remote-debugging-port='+creationPort]:[]),'--new-window','--user-data-dir',path.join(stage,'vscode-data'),'--extensions-dir',path.join(stage,'extensions'),'--extensionDevelopmentPath='+extension,...(classWorkspaceUi?[]:['--extensionTestsPath='+path.join(extension,'test/smoke.js')]),'--disable-workspace-trust','--skip-welcome','--skip-release-notes',workspace],{env:hostEnv,windowsHide:!creation&&!classWorkspaceUi&&!workspaces&&!incremental&&!nativeOids&&process.env.JADE_FORMATTING_UI_HOLD!=='1',stdio:'inherit'});
  await artifacts.wait(child,{signal:cancellation.signal});
  for(let i=0;i<(alternating?140:180);i++){
   if(cancellation.signal.aborted)throw Error('VS Code host cancelled.');

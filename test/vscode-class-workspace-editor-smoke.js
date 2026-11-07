@@ -3,11 +3,16 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {ClassWorkspaceEditorProvider}=require('../src/class-workspace-editor-provider');
 async function run(){
  const root=vscode.workspace.workspaceFolders[0].uri.fsPath,report=path.resolve(root,'../host-report.json'),sessions=[],owned=[];
+ const nativeSessions=new Map(),servicesFactory=ClassWorkspaceEditorProvider.prototype.services;
+ // Observe the real production provider without changing its behavior or
+ // exposing test-only editor state through the extension's public API.
+ ClassWorkspaceEditorProvider.prototype.services=function(document,binding,panel){const services=servicesFactory.call(this,document,binding,panel);nativeSessions.set(document.uri.toString(),{document,binding,panel,services});return services;};
  async function wait(predicate,label){for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,50));}throw Error('Timed out: '+label);}
  async function writeExternal(file,text){for(let attempt=0;;attempt++){try{fs.writeFileSync(file,text);return;}catch(error){if(attempt===20||!['EBUSY','EPERM'].includes(error.code))throw error;await new Promise(resolve=>setTimeout(resolve,50));}}}
  const method=name=>[name+' (','jadeMethodSources','name','{','name() : String;','begin',' return "🐟";','end;','}',')'];
  const source=['schemaDefinition','Pets subschemaOf RootSchema partialDefinition;','typeHeaders','Fish subclassOf Object transient;','Bird subclassOf Object transient;','typeDefinitions','Fish completeDefinition','(','jadeMethodDefinitions','name() : String;',')','Bird completeDefinition','(','jadeMethodDefinitions','name() : String;',')','typeSources',...method('Fish'),...method('Bird')].join('\r\n');
  const file=path.join(root,'SharedClasses.cls');fs.writeFileSync(file,source);const uri=vscode.Uri.file(file);let document;
+ const secondary=path.join(root,'Fish-extra.cls');fs.writeFileSync(secondary,'schemaDefinition\r\nPets subschemaOf RootSchema partialDefinition;\r\ntypeDefinitions\r\nFish partialDefinition\r\n(\r\njadeMethodDefinitions\r\nextra() : String;\r\n)\r\ntypeSources\r\nFish (\r\njadeMethodSources\r\nextra\r\n{\r\nextra() : String;\r\nbegin\r\n return "extra";\r\nend;\r\n}\r\n)');
  try{
   const provider=new ClassWorkspaceEditorProvider(vscode,session=>{sessions.push(session);session.panel.webview.html='<html><body>Real source custom editor host proof</body></html>';return {dispose(){}};});
   owned.push(provider,vscode.window.registerCustomEditorProvider('jade.testClassWorkspace',provider,{supportsMultipleEditorsPerDocument:true,webviewOptions:{retainContextWhenHidden:true}}));
@@ -43,8 +48,23 @@ async function run(){
   await vscode.commands.executeCommand('jadeNative.previewClassMember',{...fishRow,owner:'Fish',name:'name',kind:'method',file:uri.toString()});assert.equal(productionTabs().length,1);
   await vscode.commands.executeCommand('jadeNative.openClassWorkspace',birdRow);await wait(()=>productionTabs().some(tab=>tab.label==='Pets::Bird'),'second production class sharing original source');assert.equal(productionTabs().length,2);
   await vscode.commands.executeCommand('jadeNative.openOriginalSource');assert.strictEqual(vscode.window.activeTextEditor.document,document,'Public original-source command resolves the active class without an explicit row');
-  fs.writeFileSync(report,JSON.stringify({passed:true,sameTextDocument:true,twoClassesSameFile:true,separateEditorGroups:true,nativeUndoRedo:true,originalEditorSynchronization:true,save:true,cleanExternalReload:true,dirtyExternalRevisionsPreserved:true,crlfUnicode:true,completionBridge:true,diagnosticBridge:true,productionRegistrationAndController:true,productionClassReuse:true,productionMemberNavigation:true,noDatabase:true},null,2));
+  await api.classView.previewController.open(fishRow);let moved;
+  for(let attempt=0;attempt<100&&!moved;attempt++){try{moved=await api.classView.previewController.openOwningSource(fishRow,JSON.stringify(['Pets','Fish','method','extra']));}catch(error){if(!/not ready to switch/.test(error.message)||attempt===99)throw error;await new Promise(resolve=>setTimeout(resolve,50));}}
+  assert.equal(moved.opened,true);await wait(()=>productionTabs().some(tab=>tab.label==='Pets::Fish'&&tab.input.uri.toString()===vscode.Uri.file(secondary).toString()),'native secondary source transition');assert.equal(productionTabs().length,2,'Resource transition replaces the class page instead of creating another logical class');
+  await vscode.commands.executeCommand('jadeNative.openOriginalSource');assert.equal(vscode.window.activeTextEditor.document.uri.toString(),vscode.Uri.file(secondary).toString());
+  const secondarySession=nativeSessions.get(vscode.Uri.file(secondary).toString());assert.ok(secondarySession,'Observe the actual production secondary-file provider');
+  assert.strictEqual(secondarySession.document,vscode.window.activeTextEditor.document);
+  await api.classView.previewController.open(fishRow);
+  await wait(()=>secondarySession.panel.active&&secondarySession.binding.snapshot()?.member==='extra','secondary production canvas selected and active');
+  const secondaryBefore=secondarySession.document.getText(),primaryBefore=document.getText(),partial=secondarySession.binding.snapshot(),replaceAt=partial.text.indexOf('"extra"');assert.ok(replaceAt>=0);
+  await secondarySession.binding.edit({version:partial.version,owner:'Fish',member:'extra',start:replaceAt,end:replaceAt+7,text:'"native partial edit"'});
+  await wait(()=>secondarySession.document.isDirty&&secondarySession.document.getText().includes('"native partial edit"'),'actual secondary backing document edit');
+  assert.equal(document.getText(),primaryBefore,'Editing the partial file must not change the primary class file');
+  await secondarySession.services.undo();await wait(()=>secondarySession.document.getText()===secondaryBefore,'native secondary custom-editor undo');
+  await secondarySession.services.redo();await wait(()=>secondarySession.document.getText().includes('"native partial edit"'),'native secondary custom-editor redo');
+  await secondarySession.services.save();assert.equal(secondarySession.document.isDirty,false);assert.equal(fs.readFileSync(secondary,'utf8'),secondarySession.document.getText());assert.equal(document.getText(),primaryBefore);
+  fs.writeFileSync(report,JSON.stringify({passed:true,sameTextDocument:true,twoClassesSameFile:true,separateEditorGroups:true,nativeUndoRedo:true,originalEditorSynchronization:true,save:true,cleanExternalReload:true,dirtyExternalRevisionsPreserved:true,crlfUnicode:true,completionBridge:true,diagnosticBridge:true,productionRegistrationAndController:true,productionClassReuse:true,productionMemberNavigation:true,nativeSecondarySourceTransition:true,nativeSecondaryEditUndoRedoSave:true,primaryUnchangedAfterSecondaryEdit:true,noDatabase:true},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
- finally{if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
+ finally{ClassWorkspaceEditorProvider.prototype.services=servicesFactory;for(const session of nativeSessions.values())if(session.document?.isDirty)await session.document.save();for(const item of owned.reverse())item.dispose();}
 }
 module.exports={run};

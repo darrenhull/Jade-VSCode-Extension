@@ -6,7 +6,7 @@ function buildMethodEditor() {
   const result=require('esbuild').buildSync({
     entryPoints: [path.resolve(__dirname, '../extension/media/method-editor-entry.js')],
     outfile: path.resolve(__dirname, '../extension/media/method-editor.js'),
-    bundle: true, minify: true, platform: 'browser', target: ['chrome120'],
+    bundle: true, minify: true, platform: 'browser', target: ['chrome114'],
     legalComments: 'eof', sourcemap: false,metafile:true,absWorkingDir:root,
   });
   const packages=new Set();

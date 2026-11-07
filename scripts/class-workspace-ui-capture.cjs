@@ -34,6 +34,11 @@ async function withClassWorkspace(port, action, { predicate = 'Boolean(document.
         if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
         return result.result?.value;
       },
+      async windowEvaluate(expression) {
+        const result=await client.request("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true},pageSession);
+        if(result.exceptionDetails)throw Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+        return result.result?.value;
+      },
       async wait(expression, description) {
         for (let attempt = 0; attempt < 100; attempt++) {
           const result = await this.evaluate(expression);

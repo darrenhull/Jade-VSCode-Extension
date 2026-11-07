@@ -9,7 +9,24 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 - Actual VS Code host checks have proved shared source/undo with the original editor, CRLF and Unicode mapping, clean external reload and preservation of dirty-versus-disk conflicts.
 - VS Code reuses a custom text editor for the same URI and view type in the same editor group. A different class in the same physical file therefore opens in a separate editor group; both pages share the original document. Separate classes in separate files open normal separate tabs. No projection URI or duplicate source buffer is introduced.
 - An inherited method belonging to another file is shown with its declaring identity and an explicit action to open that class workspace. Editing then occurs under that original document's native save/undo ownership.
+- A method in another partial file of the same class uses a native editor transition to that exact file. The native close/save/cancel result is honoured before replacing the class page. Cancelling preserves the old page, selection and dirty source. Actual UI proof covers native Cancel, subsequent successful transition and secondary-file edit/undo/redo/save without changing the primary file.
 - Model checks cover project-qualified same-name classes, declared overrides, inherited ownership and bounded searches across 10,000 members. Production UI, package acceptance, native read-only checks and current-head CI/review remain delivery gates.
+
+### Acceptance evidence checkpoint
+
+| Gate | Evidence / current result |
+| --- | --- |
+| Shared original document | Actual VS Code host: real production registration, class reuse, two classes in one CLS, original-editor synchronization, native undo/redo/save, clean external reload and retained dirty-versus-disk revisions passed |
+| Scale and navigation | 30,000-class discovery and warm metadata reuse regressions; 10,000-member browser test renders at most 100 and searches beyond the current page |
+| Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
+| Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
+| Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
+| Default regression | Checkpoint: 629 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Final current-source rerun remains required |
+| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; final UI artifact capture remains required |
+| Recovery and partial sources | Actual normal development host passed rejected-edit/reopen recovery, exact Copy, native confirmed Restore/Discard, native undo, dirty primary-file Cancel, successful partial-file transition and secondary-file edit/undo/redo/save |
+| Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
+
+The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
 
 ## Outcome
 

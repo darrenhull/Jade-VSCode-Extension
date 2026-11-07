@@ -157,6 +157,7 @@ function registerClassCatalogue(vscode, context, options) {
     selectedId = id;
     persist();
     return options.openClass(row, {
+      kind:'catalogue',
       scope: metadata.scope,
       generation: metadata.generation,
       filter: { ...filter }, selectedId, scrollTop,

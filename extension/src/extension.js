@@ -183,15 +183,18 @@ function activate(context) {
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{
     config:inspectionConfig,beforeConnect:()=>nativeTests.release(),isBusy:()=>publishing,
-    pullSource:()=>vscode.commands.executeCommand('jadeNative.extractAllSources'),
+    pullSource:({projectRoot}={})=>{
+      if(!projectRoot)throw Error('Choose the originating project before pulling source.');
+      return vscode.commands.executeCommand('jadeNative.extractAllSources',vscode.Uri.file(projectRoot));
+    },
     sourceContext:async({projectRoot,schema,className})=>{
       await language.index.ready();await language.index.flush();
       const entries=(language.index.project.groups.get(schema+'::'+className)||[]).filter(entry=>!projectRoot||vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(entry.model.uri))?.uri.fsPath===projectRoot);
       const complete=entries.filter(entry=>!entry.cls.partial),files=[...new Set(entries.map(entry=>entry.model.uri))];
       if(!entries.length)return {available:false,reason:'No matching workspace source is indexed. Runtime values remain available.'};
       if(complete.length>1||!complete.length&&files.length!==1)return {available:false,reason:'Workspace source ownership is ambiguous. Runtime values remain available.'};
-      const file=(complete[0]||entries[0]).model.uri,document=vscode.workspace.textDocuments.find(document=>document.uri.toString()===file);
-      return {available:true,file,dirty:document?.isDirty===true};
+      const file=(complete[0]||entries[0]).model.uri,contributing=new Set(files);
+      return {available:true,file,dirty:vscode.workspace.textDocuments.some(document=>contributing.has(document.uri.toString())&&document.isDirty)};
     },
     inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config),
     setBusy:async value=>{publishing=value;}
