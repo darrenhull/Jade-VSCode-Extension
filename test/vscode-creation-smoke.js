@@ -61,7 +61,8 @@ async function run(){
    });
   }
   assert.equal(fs.readFileSync(file,'utf8'),before);
-  fs.writeFileSync(report,JSON.stringify({passed:true,version:ext.packageJSON.version,commandRegistered:true,webviewRendered:true,existingSourceUnchanged:true,noDatabase:true,actualWebviewFlows:!!process.env.JADE_CREATION_DEBUG_PORT,memberAutocomplete:true,keyboardSelection:true,boundedMemberPaging:true,propertyAutocomplete:true,keyOrdering:true,backPreservesChoices:true,lightAndHighContrast:true,reviewedDictionarySave:true,reviewedClassSave:true,reviewedSchemaSave:true,enterDoesNotSaveBeforeReview:true,sameViewSchemaClassDictionary:true,importedAliasesAndLocalCollision:true,importedWhitelist:true,importedReviewedSave:true},null,2));
+  const projectSwitchProof=await require('./vscode-creation-project-smoke').runProjectSwitchProof(vscode,ext,root);
+  fs.writeFileSync(report,JSON.stringify({passed:true,projectSwitchProof,version:ext.packageJSON.version,commandRegistered:true,webviewRendered:true,existingSourceUnchanged:true,noDatabase:true,actualWebviewFlows:!!process.env.JADE_CREATION_DEBUG_PORT,memberAutocomplete:true,keyboardSelection:true,boundedMemberPaging:true,propertyAutocomplete:true,keyOrdering:true,backPreservesChoices:true,lightAndHighContrast:true,reviewedDictionarySave:true,reviewedClassSave:true,reviewedSchemaSave:true,enterDoesNotSaveBeforeReview:true,sameViewSchemaClassDictionary:true,importedAliasesAndLocalCollision:true,importedWhitelist:true,importedReviewedSave:true},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
 }
 module.exports={run};
