@@ -1,6 +1,6 @@
 # Class & Object Workspace
 
-Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. Status: implementation and acceptance verification in progress; the story remains open until the delivery gates below pass.
+Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. Implementation and local acceptance checks are complete in PR #32; current-head CI, review and merge remain recorded on that PR.
 
 ## Implementation checkpoint
 
@@ -10,7 +10,7 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 - VS Code reuses a custom text editor for the same URI and view type in the same editor group. A different class in the same physical file therefore opens in a separate editor group; both pages share the original document. Separate classes in separate files open normal separate tabs. No projection URI or duplicate source buffer is introduced.
 - An inherited method belonging to another file is shown with its declaring identity and an explicit action to open that class workspace. Editing then occurs under that original document's native save/undo ownership.
 - A method in another partial file of the same class uses a native editor transition to that exact file. The native close/save/cancel result is honoured before replacing the class page. Cancelling preserves the old page, selection and dirty source. Actual UI proof covers native Cancel, subsequent successful transition and secondary-file edit/undo/redo/save without changing the primary file.
-- Model checks cover project-qualified same-name classes, declared overrides, inherited ownership and bounded searches across 10,000 members. Production UI, package acceptance, native read-only checks and current-head CI/review remain delivery gates.
+- Model and packaged UI checks cover project-qualified same-name classes, declared overrides, inherited ownership and bounded searches across 10,000 members. Native connected inspection is explicitly skipped without a validated disposable fixture; current-head CI/review remain delivery gates.
 
 ### Acceptance evidence checkpoint
 
@@ -21,12 +21,16 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 | Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
 | Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
 | Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
-| Default regression | Checkpoint: 629 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Final current-source rerun remains required |
-| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; final UI artifact capture remains required |
+| Default regression | Final local check: 654 JavaScript passes, 42 explicit skips; 18 PowerShell passes |
+| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 126 product files matched the source checkout |
 | Recovery and partial sources | Actual normal development host passed rejected-edit/reopen recovery, exact Copy, native confirmed Restore/Discard, native undo, dirty primary-file Cancel, successful partial-file transition and secondary-file edit/undo/redo/save |
 | Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
 
 The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
+
+The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The verified candidate VSIX SHA256 is `e0838ca1363845155f27f89db3a51fd8762d13910ddb9263b5ef6b4f4796c3c9`. Both class and object UI receipts identify this exact artifact. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+
+Reproduce the build with `npm ci`, `npm test` and `npm run package`. Set `JADE_TEST_CODE` to a VS Code executable. Set `JADE_CLASS_WORKSPACE_VSIX` or `JADE_OBJECT_WORKSPACE_VSIX` to the resulting VSIX and run `node scripts/host-test.cjs --class-workspace-ui` or `--object-workspace-ui`. These UI checks use private source fixtures and a deterministic read-only inspection transport. `scripts/smoke-vsix.ps1 -Vsix <path>` checks the portable native distribution without a database connection.
 
 ## Outcome
 
@@ -132,10 +136,10 @@ Default tests must not open a developer database. Native checks require explicit
 
 ## Review and release gates
 
-- [ ] Link implementation PRs to #30 without closing the parent until all accepted slices are verified.
+- [x] Link implementation PR #32 to #30; the parent remains open for review and merge.
 - [ ] Keep incomplete PRs Draft. Address current-head review findings, run required CI and check conflicts/dependencies before marking Ready and requesting owner review.
-- [ ] Attach actual UI screenshots for each changed state. Mockups are design references, not implementation proof.
-- [ ] Update the user README, architecture where applicable, capabilities and feature-focused release notes to match shipped behaviour.
+- [x] Attach actual UI screenshots for each changed state. Mockups are design references, not implementation proof.
+- [x] Update the user README, architecture where applicable, capabilities and feature-focused release notes to match implemented behaviour.
 - [ ] Preserve required owner approval and protected squash merging. Do not approve on the owner's behalf.
 - [ ] After an approved merge, verify main CI, release artifacts and requested local installation separately.
 - [ ] Close #30 only when implementation and its acceptance evidence are complete. A plan, proof-of-concept or passing model suite alone does not complete it.

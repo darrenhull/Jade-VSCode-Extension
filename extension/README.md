@@ -79,10 +79,6 @@ The optional [Jade Local MCP server](https://github.com/darrenhull/Jade-Local-MC
 
 After updating, reload all VS Code windows and reconnect other clients. If an older native CLI still owns the broker, finish its active work and use its **status** and **shutdown** commands before starting the new build. Use graceful CLI shutdown rather than terminating unrelated processes or deleting database files.
 
-## Planned class workspace
-
-[Story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30) describes a proposed integrated class workspace with grouped members, method editing and linked read-only object inspection. The current member preview is read-only; that shared-document editing experience is planned work.
-
 ## Useful commands
 
 Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the available commands, including:

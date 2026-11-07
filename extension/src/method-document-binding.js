@@ -43,13 +43,13 @@ class MethodDocumentBinding {
         }
       }
     }
-    const model = parseSource(this.document.getText(), this.document.fileName);
-    const incomplete = model.excluded?.some(item => !item.closed && item.kind !== 'comment');
+    const text = this.document.getText(), model = parseSource(text, this.document.fileName);
+    const incomplete = model.excluded?.some(item => !item.closed && item.start <= selected.end && (item.kind !== 'comment' || text.startsWith('/*', item.start)));
     if (!incomplete) {
       const method = this.find(selected.owner, selected.member, model);
       if (method) Object.assign(selected, { available: true, start: method.bodyStart, end: method.end - 1 });
       // Only a complete parse can confirm a deletion. An unfinished method stays anchored.
-      else if (!model.code.includes(selected.member + '\n{') && !model.code.includes(selected.member + '\r\n{')) selected.available = false;
+      else if (!model.classes.find(item => item.name === selected.owner)?.members.some(item => item.name === selected.member && item.bodyStart !== undefined)) selected.available = false;
     }
     const snapshot = this.snapshot();
     for (const listener of this.listeners) listener(snapshot);

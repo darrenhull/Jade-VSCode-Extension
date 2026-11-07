@@ -74,6 +74,18 @@ async function run() {
       await browser.evaluate('document.querySelector("[role=treeitem]").click()');await browser.wait('document.querySelector(".cm-content")?.textContent.includes("edited in class workspace")',"persisted native method after return");
       const method=path.join(captures,"class-workspace-method.png");await browser.screenshot(method);
       await saved();assert.equal(document.isDirty,false);assert.equal(fs.readFileSync(file,"utf8"),document.getText());
+      const beforeGap=document.getText();
+      await vscode.workspace.getConfiguration("files").update("autoSaveDelay",100,vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("files").update("autoSave","afterDelay",vscode.ConfigurationTarget.Global);
+      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("End",35,2);await browser.type('"');
+      for(let attempt=0;attempt<200&&(document.getText()===beforeGap||document.isDirty);attempt++)await new Promise(resolve=>setTimeout(resolve,20));
+      assert.notEqual(document.getText(),beforeGap);assert.equal(document.isDirty,false,"native Auto Save writes the temporarily incomplete source");assert.equal(binding.snapshot().available,true);
+      removeMethod=true;await controller.refresh();
+      await browser.wait('document.getElementById("workspace").getAttribute("aria-busy")==="false"',"auto-saved incomplete parse refresh");assert.equal(currentView.state().selectedId,"getName");assert.equal(await browser.evaluate('document.getElementById("detail-title").textContent'),"getName");assert.equal(await browser.evaluate('document.getElementById("editor-region").hidden'),false);
+      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("End",35,2);await browser.key("Backspace",8);
+      for(let attempt=0;attempt<200&&(document.getText()!==beforeGap||document.isDirty);attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.getText(),beforeGap);assert.equal(document.isDirty,false);
+      removeMethod=false;await controller.refresh();assert.equal(currentView.state().selectedId,"getName");
+      await vscode.workspace.getConfiguration("files").update("autoSave","off",vscode.ConfigurationTarget.Global);
       for(const [theme,kind,filename] of [["Default Light Modern","vscode-light","class-workspace-light.png"],["Default High Contrast","vscode-high-contrast","class-workspace-high-contrast.png"]]){
         await vscode.workspace.getConfiguration("workbench").update("colorTheme",theme,vscode.ConfigurationTarget.Global);await browser.wait('document.body.dataset.vscodeThemeKind==='+JSON.stringify(kind),"theme "+kind);assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),true);await browser.screenshot(path.join(captures,filename));
       }
@@ -105,6 +117,7 @@ async function run() {
       binding.edit=async()=>{binding.edit=nativeEdit;throw Error("Injected native edit rejection for recovery verification.");};
       await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type(marker);
       await browser.wait('!document.getElementById("draft-recovery").hidden',"durable rejected draft card");
+      assert.match(await browser.evaluate('document.getElementById("editor-status").textContent'),/^Unapplied method draft/);
       assert.equal(document.getText(),beforeRecovery,"rejected edits must leave the clean native document intact");
       assert.equal(document.isDirty,false);
       return browser.evaluate('document.querySelector("#draft-recovery pre").textContent');
@@ -137,6 +150,7 @@ async function run() {
       assert.equal(await browser.evaluate('document.getElementById("restore-draft").disabled'),false);
       await browser.evaluate('document.getElementById("restore-draft").click()');await confirm(browser,"Restore draft");
       await browser.wait('document.getElementById("draft-recovery").hidden',"explicit restore acknowledges the durable draft");
+      assert.match(await browser.evaluate('document.getElementById("editor-status").textContent'),/^Editing the backing source document/);
       assert.ok(document.getText().includes("recovered checkpoint"));assert.equal(document.isDirty,true);
       await vscode.commands.executeCommand("undo");
       for(let attempt=0;attempt<100&&document.getText()!==beforeRecovery;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
@@ -144,6 +158,7 @@ async function run() {
       await rejectDraft(browser,"// discard checkpoint ");
       await browser.evaluate('document.querySelectorAll(".recovery-actions button")[2].click()');await confirm(browser,"Discard draft");
       await browser.wait('document.getElementById("draft-recovery").hidden',"explicit discard removes the durable checkpoint");
+      assert.match(await browser.evaluate('document.getElementById("editor-status").textContent'),/^Editing the backing source document/);
       assert.equal(document.getText(),beforeRecovery);assert.equal(document.isDirty,false);
       assert.equal(await browser.evaluate('document.querySelector(".cm-content").textContent.includes("discard checkpoint")'),false,"discard clears the rejected browser projection");
       await browser.evaluate('document.getElementById("overview").click()');await browser.wait('document.getElementById("detail-title").textContent==="Class overview"',"navigation works after explicit recovery resolution");
@@ -191,7 +206,7 @@ async function run() {
       await vscode.commands.executeCommand("redo");for(let attempt=0;attempt<100&&!document.getText().includes("secondary method edit");attempt++)await new Promise(resolve=>setTimeout(resolve,20));await saved();assert.equal(fs.readFileSync(extraFile,"utf8"),document.getText());assert.equal(fs.readFileSync(file,"utf8"),primarySaved);
       const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.testClassWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),extraUri);assert.equal(tabs[0].label,"Pets::Fish");await browser.screenshot(path.join(captures,"class-workspace-secondary-source.png"));
     },{predicate:'Boolean(document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(viewId)+')'});
-    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,nativeSourceSwitchCancel:true,sameLogicalClassSecondarySource:true,secondaryNativeEditUndoSave:true},null,2));
+    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,autoSavedIncompleteMethod:true,repairedSelectionRetained:true,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,unappliedDraftCaption:true,recoveryCaptionReset:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,nativeSourceSwitchCancel:true,sameLogicalClassSecondarySource:true,secondaryNativeEditUndoSave:true},null,2));
   } catch(error) {fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
   finally {if(previousClipboard!==undefined)await vscode.env.clipboard.writeText(previousClipboard);if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
 }

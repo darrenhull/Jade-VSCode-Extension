@@ -56,11 +56,14 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         let remaining = 100;
         const groups = (snapshot.groups || []).map(group => { const items = (group.items || []).slice(0, remaining); remaining -= items.length; return { ...group, items }; }).filter(group => group.items.length);
         record.state.offset = Number.isSafeInteger(snapshot.offset) ? snapshot.offset : record.state.offset;
-        if (record.state.selectedId && !snapshot.selected && !groups.some(group => group.items.some(member => member.id === record.state.selectedId)) && !document?.isDirty) {
+        const bound = binding?.snapshot?.(), methodSelected = lastSelected && ["method", "typeMethod"].includes(lastSelected.kind);
+        const anchored = bound?.available === true && methodSelected && bound.member === lastSelected.name && bound.owner === (lastSelected.owner || row.owner || row.name) && (!lastSelected.file || lastSelected.file === document?.uri?.toString());
+        const retainActive = methodSelected ? anchored : document?.isDirty;
+        if (record.state.selectedId && !snapshot.selected && !groups.some(group => group.items.some(member => member.id === record.state.selectedId)) && !retainActive) {
           record.state.selectedId = "";
           await send({ command: "notice", message: "The selected member is no longer available. Showing the class overview." });
         }
-        const retainedSelected = document?.isDirty && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
+        const retainedSelected = retainActive && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
         record.snapshot = { ...snapshot, viewId: record.viewId, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
         if (!snapshot.inheritedAvailable) record.state.includeInherited = false;
         record.snapshot.state = { ...record.state };

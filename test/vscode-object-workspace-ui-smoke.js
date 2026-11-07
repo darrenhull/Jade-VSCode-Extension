@@ -13,10 +13,10 @@ async function run() {
   const context = { extensionPath: path.resolve(__dirname, ".."), globalStorageUri: vscode.Uri.file(path.resolve(workspace, "../inspection-private")), subscriptions };
   const config = { installPath: "C:/NotOpened", databasePath: path.resolve(workspace, "../fixture-source"), iniPath: path.resolve(workspace, "../fixture.ini"), server: "singleUser", schema: "Pets", workspaceRoots: [workspace] };
   const requests = [], transports = [];
-  const host = { ...vscode, window: { ...vscode.window,
+  const host = { ...vscode, window: Object.assign(Object.create(vscode.window), {
     createTreeView: (_name, options) => vscode.window.createTreeView("jade.testInspectionInstances", options),
     showQuickPick: async choices => choices.find(choice => choice.target === "source"),
-  }, commands: { ...vscode.commands,
+  }), commands: { ...vscode.commands,
     registerCommand(name, callback) { commands.set(name, callback); const registration=vscode.commands.registerCommand(name,callback); return { dispose() { registration.dispose(); commands.delete(name); } }; },
     executeCommand(name, ...args) { return commands.has(name) ? Promise.resolve(commands.get(name)(...args)) : vscode.commands.executeCommand(name === "jadeNative.objects.focus" ? "jade.testInspectionInstances.focus" : name, ...args); },
   } };
@@ -150,6 +150,10 @@ async function run() {
       await browser.viewport(360);
       await inspector.session.disconnect();
       await browser.wait('document.getElementById("status-label").textContent.includes("stale")', "stale snapshot");
+      assert.equal(inspector.session.client,undefined);
+      assert.match(inspector.view.message,/Disconnected/);
+      for(let attempt=0;attempt<50;attempt++){if(!await browser.windowEvaluate('document.body.innerText.includes("Connected. Compile and test")'))break;await new Promise(resolve=>setTimeout(resolve,50));}
+      assert.equal(await browser.windowEvaluate('document.body.innerText.includes("Connected. Compile and test")'),false,"sidebar must settle to disconnected before capture");
       assert.equal(await browser.evaluate('document.getElementById("properties").children.length'), 37);
       assert.equal(await browser.evaluate('document.getElementById("refresh").disabled'), true);
       assert.equal(await browser.evaluate('document.querySelector(".reference").disabled'), true);

@@ -57,3 +57,17 @@ test('reports a known read-only source before accepting an edit',async()=>{
  const {document,binding}=fixture();binding.readOnlyReason='The original source file is read-only.';const selected=binding.select('Fish','name'),original=document.getText();assert.equal(selected.readOnly,true);assert.match(selected.reason,/read-only/);
  await assert.rejects(binding.edit({version:selected.version,start:0,end:0,text:'unsafe'}),/read-only/);assert.equal(document.getText(),original);
 });
+test('does not retain a removed owner method because another class has the same method name',()=>{
+ const text=source().replace('Fish subclassOf Object transient;','Fish subclassOf Object transient;\nBird subclassOf Object transient;')+'\nBird (\njadeMethodSources\nname\n{\nname() : String;\nbegin\n return "Bird";\nend;\n}\n)';
+ const {document,binding,setText}=fixture(text),selected=binding.select('Fish','name');assert.equal(selected.available,true);
+ const from=text.lastIndexOf('\nname\n{',selected.start)+1,to=selected.end+1;
+ setText(text.slice(0,from)+text.slice(to),[{rangeOffset:from,rangeLength:to-from,text:''}]);
+ assert.match(document.getText(),/return "Bird"/);assert.equal(binding.snapshot().available,false);assert.equal(binding.snapshot().text,'');
+});
+test('retains owner-specific incomplete method and open comment anchors while typing',()=>{
+ const first=fixture(),selected=first.binding.select('Fish','name'),text=first.document.getText();
+ first.setText(text.slice(0,selected.end)+text.slice(selected.end+1),[{rangeOffset:selected.end,rangeLength:1,text:''}]);
+ assert.equal(first.binding.snapshot().available,true);assert.equal(first.binding.snapshot().owner,'Fish');assert.match(first.binding.snapshot().text,/return "🐟"/);
+ const second=fixture(),before=second.document.getText(),state=second.binding.select('Fish','name');second.setText('/*'+before,[{rangeOffset:0,rangeLength:0,text:'/*'}]);
+ assert.equal(second.binding.snapshot().available,true);assert.equal(second.binding.snapshot().start,state.start+2);assert.match(second.binding.snapshot().text,/return "🐟"/);
+});

@@ -69,6 +69,7 @@ async function withClassWorkspace(port, action, { predicate = 'Boolean(document.
         if (Math.abs(actual - width) > 1) throw Error("The private webview could not be sized to " + width + "px (actual " + actual + "px).");
       },
       async screenshot(destination) {
+        if(process.env.JADE_CLASS_WORKSPACE_RECOVERY_ONLY==="1"&&path.basename(destination)!=="class-workspace-recovery.png")return destination;
         const result = await client.request("Page.captureScreenshot", { format: "png", captureBeyondViewport: false }, pageSession);
         fs.mkdirSync(path.dirname(destination), { recursive: true });
         fs.writeFileSync(destination, Buffer.from(result.data, "base64"));

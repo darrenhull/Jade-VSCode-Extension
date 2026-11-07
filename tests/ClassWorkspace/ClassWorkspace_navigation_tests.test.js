@@ -67,10 +67,30 @@ test("HTML provides nonce CSP and an external editor mount without interpolated 
 });
 test("a temporarily unparseable dirty method retains its selected canvas metadata", async()=>{
   const h=host();let missing=false;const document={isDirty:true,uri:{toString:()=>row.file}};
+  const bound={available:true,owner:row.owner,member:"getName",text:"getName",version:1},binding={snapshot:()=>bound,select:()=>bound};
   const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>missing?{...snapshot,groups:[],selected:undefined,total:0}:snapshot});
-  const view=shell.attach({panel:h.panel,row,document});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});missing=true;await view.refresh();
+  const view=shell.attach({panel:h.panel,row,document,binding});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});missing=true;await view.refresh();
   const last=h.sent.filter(message=>message.command==="workspace").at(-1).snapshot;
   assert.equal(last.state.selectedId,"m1");assert.equal(last.selected.id,"m1");
+});
+test("an auto-saved incomplete method stays selected through parse gaps and repair",async()=>{
+  const h=host();let missing=false;const document={isDirty:false,uri:{toString:()=>row.file}},bound={available:true,owner:row.owner,member:"getName",version:2,text:'getName() : String; begin return "'};
+  const binding={snapshot:()=>bound,select:()=>bound};
+  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>missing?{...snapshot,groups:[],selected:undefined,total:0}:snapshot});
+  const view=shell.attach({panel:h.panel,row,document,binding});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});missing=true;await view.refresh();
+  let last=h.sent.filter(message=>message.command==="workspace").at(-1).snapshot;assert.equal(last.state.selectedId,"m1");assert.equal(last.selected.id,"m1");
+  missing=false;await view.refresh();last=h.sent.filter(message=>message.command==="workspace").at(-1).snapshot;assert.equal(last.state.selectedId,"m1");assert.equal(last.groups[0].items[0].id,"m1");
+});
+test("a binding-confirmed clean removal returns to Overview",async()=>{
+  const h=host();let missing=false;const document={isDirty:false,uri:{toString:()=>row.file}},bound={available:true,owner:row.owner,member:"getName",version:2,text:"getName"};
+  const binding={snapshot:()=>bound,select:()=>bound},shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>missing?{...snapshot,groups:[],selected:undefined,total:0}:snapshot});
+  const view=shell.attach({panel:h.panel,row,document,binding});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});missing=true;bound.available=false;await view.refresh();
+  assert.equal(view.state().selectedId,"");assert.ok(h.sent.some(message=>message.command==="notice"&&message.message.includes("no longer available")));
+});
+test("a binding-confirmed removal also returns to Overview before dirty source is saved",async()=>{
+  const h=host();let missing=false;const document={isDirty:true,uri:{toString:()=>row.file}},bound={available:true,owner:row.owner,member:"getName",version:2,text:"getName"};
+  const binding={snapshot:()=>bound,select:()=>bound},shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>missing?{...snapshot,groups:[],selected:undefined,total:0}:snapshot});
+  const view=shell.attach({panel:h.panel,row,document,binding});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});missing=true;bound.available=false;await view.refresh();assert.equal(view.state().selectedId,"");
 });
 test("initial member selection survives the custom editor ready handshake",async()=>{
   const h=host(),selected=[];
