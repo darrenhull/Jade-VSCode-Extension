@@ -1,3 +1,8 @@
+# 0.14.3 — Native object IDs
+
+- See Jade's own object identifiers when browsing database objects, references and collections.
+- Copy an ID from Jade and use it to inspect the same object in VS Code.
+
 # 0.14.2 — Build changed workspace files with F5
 
 - Press F5 from a Jade source file to build new and changed files across its workspace, including classes you have not opened.

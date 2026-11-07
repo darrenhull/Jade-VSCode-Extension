@@ -2,6 +2,7 @@
 const { spawn } = require("node:child_process"),
   { EventEmitter } = require("node:events"),
   { StringDecoder } = require("node:string_decoder");
+const { requireNativeOidCapability } = require("./NativeObjectIdentity");
 class InspectorTransport extends EventEmitter {
   constructor(executable, session, options = {}) {
     super();
@@ -69,7 +70,12 @@ class InspectorTransport extends EventEmitter {
         if (!p) continue;
         this.pending.delete(packet.id);
         clearTimeout(p.timer);
-        if (packet.success) p.resolve(packet.body || {});
+        if (packet.success) {
+          try {
+            if ((this.options.protocol || "jade-inspect/1") === "jade-inspect/1") requireNativeOidCapability(packet.body);
+            p.resolve(packet.body || {});
+          } catch (error) { p.reject(error); }
+        }
         else {
           const error = Error(packet.message || "Native inspection failed.");
           error.code = packet.code;
@@ -81,6 +87,10 @@ class InspectorTransport extends EventEmitter {
             Error("Native inspector did not confirm a read-only connection."),
           );
           return;
+        }
+        if ((this.options.protocol || "jade-inspect/1") === "jade-inspect/1") {
+          try { requireNativeOidCapability(packet); }
+          catch (error) { this.fail(error); return; }
         }
         this.state = "ready";
         clearTimeout(this.startTimer);

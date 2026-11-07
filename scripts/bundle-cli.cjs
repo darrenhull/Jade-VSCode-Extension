@@ -5,6 +5,7 @@ function bundleCli(options={}){
  const manifestBytes=fs.readFileSync(path.join(source,'distribution.json'));
  const manifest=JSON.parse(manifestBytes.toString('utf8'));
  if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
+ require('../extension/src/NativeObjectIdentity').requireNativeOidDistribution(manifest);
  for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'])if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
  const pinFile=options.pinFile||(!(options.source||process.env.JADE_CLI_DISTRIBUTION)?path.join(root,'packages/jade-cli-pin.json'):undefined);
  if(pinFile)require('./NativePin.cjs').verifyNativePin(source,pinFile,manifestBytes);

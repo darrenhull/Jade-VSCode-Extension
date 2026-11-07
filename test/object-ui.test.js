@@ -6,7 +6,7 @@ const test = require("node:test"),
   path = require("node:path"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../extension/src/object-explorer");
-const oid = (n) => n.toString(16).padStart(44, "0");
+const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
 function setup({ delayedBusy = false, authentication = false, nativeTarget = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
@@ -649,4 +649,15 @@ test("a slower object read cannot overwrite a later navigation", async () => {
   } finally {
     await s.cleanup();
   }
+});
+
+test('legacy lookup inputs remain internal while history and Copy ID use the native response identity',async()=>{
+ const s=setup(),legacy='A'.repeat(44),canonical='66.101.305.2.1';
+ try{
+  await s.connect();const client=s.clients[0],original=client.request;
+  client.request=async(command,args)=>{const result=await original(command,args);return command==='object'?{...result,oid:canonical}:result;};
+  const opened=await s.commands.get('jadeNative.inspectObject')(legacy);assert.equal(opened.oid,canonical);assert.equal(client.requests.find(request=>request.command==='object').args.oid,legacy,'Native parsing receives the unchanged legacy input.');
+  assert.equal(s.controller.session.history.at(-1).oid,canonical,'History must not redisplay a transport alias.');
+  await s.panels[0].receive({command:'copyOid'});assert.equal(s.copied.at(-1),canonical);assert.equal(s.panels[0].title,'Fish · '+canonical);
+ }finally{await s.cleanup();}
 });

@@ -4,6 +4,7 @@ const fs = require("node:fs"),
   crypto = require("node:crypto");
 const { InspectionSession } = require("./object-session"),
   { InspectorTransport } = require("./object-transport");
+const { validateObjectIdentity } = require("./NativeObjectIdentity");
 const { fieldText } = require("../media/object-page");
 const { ClassBrowserModel } = require("./class-browser-model");
 const { pickClass } = require("./class-browser-ui");
@@ -624,7 +625,7 @@ function registerObjectExplorer(vscode, context, services) {
   }
   async function copyOid(value) {
     const oid = typeof value === "string" ? value : value?.oid;
-    if (!/^[0-9a-f]{44}$/i.test(oid || ""))
+    if (validateObjectIdentity(oid))
       throw Error("Select an object with a native identifier first.");
     await vscode.env.clipboard.writeText(oid);
     return oid;
@@ -649,8 +650,8 @@ function registerObjectExplorer(vscode, context, services) {
     return result;
   }
   async function inspect(oid, record, visit = true) {
-    if (!/^[0-9a-f]{44}$/i.test(oid || ""))
-      throw Error("Enter the native 44-character hexadecimal object ID.");
+    if (validateObjectIdentity(oid))
+      throw Error(validateObjectIdentity(oid));
     if (!session.client) await connect();
     const recipient =
         record ||
@@ -662,6 +663,9 @@ function registerObjectExplorer(vscode, context, services) {
     else pendingUnpinnedRead = ticket;
     const generation = session.generation;
     const object = await session.request("object", { oid });
+    if (validateObjectIdentity(object.oid))
+      throw Error("Native inspector returned an invalid object identity.");
+    oid = object.oid;
     if (generation !== session.generation) return;
     if (
       recipient
@@ -889,7 +893,7 @@ function registerObjectExplorer(vscode, context, services) {
       record.page = page;
       record.cursor = page.cursor;
     }
-    record.panel.title = object.className + " · " + oid.slice(0, 10);
+    record.panel.title = object.className + " · " + oid;
     record.panel.reveal();
     await sendObject(record);
     await record.rendered;
@@ -1025,11 +1029,8 @@ function registerObjectExplorer(vscode, context, services) {
         if (typeof oid !== "string")
           oid = await vscode.window.showInputBox({
             title: "Inspect native Jade object",
-            prompt: "44-character hexadecimal OID from this database",
-            validateInput: (value) =>
-              /^[0-9a-f]{44}$/i.test(value)
-                ? undefined
-                : "Enter a 44-character hexadecimal OID.",
+            prompt: "Jade object ID from this database",
+            validateInput: validateObjectIdentity,
           });
         if (oid) return inspect(oid);
       }),
