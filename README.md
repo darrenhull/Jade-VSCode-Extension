@@ -1,5 +1,11 @@
 # Jade VS Code extension
 
+## Development test artifacts
+
+Host checks create one disposable private profile, extension copy, workspace and native broker context. The harness keeps a compact report in `evidence/` and removes its run directory after success, failure or cancellation once its own host and native processes have exited. It never scans or deletes other runs, user databases or source folders. If ownership changes or a process remains alive, cleanup fails explicitly and reports the retained path.
+
+Each run checks for at least 2 GiB free before copying. This is an admission check, not a reservation against other applications or simultaneous runs; run database-heavy host checks sequentially and provide additional space for larger Source databases. No reusable database cache is required by this harness. If one is introduced, it belongs under `%LOCALAPPDATA%/JadeTools/test-cache` with bounded retention, not Temp or the source workspace.
+
 Independent development workspace for the Jade Native Runner extension. The backend is the native C++ Jade CLI; VS Code supplies editor, Testing and debugger integration.
 
 This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
