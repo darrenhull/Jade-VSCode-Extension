@@ -25,9 +25,33 @@
     const base = { memberDictionary: "MemberKeyDictionary", externalDictionary: "ExtKeyDictionary", objectArray: "ObjectArray", objectSet: "ObjectSet" }[family];
     return { family, keys: dictionary, tuning: dictionary || family === "objectSet", selector, base: base ? "RootSchema::" + base : undefined };
   }
+  function comparisonPresentation(key, kind) {
+    const type = kind === "external" ? key.type : key._type;
+    const applicable = !type || ["String", "StringUtf8"].includes(type), knownString = type === "String";
+    const mode = key.comparison || "native";
+    return { type, applicable, mode, legacy: applicable && mode === "native", options: [
+      { value: "native", label: "Jade default / locale", disabled: false },
+      { value: "binary", label: "Binary (case-sensitive)", disabled: !knownString },
+      { value: "latin1", label: "Latin1 (unavailable)", disabled: true }
+    ], reason: "Latin1 source syntax is not yet proved for this Jade runtime; this mode is unavailable." + (!knownString ? " Binary requires a known String key; select a String property or key type." : " Binary omits LCID and ignore-case options.") };
+  }
+  function comparisonSelectionError(draft) {
+    if (draft.type !== "collection" || !collectionPresentation(draft).keys) return;
+    for (const [index, key] of (draft.keys || []).entries()) {
+      const view = comparisonPresentation(key, draft.kind);
+      if (!view.applicable) continue;
+      if (view.mode === "binary" && view.type !== "String") return { field: "key-comparison-" + index, message: "Binary comparison requires a known String key. Select a String property or choose Jade default / locale." };
+      if (!["native", "binary"].includes(view.mode)) return { field: "key-comparison-" + index, message: "Latin1 or unknown comparison modes are unavailable until their native source behavior is proved. Choose Jade default / locale." };
+    }
+  }
   function definitionRequest(draft) {
     const request = JSON.parse(JSON.stringify(draft));
-    for (const key of request.keys || []) delete key._type;
+    for (const key of request.keys || []) {
+      const view = comparisonPresentation(key, draft.kind);
+      if (!view.applicable || key.comparison === "binary") { delete key.locale; delete key.caseInsensitive; }
+      if (!view.applicable) delete key.comparison;
+      delete key._type;
+    }
     if (draft.type === "collection" && !collectionPresentation(draft).keys) {
       delete request.keys; delete request.duplicatesAllowed; delete request.kind;
     }
@@ -60,7 +84,7 @@
   }
   function diagnosticField(data) {
     if (!Number.isSafeInteger(data.keyIndex) || data.keyIndex < 0) return data.field;
-    const suffix = { length: "length", nativeLength: "length", type: "type", scale: "scale", descending: "direction", direction: "direction", caseInsensitive: "case", locale: "locale", nativeSortOrder: "locale" }[data.attribute];
+    const suffix = { length: "length", nativeLength: "length", type: "type", scale: "scale", descending: "direction", direction: "direction", caseInsensitive: "case", locale: "locale", nativeSortOrder: "locale", comparison: "comparison" }[data.attribute];
     return "key-" + (suffix ? suffix + "-" : "") + data.keyIndex;
   }
   function describeDraft(draft) {
@@ -68,7 +92,7 @@
     if (draft.type === "class") return "A " + draft.lifetime + " class " + (draft.name || "…") + " inheriting " + (draft.superclass || "Object");
     const family = collectionPresentation(draft).family;
     if (["objectArray", "objectSet"].includes(family)) return "A " + draft.lifetime + " " + (family === "objectArray" ? "array" : "set") + " of " + (draft.membership?.split("::").at(-1) || "…") + ". No sort keys apply.";
-    const keys = (draft.keys || []).map(k => (k.name || "…") + (k.descending ? " descending" : " ascending"));
+    const keys = (draft.keys || []).map(k => (k.name || "…") + (k.descending ? " descending" : " ascending") + (k.comparison === "binary" && comparisonPresentation(k, draft.kind).applicable ? " · Binary" : ""));
     return "A " + draft.lifetime + " dictionary of " + (draft.membership?.split("::").at(-1) || "…") + (keys.length ? ", sorted by " + keys.join(", then ") : "") + "; duplicate keys " + (draft.duplicatesAllowed ? "allowed" : "prohibited") + ".";
   }
   function mount(root) {
@@ -249,7 +273,7 @@
         function field(label, el) { const l = document.createElement("label"); l.textContent = label; l.append(el); row.append(l); return el; }
         const name = document.createElement("input"); name.value = key.name || ""; name.id = "key-" + index; name.autocomplete = "off";
         field(draft.kind === "external" ? "Key name" : "Property or reference path", name);
-        name.oninput = () => { key.name = name.value; changed(); };
+        name.oninput = () => { key.name = name.value; if (draft.kind !== "external") delete key._type; reflectComparison(); changed(); };
         if (draft.kind !== "external") { const list = document.createElement("span"); list.id = "key-results-" + index; list.className = "results"; list.hidden = true; list.role = "listbox"; name.parentElement.className = "choice"; name.parentElement.append(list); combo(name, list, "key-" + index, property => { key.name = property.name; key._type = property.type; name.value = property.name; renderKeys(); changed(); $("key-" + index)?.focus(); }); }
         if (draft.kind === "external") {
           const type = document.createElement("select"); type.id = "key-type-" + index; type.append(...["String", "StringUtf8", "Binary", "Integer", "Integer64", "Real", "Decimal", "Date", "Time", "TimeStamp", "Boolean", "Character"].map(t => option(t))); type.value = key.type || "String"; key.type = type.value; field("Key type", type).onchange = () => { key.type = type.value; renderKeys(); changed(); };
@@ -261,11 +285,17 @@
         const locale = document.createElement("input"); locale.id = "key-locale-" + index; locale.type = "number"; locale.min = "1"; locale.placeholder = "Schema default"; locale.value = key.locale ?? ""; field("Text locale ID", locale).oninput = () => { if (locale.value === "") delete key.locale; else key.locale = Number(locale.value); changed(); };
         const locales = document.createElement("datalist"); locales.id = "key-locales-" + index; locale.setAttribute("list", locales.id); locales.append(...(selectedSchema?.locales || []).slice(0, 100).map(value => option(String(value.id), value.name + " (" + value.id + ")"))); row.append(locales);
         const schemaLocale = selectedSchema?.locales?.find(value => value.schemaDefault); if (schemaLocale) locale.placeholder = "Schema default (" + schemaLocale.id + ")";
-        const valueType = draft.kind === "external" ? key.type : key._type;
-        const text = !valueType || ["String", "StringUtf8"].includes(valueType);
-        ci.disabled = locale.disabled = !text;
-        ci.parentElement.hidden = locale.parentElement.hidden = !text;
-        if (!text) { delete key.caseInsensitive; delete key.locale; }
+        const comparison = document.createElement("select"); comparison.id = "key-comparison-" + index;
+        field("Text comparison", comparison); const comparisonHelp = document.createElement("small"); comparisonHelp.id = "key-comparison-help-" + index; comparisonHelp.className = "hint";
+        comparison.setAttribute("aria-describedby", comparisonHelp.id); comparison.parentElement.append(comparisonHelp);
+        function reflectComparison() {
+          const view = comparisonPresentation(key, draft.kind);
+          comparison.replaceChildren(...view.options.map(choice => { const item = option(choice.value, choice.label); item.disabled = choice.disabled; return item; })); comparison.value = view.mode;
+          comparison.parentElement.hidden = !view.applicable; comparisonHelp.textContent = view.reason;
+          ci.disabled = locale.disabled = !view.legacy; ci.parentElement.hidden = locale.parentElement.hidden = !view.legacy;
+        }
+        comparison.onchange = () => { key.comparison = comparison.value; reflectComparison(); changed(); };
+        reflectComparison();
         const controls = document.createElement("div"); controls.className = "key-controls";
         for (const [label, delta] of [["Up", -1], ["Down", 1], ["Remove", 0]]) { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = label === "Up" ? "↑" : label === "Down" ? "↓" : "Remove"; b.setAttribute("aria-label", label + " key " + (index + 1)); b.disabled = delta !== 0 && (index + delta < 0 || index + delta >= draft.keys.length); b.onclick = () => { if (delta) draft.keys = moveKey(draft.keys, index, delta); else draft.keys.splice(index, 1); renderKeys(); changed(); const focus = $("key-" + Math.max(0, Math.min(draft.keys.length - 1, index + delta))); focus?.focus(); }; controls.append(b); }
         row.append(controls); $("keys").append(row);
@@ -306,7 +336,7 @@
       if (data.command === "catalogUpdated") { if (data.project !== projectId) return; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; pending.clear(); for (const combo of combos.values()) combo.close(); if (data.created?.type === "schema" && draft.type === "schema" && draft.name === data.created.name) { draft.schema = data.created.name; $("schema").value = draft.schema; } selectedSchema = schemaPage.items.find(s => s.name === draft.schema); persist(); return; }
       if (["search", "schemas", "properties", "storage"].includes(data.command)) { if (pending.get(data.field) !== data.sequence) return; let page = data.page; if (data.command === "storage") { $("map-file-note").textContent = page.message || "Only existing native database files are offered. The reviewed mapping applies to this new class."; root.JadeCreationRulesView.renderPlacementView(document, $("exclusive-placement-view"), page); } if (data.field === "parent" && !page.offset && !page.items.some(r => r.name === "RootSchema") && (!$("parent").value || "rootschema".includes($("parent").value.toLowerCase()))) page = { ...page, items: [{ name: "RootSchema" }, ...page.items] }; combos.get(data.field)?.render(page); return; }
       if (data.command === "describe") { if (requestedProject === undefined && data.sequence === previewSequence) renderRules(data.rules); return; }
-      if (data.command === "preview") { if (requestedProject !== undefined || data.sequence !== previewSequence || data.project !== undefined && data.project !== projectId) return; renderRules(data.rules); const sizingError = draft.type === "collection" && root.JadeCreationRulesView.sizingSelectionError(draft, sizingModes); if (sizingError) { receipt = undefined; validPreview = false; error(sizingError, "sizing-mode"); $("status").textContent = "Your sizing choice is preserved. Correct it or explicitly choose Jade default."; updateSteps(); return; } receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); renderReviewFiles(data.files); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)" + (data.files.some(file => file.operation === "update") ? ", including a reviewed existing metadata update." : "."); error(""); updateSteps(); return; }
+      if (data.command === "preview") { if (requestedProject !== undefined || data.sequence !== previewSequence || data.project !== undefined && data.project !== projectId) return; const comparisonError = comparisonSelectionError(draft); if (comparisonError) { receipt = undefined; validPreview = false; error(comparisonError.message, comparisonError.field); $("status").textContent = "Choose an available comparison mode before reviewing source."; updateSteps(); return; } renderRules(data.rules); const sizingError = draft.type === "collection" && root.JadeCreationRulesView.sizingSelectionError(draft, sizingModes); if (sizingError) { receipt = undefined; validPreview = false; error(sizingError, "sizing-mode"); $("status").textContent = "Your sizing choice is preserved. Correct it or explicitly choose Jade default."; updateSteps(); return; } receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); renderReviewFiles(data.files); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)" + (data.files.some(file => file.operation === "update") ? ", including a reviewed existing metadata update." : "."); error(""); updateSteps(); return; }
       if (data.command === "saved") { if (data.sequence !== saveSequence) return; setSaving(false); validPreview = false; receipt = undefined; $("save").disabled = true; $("status").textContent = "Saved " + data.files.join(", ") + ". Build or publish separately."; if (data.notice) error(data.notice); return; }
       if (data.command === "error") { if (data.operation === "project") { if (data.sequence !== projectSequence) return; requestedProject = undefined; $("project").value = projectId ?? ""; if (!saving) projectId = undefined; } if (data.operation === "save" && data.sequence !== saveSequence) return; if (["preview", "describe"].includes(data.operation) && data.sequence !== previewSequence) return; if (data.operation === "describe") { $("rules-info").textContent = data.message; $("rule-details").textContent = "Native metadata for the current selection is unavailable: " + data.message; return; } if (["search", "schemas", "properties", "storage"].includes(data.operation) && pending.get(data.field) !== data.sequence) return; if (data.operation === "save") setSaving(false); validPreview = false; receipt = undefined; error(data.message, diagnosticField(data), data); $("status").textContent = data.operation === "project" ? "Choose a project or refresh source choices before continuing." : diagnosticPresentation(data).kind === "metadata-unavailable" ? "Your choices are preserved. Supply the missing metadata, then refresh source choices." : "Your choices are preserved. Correct the definition to continue."; updateSteps(); if (data.operation === "save") { $("error").tabIndex = -1; $("error").focus(); } }
     });
@@ -314,5 +344,5 @@
     root.JadeCreationRulesView.renderPlacementView(document, $("exclusive-placement-view"), {});
     reflectKind(); send({ command: "ready" });
   }
-  return { moveKey, prepareInheritedKeys, definitionRequest, describeDraft, collectionPresentation, canSave, diagnosticField, choicePresentation, diagnosticPresentation, mount };
+  return { comparisonPresentation, comparisonSelectionError, moveKey, prepareInheritedKeys, definitionRequest, describeDraft, collectionPresentation, canSave, diagnosticField, choicePresentation, diagnosticPresentation, mount };
 });

@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const { moveKey, definitionRequest, describeDraft, collectionPresentation, prepareInheritedKeys, canSave, diagnosticField, choicePresentation, diagnosticPresentation } = require("../../extension/media/creation-designer");
+const { moveKey, comparisonPresentation, comparisonSelectionError, definitionRequest, describeDraft, collectionPresentation, prepareInheritedKeys, canSave, diagnosticField, choicePresentation, diagnosticPresentation } = require("../../extension/media/creation-designer");
 test("imported choices show alias, exporter and importing context without replacing their qualified identity", () => {
   const row = { id: "Consumer::Zoo::Fish", label: "Consumer::Zoo::Fish", name: "Zoo::Fish", nativeName: "Zoo::Fish", imported: true, originSchema: "Provider", metadataStatus: "known" };
   const presentation = choicePresentation(row, "ConsumerChild");
@@ -22,6 +22,7 @@ test("inherited-key diagnostics identify the offending control without replacing
   assert.equal(diagnosticField({ field: "keys", keyIndex: 1, attribute: "caseInsensitive", nativeCode: 6386 }), "key-case-1");
   assert.equal(diagnosticField({ field: "keys", keyIndex: 2, attribute: "name" }), "key-2");
   assert.equal(diagnosticField({ field: "keys" }), "keys");
+  assert.equal(diagnosticField({ field: "keys", keyIndex: 0, attribute: "comparison" }), "key-comparison-0");
 });
 test("implicit form submission is permitted only from the reviewed source step", () => {
   const reviewed = { receipt: "receipt", validPreview: true, saving: false };
@@ -90,4 +91,21 @@ test("request preserves schema-qualified identities and all supported dictionary
   assert.match(describeDraft(draft), /persistent dictionary of Fish/);
   assert.match(describeDraft(draft), /owner.name descending/);
   assert.match(describeDraft(draft), /duplicate keys allowed/);
+});
+
+test('comparison choices enable proved Binary only for known String keys and explain disabled Latin1',()=>{
+ for(const key of [{type:'String'},{_type:'String'}]){
+  const view=comparisonPresentation(key,key.type?'external':'member');assert.equal(view.options.find(x=>x.value==='binary').disabled,false);assert.equal(view.options.find(x=>x.value==='latin1').disabled,true);assert.match(view.reason,/Latin1.*not.*proved/i);
+ }
+ for(const key of [{},{type:'StringUtf8'},{_type:'Integer'}])assert.equal(comparisonPresentation(key,key.type?'external':'member').options.find(x=>x.value==='binary').disabled,true);
+});
+test('Binary emits no retained case or LCID options and native restores the original ordered draft',()=>{
+ const draft={type:'collection',kind:'external',keys:[{name:'name',type:'String',comparison:'binary',locale:2057,caseInsensitive:true,descending:true},{name:'age',type:'Integer',comparison:'binary',locale:2057,caseInsensitive:true}]};
+ const request=definitionRequest(draft);assert.equal(request.keys[0].comparison,'binary');assert.equal(request.keys[0].locale,undefined);assert.equal(request.keys[0].caseInsensitive,undefined);assert.equal(request.keys[0].descending,true);assert.equal(request.keys[1].comparison,undefined);assert.equal(request.keys[1].locale,undefined);assert.equal(request.keys[1].caseInsensitive,undefined);
+ assert.equal(draft.keys[0].locale,2057);draft.keys[0].comparison='native';assert.equal(definitionRequest(draft).keys[0].locale,2057);assert.equal(definitionRequest(draft).keys[0].caseInsensitive,true);
+});
+test('unavailable text comparison cannot silently become a successful native preview',()=>{
+ for(const key of [{comparison:'binary'},{_type:'StringUtf8',comparison:'binary'},{_type:'String',comparison:'latin1'}])assert.match(comparisonSelectionError({type:'collection',kind:'member',keys:[key]}).message,/String|Latin1/);
+ assert.equal(comparisonSelectionError({type:'collection',kind:'member',keys:[{_type:'String',comparison:'binary'}]}),undefined);
+ assert.equal(comparisonSelectionError({type:'collection',collectionFamily:'objectSet',keys:[{comparison:'latin1'}]}),undefined);
 });
