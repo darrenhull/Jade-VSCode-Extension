@@ -53,3 +53,18 @@ test('editing while save preparation is awaiting the catalogue prevents writing 
  await session.handle({command:'project',project:'0',sequence:1});await session.handle({command:'preview',sequence:2,request:{type:'class',schema:'App',name:'A'}});const receipt=f.sent.at(-1).receipt;
  const writing=session.handle({command:'save',sequence:2,receipt});await session.handle({command:'invalidate'});finish();await writing;assert.equal(f.writes.length,0);assert.match(f.sent.at(-1).message,/changed during save/i);
 });
+test('successful saves refresh the same designer catalogue for subsequent schema and class creation',async()=>{
+ const f=fixture();let written=false;
+ const fresh={...f.model,schemas:()=>({items:[{name:'App'},{name:'NewSchema'}],total:2}),search:()=>({items:[{name:'NewClass',schema:'NewSchema',id:'NewSchema::NewClass'}]})};
+ const session=createDesignerSession({post:async m=>f.sent.push(m),projects:[{id:'0',name:'Project',root:'C:/project'}],modelProvider:async()=>written?fresh:f.model,save:async()=>{written=true;return {files:['C:/project/NewSchema.scm']};}});
+ await session.handle({command:'project',project:'0',sequence:1});await session.handle({command:'preview',sequence:2,request:{type:'schema',name:'NewSchema'}});
+ await session.handle({command:'save',sequence:2,receipt:f.sent.at(-1).receipt});
+ const changed=f.sent.find(m=>m.command==='catalogUpdated');assert.ok(changed);assert.equal(changed.page.items[1].name,'NewSchema');
+ await session.handle({command:'search',sequence:3,schema:'NewSchema',kind:'member',query:'NewClass'});assert.equal(f.sent.at(-1).page.items[0].id,'NewSchema::NewClass');
+});
+test('a refresh failure after writing reports saved files and requires a project refresh without replaying writes',async()=>{
+ const f=fixture();let count=0;
+ const session=createDesignerSession({post:async m=>f.sent.push(m),projects:[{id:'0',name:'Project',root:'C:/project'}],modelProvider:async()=>{if(++count===3)throw Error('refresh failed');return f.model;},save:async()=>{f.writes.push('saved');return {files:['C:/project/A.cls']};}});
+ await session.handle({command:'project',project:'0',sequence:1});await session.handle({command:'preview',sequence:2,request:{type:'class',schema:'App',name:'A'}});await session.handle({command:'save',sequence:2,receipt:f.sent.at(-1).receipt});
+ assert.equal(f.writes.length,1);assert.equal(f.sent.at(-1).command,'saved');assert.match(f.sent.at(-1).notice,/saved.*refresh/i);
+});

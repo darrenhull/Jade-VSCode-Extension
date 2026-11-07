@@ -36,6 +36,13 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     const root = { name: "RootSchema", header: { text: "" }, entries: [], classes: [...language.system.values()].map(cls => ({ owner: cls.name, selectable: classNames.has(cls.name), model: { classes: [cls] } })) };
     project = { ...project, schemas: [...project.schemas.filter(schema => schema.name !== "RootSchema"), root] };
   }
+  // The same known base types must back both autocomplete and generation when
+  // no verified cache is available. Their empty member lists do not pretend to
+  // supply native system properties; refreshing the cache supplies those.
+  const root = project.schemas.find(schema => schema.name === "RootSchema") || { name: "RootSchema", header: { text: "" }, entries: [], classes: [] };
+  const classes = [...root.classes];
+  for (const name of systemTypes) if (!classes.some(entry => entry.owner === name)) classes.push({ owner: name, model: { classes: [{ name, kind: "class", members: [] }] } });
+  project = { ...project, schemas: [...project.schemas.filter(schema => schema.name !== "RootSchema"), { ...root, classes }] };
   const schemasByName = new Map(project.schemas.map(schema => [schema.name, schema]));
   const visibleCache = new Map();
   let catalog, dictionaryKinds;

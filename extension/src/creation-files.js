@@ -5,25 +5,41 @@ const inside = (root, file) => {
   return relative && relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative);
 };
 const identity = file => path.resolve(file).toLowerCase();
+function canonicalIdentity(file) {
+  file = path.resolve(file);
+  let ancestor = path.dirname(file);
+  while (!fs.existsSync(ancestor)) {
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) throw Error("Cannot resolve source parent: " + file);
+    ancestor = parent;
+  }
+  return identity(path.resolve(fs.realpathSync(ancestor), path.relative(ancestor, file)));
+}
 
 // Only a reviewed plan is written. Preflight the entire set before creating any
 // file, and use exclusive creation to handle a competing writer safely.
 function writeCreation(root, generated, { dirtyFiles = [], dirtyPaths = [] } = {}) {
-  root = fs.realpathSync(root);
+  const logicalRoot = path.resolve(root);
+  root = fs.realpathSync(logicalRoot);
   if (!Array.isArray(generated?.files) || !generated.files.length)
     throw Error("There are no generated files to save.");
-  const dirty = new Set([...dirtyFiles, ...dirtyPaths].map(identity)), seen = new Set();
+  const dirty = new Set([...dirtyFiles, ...dirtyPaths].map(canonicalIdentity)), seen = new Set();
   const files = generated.files.map(entry => {
     if (typeof entry?.file !== "string" || typeof entry.text !== "string")
       throw Error("Invalid generated source file.");
-    const file = path.resolve(entry.file), key = identity(file);
-    if (!inside(root, file)) throw Error("Generated files must remain within the selected workspace.");
+    const file = path.resolve(entry.file);
+    if (!inside(logicalRoot, file)) throw Error("Generated files must remain within the selected workspace.");
+    const key = canonicalIdentity(file);
     if (seen.has(key)) throw Error("Generated files contain duplicate paths.");
     seen.add(key);
     if (dirty.has(key)) throw Error("An unsaved editor already uses this file: " + file);
     if (fs.existsSync(file)) throw Error("Source file already exists: " + file);
     let ancestor = path.dirname(file);
-    while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
+    while (!fs.existsSync(ancestor)) {
+      const parent = path.dirname(ancestor);
+      if (parent === ancestor) throw Error("Cannot resolve source parent: " + file);
+      ancestor = parent;
+    }
     const real = fs.realpathSync(ancestor);
     if (real !== root && !inside(root, real)) throw Error("Source folder points outside the workspace.");
     return { file, text: entry.text };
@@ -34,8 +50,15 @@ function writeCreation(root, generated, { dirtyFiles = [], dirtyPaths = [] } = {
       fs.mkdirSync(path.dirname(entry.file), { recursive: true });
       const parent = fs.realpathSync(path.dirname(entry.file));
       if (parent !== root && !inside(root, parent)) throw Error("Source folder points outside the workspace.");
-      fs.writeFileSync(entry.file, entry.text, { flag: "wx" });
+      const descriptor = fs.openSync(entry.file, "wx");
       created.push(entry.file);
+      let writeError;
+      try { fs.writeFileSync(descriptor, entry.text); }
+      catch (error) { writeError = error; throw error; }
+      finally {
+        try { fs.closeSync(descriptor); }
+        catch (error) { if (!writeError) throw error; }
+      }
     }
   } catch (error) {
     // These files were exclusively created by this operation. Existing files and

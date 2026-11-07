@@ -34,12 +34,12 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
       if (command === "search" || command === "schemas" || command === "properties") {
         const request = { schema: String(message.schema || ""), query: String(message.query || "").slice(0, 256), kind: message.kind === "member" ? "member" : "superclass", membership: String(message.membership || ""), collectionKind: message.collectionKind, offset: Math.max(0, Math.min(100000, Number(message.offset) || 0)), limit: Math.max(1, Math.min(50, Number(message.limit) || 50)) };
         const page = await (command === "schemas" ? activeModel.schemas(request) : command === "properties" ? activeModel.keyChoices(request) : activeModel.search(request));
-        if (fresh() && project === current) return reply({ command, sequence, field: message.field, schema: request.schema, membership: request.membership, page });
+        if (fresh() && project === current && activeModel === model) return reply({ command, sequence, field: message.field, schema: request.schema, membership: request.membership, page });
       } else if (command === "preview") {
         review = undefined;
         const request = structuredClone(message.request);
         const generated = await activeModel.preview(request);
-        if (!fresh() || project !== current) return;
+        if (!fresh() || project !== current || activeModel !== model) return;
         const receipt = crypto.randomBytes(24).toString("hex");
         review = { receipt, request, generated, fingerprint: fingerprint(generated), project };
         return reply({ command: "preview", sequence, receipt, summary: generated.summary, files: generated.files.map(f => ({ relativePath: f.relativePath || path.basename(f.file), text: f.text })) });
@@ -56,8 +56,22 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
           if (fingerprint(checked) !== approved.fingerprint) throw Error("Source definitions changed since review. Review the updated source before saving.");
           const result = await save(project.root, approved.generated, { dirtyPaths: dirtyPaths() });
           review = undefined;
-          await saved(result);
-          return reply({ command: "saved", sequence, files: result.files.map(f => typeof f === "string" ? path.basename(f) : f.relativePath || path.basename(f.file)) });
+          let notice;
+          // A successful write is final even if catalogue refresh or opening the
+          // new editor fails. Never replay it or label it a failed save.
+          try {
+            const refreshed = await modelProvider(project), page = await refreshed.schemas({ limit: 50 });
+            if (!disposed && current === project) {
+              model = refreshed;
+              await reply({ command: "catalogUpdated", project: project.id, page, notice: refreshed.notice, created: { type: approved.request.type, name: approved.request.name, schema: approved.request.schema } });
+            }
+          } catch (error) {
+            if (current === project) model = undefined;
+            notice = "Files saved, but refreshing the source choices failed: " + error.message + ". Select the project again to refresh before creating another definition.";
+          }
+          try { if (!disposed) await saved(result); }
+          catch (error) { notice = (notice ? notice + " " : "") + "Files saved, but opening the source editor failed: " + error.message; }
+          return reply({ command: "saved", sequence, files: result.files.map(f => typeof f === "string" ? path.basename(f) : f.relativePath || path.basename(f.file)), ...(notice ? { notice } : {}) });
         } finally { saving = false; }
       }
     } catch (error) {

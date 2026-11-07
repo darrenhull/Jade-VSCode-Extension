@@ -10,6 +10,7 @@
     return copy;
   }
   function definitionRequest(draft) { const request = JSON.parse(JSON.stringify(draft)); for (const key of request.keys || []) delete key._type; return request; }
+  function canSave({ step, receipt, validPreview, saving }) { return step === 2 && Boolean(receipt) && validPreview === true && saving !== true; }
   function describeDraft(draft) {
     if (draft.type === "schema") return "Schema " + (draft.name || "…") + " inheriting " + (draft.parent || "RootSchema");
     if (draft.type === "class") return "A " + draft.lifetime + " class " + (draft.name || "…") + " inheriting " + (draft.superclass || "Object");
@@ -40,7 +41,7 @@
     function updateSteps() {
       $("definition").hidden = step !== 0; $("rules").hidden = step !== 1; $("review").hidden = step !== 2;
       $("back").hidden = step === 0; $("next").hidden = step === 2; $("save").hidden = step !== 2;
-      $("save").disabled = !validPreview || saving;
+      $("save").disabled = !canSave({ step, receipt, validPreview, saving });
       $("next").textContent = step === 0 && draft.type === "collection" ? "Keys & rules →" : "Review source →";
       Array.from($("steps").children).forEach((el, index) => { if (index === step) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current"); });
       $("steps").children[1].hidden = draft.type !== "collection";
@@ -157,19 +158,20 @@
     $("next").onclick = () => { step = step === 0 && draft.type === "collection" ? 1 : 2; updateSteps(); changed(); const heading = (step === 1 ? $("rules") : $("review")).querySelector("h2"); heading.tabIndex = -1; heading.focus(); };
     $("back").onclick = () => { step = step === 2 && draft.type === "collection" ? 1 : 0; updateSteps(); };
     $("cancel").onclick = () => send({ command: "cancel" });
-    $("designer").onsubmit = event => { event.preventDefault(); if (!receipt || !validPreview || saving) return; saving = true; $("save").disabled = true; send({ command: "save", sequence: previewSequence, receipt }); };
+    $("designer").onsubmit = event => { event.preventDefault(); if (!canSave({ step, receipt, validPreview, saving })) return; saving = true; $("save").disabled = true; send({ command: "save", sequence: previewSequence, receipt }); };
     $("project").onchange = () => { projectId = $("project").value; receipt = undefined; validPreview = false; $("save").disabled = true; projectSequence = ++sequence; pending.clear(); for (const c of combos.values()) c.close(); send({ command: "project", project: projectId, sequence: projectSequence }); };
     root.addEventListener("message", ({ data }) => {
       if (!data || disposed) return;
       if (data.command === "projects") { $("project").replaceChildren(...data.projects.map(p => option(p.id, p.name))); const state = savedState; if (state?.draft && data.projects.some(p => p.id === state.projectId)) { draft = state.draft; step = state.step || 0; $("project").value = state.projectId; for (const [id, prop] of [["schema", "schema"], ["name", "name"], ["parent", "parent"], ["version", "version"], ["member", "membership"], ["superclass", "superclass"], ["kind", "type"], ["dictionary", "kind"], ["lifetime", "lifetime"]]) $(id).value = draft[prop] || ""; $("duplicates").checked = Boolean(draft.duplicatesAllowed); $("load-factor").value = draft.loadFactor ?? ""; } reflectKind(); $("project").onchange(); return; }
       if (data.command === "project") { if (data.sequence !== projectSequence) return; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; if (!draft.schema && schemaPage.items.length) draft.schema = schemaPage.items[0].name; $("schema").value = draft.schema; selectedSchema = schemaPage.items.find(s => s.name === draft.schema); if (!draft.version && selectedSchema?.version) $("version").value = draft.version = selectedSchema.version; draft.parent ||= "RootSchema"; renderKeys(); changed(); return; }
+      if (data.command === "catalogUpdated") { if (data.project !== projectId) return; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; pending.clear(); for (const combo of combos.values()) combo.close(); if (data.created?.type === "schema" && draft.type === "schema" && draft.name === data.created.name) { draft.schema = data.created.name; $("schema").value = draft.schema; } selectedSchema = schemaPage.items.find(s => s.name === draft.schema); persist(); return; }
       if (["search", "schemas", "properties"].includes(data.command)) { if (pending.get(data.field) !== data.sequence) return; let page = data.page; if (data.field === "parent" && !page.offset && !page.items.some(r => r.name === "RootSchema") && (!$("parent").value || "rootschema".includes($("parent").value.toLowerCase()))) page = { ...page, items: [{ name: "RootSchema" }, ...page.items] }; combos.get(data.field)?.render(page); return; }
       if (data.command === "preview") { if (data.sequence !== previewSequence) return; receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); $("files").replaceChildren(...data.files.map(file => { const section = document.createElement("section"), title = document.createElement("h3"), source = document.createElement("pre"); title.textContent = file.relativePath; source.textContent = file.text; source.tabIndex = 0; section.append(title, source); return section; })); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)."; error(""); updateSteps(); return; }
-      if (data.command === "saved") { saving = false; validPreview = false; receipt = undefined; $("save").disabled = true; $("status").textContent = "Saved " + data.files.join(", ") + ". Build or publish separately."; return; }
+      if (data.command === "saved") { saving = false; validPreview = false; receipt = undefined; $("save").disabled = true; $("status").textContent = "Saved " + data.files.join(", ") + ". Build or publish separately."; if (data.notice) error(data.notice); return; }
       if (data.command === "error") { if (data.operation === "preview" && data.sequence !== previewSequence) return; if (["search", "schemas", "properties"].includes(data.operation) && pending.get(data.field) !== data.sequence) return; saving = false; validPreview = false; receipt = undefined; error(data.message, data.field); $("status").textContent = "Your choices are preserved. Correct the definition to continue."; updateSteps(); if (data.operation === "save") { $("error").tabIndex = -1; $("error").focus(); } }
     });
     root.addEventListener("unload", () => { disposed = true; clearTimeout(timer); pending.clear(); for (const c of combos.values()) c.dispose(); });
     reflectKind(); send({ command: "ready" });
   }
-  return { moveKey, definitionRequest, describeDraft, mount };
+  return { moveKey, definitionRequest, describeDraft, canSave, mount };
 });
