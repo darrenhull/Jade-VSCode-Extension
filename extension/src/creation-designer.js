@@ -7,7 +7,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
   let current, model, disposed = false, review, saving = false;
   const latest = new Map();
   const reply = message => disposed ? undefined : post(message);
-  const fingerprint = value => JSON.stringify(value.files.map(f => [f.file, f.text]));
+  const fingerprint = value => JSON.stringify(value.files.map(f => [f.file, f.text, f.operation || "create", f.expectedHash || null, f.expectedText ?? null, f.encoding ?? null, f.bom ?? null]));
   async function handle(message) {
     if (disposed || !message || typeof message !== "object") return;
     const command = message.command;
@@ -17,7 +17,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
     const fresh = () => !disposed && latest.get(channel) === token;
     try {
       if (command === "ready") return reply({ command: "projects", projects: projects.map(p => ({ id: p.id, name: p.name })) });
-      if (command === "invalidate") { if (message.project !== undefined && message.project !== current?.id) return; review = undefined; latest.delete("preview"); return; }
+      if (command === "invalidate") { if (message.project !== undefined && message.project !== current?.id) return; review = undefined; latest.delete("preview"); latest.delete("describe"); return; }
       if (command === "project") {
         if (saving) throw Error("Wait for the current save to finish.");
         const selected = projects.find(p => p.id === message.project);
@@ -32,10 +32,13 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
       if (!current || !model) throw Error("Choose a project first.");
       if (message.project !== undefined && message.project !== current.id) throw Error("The active project changed. Choose the project again before continuing.");
       const project = current, activeModel = model;
-      if (command === "search" || command === "schemas" || command === "properties") {
-        const request = { schema: String(message.schema || ""), query: String(message.query || "").slice(0, 256), kind: message.kind === "member" ? "member" : "superclass", membership: String(message.membership || ""), collectionKind: message.collectionKind, offset: Math.max(0, Math.min(100000, Number(message.offset) || 0)), limit: Math.max(1, Math.min(50, Number(message.limit) || 50)) };
-        const page = await (command === "schemas" ? activeModel.schemas(request) : command === "properties" ? activeModel.keyChoices(request) : activeModel.search(request));
+      if (command === "search" || command === "schemas" || command === "properties" || command === "storage") {
+        const request = { schema: String(message.schema || ""), query: String(message.query || "").slice(0, 256), kind: message.kind === "member" ? "member" : "superclass", membership: String(message.membership || ""), collectionKind: message.collectionKind, collectionFamily: message.collectionFamily, offset: Math.max(0, Math.min(100000, Number(message.offset) || 0)), limit: Math.max(1, Math.min(50, Number(message.limit) || 50)) };
+        const page = await (command === "schemas" ? activeModel.schemas(request) : command === "properties" ? activeModel.keyChoices(request) : command === "storage" ? activeModel.storage(request) : activeModel.search(request));
         if (fresh() && project === current && activeModel === model) return reply({ command, sequence, field: message.field, schema: request.schema, membership: request.membership, page });
+      } else if (command === "describe") {
+        const rules = await activeModel.describe(structuredClone(message.request));
+        if (fresh() && project === current && activeModel === model) return reply({ command: "describe", sequence, rules });
       } else if (command === "preview") {
         review = undefined;
         const request = structuredClone(message.request);
@@ -43,7 +46,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
         if (!fresh() || project !== current || activeModel !== model) return;
         const receipt = crypto.randomBytes(24).toString("hex");
         review = { receipt, request, generated, fingerprint: fingerprint(generated), project };
-        return reply({ command: "preview", sequence, receipt, summary: generated.summary, files: generated.files.map(f => ({ relativePath: f.relativePath || path.basename(f.file), text: f.text })) });
+        return reply({ command: "preview", sequence, receipt, summary: generated.summary, rules: generated.rules, files: generated.files.map(f => ({ relativePath: f.relativePath || path.basename(f.file), text: f.text, operation: f.operation || "create", ...(f.operation === "update" ? { expectedText: f.expectedText } : {}) })) });
       } else if (command === "save") {
         if (saving) throw Error("A save is already running.");
         const approved = review;
@@ -87,8 +90,10 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
       }
     } catch (error) {
       if (fresh()) {
-        const text = error.message || String(error), field = error.field || message.field || (/name|already exists/i.test(text) ? "name" : /member/i.test(text) ? "member" : /superclass/i.test(text) ? "superclass" : /schema/i.test(text) ? "schema" : undefined);
-        return reply({ command: "error", sequence, operation: command, field, message: text, ...(error.code !== undefined ? { code: error.code } : {}), ...(error.metadataStatus ? { metadataStatus: error.metadataStatus } : {}) });
+        if (command === "save" && error.outcome && (error.outcome.changedFiles?.length || error.outcome.savedFiles?.length)) { review = undefined; model = undefined; }
+        const text = error.message || String(error), nativeField = error.field || message.field || (/name|already exists/i.test(text) ? "name" : /member/i.test(text) ? "member" : /superclass/i.test(text) ? "superclass" : /schema/i.test(text) ? "schema" : undefined);
+        const field = nativeField === "sizing" ? "sizing-value" : nativeField;
+        return reply({ command: "error", sequence, operation: command, field, message: text, ...(error.code !== undefined ? { code: error.code } : {}), ...(error.metadataStatus ? { metadataStatus: error.metadataStatus } : {}), ...(error.outcome ? { outcome: error.outcome } : {}), ...(Number.isSafeInteger(error.keyIndex) ? { keyIndex: error.keyIndex } : {}), ...(error.keyName ? { keyName: error.keyName } : {}), ...(error.attribute ? { attribute: error.attribute } : {}), ...(error.nativeCode !== undefined ? { nativeCode: error.nativeCode } : {}), ...(error.nativeCodeProvenance ? { nativeCodeProvenance: error.nativeCodeProvenance } : {}) });
       }
     }
   }
@@ -96,7 +101,7 @@ function createDesignerSession({ post, projects, modelProvider, save, dirtyPaths
 }
 
 function designerHtml({ nonce, cspSource, asset }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${asset("creation-designer.css")}"><title>Create Jade source</title></head><body>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${asset("creation-designer.css")}"><link rel="stylesheet" href="${asset("creation-rules-view.css")}"><title>Create Jade source</title></head><body>
   <header><div class="eyebrow">JADE TOOLS / CREATE</div><h1>Create something native.</h1><p>Define it here. Review the source. Save when you’re ready.</p><span class="badge">Local files only · no publish</span></header>
   <nav aria-label="Creation steps"><ol id="steps"><li aria-current="step">1 · Definition</li><li>2 · Keys &amp; rules</li><li>3 · Review</li></ol></nav>
   <form id="designer" novalidate><div class="layout"><main>
@@ -105,17 +110,19 @@ function designerHtml({ nonce, cspSource, asset }) {
   <label class="choice">Target schema<input id="schema" data-test="schema" autocomplete="off" aria-describedby="schema-help"><span class="results" id="schema-results" role="listbox" hidden></span><small id="schema-help">Search existing schemas in this project.</small></label>
   <label title="Collection class name identifies the new collection type"><span id="name-label">Class name</span><input id="name" data-test="name" autocomplete="off" aria-describedby="name-error"><small class="field-error" id="name-error"></small></label>
   <label class="schema-only choice" hidden>Parent schema<input id="parent" value="RootSchema" autocomplete="off"><span class="results" id="parent-results" role="listbox" hidden></span></label><label class="schema-only" hidden>Jade version<input id="version" placeholder="25.0.02" autocomplete="off"></label>
-  <label class="not-schema">Lifetime<select id="lifetime"><option value="transient">Transient</option><option value="persistent">Persistent</option></select></label>
-  <label class="collection-only" hidden>Dictionary<select id="dictionary"><option value="member">Member-key dictionary</option><option value="external">External-key dictionary</option></select></label>
+  <label class="not-schema">Default lifetime<select id="lifetime"><option value="transient">Transient</option><option value="persistent">Persistent</option></select><small id="lifetime-note">Jade validates lifetime compatibility with the selected superclass.</small></label>
+  <label class="collection-only" hidden>Collection family<select id="dictionary"><option value="member" data-base="RootSchema::MemberKeyDictionary">Member-key dictionary</option><option value="external" data-base="RootSchema::ExtKeyDictionary">External-key dictionary</option><option value="objectArray" data-base="RootSchema::ObjectArray">Object array</option><option value="objectSet" data-base="RootSchema::ObjectSet">Object set</option></select></label>
   <label class="collection-only choice" hidden>Member class<input id="member" data-test="member" autocomplete="off" aria-describedby="member-help"><span class="results" id="member-results" role="listbox" hidden></span><small id="member-help">Search visible schema-qualified classes.</small></label>
   <label class="not-schema choice">Superclass<input id="superclass" value="Object" autocomplete="off" aria-describedby="superclass-help"><span class="results" id="superclass-results" role="listbox" hidden></span><small id="superclass-help">Imported package classes can be collection members; native Jade does not permit subclassing imported classes.</small></label>
-  </div><p class="hint">Choices follow schema visibility. A folder name does not identify a Jade type.</p></section>
+  </div><p class="hint">Choices follow schema visibility. A folder name does not identify a Jade type.</p>
+  <details id="collection-storage" class="collection-only" hidden><summary>Storage &amp; sizing</summary><div class="grid"><label>Requested source sizing<select id="sizing-mode"><option value="native">Jade default</option><option value="blockSize" disabled>Entries per block — source bounds unavailable</option><option value="expectedPopulation" disabled>Expected population — source bounds unavailable</option></select></label><label id="sizing-value-field" hidden><span id="sizing-value-label">Requested entries per block</span><input id="sizing-value" type="number" step="1" placeholder="Enter requested source value" aria-describedby="sizing-note"><small>Zero explicitly requests Jade's native default. Only one sizing option is emitted.</small></label><label id="load-factor-field">Btree load factor (%)<input id="load-factor" type="number" min="1" max="100" step="1" placeholder="Jade default"><small>Available for dictionaries and object sets; omitted for arrays.</small></label><label class="choice">Class-map file (existing)<input id="map-file" autocomplete="off" placeholder="Jade default — leave empty" aria-describedby="map-file-note"><span class="results" id="map-file-results" role="listbox" hidden></span><small id="map-file-note">Search schema-qualified native files. This ordinary class mapping adds a reviewed schema-metadata change for the new class; it does not move existing data.</small></label></div><div id="exclusive-placement-view"></div><p class="hint" id="sizing-note" aria-live="polite">Custom modes require verified native source bounds. Jade determines effective runtime allocation.</p></details></section>
   <section class="card" id="rules" hidden><h2>Keys &amp; rules</h2><p>Keys run from top to bottom. Use the arrow buttons to change priority.</p><div id="keys"></div><button id="add-key" type="button" class="secondary">＋ Add key</button>
-  <details><summary>Advanced settings</summary><label class="check"><input type="checkbox" id="duplicates">Allow duplicate keys</label><label> Btree load factor (%)<input id="load-factor" type="number" min="1" max="100" placeholder="Jade default"></label><p class="hint">Positive text locale IDs and ignore-case settings are supported. Binary/Latin1 modes and further collection families are not available in this flow yet.</p></details></section>
+  <details><summary>Advanced key settings</summary><label class="check"><input type="checkbox" id="duplicates">Allow duplicate keys</label><p class="hint">Positive text locale IDs and ignore-case settings are supported. Unproved comparison modes, primitive arrays, dynamic dictionaries and ad hoc indexes are unavailable.</p></details></section>
   <section class="card" id="review" hidden><h2>Review native source</h2><p>Saving creates source files only. Use Build or Publish separately.</p><div id="files"></div></section>
-  </main><aside class="card"><div class="eyebrow">YOUR DEFINITION</div><h2 id="summary" data-test="summary">Start with a project and a schema.</h2><p id="status" role="status" aria-live="polite">Loading projects…</p><div id="error" data-test="error" role="alert" hidden></div><button id="refresh-choices" type="button" class="secondary">Refresh source choices</button><p id="catalog-notice" class="hint"></p><details id="live-source-details"><summary>Native source preview</summary><pre id="live-source" tabindex="0">Complete the definition to preview native source.</pre></details><p class="hint">Jade’s native compiler remains the authority. No database instances are created here.</p></aside></div>
+  <details class="card not-schema native-rules-panel" id="native-rule-details"><summary>Native lifetime permissions &amp; inherited key details</summary><div id="rule-details"></div></details>
+  </main><aside class="card"><div class="eyebrow">YOUR DEFINITION</div><h2 id="summary" data-test="summary">Start with a project and a schema.</h2><p id="status" role="status" aria-live="polite">Loading projects…</p><div id="error" data-test="error" role="alert" hidden></div><button id="refresh-choices" type="button" class="secondary">Refresh source choices</button><section id="collection-rules" hidden><h3>Native rules</h3><div id="rules-info" aria-live="polite"></div></section><p id="catalog-notice" class="hint"></p><details id="live-source-details"><summary>Native source preview</summary><pre id="live-source" tabindex="0">Complete the definition to preview native source.</pre></details><p class="hint">Jade’s native compiler remains the authority. No database instances are created here.</p></aside></div>
   <footer><button id="cancel" type="button" class="secondary">Cancel</button><span class="spacer"></span><button id="back" data-test="back" type="button" class="secondary" hidden>Back</button><button id="next" data-test="next" type="button">Review source →</button><button id="save" data-test="save" type="submit" hidden disabled>Save source files</button></footer></form>
-  <script nonce="${nonce}" src="${asset("creation-designer.js")}"></script></body></html>`;
+  <script nonce="${nonce}" src="${asset("creation-rules-view.js")}"></script><script nonce="${nonce}" src="${asset("creation-designer.js")}"></script></body></html>`;
 }
 
 function registerCreationDesigner(vscode, context, options = {}) {
@@ -153,7 +160,8 @@ function registerCreationDesigner(vscode, context, options = {}) {
         model.notice = [notice, "Choices follow schema ancestry and extracted package visibility.", model.importsNotice].filter(Boolean).join(" ");
         return model;
       },
-      save: writeCreation, dirtyPaths: () => vscode.workspace.textDocuments.filter(d => d.isDirty && ["file", "untitled"].includes(d.uri.scheme) && path.isAbsolute(d.uri.fsPath)).map(d => d.uri.fsPath),
+      save: (root, generated, options) => generated.files.some(file => file.operation === "update") ? require("./creation-workspace-edit").applyCreationWorkspaceEdit(vscode, root, generated, options) : writeCreation(root, generated, options),
+      dirtyPaths: () => vscode.workspace.textDocuments.filter(d => d.isDirty && ["file", "untitled"].includes(d.uri.scheme) && path.isAbsolute(d.uri.fsPath)).map(d => d.uri.fsPath),
       saved: async result => { const file = result.header || result.files[0]; if (file) await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(typeof file === "string" ? file : file.file)); },
     });
     const listener = panel.webview.onDidReceiveMessage(async message => { if (message?.command === "cancel") { panel.dispose(); return; } await session.handle(message); });

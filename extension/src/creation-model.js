@@ -4,7 +4,10 @@ const { planSchema } = require("./native-project");
 const { generateCollection, collectionKeyChoices } = require("./collections");
 const { LanguageModel } = require("./language-model");
 const { createCreationImports } = require("./creation-imports");
-const systemTypes = ["Object", "MemberKeyDictionary", "ExtKeyDictionary"];
+const { createCollectionRules, familyFor, bases, nativeCollectionOptions } = require("./collection-rules");
+const { nativeClassSource, readCollectionDefinition, applyNativeCollectionOptions } = require("./collection-definition");
+const { storageCatalog, planStorageMapping } = require("./collection-storage");
+const systemTypes = ["Object", ...Object.values(bases)];
 const folded = value => String(value || "").toLowerCase();
 function invalid(field, message, details) { const error = Error(message); error.field = field; Object.assign(error, details); throw error; }
 function inField(field, operation) { try { return operation(); } catch (error) { if (!error.field) error.field = field; throw error; } }
@@ -16,6 +19,7 @@ function page(items, { query = "", offset = 0, limit = 50 } = {}) {
   return { items: matched.slice(offset, offset + limit), total: matched.length, offset, limit, hasMore: offset + limit < matched.length };
 }
 function createCreationModel(project, { sourceRoot = project.root, systemCache } = {}) {
+  const collectionRules = createCollectionRules(project, { systemCache, catalogProvider: () => getCatalog() });
   const schemaNames = new Set();
   for (const schema of project.schemas) {
     if (schemaNames.has(folded(schema.name))) invalid("schema", "Duplicate schema declaration: " + schema.name);
@@ -33,6 +37,8 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     // second native metadata interpretation in the authoring UI.
     const language = new LanguageModel();
     language.setSystemCache(systemCache);
+    // These are the native cache reader's class categories: primitive (6),
+    // pseudo type (7) and interface (8) remain metadata, not superclass choices.
     const classNames = new Set(systemCache.types.filter(type => !type.primitive && ![6, 7, 8].includes(type.category)).map(type => type.name));
     const root = { name: "RootSchema", header: { text: "" }, entries: [], classes: [...language.system.values()].map(cls => ({ owner: cls.name, selectable: classNames.has(cls.name), model: { classes: [cls] } })) };
     project = { ...project, schemas: [...project.schemas.filter(schema => schema.name !== "RootSchema"), root] };
@@ -118,7 +124,8 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
   function search(options) {
     let choices = visible(options.schema);
     if (options.kind === "superclass") choices = choices.filter(choice => !choice.imported);
-    if (options.kind === "superclass" && options.collectionKind) choices = choices.filter(choice => dictionaryKind(choice) === options.collectionKind);
+    if (options.kind === "superclass" && options.collectionFamily) choices = choices.filter(choice => collectionRules.familyOf(choice.id) === options.collectionFamily);
+    else if (options.kind === "superclass" && options.collectionKind) choices = choices.filter(choice => dictionaryKind(choice) === options.collectionKind);
     return page(choices, options);
   }
   function keyChoices(options) {
@@ -128,7 +135,7 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     return page(collectionKeyChoices(member, c, options.schema).map(property => ({ ...property, label: property.name })), options);
   }
   function preview(request) {
-    let result, summary;
+    let result, summary, rulesRequest = request;
     if (request.type === "schema") {
       if (!/^[A-Za-z_]\w*$/.test(request.name || "") || ["rootschema", "jadeschema"].includes(folded(request.name))) invalid("name", "Enter a valid user schema name.");
       if (project.schemas.some(schema => folded(schema.name) === folded(request.name))) invalid("name", "A schema with this name already exists.");
@@ -156,29 +163,48 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
       if (!/^[A-Z][A-Za-z0-9_]*$/.test(request.name || "") || /^Jade/i.test(request.name)) invalid("name", "Class name must start with an uppercase letter and must not use the Jade prefix.");
       if (visible(schema.name).some(choice => folded(choice.name) === folded(request.name))) invalid("name", "A visible class with this name already exists.");
       if (!["transient", "persistent"].includes(request.lifetime)) invalid("lifetime", "Choose transient or persistent lifetime.");
+      collectionRules.validate(request);
       if (request.type === "collection") {
-        if (!["member", "external"].includes(request.kind)) invalid("dictionary", "Choose member or external keys.");
+        const family = familyFor(request), dictionary = family === "memberDictionary" || family === "externalDictionary";
         const member = resolveChoice(schema.name, request.membership, "member class");
-        if (request.kind === "member" && member.imported && getCatalog().schemas.find(value => value.name === schema.name)?.members.find(value => value.id === member.id)?.metadataStatus !== "known") invalid("keys", "Exported property metadata for " + member.label + " is unavailable. Pull the exporting package source before defining member keys.", { code: "JADE_IMPORT_METADATA_UNAVAILABLE", metadataStatus: "nativeRequired" });
-        const superclass = request.superclass ? resolveChoice(schema.name, request.superclass, "superclass").name : undefined;
-        if (request.superclass && dictionaryKind(resolveChoice(schema.name, request.superclass, "superclass")) !== request.kind) invalid("superclass", "Choose a visible dictionary superclass matching the selected key kind.");
+        if (family === "memberDictionary" && member.imported && getCatalog().schemas.find(value => value.name === schema.name)?.members.find(value => value.id === member.id)?.metadataStatus !== "known") invalid("keys", "Exported property metadata for " + member.label + " is unavailable. Pull the exporting package source before defining member keys.", { code: "JADE_IMPORT_METADATA_UNAVAILABLE", metadataStatus: "nativeRequired" });
+        const selectedBase = resolveChoice(schema.name, request.superclass || "RootSchema::" + bases[family], "superclass"), superclass = selectedBase.name;
+        if (collectionRules.familyOf(selectedBase.id) !== family) invalid("superclass", "Choose a visible superclass matching the selected collection family.");
         if (request.loadFactor !== undefined && (!Number.isInteger(request.loadFactor) || request.loadFactor < 1 || request.loadFactor > 100)) invalid("load-factor", "Load factor must be a whole percentage from 1 to 100.");
-        const generated = inField("keys", () => generateCollection({ ...request, membership: member.name, superclass }, getCatalog()));
-        result = { files: [{ file: path.resolve(generated.folder, "types", generated.fileName), text: generated.text }] };
-        const keys = request.keys.map(key => key.name + (key.descending ? " descending" : " ascending")).join(", then ");
-        summary = "A " + request.lifetime + " " + (request.kind === "external" ? "external-key" : "member-key") + " dictionary of " + member.label + ", sorted by " + keys + "; duplicate keys " + (request.duplicatesAllowed ? "allowed" : "prohibited") + ".";
+        if (dictionary) {
+          const kind = family === "memberDictionary" ? "member" : "external";
+          const generated = inField("keys", () => generateCollection({ ...request, kind, membership: member.name, superclass }, getCatalog()));
+          const generatedMetadata = readCollectionDefinition({ owner: request.name, text: generated.text }, schema.name);
+          rulesRequest = { ...request, keys: generatedMetadata.keys };
+          collectionRules.validate(rulesRequest);
+          result = { files: [{ file: path.resolve(generated.folder, "types", generated.fileName), text: applyNativeCollectionOptions(generated.text, request.name, nativeCollectionOptions(request)) }] };
+          const keys = request.keys.map(key => key.name + (key.descending ? " descending" : " ascending")).join(", then ");
+          summary = "A " + request.lifetime + " " + (kind === "external" ? "external-key" : "member-key") + " dictionary of " + member.label + ", sorted by " + keys + "; duplicate keys " + (request.duplicatesAllowed ? "allowed" : "prohibited") + ".";
+        } else {
+          if (request.keys?.length || request.duplicatesAllowed) invalid("keys", "Arrays and sets do not define dictionary keys or duplicate-key rules.");
+          if (family === "objectArray" && request.loadFactor !== undefined) invalid("load-factor", "Load factors apply to Btree sets and dictionaries, not arrays.");
+          const version = /jadeVersionNumber\s+"([\d.]+)"/.exec(schema.header.text)?.[1];
+          if (!/^\d+\.\d+\.\d+$/.test(version || "")) invalid("schema", "Schema header has no valid Jade version.");
+          const text = applyNativeCollectionOptions(nativeClassSource({ version, schema: schema.name, parentSchema: schema.parent, name: request.name, superclass, lifetime: request.lifetime, membership: member.name }), request.name, nativeCollectionOptions(request, { includeLoadFactor: family === "objectSet" }));
+          result = { files: [{ file: path.resolve(schema.folder, "types", request.name + ".cls"), text }] };
+          summary = "A " + request.lifetime + " " + (family === "objectArray" ? "ordered array" : "set of unique objects") + " of " + member.label + (family === "objectArray" ? "; repeated objects are allowed." : "; no ordering is promised.");
+        }
       } else if (request.type === "class") {
         const superclass = resolveChoice(schema.name, request.superclass || "RootSchema::Object", "superclass");
         const version = /jadeVersionNumber\s+"([\d.]+)"/.exec(schema.header.text)?.[1];
         if (!/^\d+\.\d+\.\d+$/.test(version || "")) invalid("schema", "Schema header has no valid Jade version.");
-        const text = [`jadeVersionNumber "${version}";`, "schemaDefinition", `\t${schema.name} subschemaOf ${schema.parent} partialDefinition;`, "typeHeaders", `\t${request.name} subclassOf ${superclass.name}${request.lifetime === "transient" ? " transient" : ""};`, "typeDefinitions", `\t${request.name} completeDefinition`, "\t(", "\t)", "databaseDefinitions", "typeSources", ""].join("\r\n");
+        const text = nativeClassSource({ version, schema: schema.name, parentSchema: schema.parent, name: request.name, superclass: superclass.name, lifetime: request.lifetime });
         result = { files: [{ file: path.resolve(schema.folder, "types", request.name + ".cls"), text }] };
         summary = "A " + request.lifetime + " class " + schema.name + "::" + request.name + " inheriting " + superclass.label + ". Native Jade validates the superclass lifetime rules.";
       } else invalid("kind", "Choose schema, class or collection.");
     }
+    if (request.type !== "schema" && request.mapFile) {
+      const mapping = planStorageMapping(project, request);
+      if (mapping) result.files.push(mapping);
+    }
     const files = result.files.map(entry => ({ ...entry, file: path.resolve(entry.file), relativePath: path.relative(project.root, entry.file) }));
-    return { ...result, files, summary, source: files[0].text };
+    return { ...result, files, summary, source: files[0].text, ...(request.type !== "schema" ? { rules: collectionRules.describe(rulesRequest) } : {}) };
   }
-  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview, importsNotice: imports.notice() };
+  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview, importsNotice: imports.notice(), storage: options => { const catalog = storageCatalog(project, options.schema); return { ...catalog, ...page(catalog.items, options) }; }, describe: request => request.type === "schema" ? { warnings: [], lifetime: { message: "Schemas define a namespace; class lifetime settings do not apply." } } : collectionRules.describe(request) };
 }
 module.exports = { createCreationModel };

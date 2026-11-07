@@ -33,6 +33,9 @@ function collectionCatalog(project) {
           name: p.name,
           type: p.type,
           length: p.length,
+          precision: p.precision,
+          scale: p.scale,
+          owner: type.cls.name,
           schema: type.schema,
         });
     const result = [...members.values()];

@@ -7,7 +7,7 @@ function mounted() {
  function element(id='') { const attributes=new Map(),events={};return {id,value:'',children:[],dataset:{},classList:{toggle(){}},hidden:false,disabled:false,parentElement:{append(){},hidden:false},addEventListener(type,fn){events[type]=fn;},emit(type){events[type]?.({});},removeAttribute(k){attributes.delete(k);},setAttribute(k,v){attributes.set(k,v);},getAttribute(k){return attributes.get(k);},append(...els){this.children.push(...els);},replaceChildren(...els){this.children=els;if(id==='project'&&!this.value)this.value=els[0]?.value||'';},querySelector(){return element();},contains(){return false;},focus(){},scrollIntoView(){}}; }
  const document={getElementById(id){if(!elements.has(id))elements.set(id,element(id));return elements.get(id);},createElement:()=>element(),querySelectorAll:()=>[]};
  document.getElementById('steps').children=[element(),element(),element()];
- const root={document,addEventListener:(type,fn)=>listeners[type]=fn,acquireVsCodeApi:()=>({getState:()=>undefined,setState:s=>state=structuredClone(s),postMessage:m=>{messages.push(m);if(session)tasks.push(session.handle(m));}})};
+ const root={JadeCreationRulesView:require('../../extension/media/creation-rules-view'),document,addEventListener:(type,fn)=>listeners[type]=fn,acquireVsCodeApi:()=>({getState:()=>undefined,setState:s=>state=structuredClone(s),postMessage:m=>{messages.push(m);if(session)tasks.push(session.handle(m));}})};
  let session,release,rejectSave=false,rejectProject=false;
  const projects=[{id:'A',name:'Alpha',root:'C:/Alpha'},{id:'B',name:'Beta',root:'C:/Beta'}];
  const model=p=>({schemas:()=>({items:[{name:'Pets'}]}),preview:()=>({summary:p.name,files:[{file:p.root+'/Created.cls',text:p.name,relativePath:'Created.cls'}]})});

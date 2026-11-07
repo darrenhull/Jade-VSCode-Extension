@@ -1,3 +1,11 @@
+# 0.16.0 — Collection families and native rules
+
+- Create ordered object arrays and unique object sets alongside keyed dictionaries.
+- Review inherited keys, known property attributes and class/subclass lifetime permissions, with unknown metadata clearly identified.
+- Check proven aggregate String key limits and inherited-key compatibility before saving; select native Binary comparison where supported.
+- Choose expected population or entries per block, with verified source bounds and clear native runtime sizing guidance.
+- Select an existing database file and review both the new class and its schema mapping before saving. Dirty files and stale reviews block the write.
+
 # 0.15.0 — Create schemas, classes and collections
 
 - Create a schema, ordinary class or keyed dictionary from one designer under Jade Tools.
