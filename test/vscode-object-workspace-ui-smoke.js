@@ -70,6 +70,32 @@ async function run() {
     await vscode.commands.executeCommand("jadeNative.moreObjectInstances",classNode);
     assert.ok((await inspector.provider.getChildren(classNode)).some(row=>row.command==="jadeNative.firstObjectInstances"));
     await vscode.commands.executeCommand("jadeNative.firstObjectInstances",classNode);
+    await vscode.commands.executeCommand("jadeNative.filterObjectInstances",classNode);
+    const instanceFilterEvidence=await withClassWorkspace(Number(process.env.JADE_OBJECT_WORKSPACE_DEBUG_PORT),async browser=>{
+      await browser.wait('document.getElementById("rows").children.length===100', 'instance grid page');
+      await browser.viewport(760);
+      const reads=requests.length;
+      await browser.evaluate('document.getElementById("query").value="pets fish 9050.50";document.getElementById("query").dispatchEvent(new Event("input"))');
+      await browser.wait('document.getElementById("rows").children.length===1','instance autocomplete match');
+      assert.equal(requests.length,reads,'typing must not read properties or scan native pages');
+      assert.equal(await browser.evaluate('document.getElementById("rows").textContent.includes("9050.50")'),true);
+      await browser.screenshot(path.join(captures,"instances-filtered.png"));
+      await browser.evaluate('document.getElementById("clear").focus()');await browser.keyInWindow('Enter',13);
+      await browser.wait('document.getElementById("rows").children.length===100','keyboard clear');
+      await browser.evaluate('document.getElementById("query").value="fish";document.getElementById("query").dispatchEvent(new Event("input"))');
+      await browser.wait('document.getElementById("suggestions").children.length===10','filter applied');
+      await browser.evaluate('document.getElementById("next").click()');
+      await browser.wait('document.getElementById("count").textContent.includes("Page 2")','native filtered page next');
+      assert.equal(await browser.evaluate('document.getElementById("query").value'),"fish");
+      assert.equal(await browser.evaluate('document.getElementById("next").disabled'),true);
+      assert.equal(await browser.evaluate('document.getElementById("previous").textContent'),"First");
+      await browser.viewport(360);assert.equal(await browser.evaluate("document.documentElement.scrollWidth<=window.innerWidth"),true,"instance grid page has no horizontal overflow");await browser.screenshot(path.join(captures,"instances-filtered-360.png"));
+      await browser.evaluate('document.querySelector("footer").scrollIntoView({block:"end"})');
+      await browser.screenshot(path.join(captures,"instances-filtered-controls-360.png"));
+      await browser.evaluate('document.getElementById("previous").click()');
+      await browser.wait('document.getElementById("count").textContent.includes("Page 1")','instance return first');
+      return {instanceGrid:true,currentPageAutocomplete:true,keyboardClear:true,nativeFirstNext:true,filterPreserved:true,noNativeReadsOnTyping:true};
+    },{predicate:'Boolean(document.getElementById("classes") && document.querySelector("header")?.textContent.includes("current native page"))'});
     await vscode.commands.executeCommand("jadeNative.inspectObject","9050.1");
     const contrast = [];
     const evidence = await withClassWorkspace(Number(process.env.JADE_OBJECT_WORKSPACE_DEBUG_PORT), async browser => {
@@ -165,7 +191,7 @@ async function run() {
     assert.ok(requests.every(request => ["catalog", "instances", "object", "collection", "release"].includes(request.command)));
     assert.ok(requests.filter(request=>request.command==="instances").every(request=>request.args.limit===100));
     const artifact = process.env.JADE_OBJECT_WORKSPACE_VSIX ? { name: path.basename(process.env.JADE_OBJECT_WORKSPACE_VSIX), sha256: require("node:crypto").createHash("sha256").update(fs.readFileSync(process.env.JADE_OBJECT_WORKSPACE_VSIX)).digest("hex") } : undefined;
-    fs.writeFileSync(report, JSON.stringify({ passed: true, artifact, ...evidence }, null, 2));
+    fs.writeFileSync(report, JSON.stringify({ passed: true, artifact, ...instanceFilterEvidence, ...evidence }, null, 2));
   } catch (error) {
     fs.writeFileSync(report, JSON.stringify({ passed: false, error: error.stack }, null, 2));
     throw error;

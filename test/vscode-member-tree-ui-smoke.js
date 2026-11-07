@@ -6,7 +6,8 @@ async function run(){
  const root=vscode.workspace.workspaceFolders[0].uri.fsPath,report=path.resolve(root,"../host-report.json"),captures=process.env.JADE_OBJECT_WORKSPACE_SCREENSHOTS,subscriptions=[],stored=new Map();
  const file=path.join(root,"NativeTreeFish.cls"),uri=vscode.Uri.file(file);
  const text='schemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ntypeHeaders\nFish subclassOf Object transient;\ntypeDefinitions\nFish completeDefinition\n(\nattributeDefinitions\n'+Array.from({length:275},(_,index)=>'property'+String(index).padStart(4,'0')+': String[50];').join('\n')+'\n)\ntypeSources\n';
- fs.writeFileSync(file,text);let reads=0;
+ fs.writeFileSync(file,text);let reads=0;const documentChanges=[];
+ subscriptions.push(vscode.workspace.onDidChangeTextDocument(event=>{if(event.document.uri.toString()===uri.toString()&&event.contentChanges.length)documentChanges.push({version:event.document.version,changes:event.contentChanges.map(change=>({offset:change.rangeOffset,length:change.rangeLength,text:change.text}))});}));
  const index=new SourceIndex({list:async()=>[uri.toString()],read:async()=>{reads++;return text;}});
  const host={...vscode,window:Object.assign(Object.create(vscode.window),{createTreeView:(_id,options)=>vscode.window.createTreeView("jade.testInspectionInstances",options)})};
  const context={subscriptions,extensionPath:path.resolve(__dirname,".."),extensionUri:vscode.Uri.file(path.resolve(__dirname,"..")),workspaceState:{get:key=>stored.get(key),update:async(key,value)=>stored.set(key,value)}};
@@ -38,9 +39,11 @@ async function run(){
   await vscode.commands.executeCommand(last.command,...last.arguments);rows=await api.provider.getChildren(group);
   assert.equal(rows.filter(row=>row.kind==="property").length,79);assert.ok(rows.length<=100);assert.equal(reads,beforeReads);
   await api.view.reveal(rows.at(-1),{select:true,focus:true});await wait('document.body.innerText.includes("property0274")');await capture("native-member-tree-last.png");
-  assert.equal(editor.document.isDirty,false);
+  assert.deepEqual(documentChanges,[],"member paging must not emit source edits");
+  assert.equal(editor.document.getText(),text,"member paging must preserve source bytes");
+  assert.equal(editor.document.isDirty,false,"member paging must not dirty the original source: "+JSON.stringify(editor.document.getText().slice(-300)));
   const artifact=process.env.JADE_OBJECT_WORKSPACE_VSIX?{name:path.basename(process.env.JADE_OBJECT_WORKSPACE_VSIX),sha256:crypto.createHash("sha256").update(fs.readFileSync(process.env.JADE_OBJECT_WORKSPACE_VSIX)).digest("hex")}:undefined;
-  fs.writeFileSync(report,JSON.stringify({passed:true,artifact,members:275,dataPageLimit:98,totalRowLimit:100,pageCounts:[99,100,80],nativeTreeRendered:true,nextPrevious:true,pagerArguments:"groupId + offset only",sourceReadsWhilePaging:reads-beforeReads,nativeDatabaseOpened:false,screenshots:["native-member-tree-first.png","native-member-tree-middle.png","native-member-tree-last.png"]},null,2));
+  fs.writeFileSync(report,JSON.stringify({passed:true,artifact,members:275,dataPageLimit:98,totalRowLimit:100,pageCounts:[99,100,80],nativeTreeRendered:true,nextPrevious:true,pagerArguments:"groupId + offset only",sourceReadsWhilePaging:reads-beforeReads,sourceEditsDuringPaging:documentChanges.length,sourceBytesUnchanged:true,sourceDocumentClean:true,nativeDatabaseOpened:false,screenshots:["native-member-tree-first.png","native-member-tree-middle.png","native-member-tree-last.png"]},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
  finally{client?.close();for(const item of subscriptions.reverse())item.dispose?.();index.dispose();}
 }

@@ -1,7 +1,7 @@
 'use strict';
 const {ClassWorkspaceEditorProvider}=require('./class-workspace-editor-provider');
 const {classIdentity}=require('./class-workspace');
-const {MethodDraftRecovery}=require('./method-draft-recovery');
+const {MethodDraftRecovery,sourceMemberKind}=require('./method-draft-recovery');
 const STATE='jade.classWorkspaceContexts.v1';
 function safeContext(value){
   const input=value?.row;
@@ -38,7 +38,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     session.panel.title=row.qualifiedName;
     remember(row,session.panel.viewColumn,state.origin);
     const editorScriptUri=session.panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','method-editor.js'));
-    const draftIdentity=()=>{const selected=session.binding.snapshot();if(!selected)throw Error('Select a source method first.');return {uri:session.document.uri.toString(),projectId:row.projectId,schema:row.schema,owner:selected.owner,member:selected.member};};
+    const draftIdentity=()=>{const selected=session.binding.snapshot();if(!selected)throw Error('Select a source member first.');return {uri:session.document.uri.toString(),projectId:row.projectId,schema:row.schema,owner:selected.owner,member:selected.member,kind:sourceMemberKind(selected.kind)};};
     const recoveryScope={uri:session.document.uri.toString(),projectId:row.projectId,schema:row.schema,owner:row.name};
     let displayedDraft;
     let reservedIdentity;
@@ -57,26 +57,26 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
         try{await recovery.reserve(identity);reservedIdentity=identity;session.binding.readOnlyReason=sourceReadOnlyReason;return {...session.binding.snapshot(),maxCharacters:recovery.maxCharacters};}
         catch(error){session.binding.readOnlyReason=error.message;return {...session.binding.snapshot(),readOnly:true,reason:error.message};}
       },
-      save(draft){const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member)throw Error('The selected method changed before its recovery checkpoint.');return recovery.save(identity,draft);},
+      save(draft){const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member||sourceMemberKind(draft?.kind)!==identity.kind)throw Error('The selected member changed before its recovery checkpoint.');return recovery.save(identity,draft);},
       get(){const selected=session.binding.snapshot();displayedDraft=(selected&&recovery.get(draftIdentity()))||recovery.list(recoveryScope)[0];return displayedDraft;},
       acknowledge:()=>session.binding.snapshot()?recovery.acknowledge(draftIdentity(),session.binding.snapshot()):Promise.resolve(false),
       async discard(){
         if(!displayedDraft)return;
         const identity=displayedDraft.identity;await recovery.discard(identity);
         const selected=session.binding.snapshot();
-        if(selected?.owner===identity.owner&&selected?.member===identity.member){session.binding.readOnlyReason=sourceReadOnlyReason;return draftRecovery.prepare(session.binding.snapshot());}
+        if(selected?.owner===identity.owner&&selected?.member===identity.member&&sourceMemberKind(selected.kind)===sourceMemberKind(identity.kind)){session.binding.readOnlyReason=sourceReadOnlyReason;return draftRecovery.prepare(session.binding.snapshot());}
       },
       async copy(){const draft=displayedDraft&&recovery.get(displayedDraft.identity);if(draft)await vscode.env.clipboard.writeText(draft.text);},
       async restore(){
         const identity=draftIdentity(),draft=displayedDraft&&recovery.get(displayedDraft.identity),selected=session.binding.snapshot();
         if(!draft)return selected;
-        if(identity.owner!==draft.identity.owner||identity.member!==draft.identity.member)throw Error('Select '+draft.identity.owner+'::'+draft.identity.member+' before restoring its draft.');
+        if(identity.owner!==draft.identity.owner||identity.member!==draft.identity.member||identity.kind!==sourceMemberKind(draft.identity.kind))throw Error('Select '+draft.identity.owner+'::'+draft.identity.member+' before restoring its draft.');
         if(sourceReadOnlyReason)throw Error(sourceReadOnlyReason);
         const previousReason=session.binding.readOnlyReason;let operation;
         // Bypass only the recovery lock for this explicitly confirmed edit.
         // Keep the canvas locked during native application and persistence.
         session.binding.readOnlyReason=sourceReadOnlyReason;
-        try{operation=session.binding.edit({version:selected.version,owner:selected.owner,member:selected.member,start:0,end:selected.text.length,text:draft.text});}
+        try{operation=session.binding.edit({version:selected.version,owner:selected.owner,member:selected.member,kind:selected.kind,start:0,end:selected.text.length,text:draft.text});}
         finally{session.binding.readOnlyReason=previousReason;}
         const result=await operation;
         if(result.text!==draft.text)throw Error('The recovered method was not applied completely. Its draft is retained.');
@@ -102,7 +102,20 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     if(disposed)throw Error('Class workspace is closed.');
     const identity=await model.resolveClass(row),key=classIdentity(identity),existing=views.get(key);
     origin??=existing?.origin;
-    if(existing){if(origin){existing.origin=origin;existing.view.setOrigin(origin);remember(identity,existing.panel.viewColumn,origin);}existing.panel.reveal(existing.panel.viewColumn);if(selectedId)await existing.view.select(selectedId);return {opened:true,reused:true,uri:identity.file};}
+    if(existing){
+      try{
+        if(origin){existing.origin=origin;existing.view.setOrigin(origin);remember(identity,existing.panel.viewColumn,origin);}
+        existing.panel.reveal(existing.panel.viewColumn);
+        if(selectedId)await existing.view.select(selectedId);
+        return {opened:true,reused:true,uri:identity.file};
+      }catch(error){
+        if(!/webview is disposed/i.test(error?.message||''))throw error;
+        // Native disposal may precede delivery of onDidDispose. The explicit
+        // navigation request opens a fresh view, never revives the old panel.
+        if(views.get(key)===existing)views.delete(key);
+        existing.view.dispose();
+      }
+    }
     const other=[...views.values()].some(value=>value.row.file===identity.file);
     const column=other?vscode.ViewColumn.Beside:vscode.ViewColumn.Active;
     pending.set(identity.file,{row:identity,origin,selectedId});
@@ -116,7 +129,22 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     opening=operation.catch(()=>{});
     return operation;
   }
-  async function prepareActiveSource(uri){const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();for(const value of views.values())if((value.row.file===uri.toString()||project&&value.row.projectId===project)&&(value.panel.active||value.binding?.snapshot?.()))if(await value.view.flushPendingEdits?.()===false)return false;return true;}
+  async function prepareActiveSource(uri){
+    const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();
+    for(const [key,value] of views){
+      if(value.row.file!==uri.toString()&&!(project&&value.row.projectId===project))continue;
+      try{
+        if((value.panel.active||value.binding?.snapshot?.())&&await value.view.flushPendingEdits?.()===false)return false;
+      }catch(error){
+        if(!/webview is disposed/i.test(error?.message||''))throw error;
+        // A native close can precede the extension-host disposal event. Its
+        // stale canvas must not prevent flushing the remaining live sources.
+        if(views.get(key)===value)views.delete(key);
+        value.view.dispose();
+      }
+    }
+    return true;
+  }
   const controller={open,prepareActiveSource,async openOriginal(){const selected=[...views.values()].find(value=>value.panel.active)||views.get(lastActiveKey)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
   context.subscriptions.push(controller);
   return controller;

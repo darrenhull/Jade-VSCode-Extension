@@ -36,17 +36,21 @@ Choose **New Scratch Pad** under Tools, select a schema, type Jade code and pres
 
 Each run has separate local variables. Changes your code commits to Working data can remain for later runs. Interactive input is unavailable, and F5 does not execute scratch code.
 
+Before execution, Jade prepares the saved workspace definitions. A compiler error in those files can prevent the scratch code from running; the result includes the native diagnostic and reported source location. Idle Database Objects inspection is released automatically before a run. An active build or test retains ownership until it finishes or is cancelled.
+
 ## Browse and create
 
 Choose a workspace class from **Find Class**, the class catalogue or **Object Explorer** to open its **Class Workspace**. Its grouped member rail searches declarations in the current file and shows up to 100 at a time. Use the kind filter and resolved inherited-member toggle to narrow the list; **Back to Classes** restores the originating search, tree or catalogue context.
 
-Selecting a local method opens an editable canvas backed by its original source document, with completion, diagnostics, navigation and native undo. **Save writes the entire original file**, including changes in other methods; configured Auto Save applies. **Open Original Source** shows that same buffer. Build and Publish remain separate actions. A second class sharing the same physical file opens in a separate editor group so its page can keep its own selection while sharing the document.
+Selecting a local method, property or reference opens an editable canvas backed by its original source document, with completion, diagnostics, navigation and native undo. Use **Save file** or **Ctrl+S**; saving writes the entire current file, including other unsaved member edits. Configured Auto Save also applies. **Open Original Source** shows that same buffer. Build and Publish remain separate actions. A second class sharing the same physical file opens in a separate editor group so its page can keep its own selection while sharing the document.
 
 Each page keeps its current backing file. It does not switch or close that file to edit a method from another partial file. Opening another source file or declaring class is explicit; separately opened files retain their own pages and native undo history.
 
 If a source update rejects an edit, a recovery card preserves the method draft across reopening. Review or copy it, explicitly restore it into the real document, or confirm its discard before editing resumes. Recovery checkpoints stay in VS Code's private workspace storage. Large methods and exhausted recovery capacity explain why protected inline editing is unavailable and offer **Open Original Source**.
 
 Inherited methods in another file have an explicit **Open declaring class** action. Missing or ambiguous source stays unavailable with an explanation. **Instances** asks which database target to browse; it does not publish an unpublished class. Object and collection pages remain read-only snapshots, retain history and page state, and show their last values as stale after disconnection.
+
+Use the filter icon beside a database class to open its instance results with the same autocomplete and grid controls as class search. Instance filtering searches identities, class names and schemas on the **current native page**. It does not scan the database or evaluate property values. Clear restores that page; Next and Return to first page retain native cursor paging.
 
 - **Jade: Create Schema, Class or Collection:** open the shared designer from Jade Tools or the Command Palette. Choose a project and schema, define a class, keyed dictionary, ordered object array or unique object set, and review the summary and native source before saving. Search schema-qualified superclasses, member classes and key properties. Use Back to adjust choices without losing the draft. A new schema's header stays beside its folder in the configured source subfolder.
 - Review inherited keys and known property attributes, duplicate policy and lifetime permissions. Unknown metadata remains clearly identified; a default lifetime does not restrict other lifetimes. Sizing offers either expected population or entries per block with verified source bounds. Actual runtime allocation remains native-dependent. Binary comparison is supported; Latin1 and unproved placement/partition modes remain unavailable with reasons.

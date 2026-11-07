@@ -99,7 +99,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
               },
             },
             messages: [],
-            onDidDispose: (fn) => (dispose = fn),
+            onDidDispose: (fn) => { dispose=fn; return disposable; },
             reveal() {},
             dispose() {
               dispose?.();

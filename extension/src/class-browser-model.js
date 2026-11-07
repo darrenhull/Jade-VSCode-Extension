@@ -34,7 +34,7 @@ class ClassBrowserModel {
     for (const row of this.rows) {
       if (!this.bySchema.has(row.schema)) this.bySchema.set(row.schema, []);
       this.bySchema.get(row.schema).push(row);
-      this.text.set(row.browserId, (row.schema + "::" + row.name).toLowerCase());
+      this.text.set(row.browserId, (row.schema + "::" + row.name + " " + (row.searchText || "")).toLowerCase());
     }
     this.cache = new Map();
     return this;

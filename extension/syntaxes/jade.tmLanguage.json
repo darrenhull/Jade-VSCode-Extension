@@ -1,5 +1,5 @@
 {
-  "name": "Jade (NZ)",
+  "name": "Jade",
   "scopeName": "source.jade-nz",
   "patterns": [
     { "name": "comment.line.double-slash.jade", "begin": "//", "end": "$" },

@@ -16,7 +16,21 @@ function summary(result,schema,elapsed) {
 }
 function resultText(result) {
   const report=result.report||{},message=report.output||'';
-  return String(message).slice(-262144)+(report.outputTruncated?'\n[Native output was truncated; later output was omitted.]':'')+(result.passed?'':((message?'\n':'')+(report.error||report.diagnostics?.[0]?.message||'Native execution failed (Jade '+result.code+').')));
+  const parts=[];
+  if(result.passed===false&&report.native_project===true&&report.compiled===false)parts.push('Workspace preparation failed. Scratch code was not executed.');
+  if(message)parts.push(String(message).slice(-262144));
+  if(report.outputTruncated)parts.push('[Native output was truncated; later output was omitted.]');
+  if(!result.passed){
+    if(report.error)parts.push(String(report.error));
+    for(const diagnostic of Array.isArray(report.diagnostics)?report.diagnostics:[]){
+      const code=diagnostic.compiler_error??diagnostic.code??result.code;
+      let location=typeof diagnostic.source==='string'?diagnostic.source:'';
+      if(location&&diagnostic.line!==undefined){location+=':'+diagnostic.line;if(diagnostic.column!==undefined)location+=':'+diagnostic.column;}
+      parts.push((code===undefined?'Jade':('Jade '+code))+': '+(diagnostic.message||'Native Jade compilation failed.')+(location?'\n'+location:''));
+    }
+    if(!report.error&&!report.diagnostics?.length)parts.push('Native execution failed (Jade '+result.code+').');
+  }
+  return parts.join('\n');
 }
 function notebookOutputs(vscode,result,schema,elapsed) {
   const outputs=[new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.text(summary(result,schema,elapsed),'text/plain')])],text=resultText(result);

@@ -3,8 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {HostTestArtifacts}=require('../../scripts/HostTestArtifacts.cjs');
 const {OwnedCliFixture}=require('../../test/OwnedCliFixture');
 function proxy(){const child=new EventEmitter();child.exitCode=null;child.signalCode=null;child.kill=()=>assert.fail('The already-closed fixture proxy must not be killed');return child;}
-test('waits beyond shutdown acknowledgement and proxy close for a real owned broker final write and exit',async t=>{
- let broker,finalWrite=false,stage;const child=proxy();
+test('waits beyond shutdown acknowledgement and proxy close for a real owned broker final write and exit',{timeout:10000},async t=>{
+ let broker,brokerClosed,finalWrite=false,stage;const child=proxy();
  const fixture=new OwnedCliFixture({entry:'fixture.exe',spawn:()=>child,createSession:options=>{
   options.spawn('fixture.exe',[],{env:{}});
   const session={client:{child},request(command){assert.equal(command,'shutdown');broker.send('shutdown');child.exitCode=0;child.emit('close',0);session.client=undefined;return {promise:Promise.resolve({passed:true})};},dispose(){}};return session;
@@ -13,10 +13,14 @@ test('waits beyond shutdown acknowledgement and proxy close for a real owned bro
  await fixture.run(async({root,stateDirectory})=>{
   stage=root;
   broker=spawn(process.execPath,['-e',"const fs=require('node:fs'),path=require('node:path'),state=process.argv[1];fs.mkdirSync(state,{recursive:true});fs.writeFileSync(path.join(state,'owner.json'),JSON.stringify({brokerPID:process.pid,nativePIDs:[]}));process.send('ready');process.on('message',()=>{setTimeout(()=>{fs.writeFileSync(path.join(state,'final-write'),'completed');fs.writeFileSync(path.join(state,'owner.json'),JSON.stringify({brokerPID:0,nativePIDs:[]}));process.send('final-write');process.exit(0);},120);});",stateDirectory],{windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
+  brokerClosed=new Promise(resolve=>broker.once('close',resolve));
   broker.on('message',message=>{if(message==='final-write')finalWrite=true;});
   await new Promise((resolve,reject)=>{broker.once('message',resolve);broker.once('error',reject);});
  });
- assert.equal(finalWrite,true);assert.equal(fs.existsSync(stage),false);assert.notEqual(broker.exitCode,null);
+ // OS liveness can report exit before Node dispatches ChildProcess's close
+ // event. Await that event before asserting its JavaScript exitCode value.
+ await brokerClosed;
+ assert.equal(finalWrite,true);assert.equal(fs.existsSync(stage),false);assert.equal(broker.exitCode,0);
 });
 test('retains the contained fixture when its owned broker remains alive after acknowledgement',async t=>{
  const container=fs.mkdtempSync(path.join(os.tmpdir(),'jade-owned-cli-test-'));let stage,alive=true;const child=proxy();

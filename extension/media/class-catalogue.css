@@ -125,3 +125,9 @@ nav {
 #error {
   color: var(--vscode-errorForeground);
 }
+
+h1, #context { overflow-wrap: anywhere; }
+#context { margin-bottom: 10px; }
+footer { flex-wrap: wrap; }
+.search { min-width: min(240px, 100%); }
+input { box-sizing: border-box; max-width: 100%; }

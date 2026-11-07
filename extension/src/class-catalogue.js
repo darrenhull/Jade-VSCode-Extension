@@ -19,6 +19,7 @@ function registerClassCatalogue(vscode, context, options) {
     renderedRevision = 0,
     renderedRows = 0,
     loading = false,
+    nativeNavigating = false,
     metadata = {
       scope: options.scope || "workspace",
       label: options.label || "Jade classes",
@@ -44,6 +45,7 @@ function registerClassCatalogue(vscode, context, options) {
       ...(parent ? { parent } : {}),
       ...(typeof row.kind === "string" && row.kind ? { kind: row.kind } : {}),
       position: row.position,
+      ...(options.presentation?.instance ? {className:row.className} : {}),
     };
   }
   function publish() {
@@ -54,15 +56,19 @@ function registerClassCatalogue(vscode, context, options) {
             .search(filter.query, { schema: filter.schema, limit: 10 })
             .items.map(viewRow)
         : [];
-    const columns = ["name", "schema"];
+    const columns = options.presentation?.instance ? ["name", "className", "schema"] : ["name", "schema"];
     if (model.rows.some(row => row.projectName)) columns.push("projectName");
     if (model.rows.some((row) => viewRow(row).parent)) columns.push("parent");
     else if (model.rows.some((row) => viewRow(row).kind)) columns.push("kind");
+    if (options.presentation?.instance) { page.label = `${page.items.length} matching of ${model.rows.length} instances on current page · Page ${metadata.nativePaging?.number || 1}`; page.hasPrevious=false; page.hasMore=false; }
     lastPayload = {
       command: "catalogue",
       revision: ++revision,
       label: metadata.label,
       scope: metadata.scope,
+      nativePaging: metadata.nativePaging,
+      presentation: options.presentation,
+      emptyMessage: options.presentation?.instance ? (model.rows.length ? "No matching instances on this page. Clear the filter or load the next native page." : "No persistent instances on this page.") : "No matching classes.",
       loading,
       filter: { ...filter },
       selectedId, scrollTop,
@@ -94,6 +100,7 @@ function registerClassCatalogue(vscode, context, options) {
         scope: next.scope || options.scope || "workspace",
         label: next.label || options.label || "Jade classes",
         generation: next.generation,
+        nativePaging:next.nativePaging,
       };
       model = new ClassBrowserModel({ scope: metadata.scope });
       model.setClasses(next.rows);
@@ -129,7 +136,7 @@ function registerClassCatalogue(vscode, context, options) {
       schema: Object.hasOwn(value, "schema")
         ? value.schema || undefined
         : filter.schema,
-      offset: value.offset ?? 0,
+      offset: options.presentation?.instance ? 0 : value.offset ?? 0,
     };
     model.page(next);
     filter = next;
@@ -138,6 +145,7 @@ function registerClassCatalogue(vscode, context, options) {
   }
   async function open(id) {
     if (loading) throw Error("Class catalogue is refreshing");
+    if (metadata.nativePaging?.stale) throw Error("This instance snapshot is disconnected. Reopen instances from the connected database.");
     if (typeof id !== "string" || id.length > 16384)
       throw Error("Unknown class identity");
     let identity;
@@ -174,7 +182,13 @@ function registerClassCatalogue(vscode, context, options) {
         schema: message.schema,
         offset: message.offset,
       });
-    else if (message?.command === "refresh") await refresh();
+    else if (message?.command === "refresh") { await options.refreshPage?.(); await refresh(); }
+    else if (message?.command === "nativeNext" || message?.command === "nativeFirst") {
+      if (!metadata.nativePaging || metadata.nativePaging.stale || loading || nativeNavigating) return;
+      if (message.command === "nativeNext" && !metadata.nativePaging?.hasMore) return;
+      nativeNavigating=true;
+      try { await options.nativePage?.(message.command === "nativeNext"); await refresh(); } finally { nativeNavigating=false; }
+    }
     else if (message?.command === "open") {
       if (Number.isFinite(message.scrollTop)) scrollTop = Math.max(0, Math.min(10000000,message.scrollTop));
       await open(message.id);
@@ -191,7 +205,7 @@ function registerClassCatalogue(vscode, context, options) {
   }
   function create() {
     panel = vscode.window.createWebviewPanel(
-      "jadeClassCatalogue",
+      options.presentation?.instance ? "jadeInstanceCatalogue" : "jadeClassCatalogue",
       options.label || "Jade classes",
       vscode.ViewColumn.Active,
       {
@@ -213,7 +227,7 @@ function registerClassCatalogue(vscode, context, options) {
             )
             .toString(),
         );
-    current.webview.html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escape(current.webview.cspSource)}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${uri("class-catalogue.css")}"><title>${escape(options.label || "Jade classes")}</title></head><body><header><h1 id="title">${escape(options.label || "Jade classes")}</h1><p>Search the full class catalogue. Open a class to explore its members.</p></header><section class="toolbar" aria-label="Class search"><label class="search">Class or schema<input id="query" type="search" list="suggestions" autocomplete="off" placeholder="Search all classes" aria-controls="classes"><datalist id="suggestions"></datalist></label><label>Schema<select id="schema" aria-controls="classes"><option value="">All schemas</option></select></label><button id="refresh" type="button">Refresh</button></section><p id="error" role="alert" hidden></p><div class="table-wrap"><table id="classes"><thead id="head"></thead><tbody id="rows"></tbody></table><p id="empty" hidden>No matching classes.</p></div><footer><span id="count" role="status" aria-live="polite">Loading classes…</span><nav aria-label="Class pages"><button id="previous" type="button" disabled>Previous</button><button id="next" type="button" disabled>Next</button></nav></footer><script nonce="${nonce}" src="${uri("class-catalogue.js")}"></script></body></html>`;
+    current.webview.html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escape(current.webview.cspSource)}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${uri("class-catalogue.css")}"><title>${escape(options.label || "Jade classes")}</title></head><body><header><h1 id="title">${escape(options.label || "Jade classes")}</h1><p id="context" hidden></p><p>${escape(options.presentation?.intro || "Search the full class catalogue. Open a class to explore its members.")}</p></header><section class="toolbar" aria-label="${options.presentation?.instance ? "Instance search" : "Class search"}"><label class="search">${escape(options.presentation?.searchLabel || "Class or schema")}<input id="query" type="search" list="suggestions" autocomplete="off" placeholder="${escape(options.presentation?.placeholder || "Search all classes")}" aria-controls="classes"><datalist id="suggestions"></datalist></label><label>Schema<select id="schema" aria-controls="classes"><option value="">All schemas</option></select></label><button id="clear" type="button"${options.presentation?.instance ? "" : " hidden"}>Clear</button><button id="refresh" type="button">Refresh</button></section><p id="error" role="alert" hidden></p><div class="table-wrap"><table id="classes"><thead id="head"></thead><tbody id="rows"></tbody></table><p id="empty" hidden>No matching classes.</p></div><footer><span id="count" role="status" aria-live="polite">${options.presentation?.instance ? "Loading instances…" : "Loading classes…"}</span><nav aria-label="${options.presentation?.instance ? "Native instance pages" : "Class pages"}"><button id="previous" type="button" disabled>Previous</button><button id="next" type="button" disabled>Next</button></nav></footer><script nonce="${nonce}" src="${uri("class-catalogue.js")}"></script></body></html>`;
     listeners.push(
       current.webview.onDidReceiveMessage((message) =>
         receive(message).catch((error) =>
@@ -229,6 +243,8 @@ function registerClassCatalogue(vscode, context, options) {
         panel = undefined;
         ready = false;
         lastPayload = undefined;
+        model = new ClassBrowserModel({scope:metadata.scope});
+        options.onClose?.();
         for (const listener of listeners.splice(0)) listener.dispose();
       }),
     );
@@ -258,6 +274,7 @@ function registerClassCatalogue(vscode, context, options) {
     show,
     refresh,
     invalidate,
+    update: refresh,
     setFilter,
     open,
     snapshot: () => lastPayload,

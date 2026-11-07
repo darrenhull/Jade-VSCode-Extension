@@ -200,6 +200,13 @@ function activate(context) {
     inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config),
     setBusy:async value=>{publishing=value;}
   });
+  const workspaceOperationGuard=new (require('./WorkspaceOperationGuard').WorkspaceOperationGuard)({
+    isBusy:()=>publishing,inspectorOwnsLock:()=>objectExplorer?.ownsLock()===true,
+    releaseInspector:()=>objectExplorer?.releaseForOperation(),
+    claim:value=>{publishing=value;},
+    updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value),
+    releaseNative:()=>nativeTests.release()
+  });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
     client:nativeTests,
     configFor:(_document,scope)=>inspectionConfig({uri:scope.configurationResource},scope.folder),
@@ -208,13 +215,8 @@ function activate(context) {
       for(const model of language.index.project.models.values())if(model.schema&&vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(model.uri))?.uri.toString()===scope.folder.uri.toString())schemas.set(model.schema,{name:model.schema,parent:model.parentSchema});
       return [...schemas.values()].sort((a,b)=>a.name.localeCompare(b.name));
     },
-    beforeOperation:async()=>{
-      if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');
-      publishing=true;await vscode.commands.executeCommand('setContext','jadeNative.publishing',true);
-      try {await objectExplorer?.releaseForOperation();await nativeTests.release();}
-      catch(error){publishing=false;await vscode.commands.executeCommand('setContext','jadeNative.publishing',false);throw error;}
-    },
-    afterOperation:async()=>{publishing=false;await vscode.commands.executeCommand('setContext','jadeNative.publishing',false);}
+    beforeOperation:()=>workspaceOperationGuard.acquire(),
+    afterOperation:lease=>workspaceOperationGuard.release(lease)
   });
   language.setWorkspaceSchemaResolver(workspaces.schemaFor);
   language.setWorkspaceResourceResolver(workspaces.resourceFor);

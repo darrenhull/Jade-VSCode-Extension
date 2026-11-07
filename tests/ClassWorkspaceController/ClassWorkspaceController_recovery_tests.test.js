@@ -3,13 +3,15 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {registerClassWorkspaces}=require('../../extension/src/class-workspace-controller');
 const {MethodDocumentBinding}=require('../../extension/src/method-document-binding');
 const {MethodDraftRecovery}=require('../../extension/src/method-draft-recovery');
-async function fixture({pendingAtStartup=true}={}){
+async function fixture({pendingAtStartup=true,kind='method'}={}){
  const stored=new Map(),storage={get:key=>stored.get(key),update:async(key,value)=>stored.set(key,structuredClone(value))},identity={name:'Fish',schema:'Pets',projectId:'file:///project',file:'file:///project/Fish.cls',qualifiedName:'Pets::Fish'};
  let text='schemaDefinition\nPets subschemaOf RootSchema;\ntypeHeaders\nFish subclassOf Object transient;\ntypeDefinitions\nFish completeDefinition\n(\njadeMethodDefinitions\nname() : String;\nother();\n)\ntypeSources\nFish (\njadeMethodSources\nname\n{\nname() : String;\nbegin\n return "baseline";\nend;\n}\nother\n{\nother();\nbegin\nend;\n}\n)',version=1,provider,services;
+ if(kind!=='method')text=text.replace('jadeMethodDefinitions','attributeDefinitions\nfield: String[20] number = 1;\nreferenceDefinitions\nlink: Object number = 2;\njadeMethodDefinitions');
+ const member=kind==='method'?'name':kind==='property'?'field':'link';
  const document={uri:{scheme:'file',toString:()=>identity.file},fileName:'Fish.cls',getText:()=>text,get version(){return version;},isDirty:false};
  const binding=new MethodDocumentBinding(document,async(start,end,value)=>{text=text.slice(0,start)+value+text.slice(end);version++;document.isDirty=true;binding.changed([{rangeOffset:start,rangeLength:end-start,text:value}]);return true;});
- const initial=binding.select('Fish','name'),recoveredText=initial.text.replace('baseline','recovered');
- if(pendingAtStartup)await new MethodDraftRecovery(storage).save({uri:identity.file,projectId:identity.projectId,schema:'Pets',owner:'Fish',member:'name'},{text:recoveredText,version:9});
+ const initial=binding.select('Fish',member,kind),recoveredText=kind==='method'?initial.text.replace('baseline','recovered'):initial.text.replace(kind==='property'?'20':'Object',kind==='property'?'40':'Fish');
+ if(pendingAtStartup)await new MethodDraftRecovery(storage).save({uri:identity.file,projectId:identity.projectId,schema:'Pets',owner:'Fish',member,kind},{text:recoveredText,version:9});
  const disposable={dispose(){}},panel={active:true,viewColumn:1,webview:{asWebviewUri:value=>value},onDidDispose:()=>disposable};
  const vscode={Uri:{parse:value=>({toString:()=>value}),joinPath:()=>({toString:()=>''})},ViewColumn:{Active:-1,Beside:-2},window:{registerCustomEditorProvider:(_id,value)=>{provider=value;return disposable;}},commands:{executeCommand:async()=>provider.createView({document,panel,binding,services:{}})}};
  const controller=registerClassWorkspaces(vscode,{extensionUri:{},subscriptions:[],workspaceState:storage},{model:{resolveClass:async()=>identity},shell:{attach:session=>{services=session.services.draftRecovery;return {dispose(){},state:()=>({})};},dispose(){}}});await controller.open(identity);
@@ -38,4 +40,9 @@ test('returning from an unresolved method restores the independent method editin
  state=await f.services.prepare(f.binding.select('Fish','other'));assert.equal(state.readOnly,false);assert.equal(state.reason,undefined);
  await f.services.save({owner:'Fish',member:'other',text:state.text+'// deliberate other edit',version:state.version});
  f.binding.select('Fish','name');assert.equal(f.services.get().text,f.recoveredText);
+});
+for(const kind of ['property','reference'])test('protects and explicitly restores '+kind+' recovery through the original declaration binding',async()=>{
+ const f=await fixture({kind}),before=f.document.getText(),prepared=await f.services.prepare(f.binding.snapshot());assert.equal(prepared.readOnly,true);
+ const snapshot=f.binding.snapshot();await assert.rejects(f.binding.edit({version:snapshot.version,kind,start:0,end:0,text:'unsafe'}),/Restore|discard/i);
+ assert.equal(f.document.getText(),before);f.services.get();const restored=await f.services.restore();assert.equal(restored.kind,kind);assert.equal(restored.text,f.recoveredText);assert.equal(restored.readOnly,false);assert.equal(f.document.isDirty,true);assert.equal(f.services.get(),undefined);
 });

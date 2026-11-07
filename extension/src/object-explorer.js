@@ -15,6 +15,7 @@ function registerObjectExplorer(vscode, context, services) {
     output = vscode.window.createOutputChannel("Jade Objects"),
     panels = new Set(),
     pages = new Map(),
+    instanceCatalogues = new Map(),
     pageLoads = new Map(),
     classVersions = new Map(),
     classOffsets = new Map(),
@@ -207,6 +208,7 @@ function registerObjectExplorer(vscode, context, services) {
     classOffsets.clear();
     schemaNodes.clear();
     pages.clear();
+    for (const record of instanceCatalogues.values()) void record.controller.update().catch(() => {});
     events.fire();
     refreshDescription();
     for (const record of panels) {
@@ -234,6 +236,7 @@ function registerObjectExplorer(vscode, context, services) {
     pages.clear();
     pageLoads.clear();
     classVersions.clear();
+    for(const record of instanceCatalogues.values()) void record.controller.update().catch(()=>{});
     events.fire();
     await Promise.all(
       previous.map((page) => releaseNativeCursor(page.cursor, generation)),
@@ -245,6 +248,7 @@ function registerObjectExplorer(vscode, context, services) {
     pages.delete(oid);
     pageLoads.delete(oid);
     await releaseNativeCursor(previous?.cursor);
+    for(const record of instanceCatalogues.values()) if(record.generation===session.generation && record.oid===oid) void record.controller.update().catch(()=>{});
   }
   function loadCatalog() {
     const generation = session.generation,
@@ -308,6 +312,8 @@ function registerObjectExplorer(vscode, context, services) {
           number: next ? (previous.number || 1) + 1 : 1,
         };
         pages.set(row.oid, current);
+        const record=instanceCatalogues.get(instanceCatalogueKey(row));
+        if(record) { record.page=current; void record.controller.update().catch(error=>output.appendLine(error.message)); }
         return current;
       })
       .finally(() => {
@@ -386,7 +392,7 @@ function registerObjectExplorer(vscode, context, services) {
     return "database:" + session.target + ":" + (currentTarget?.databasePath || "").toLowerCase();
   }
   function classNode(row) {
-    return { ...row, kind: "class", id: row.browserId,
+    return { ...row, kind: "class", id: row.browserId, inspectionGeneration: session.generation,
       description: row.collection ? "Collection" : row.persistentAllowed === false ? "Transient class" : undefined };
   }
   function classChildren(schema) {
@@ -665,6 +671,38 @@ function registerObjectExplorer(vscode, context, services) {
       return revealClass(row, metadata.generation);
     },
   });
+  function instanceCatalogueKey(row) { return JSON.stringify([session.generation, row.schema, row.oid]); }
+  async function filterInstances(row) {
+    if (!row || row.kind !== 'class' || row.inspectionGeneration !== session.generation || !session.client) throw Error('Choose a class in the connected Database Objects view.');
+    const generation=session.generation, key=instanceCatalogueKey(row);
+    let record=instanceCatalogues.get(key);
+    if (!record) {
+      if(instanceCatalogues.size>=12) throw Error('Close an instance search tab before opening another (12 tabs maximum).');
+      const page=pages.get(row.oid) || await classPage(row);
+      if (!page || generation!==session.generation || disposed) return;
+      const existing=instanceCatalogues.get(key);
+      if(existing){await existing.controller.show();return existing.controller;}
+      if(instanceCatalogues.size>=12){await discardClassPage(row.oid);throw Error('Close an instance search tab before opening another (12 tabs maximum).');}
+      const connection={target:session.target,path:currentTarget?.databasePath};
+      record={page,generation,oid:row.oid};
+      const active=()=>!disposed && generation===session.generation && !!session.client;
+      record.controller=registerClassCatalogue(vscode,context,{
+        scope:'instances:'+key, label:row.schema+'::'+row.name+' · Instances',
+        presentation:{instance:true,title:row.schema+'::'+row.name+' · Instances', intro:'Filter the current native page of up to 100 instances. Search Object ID, class or schema. First and Next load native pages; filtering does not scan the database or read object properties.', searchLabel:'Object ID, class or schema · current page',placeholder:'Filter current page'},
+        getRows:()=>({scope:'instances:'+key,generation,
+          label:row.schema+'::'+row.name+' · '+connection.target+' · '+connection.path+' · Read-only',
+          rows:record.page.items.map(item=>({...item,schema:item.schema||row.schema,name:item.oid,className:item.className||row.name,searchText:item.className||row.name})),
+          nativePaging:{number:record.page.number||1,hasMore:!!record.page.hasMore && pages.get(row.oid)===record.page,stale:!active(),cursorReleased:active() && pages.get(row.oid)!==record.page}}),
+        nativePage:async next=>{ if(!active())return; if(!next)await discardClassPage(row.oid); if(!active())return; const page=await classPage(row,next); if(page&&active()){record.page=page;events.fire(row);} },
+        refreshPage:async()=>{if(!active())return;await discardClassPage(row.oid);if(!active())return;const page=await classPage(row);if(page&&active()){record.page=page;events.fire(row);}},
+        openClass:item=>{if(!active())throw Error('The instance snapshot is disconnected.');return inspect(item.oid);},
+        onClose:()=>{instanceCatalogues.delete(key);if(active() && pages.get(row.oid)===record.page)void discardClassPage(row.oid).catch(()=>{});record.page={items:[],number:1,hasMore:false};},
+      });
+      instanceCatalogues.set(key,record);
+    }
+    await record.controller.show();
+    return record.controller;
+  }
   if (view.onDidCollapseElement)
     context.subscriptions.push(
       view.onDidCollapseElement(({ element }) => {
@@ -1129,6 +1167,7 @@ function registerObjectExplorer(vscode, context, services) {
       events.fire(schema);
       return { schema: schemaName, offset: page.offset, total: page.total };
     })),
+    vscode.commands.registerCommand("jadeNative.filterObjectInstances", row => action(() => filterInstances(row))),
     vscode.commands.registerCommand("jadeNative.moreObjectInstances", (row) =>
       action(async () => {
         await classPage(row, true);
@@ -1182,6 +1221,7 @@ function registerObjectExplorer(vscode, context, services) {
     provider,
     view,
     classCatalogue,
+    instanceCatalogue: row => instanceCatalogues.get(instanceCatalogueKey(row))?.controller,
     browseInstances,
     ownsLock: () => lock,
     releaseForOperation: async () => {

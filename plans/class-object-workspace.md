@@ -1,6 +1,6 @@
 # Class & Object Workspace
 
-Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. PR #32 includes the implementation; current-file scoping and the three review fixes are implemented, with final packaged checks completing before owner review and merge.
+Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. PR #32 includes the implementation. Current-file scoping and the three review fixes passed verification; property/reference editing, visible Save, instance filtering and local-test fixes are implemented and verified. The candidate is installed locally; current-head CI and review remain before merge.
 
 ## Implementation checkpoint
 
@@ -12,6 +12,15 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 - The user's final scope is **current file only**. Declared groups, counts and method editing use the current backing file. Other source files open only through explicit navigation, with independent file-qualified pages; the current page is never rebound or closed automatically.
 - Model and packaged UI checks cover project-qualified same-name classes, declared overrides, inherited ownership and bounded searches across 10,000 members. Native connected inspection is explicitly skipped without a validated disposable fixture; current-head CI/review remain delivery gates.
 
+### Additions from local testing
+
+- [x] Extend the shared document canvas to current-file property and reference declarations, including exact native source ranges, incomplete typing, rename/undo, completion/diagnostics and protected recovery.
+- [x] Add visible Save file with Ctrl+S, whole-document scope and dirty/saving/saved/error feedback; drain pending canvas edits before saving.
+- [x] Reuse class-search autocomplete and grid controls for instance identities on the current native page, retaining Next/First, labelled scope and target/session isolation.
+- [x] Reproduce and fix synchronous disposed-webview sends and stale-panel reuse; verify native close-class/open-another-class/reopen behaviour in the final host run.
+- [x] Fix Scratch Pad's idle-inspector ownership handover with lease/race regressions and show complete native diagnostics. An isolated native proof compiled/executed the Hello script and returned 6027 for invalid code; its private broker/processes and Working database were removed after shutdown. User source remains unchanged.
+- [x] Present the language as **Jade** in language selection and syntax metadata.
+
 ### Acceptance evidence checkpoint
 
 | Gate | Evidence / current result |
@@ -21,14 +30,16 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 | Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
 | Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
 | Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
-| Default regression | Final local check: 688 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
-| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 127 product files matched the source checkout |
+| Default regression | Final local check: 730 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
+| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 128 product files matched the source checkout |
 | Recovery and current-file sources | Rejected-edit/reopen recovery, exact Copy, confirmed Restore/Discard and native undo have working UI proofs. Regressions protect reopened/recreated recovery from fresh edits and preserve independent method permissions. Declared members stay in the current file; automatic cross-file transitions have been removed |
 | Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
 
 The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
 
-The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The final candidate VSIX SHA256 is `f163c8cfc7969715f1b1eb2fff61cde24010f6b0cc0394f840b7437838d6cbb4`. Native distribution checks and all 127 packaged product files were verified against the checkout. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The final candidate VSIX SHA256 is `37ffc5f5701d5818219fa8363b3d20bc569a7570e714529bed8a8c8a3d62fc6d`. Native distribution checks and all 128 packaged product files were verified against the checkout. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+
+The installed candidate also passed native execution of the supplied Integer sum script in the configured Working database: compiler/execution success, no diagnostics, output `The sum of x and y is: 30`, 2756 ms. Source was not published. Its saved-file preparation remains project-wide; a syntax error in another saved class can prevent scratch execution.
 
 The native member tree also limits responses to 100 rows including paging controls (98 members per full page), sends only group identity/offset for paging and does not reread source while paging. F5, Shift+F5 and Ctrl+F5 each dispatch exactly once from both the method canvas and Overview to the correct backing URI after pending edits drain. Their UI test stubs command dispatch; compilation/publication are not executed by that keyboard check. Existing native compiler, test, publish-confirmation and debugger behavior is retained.
 
@@ -148,4 +159,4 @@ Default tests must not open a developer database. Native checks require explicit
 
 ## Scope limits
 
-This plan does not add stored-data editing, non-method inline source editors, arbitrary method execution, live watches, automatic source pulls, a new schema browser, impact graphs, new native database APIs, or changes to compile/publish semantics. Source remains workspace files; native execution remains owned by the existing C++ CLI and installed runtime.
+This plan does not add stored-data editing, inline editors for constants/keys or class headers, arbitrary method execution, live watches, automatic source pulls, a new schema browser, impact graphs, new native database APIs, or changes to compile/publish semantics. Source remains workspace files; native execution remains owned by the existing C++ CLI and installed runtime.

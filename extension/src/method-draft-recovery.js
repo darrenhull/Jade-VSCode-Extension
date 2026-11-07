@@ -1,5 +1,6 @@
 'use strict';
 const STORAGE_KEY='jade.methodDraftRecovery.v1';
+function sourceMemberKind(kind){if(kind===undefined||kind==='method'||kind==='typeMethod')return 'method';if(kind==='property'||kind==='reference')return kind;throw new Error('Invalid source member kind.');}
 /** Bounded safety checkpoints only. Saving and undo always belong to TextDocument. */
 class MethodDraftRecovery {
   constructor(storage,{maxCharacters=262144,maxRecords=32,maxBytes=67108864}={}){
@@ -12,7 +13,7 @@ class MethodDraftRecovery {
   }
   key(identity){
     if(!identity||!['uri','projectId','schema','owner','member'].every(field=>typeof identity[field]==='string'&&identity[field].length>0&&identity[field].length<=4096)||!identity.uri.startsWith('file:'))throw new Error('Draft recovery requires a resolved local source identity.');
-    return JSON.stringify([identity.projectId,identity.uri,identity.schema,identity.owner,identity.member]);
+    return JSON.stringify([identity.projectId,identity.uri,identity.schema,identity.owner,identity.member,sourceMemberKind(identity.kind)]);
   }
   serial(action){const next=this.queue.then(action);this.queue=next.catch(()=>{});return next;}
   get(identity){const value=this.records.get(this.key(identity));return value&&!value.pristine?structuredClone(value):undefined;}
@@ -38,7 +39,7 @@ class MethodDraftRecovery {
     if(this.unresolved.has(key))throw new Error('Restore or discard the recovered draft before editing this method.');
     if(typeof draft?.text!=='string'||draft.text.length>this.maxCharacters)throw new Error('Method draft is too large for protected editing. Open Original Source to edit this method.');
     if(!Number.isSafeInteger(draft.version)||draft.version<0)throw new Error('Invalid source revision for draft recovery.');
-    const next=new Map(this.records),record={identity:Object.fromEntries(['uri','projectId','schema','owner','member'].map(field=>[field,identity[field]])),text:draft.text,version:draft.version,modifiedAt:Date.now()};next.set(key,record);
+    const next=new Map(this.records),record={identity:{...Object.fromEntries(['uri','projectId','schema','owner','member'].map(field=>[field,identity[field]])),kind:sourceMemberKind(identity.kind)},text:draft.text,version:draft.version,modifiedAt:Date.now()};next.set(key,record);
     const values=[...next.values()];
     if(values.length>this.maxRecords||Buffer.byteLength(JSON.stringify(values),'utf8')>this.maxBytes)throw new Error('Method recovery storage is full. Recover or discard an existing draft before editing another method.');
     await this.storage.update(STORAGE_KEY,values);this.records=next;return structuredClone(record);
@@ -52,4 +53,4 @@ class MethodDraftRecovery {
   });}
   discard(identity){return this.serial(async()=>{const next=new Map(this.records),key=this.key(identity),record=next.get(key);if(record&&this.leases.has(key))next.set(key,{...record,text:'',pristine:true});else next.delete(key);await this.storage.update(STORAGE_KEY,[...next.values()]);this.records=next;this.unresolved.delete(key);});}
 }
-module.exports={MethodDraftRecovery};
+module.exports={MethodDraftRecovery,sourceMemberKind};

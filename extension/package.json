@@ -88,6 +88,11 @@
         "icon": "$(filter)"
       },
       {
+        "command": "jadeNative.filterObjectInstances",
+        "title": "Jade: Filter Instances…",
+        "icon": "$(filter)"
+      },
+      {
         "command": "jadeNative.disconnectTestRunner",
         "title": "Jade: Disconnect Build and Test Runtime",
         "icon": "$(debug-disconnect)",
@@ -314,7 +319,7 @@
       {
         "id": "jade-nz",
         "aliases": [
-          "Jade (NZ)"
+          "Jade"
         ],
         "extensions": [
           ".cls",
@@ -372,6 +377,11 @@
     ],
     "menus": {
       "view/item/context": [
+        {
+          "command": "jadeNative.filterObjectInstances",
+          "when": "view == jadeNative.objects && viewItem == jadeObjectClass",
+          "group": "inline@1"
+        },
         {
           "command": "jadeNative.copyObjectOid",
           "when": "view == jadeNative.objects && viewItem == jadeObjectInstance",

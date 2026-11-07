@@ -64,7 +64,7 @@ class ClassWorkspaceEditorProvider {
       async completions(offset, trigger) {
         const selected = binding.snapshot();
         const result = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', document.uri, position(offset), trigger);
-        if (document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner) return { items: [], incomplete: true };
+        if (document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner || binding.snapshot()?.kind !== selected.kind) return { items: [], incomplete: true };
         return { items: (result?.items || []).slice(0, 100).map(item => ({
           label: typeof item.label === 'string' ? item.label : item.label.label,
           detail: item.detail,
@@ -79,7 +79,7 @@ class ClassWorkspaceEditorProvider {
         requireActive();
         const selected = binding.snapshot();
         const locations = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', document.uri, position(offset));
-        if (panel?.active!==true || document.isClosed || document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner) return false;
+        if (panel?.active!==true || document.isClosed || document.version !== selected.version || binding.snapshot()?.member !== selected.member || binding.snapshot()?.owner !== selected.owner || binding.snapshot()?.kind !== selected.kind) return false;
         const first = locations?.[0];
         if (!first) return false;
         const uri = first.targetUri || first.uri, targetRange = first.targetSelectionRange || first.range;

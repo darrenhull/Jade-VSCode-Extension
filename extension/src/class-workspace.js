@@ -22,9 +22,9 @@ function workspaceHtml({ nonce, cspSource, scriptUri, styleUri, editorScriptUri,
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escape(cspSource)} 'unsafe-inline'; script-src 'nonce-${escape(nonce)}'; font-src ${escape(cspSource)}; img-src ${escape(cspSource)} data:;"><link rel="stylesheet" href="${escape(styleUri)}">${editorStyleUri ? `<link rel="stylesheet" href="${escape(editorStyleUri)}">` : ""}<title>Class workspace</title></head><body>
 <div id="workspace" class="workspace" aria-busy="true">
  <header class="identity"><button id="back" class="quiet">← Back to Classes</button><div class="identity-title"><span class="eyebrow">CLASS WORKSPACE</span><h1 id="class-name">Loading class…</h1><p id="class-context"></p></div><span id="source-status" class="badge">Workspace source</span></header>
- <nav class="toolbar" aria-label="Class actions"><button id="overview">Overview</button><button id="member-picker" aria-expanded="false" aria-controls="member-rail">Browse members <span id="member-count"></span> ▾</button><span class="toolbar-spacer"></span><button id="instances">Instances ↗</button><button id="original">Open Original Source ↗</button><button id="more" aria-label="More class actions" aria-expanded="false">⋯</button></nav>
+ <nav class="toolbar" aria-label="Class actions"><button id="overview">Overview</button><button id="save-document" class="primary" title="Save the entire current file (Ctrl+S)">Save file</button><span id="save-feedback" class="save-feedback" role="status" aria-live="polite">Entire current file</span><button id="member-picker" aria-expanded="false" aria-controls="member-rail">Browse members <span id="member-count"></span> ▾</button><span class="toolbar-spacer"></span><button id="instances">Instances ↗</button><button id="original">Open Original Source ↗</button><button id="more" aria-label="More class actions" aria-expanded="false">⋯</button></nav>
  <p id="notice" class="notice" role="status" hidden></p>
- <div class="split"><aside id="member-rail" aria-label="Class members"><div class="rail-search"><label for="search">Find a member</label><input id="search" type="search" autocomplete="off" placeholder="Search all members…"><div class="filters"><label class="sr-only" for="kind">Member kind</label><select id="kind"><option value="all">All kinds</option><option value="property">Properties</option><option value="reference">References</option><option value="method">Methods</option><option value="typeMethod">Type methods</option><option value="constant">Constants</option><option value="key">Collection keys</option><option value="base">Inheritance</option></select><label class="inherited"><input id="inherited" type="checkbox" disabled> Inherited</label></div><p id="inherited-reason" class="hint"></p></div><div id="member-tree" role="tree" aria-label="Members" tabindex="0"></div><div id="pagination"><button id="previous" aria-label="Previous member page">‹</button><span id="page-status" aria-live="polite"></span><button id="next" aria-label="Next member page">›</button></div></aside><div id="rail-resizer" role="separator" aria-label="Resize member navigation" aria-orientation="vertical" aria-valuemin="240" aria-valuemax="320" aria-valuenow="280" tabindex="0"></div><main id="canvas"><div class="detail-header"><div><span id="detail-kind" class="eyebrow">OVERVIEW</span><h2 id="detail-title" tabindex="-1">Class overview</h2><p id="detail-origin"></p></div></div><div id="overview-content"></div><pre id="member-detail" hidden></pre><section id="editor-region" aria-label="Method source" hidden><p id="editor-status" class="hint"></p><div id="method-editor"></div><p class="hint save-hint">Save writes the entire source document. Build and Publish are separate actions.</p></section><div id="empty-state" hidden><h3>No members match</h3><p>Try another name or clear the filters.</p><button id="clear-search">Clear filters</button></div><div id="failure" role="alert" hidden><p id="failure-message"></p><button id="retry">Try again</button></div></main></div><div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+ <div class="split"><aside id="member-rail" aria-label="Class members"><div class="rail-search"><label for="search">Find a member</label><input id="search" type="search" autocomplete="off" placeholder="Search all members…"><div class="filters"><label class="sr-only" for="kind">Member kind</label><select id="kind"><option value="all">All kinds</option><option value="property">Properties</option><option value="reference">References</option><option value="method">Methods</option><option value="typeMethod">Type methods</option><option value="constant">Constants</option><option value="key">Collection keys</option><option value="base">Inheritance</option></select><label class="inherited"><input id="inherited" type="checkbox" disabled> Inherited</label></div><p id="inherited-reason" class="hint"></p></div><div id="member-tree" role="tree" aria-label="Members" tabindex="0"></div><div id="pagination"><button id="previous" aria-label="Previous member page">‹</button><span id="page-status" aria-live="polite"></span><button id="next" aria-label="Next member page">›</button></div></aside><div id="rail-resizer" role="separator" aria-label="Resize member navigation" aria-orientation="vertical" aria-valuemin="240" aria-valuemax="320" aria-valuenow="280" tabindex="0"></div><main id="canvas"><div class="detail-header"><div><span id="detail-kind" class="eyebrow">OVERVIEW</span><h2 id="detail-title" tabindex="-1">Class overview</h2><p id="detail-origin"></p></div></div><div id="overview-content"></div><pre id="member-detail" hidden></pre><section id="editor-region" aria-label="Member source" hidden><p id="editor-status" class="hint"></p><div id="method-editor"></div><p class="hint save-hint">Save writes the entire source document. Build and Publish are separate actions.</p></section><div id="empty-state" hidden><h3>No members match</h3><p>Try another name or clear the filters.</p><button id="clear-search">Clear filters</button></div><div id="failure" role="alert" hidden><p id="failure-message"></p><button id="retry">Try again</button></div></main></div><div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 </div>${editorScriptUri ? `<script nonce="${escape(nonce)}" src="${escape(editorScriptUri)}"></script>` : ""}<script nonce="${escape(nonce)}" src="${escape(scriptUri)}"></script></body></html>`;
 }
 function createClassWorkspaces(vscode, context, adapters = {}) {
@@ -44,21 +44,31 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     panel.webview.options = { ...panel.webview.options, enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")] };
     panel.webview.html = workspaceHtml({ nonce: crypto.randomBytes(18).toString("hex"), cspSource: panel.webview.cspSource, scriptUri: asset("class-workspace.js"), styleUri: asset("class-workspace.css"), editorScriptUri: services.editorScriptUri || asset("method-editor.js"), editorStyleUri: services.editorStyleUri });
     const current = revision => !disposed && !record.closed && record.revision === revision;
-    const send = message => { if (record.ready && !record.closed) return Promise.resolve(panel.webview.postMessage(message)).catch(() => {}); };
+    const send = async message => {
+      if (!record.ready || record.closed || disposed) return false;
+      try { return await panel.webview.postMessage(message); }
+      catch (error) {
+        // The native panel can be released before its disposal notification
+        // reaches the extension host. Retire it instead of reusing its view.
+        if (/webview is disposed/i.test(error?.message || '')) { close(); return false; }
+        return false;
+      }
+    };
     async function load() {
       const revision = ++record.revision;
       const lastSelected = selectedMember();
-      send({ command: "loading", revision });
+      void send({ command: "loading", revision });
       try {
+        if (!current(revision)) return;
         const input = { ...record.state };
         const snapshot = adapters.load ? await adapters.load(row, input, document) : { identity: await adapters.resolveClass(row, document), ...await adapters.members(row, input, document) };
         if (!current(revision)) return;
         let remaining = 100;
         const groups = (snapshot.groups || []).map(group => { const items = (group.items || []).slice(0, remaining); remaining -= items.length; return { ...group, items }; }).filter(group => group.items.length);
         record.state.offset = Number.isSafeInteger(snapshot.offset) ? snapshot.offset : record.state.offset;
-        const bound = binding?.snapshot?.(), methodSelected = lastSelected && ["method", "typeMethod"].includes(lastSelected.kind);
-        const anchored = bound?.available === true && methodSelected && bound.member === lastSelected.name && bound.owner === (lastSelected.owner || row.owner || row.name) && (!lastSelected.file || lastSelected.file === document?.uri?.toString());
-        const retainActive = methodSelected ? anchored : document?.isDirty;
+        const bound = binding?.snapshot?.(), sourceSelected = lastSelected && ["method", "typeMethod", "property", "reference"].includes(lastSelected.kind);
+        const anchored = bound?.available === true && sourceSelected && bound.member === lastSelected.name && bound.owner === (lastSelected.owner || row.owner || row.name) && (!lastSelected.file || lastSelected.file === document?.uri?.toString());
+        const retainActive = sourceSelected ? anchored : document?.isDirty;
         if (record.state.selectedId && !snapshot.selected && !groups.some(group => group.items.some(member => member.id === record.state.selectedId)) && !retainActive) {
           record.state.selectedId = "";
           await send({ command: "notice", message: "The selected member is no longer available. Showing the class overview." });
@@ -78,9 +88,9 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (!record.state.selectedId) return undefined;
       return record.snapshot?.groups?.flatMap(group => group.items).find(member => member.id === record.state.selectedId) || (record.snapshot?.selected?.id === record.state.selectedId ? record.snapshot.selected : undefined);
     }
-    function localMethod() {
+    function localEditableMember() {
       const member = selectedMember();
-      return member && ["method", "typeMethod"].includes(member.kind) && !member.system && (!member.file || member.file === document?.uri?.toString()) ? member : undefined;
+      return member && ["method", "typeMethod", "property", "reference"].includes(member.kind) && !member.system && (!member.file || member.file === document?.uri?.toString()) ? member : undefined;
     }
     async function select(id) {
       if (record.closed || id && !record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) && record.snapshot?.selected?.id !== id) return;
@@ -88,14 +98,14 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       persist(record);
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
       const member = selectedMember();
-      if (member && binding && ["method", "typeMethod"].includes(member.kind)) {
+      if (member && binding && ["method", "typeMethod", "property", "reference"].includes(member.kind)) {
         const memberFile = String(member.file || ""), documentFile = document?.uri?.toString();
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
         const preview = foreign && adapters.preview ? await adapters.preview(row, id, document) : undefined;
         if (record.closed || record.state.selectedId !== id) return;
         const snapshot = foreign
           ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : "This method belongs to another source document and is read-only here. Open Original Source to view or edit that file explicitly.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: member.inherited === true && !member.system }
-          : binding.select(member.owner || member.declaringClass || row.owner, member.name);
+          : binding.select(member.owner || member.declaringClass || row.owner, member.name, member.kind);
         const prepared = services.draftRecovery?.prepare && !foreign ? await services.draftRecovery.prepare(snapshot) : snapshot;
         if (record.closed || record.state.selectedId !== id) return;
         record.editorEditable = prepared.available === true && !prepared.readOnly;
@@ -131,33 +141,45 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "retry": await load(); break;
           case "editorDraft": if (services.draftRecovery) await services.draftRecovery.save(value.draft); break;
           case "editorEdit": if (binding) {
-            const member = localMethod();
-            if (!member || record.editorEditable === false || value.edit?.owner !== (member.owner || row.owner) || value.edit?.member !== member.name) throw Error("This edit no longer belongs to an editable selected local method. Your draft was retained.");
+            const member = localEditableMember();
+            if (!member || record.editorEditable === false || value.edit?.owner !== (member.owner || row.owner) || value.edit?.member !== member.name || value.edit?.kind !== undefined && value.edit.kind !== member.kind) throw Error("This edit no longer belongs to an editable selected local member. Your draft was retained.");
             if (services.draftRecovery && value.draft) await services.draftRecovery.save(value.draft);
             const snapshot = await binding.edit(value.edit); await send({ command: "editorSnapshot", snapshot });
             if (await services.draftRecovery?.acknowledge(snapshot)) await send({ command: "editorDraftRecovery", draft: undefined });
           } break;
-          case "copyDraft": if (services.draftRecovery) { await services.draftRecovery.copy(); await send({ command: "notice", message: "Recovered method draft copied. The source document has not changed." }); } break;
+          case "copyDraft": if (services.draftRecovery) { await services.draftRecovery.copy(); await send({ command: "notice", message: "Recovered member draft copied. The source document has not changed." }); } break;
           case "discardDraft": if (services.draftRecovery) {
-            const answer = await vscode.window.showWarningMessage("Discard the recovered method draft? The source document will not change.", { modal: true }, "Discard draft");
+            const answer = await vscode.window.showWarningMessage("Discard the recovered member draft? The source document will not change.", { modal: true }, "Discard draft");
             if (answer === "Discard draft") { const resolved = await services.draftRecovery.discard() || binding?.snapshot(); if (resolved) { record.editorEditable = resolved.available === true && !resolved.readOnly; await send({ command: "editorSnapshot", snapshot: resolved, reset: true }); } await send({ command: "editorDraftRecovery", draft: undefined }); }
           } break;
-          case "restoreDraft": if (services.draftRecovery && localMethod()) {
-            const answer = await vscode.window.showWarningMessage("Replace the selected method with its recovered draft? Review the source and draft before restoring. Saving still writes the entire source document.", { modal: true }, "Restore draft");
+          case "restoreDraft": if (services.draftRecovery && localEditableMember()) {
+            const answer = await vscode.window.showWarningMessage("Replace the selected member with its recovered draft? Review the source and draft before restoring. Saving still writes the entire source document.", { modal: true }, "Restore draft");
             if (answer === "Restore draft") { const snapshot = await services.draftRecovery.restore(); record.editorEditable = snapshot.available === true && !snapshot.readOnly; await send({ command: "editorSnapshot", snapshot, reset: true }); await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); }
           } break;
-          case "editorSave": if (await services.save?.() === false) await send({ command: "notice", message: "The source document was not saved. Your edits remain in the document." }); break;
+          case "editorSave": {
+            if(record.saving)break;
+            record.saving=true;
+            await send({command:"saveState",status:"saving",dirty:document?.isDirty ?? true});
+            try{
+              if(typeof services.save!=="function"||await services.save()===false)throw Error("The current source file was not saved. Your edits remain in the document.");
+              await send({command:"saveState",status:"saved",dirty:document?.isDirty ?? false});
+            }catch(error){
+              await send({command:"saveState",status:"error",dirty:document?.isDirty ?? true,message:error?.message || String(error)});
+              await send({command:"notice",message:error?.message || String(error)});
+            }finally{record.saving=false;}
+            break;
+          }
           case "editorUndo": await services.undo?.(); break;
           case "editorRedo": await services.redo?.(); break;
           case "editorBuild": await services.build?.(); break;
           case "editorPublish": await services.publish?.(); break;
           case "editorRunTests": await services.runTests?.(); break;
-          case "editorActionBlocked": await send({ command: "notice", message: "Resolve the unapplied method draft before building, publishing or running tests." }); break;
-          case "editorConflict": await send({ command: "notice", message: "Source changed while an edit was pending. Your method draft is preserved; open original source to resolve it." }); break;
-          case "editorNotice": await send({ command: "notice", message: "Method draft is too large for protected editing. Open Original Source to edit this method." }); break;
-          case "editorDefinition": if (localMethod() && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= (binding?.snapshot()?.text?.length || 0)) await services.definition?.(value.offset); break;
+          case "editorActionBlocked": await send({ command: "notice", message: "Resolve the unapplied member draft before building, publishing or running tests." }); break;
+          case "editorConflict": await send({ command: "notice", message: "Source changed while an edit was pending. Your member draft is preserved; open original source to resolve it." }); break;
+          case "editorNotice": await send({ command: "notice", message: "Member draft is too large for protected editing. Open Original Source to edit this method." }); break;
+          case "editorDefinition": if (localEditableMember() && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= (binding?.snapshot()?.text?.length || 0)) await services.definition?.(value.offset); break;
           case "editorCompletions": {
-            if (!localMethod() || !Number.isSafeInteger(value.id) || !Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > (binding?.snapshot()?.text?.length || 0) || value.version !== binding?.snapshot()?.version) return;
+            if (!localEditableMember() || !Number.isSafeInteger(value.id) || !Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > (binding?.snapshot()?.text?.length || 0) || value.version !== binding?.snapshot()?.version) return;
             const version = value.version, member = binding.snapshot()?.member;
             const result = await services.completions?.(value.offset, typeof value.trigger === "string" ? value.trigger.slice(0, 1) : undefined);
             if (!record.closed && binding.snapshot()?.version === version && binding.snapshot()?.member === member) await send({ command: "editorCompletions", id: value.id, result: result || { items: [] } });
@@ -176,7 +198,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     record.subscriptions.push(panel.webview.onDidReceiveMessage(message));
     if (binding?.onDidChange) record.subscriptions.push(binding.onDidChange(snapshot => {
       const member = selectedMember();
-      if (member && ["method", "typeMethod"].includes(member.kind) && member.name === snapshot.member && (member.owner || row.owner) === snapshot.owner && (!member.file || member.file === document?.uri?.toString())) send({ command: "editorSnapshot", snapshot });
+      if (member && ["method", "typeMethod", "property", "reference"].includes(member.kind) && member.name === snapshot.member && (!snapshot.kind || snapshot.kind === member.kind) && (member.owner || row.owner) === snapshot.owner && (!member.file || member.file === document?.uri?.toString())) send({ command: "editorSnapshot", snapshot });
     }));
     if (services.onDiagnostics) record.subscriptions.push(services.onDiagnostics(() => send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] })));
     function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const request of record.flushes.values()) { clearTimeout(request.timer); request.reject(Error("The class workspace closed before its method edits were acknowledged.")); } record.flushes.clear(); for (const subscription of record.subscriptions) subscription?.dispose(); }

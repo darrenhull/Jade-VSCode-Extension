@@ -50,3 +50,9 @@ test('closing a view protects its remaining unapplied draft even when reopened i
  const recovery=new MethodDraftRecovery(state());await recovery.reserve(identity);await recovery.save(identity,{text:'pending draft',version:1});await recovery.release(identity);
  await assert.rejects(recovery.reserve(identity),/Restore|discard/i);await assert.rejects(recovery.save(identity,{text:'replacement',version:2}),/Restore|discard/i);assert.equal(recovery.get(identity).text,'pending draft');
 });
+test('keeps property and method checkpoints independent while legacy records remain methods',async()=>{
+ const storage=state(),recovery=new MethodDraftRecovery(storage);await recovery.save(identity,{text:'method draft',version:1});await recovery.save({...identity,kind:'property'},{text:'property draft',version:1});await recovery.save({...identity,kind:'reference'},{text:'reference draft',version:1});
+ assert.equal(recovery.get(identity).text,'method draft');assert.equal(recovery.get({...identity,kind:'property'}).text,'property draft');assert.equal(recovery.get({...identity,kind:'reference'}).text,'reference draft');
+ const reloaded=new MethodDraftRecovery(storage);assert.equal(reloaded.get(identity).text,'method draft');assert.equal(reloaded.get({...identity,kind:'property'}).text,'property draft');
+ await reloaded.discard({...identity,kind:'property'});assert.equal(reloaded.get(identity).text,'method draft');assert.equal(reloaded.get({...identity,kind:'reference'}).text,'reference draft');
+});

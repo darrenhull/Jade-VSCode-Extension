@@ -18,6 +18,7 @@ function activateScratchConfiguration(){
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
   if(name==='./language-tools')return {registerLanguageTools:()=>language};
   if(name==='./cli-client')return {CliWorkingSession:class{}};
+  if(name==='./WorkspaceOperationGuard')return require('../../extension/src/WorkspaceOperationGuard');
   if(name==='./jade-workspaces')return {registerWorkspaces(_vscode,_context,value){options=value;return {schemaFor(){},resourceFor(){}};}};
   return noop;
  },exported);
