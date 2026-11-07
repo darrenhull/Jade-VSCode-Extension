@@ -38,6 +38,10 @@ Each run has separate local variables. Changes your code commits to Working data
 
 ## Browse and create
 
+- **Jade: Create Schema, Class or Collection:** open the shared designer from Jade Tools or the Command Palette. Choose a project and schema, define a class or keyed dictionary, and review the summary and native source before saving. Type to search visible schema-qualified superclasses, member classes and key properties. Use Back to adjust choices without losing the draft. Creating a schema uses the configured source subfolder and keeps its header beside the schema folder.
+- The shared designer creates new files only; it does not create stored object instances, compile or publish. Existing files and unsaved buffers are protected. Arrays, sets, unproved comparison modes and further index/storage options remain outside this first release.
+- Type choices use workspace source, schema ancestry, extracted package declarations and the existing verified RootSchema cache. Imported members retain their alias and exporting-schema context, including aliases inherited by child schemas. Member-key choices expose the exported interface rather than every property of the original class. Imported classes cannot be superclasses. Missing system or export metadata is explained; native compilation remains authoritative for visibility and lifetime compatibility.
+- This release bundles native CLI **0.4.2 or newer** for package-aware builds. Updating the runtime does not fill older type caches; refresh type metadata when needed. Missing cached fields remain unknown.
 - **Object Explorer:** search schemas and classes, navigate properties and methods, and open a focused member preview. **Open Original Source** opens the editable native file.
 - **Database Objects:** choose **Source** or **Working**, search for a class, browse persistent instances, follow stored references and page through collections. This browser is read-only.
 - **Jade: Create Keyed Collection:** choose the collection and member class, select ordered composite keys and preview the native CLS source. The designer supports keyed dictionaries; arrays, sets and dynamic indexes do not have dedicated designers.
@@ -58,6 +62,7 @@ Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the avail
 - **Jade: Detect Runtime Settings**
 - **Jade: Extract All Sources**
 - **Jade: Create Keyed Collection**
+- **Jade: Create Schema, Class or Collection**
 - **Jade: Create Schema**
 - **Jade: Refresh Type Cache**
 - **Jade: Show Working Database**

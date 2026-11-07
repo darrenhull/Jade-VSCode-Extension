@@ -8,7 +8,7 @@ function requireNativeVersion(directory,minimum) {
   const version=JSON.parse(fs.readFileSync(path.join(directory,'distribution.json'),'utf8')).packageVersion,actual=parts(version),required=parts(minimum);
   for(let index=0;index<3;index++) {
     if(actual[index]>required[index])return version;
-    if(actual[index]<required[index])throw Error('Scratch Pad requires Jade CLI '+minimum+' or newer; bundled '+version+'. Update the verified release pin, or explicitly select a tested candidate with JADE_CLI_DISTRIBUTION.');
+    if(actual[index]<required[index])throw Error('Jade Tools requires Jade CLI '+minimum+' or newer; bundled '+version+'. Install an updated verified Jade Tools release.');
   }
   return version;
 }

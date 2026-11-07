@@ -173,6 +173,9 @@ function activate(context) {
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
   });
   require('./collection-designer').registerCollections(vscode,context);
+  require('./creation-designer').registerCreationDesigner(vscode,context,{
+    settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
+  });
   require('./application-debug-ui').registerApplicationDebug(vscode,context);
   require('./debugger').registerDebugger(vscode,context,{
     beforeOperation,config:classConfig,workingFiles,startWorking,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,

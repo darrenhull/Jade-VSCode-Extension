@@ -41,10 +41,23 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 - Format Document/Selection indents native CLS headers, declaration sections, collection keys, database mappings and complete method bodies while preserving Jade tokens, literal contents and line endings.
 - Database Objects provides read-only Source/Working inspection and paged collections.
 - The keyed collection designer creates native source; compilation and publication remain separate actions.
+- **Create Schema, Class or Collection** provides a shared creation flow with searchable schema-qualified choices, a live definition summary and explicit native source review/save. The existing creation commands remain available; the initial unified flow covers ordinary classes and the dictionary settings already supported by the collection designer.
 - **Scratch Pad** under Jade's Tools opens native Jade Workspace code in a simple runnable editor, with output beside the code and a previous-run comparison.
 - The experimental debugger retains its existing pinned native-runtime capabilities and limitations.
 
 See the [extension's detailed documentation](extension/README.md) and [changelog](extension/CHANGELOG.md) for the existing feature scope. Repository separation does not add the missing array/set/index designers or general debugger features.
+
+## Shared source designer
+
+Open **Jade: Create Schema, Class or Collection** from the Command Palette or Jade Tools. The first release combines schema scaffolding, ordinary classes and existing member/external dictionary options. Search choices are bounded and schema-qualified; the reviewed native files are saved exclusively without compiling or publishing. Type choices use source ancestry, extracted package declarations and the existing verified system cache. Imported members retain their package alias and exporting-schema context; member keys expose only the exported interface. Missing export metadata is shown as unavailable, and imported classes are excluded from superclass choices. Further collection families remain in the separate follow-up.
+
+This designer release requires the bundled native **Jade CLI 0.4.2 or newer** so package source/resources survive native builds and newly refreshed metadata includes subclass lifetime permissions. Updating the executable does not populate an older type cache: refresh type metadata when needed; absent fields remain unknown until refreshed.
+
+Actual running VS Code designer, with source review before saving:
+
+![Shared Jade source designer](docs/images/unified-creation-definition.png)
+
+![Reviewing native Jade collection source](docs/images/unified-creation-review.png)
 
 Actual VS Code formatting verification (document/selection formatting, undo and idempotence):
 
@@ -62,7 +75,7 @@ For ordinary `.jade` editors, use **Jade: Run Scratch Pad (Working)** or **Jade:
 
 The selected schema controls compilation and saved application definitions. Execution uses the native `RootSchemaApp` launcher; this is separate from the selected compilation schema. Resolve the intended schema explicitly in metadata queries.
 
-Scratch Pad requires native CLI **0.4.0 or newer**. Packaging rejects older bundled runtimes; development candidate testing uses the explicit `JADE_CLI_DISTRIBUTION` override and verifies all native runtime hashes. Source publication, extraction and debugging continue through their existing explicit workflows.
+Scratch Pad uses the bundled native CLI. This Jade Tools release requires **CLI 0.4.2 or newer**; packaging rejects older bundled runtimes. Explicit development overrides still verify all native runtime hashes. Source publication, extraction and debugging continue through their existing explicit workflows.
 
 This project is independently maintained; no affiliation with or endorsement by the Jade or VS Code vendors is claimed.
 
