@@ -18,7 +18,7 @@ GitHub VSIX updates are installed manually. Installing a newer VSIX updates the 
 | Feature | What you can do |
 |---|---|
 | Jade language support | Use highlighting, completion, hover, signatures, definitions and references in native source files. |
-| Compile | Press **F5** to compile saved source and its dependencies. Compiler errors appear in **Problems** and **Jade Compile** output. |
+| Compile | Press **F5** to save and build new and changed sources in the active project, including required dependencies. Use **Jade: Compile Current File** for a focused check. Compiler errors appear in **Problems** and **Jade Compile** output. |
 | Scratch Pad | Open **Jade: New Scratch Pad** to try Jade code in Working without publishing a class. Choose a schema, press **Run**, and compare the last two runs. |
 | Format | Run **Format Document** or **Format Selection** to indent CLS headers, declarations, collections, database mappings and complete method bodies. Editor tabs/spaces are respected; literal text and Jade tokens are preserved. |
 | Test | Discover and run unit tests in **Testing**, use **Run Local Test**, and inspect individual failures and assertion messages. |

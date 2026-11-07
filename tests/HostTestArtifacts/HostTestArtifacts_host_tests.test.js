@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{EventEmitter}=require('node:events');
 const {HostTestArtifacts}=require('../../scripts/HostTestArtifacts.cjs');
-for(const mode of ['formatting','workspaces'])for(const passed of [true,false])test('actual '+mode+' host-script wiring preserves '+(passed?'success':'failure')+' evidence and removes its stage',async t=>{
+for(const mode of ['formatting','workspaces','incremental'])for(const passed of [true,false])test('actual '+mode+' host-script wiring preserves '+(passed?'success':'failure')+' evidence and removes its stage',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-host-script-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const executable=path.join(root,'Code.exe');fs.writeFileSync(executable,'fixture only, never executed');
  const cli=path.join(root,'extension/vendor/jade-tools-cli/jade-cli.exe');fs.mkdirSync(path.dirname(cli),{recursive:true});fs.writeFileSync(cli,'fixture only');
@@ -20,12 +20,13 @@ for(const mode of ['formatting','workspaces'])for(const passed of [true,false])t
  assert.equal(fs.existsSync(stage),false);assert.equal(JSON.parse(fs.readFileSync(path.join(root,'evidence/vscode-'+mode+'-host.json'),'utf8')).passed,passed);assert.equal(signals.listenerCount('SIGINT'),0);assert.equal(signals.listenerCount('SIGTERM'),0);
 });
 
-for(const mode of ['cli','workspaces'])test('actual '+mode+' staging loads the native fixture guard and sibling fixture module',async t=>{
+for(const mode of ['cli','workspaces','incremental'])test('actual '+mode+' staging loads the native fixture guard and sibling fixture module',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-host-module-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const repository=path.resolve(__dirname,'../..'),executable=path.join(root,'Code.exe'),cli=path.join(root,'extension/vendor/jade-tools-cli/jade-cli.exe');
  fs.writeFileSync(executable,'fixture only, never executed');fs.mkdirSync(path.dirname(cli),{recursive:true});fs.writeFileSync(cli,'fixture only');
  const signals=new EventEmitter(),fakeProcess={env:{...process.env,JADE_TEST_CODE:executable},argv:['node','host-test.cjs','--'+mode],once:signals.once.bind(signals),removeListener:signals.removeListener.bind(signals)};
- const fixtureFs={...fs,cpSync:(_source,target)=>fs.mkdirSync(target,{recursive:true}),copyFileSync:(source,target)=>{fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(repository,'test',path.basename(source)),target);}};
+ const copied=[];
+ const fixtureFs={...fs,cpSync:(_source,target)=>fs.mkdirSync(target,{recursive:true}),copyFileSync:(source,target)=>{copied.push(path.basename(source));fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(repository,'test',path.basename(source)),target);}};
  class FixtureArtifacts extends HostTestArtifacts{constructor(){super({root,minimumFreeBytes:1024,freeBytes:()=>4096});}}
  let graphLoaded=false,stage;
  const context={process:fakeProcess,console:{log(){},error(){}},AbortController,setTimeout,clearTimeout,__dirname:path.join(root,'scripts'),require(name){
@@ -46,5 +47,5 @@ for(const mode of ['cli','workspaces'])test('actual '+mode+' staging loads the n
   if(name==='./HostTestArtifacts.cjs')return {HostTestArtifacts:FixtureArtifacts};if(name==='./bundle-cli.cjs')return {bundleCli(){}};if(name==='../extension/package.json')return {jadeNative:{minimumCliVersion:'0.4.0'}};return require(name);
  }};
  const source=fs.readFileSync(path.join(repository,'scripts/host-test.cjs'),'utf8').replace('main().catch(error=>{console.error(error);process.exitCode=1;});','globalThis.finished=main();');
- vm.runInNewContext(source,context);await context.finished;assert.equal(graphLoaded,true);assert.equal(fs.existsSync(stage),false);
+ vm.runInNewContext(source,context);await context.finished;assert.equal(graphLoaded,true);assert.equal(fs.existsSync(stage),false);assert.ok(copied.includes('vscode-'+(mode==='cli'?'cli':mode==='incremental'?'incremental-build':'workspaces')+'-smoke.js'));
 });

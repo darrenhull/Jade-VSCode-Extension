@@ -129,16 +129,7 @@ function activate(context) {
     output.appendLine(fromDatabase ? 'Database disconnected. System cache refreshed for IntelliSense; compile and test use the native working database.' : 'System cache imported. Workspace source supplies application definitions.');
     return result;
   }
-  async function workingFiles(config) {
-    const {isNestedSnapshot}=require('./source-snapshots');
-    const root=path.resolve(config.workspaceRoots[0]);
-    config.files=(await vscode.workspace.findFiles('**/*.cls','**/{node_modules,.git}/**')).filter(uri=>{
-      const relative=path.relative(root,uri.fsPath);
-      return relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)&&!isNestedSnapshot(uri,vscode.workspace);
-    }).map(uri=>uri.fsPath);
-    if(!config.files.includes(config.program))config.files.push(config.program);
-    for(const document of vscode.workspace.textDocuments){const relative=path.relative(root,document.uri.fsPath||'');if(document.isDirty&&document.uri.scheme==='file'&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)&&/\.(cls|scm|sec|ddx|jcf)$/i.test(document.uri.fsPath)&&!isNestedSnapshot(document.uri,vscode.workspace)&&!await document.save())throw new Error('Could not save '+document.uri.fsPath);}
-  }
+  const workingFiles = config => require('./compile-inputs').prepareCompileInputs(vscode, config);
   function reportDiagnostic(report) {
     if (report.diagnostics?.some(entry => entry.source && entry.source !== report.source)) {
       const grouped = new Map();
@@ -210,6 +201,12 @@ function activate(context) {
   });
   language.setWorkspaceSchemaResolver(workspaces.schemaFor);
   language.setWorkspaceResourceResolver(workspaces.resourceFor);
+  require('./compile-commands').registerCompileCommands(vscode, context, {
+    beforeOperation: () => objectExplorer?.releaseForOperation(),
+    isBusy: () => publishing,
+    setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
+    classConfig, workingFiles, startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
+  });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
     vscode.commands.registerCommand('jadeNative.refreshTests', async () => {
@@ -303,45 +300,6 @@ function activate(context) {
         return await refreshCache(config);
       } catch (error) {
         compileOutput.appendLine(error.message); compileOutput.show(true);
-        void vscode.window.showErrorMessage(error.message);
-        return { passed: false, error: error.message };
-      } finally {
-        publishing = false;
-        await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
-      }
-    }),
-    vscode.commands.registerCommand('jadeNative.compileClass', async () => {
-      await objectExplorer?.releaseForOperation();
-      if (publishing) { void vscode.window.showErrorMessage('A Jade compile or publish is already running.'); return; }
-      publishing = true;
-      try {
-        const document = vscode.window.activeTextEditor?.document;
-        if (!document || document.uri.scheme !== 'file' || !/\.(cls|scm|sec|ddx|jcf)$/i.test(document.uri.fsPath)) throw new Error('Open a native Jade source file to compile.');
-        await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
-        if (document.isDirty && !await document.save()) throw new Error('The class file could not be saved.');
-        const config = classConfig(document);
-        compileOutput.clear();
-        compileOutput.show(true);
-        compileOutput.appendLine(`Checking class methods in ${path.basename(config.program)} (no publish) ...`);
-        await workingFiles(config);
-        for(const file of config.files)diagnostics.delete(vscode.Uri.file(file));
-        const operation=startWorking({...config,testSession:nativeTests,beforeNativeProcess:()=>nativeTests.release()},'compile',text=>compileOutput.append(text),reportDiagnostic);
-        const result=await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Compiling in native Jade working database',cancellable:true},async(_,token)=>{
-          const subscription=token.onCancellationRequested(()=>operation.stop());
-          if(token.isCancellationRequested)operation.stop();
-          try{return await operation.completion;}finally{subscription.dispose();}
-        });
-        if (result.report?.error) compileOutput.appendLine(result.report.error);
-        for (const error of result.report?.diagnostics || []) {
-          compileOutput.appendLine(`Jade ${error.compiler_error} (${error.owner}::${error.method}): ${error.message}`);
-          compileOutput.appendLine(`${error.source}:${error.line}:${error.column}`);
-        }
-        if (result.passed) compileOutput.appendLine(result.report.native_project ? `Native project compile complete; synchronised ${result.report.loaded_files} source/resource file(s).` : `Native compile complete; synchronised ${result.report.loaded_files} changed CLS file(s).`);
-        compileOutput.appendLine(`CompilerExitCode=${result.code}`);
-        return result;
-      } catch (error) {
-        compileOutput.appendLine(`Compile check failed: ${error.message}`);
-        compileOutput.show(true);
         void vscode.window.showErrorMessage(error.message);
         return { passed: false, error: error.message };
       } finally {
