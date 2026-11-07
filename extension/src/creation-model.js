@@ -1,11 +1,12 @@
 "use strict";
 const path = require("node:path");
 const { planSchema } = require("./native-project");
-const { collectionCatalog, generateCollection, collectionKeyChoices } = require("./collections");
+const { generateCollection, collectionKeyChoices } = require("./collections");
 const { LanguageModel } = require("./language-model");
+const { createCreationImports } = require("./creation-imports");
 const systemTypes = ["Object", "MemberKeyDictionary", "ExtKeyDictionary"];
 const folded = value => String(value || "").toLowerCase();
-function invalid(field, message) { const error = Error(message); error.field = field; throw error; }
+function invalid(field, message, details) { const error = Error(message); error.field = field; Object.assign(error, details); throw error; }
 function inField(field, operation) { try { return operation(); } catch (error) { if (!error.field) error.field = field; throw error; } }
 function page(items, { query = "", offset = 0, limit = 50 } = {}) {
   const needle = folded(query);
@@ -44,9 +45,10 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
   for (const name of systemTypes) if (!classes.some(entry => entry.owner === name)) classes.push({ owner: name, model: { classes: [{ name, kind: "class", members: [] }] } });
   project = { ...project, schemas: [...project.schemas.filter(schema => schema.name !== "RootSchema"), { ...root, classes }] };
   const schemasByName = new Map(project.schemas.map(schema => [schema.name, schema]));
+  const imports = createCreationImports(project);
   const visibleCache = new Map();
   let catalog, dictionaryKinds;
-  const getCatalog = () => catalog ||= collectionCatalog(project);
+  const getCatalog = () => catalog ||= imports.catalog();
   const requireSchema = name => {
     const schema = schemasByName.get(name);
     if (!schema) invalid("schema", "Choose an existing user schema.");
@@ -67,14 +69,15 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     }
     for (const name of systemTypes)
       if (!found.has(folded(name))) found.set(folded(name), { name, schema: "RootSchema", id: "RootSchema::" + name, label: "RootSchema::" + name });
-    const result = [...found.values()].sort((a, b) => a.label.localeCompare(b.label));
+    const result = [...found.values(), ...imports.visible(schemaName)].sort((a, b) => a.label.localeCompare(b.label));
     visibleCache.set(schemaName, result);
     return result;
   }
   function resolveChoice(schema, identity, field) {
     const qualified = String(identity || "").includes("::");
     const result = visible(schema).find(item => qualified ? item.id === identity : item.name === identity);
-    if (!result) invalid(field === "member class" ? "member" : field, "Choose a " + field + " visible in the selected schema.");
+    if (!result) invalid(field === "member class" ? "member" : field, "Choose a " + field + " visible in the selected schema.", { code: "JADE_TYPE_NOT_VISIBLE", metadataStatus: "known" });
+    if (field === "superclass" && result.imported) invalid("superclass", "Jade does not permit subclassing imported classes. Choose a local or schema-inherited superclass.", { code: "JADE_IMPORTED_CLASS_CANNOT_BE_SUBCLASSED", metadataStatus: "known" });
     return result;
   }
   function dictionaryKind(choice) {
@@ -114,12 +117,14 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
   }
   function search(options) {
     let choices = visible(options.schema);
+    if (options.kind === "superclass") choices = choices.filter(choice => !choice.imported);
     if (options.kind === "superclass" && options.collectionKind) choices = choices.filter(choice => dictionaryKind(choice) === options.collectionKind);
     return page(choices, options);
   }
   function keyChoices(options) {
     const selected = resolveChoice(options.schema, options.membership, "member class"), c = getCatalog();
     const member = c.schemas.find(schema => schema.name === options.schema)?.members.find(member => member.name === selected.name && member.schema === selected.schema);
+    if (member?.imported && member.metadataStatus !== "known") invalid("member", "Exported property metadata for " + selected.label + " is unavailable. Pull the exporting package source before choosing member keys.", { code: "JADE_IMPORT_METADATA_UNAVAILABLE", metadataStatus: "nativeRequired" });
     return page(collectionKeyChoices(member, c, options.schema).map(property => ({ ...property, label: property.name })), options);
   }
   function preview(request) {
@@ -154,6 +159,7 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
       if (request.type === "collection") {
         if (!["member", "external"].includes(request.kind)) invalid("dictionary", "Choose member or external keys.");
         const member = resolveChoice(schema.name, request.membership, "member class");
+        if (request.kind === "member" && member.imported && getCatalog().schemas.find(value => value.name === schema.name)?.members.find(value => value.id === member.id)?.metadataStatus !== "known") invalid("keys", "Exported property metadata for " + member.label + " is unavailable. Pull the exporting package source before defining member keys.", { code: "JADE_IMPORT_METADATA_UNAVAILABLE", metadataStatus: "nativeRequired" });
         const superclass = request.superclass ? resolveChoice(schema.name, request.superclass, "superclass").name : undefined;
         if (request.superclass && dictionaryKind(resolveChoice(schema.name, request.superclass, "superclass")) !== request.kind) invalid("superclass", "Choose a visible dictionary superclass matching the selected key kind.");
         if (request.loadFactor !== undefined && (!Number.isInteger(request.loadFactor) || request.loadFactor < 1 || request.loadFactor > 100)) invalid("load-factor", "Load factor must be a whole percentage from 1 to 100.");
@@ -173,6 +179,6 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     const files = result.files.map(entry => ({ ...entry, file: path.resolve(entry.file), relativePath: path.relative(project.root, entry.file) }));
     return { ...result, files, summary, source: files[0].text };
   }
-  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview };
+  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview, importsNotice: imports.notice() };
 }
 module.exports = { createCreationModel };
