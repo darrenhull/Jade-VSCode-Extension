@@ -85,8 +85,6 @@ For connection conflicts, use **Jade: Disconnect Build and Test Runtime** or **J
 
 [Story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30) proposes an integrated class workspace with grouped members, in-context method editing and connected object/collection inspection. Its UX designs and acceptance criteria describe planned work. The shipped member preview is read-only; the proposed shared-document editor is not implemented.
 
-The [Class & Object Workspace implementation plan](plans/class-object-workspace.md) defines the editing proof, whole-file save contract, TDD sequence, dependencies and acceptance/release gates.
-
 ## Development
 
 Build this repository independently with the pinned Node version used by CI (currently 24.22.1) and npm:
