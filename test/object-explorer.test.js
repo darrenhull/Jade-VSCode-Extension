@@ -94,6 +94,7 @@ test("native inspection protocol handles fragmented unicode and closes pending r
     JSON.stringify({
       protocol: "jade-inspect/1",
       event: "ready",
+      oidFormat: "jade-native",
       readOnly: true,
     }) + "\n",
   );
@@ -104,7 +105,7 @@ test("native inspection protocol handles fragmented unicode and closes pending r
         protocol: "jade-inspect/1",
         id: 1,
         success: true,
-        body: { value: "Māori 🐟", readOnly: true },
+        body: { value: "Māori 🐟", readOnly: true, oidFormat: "jade-native" },
       }) + "\n",
     );
   c.stdout.write(b.subarray(0, b.length - 5));
