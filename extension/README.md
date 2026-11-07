@@ -30,6 +30,12 @@ For a wrapped statement or declaration, include its first line in the selection 
 
 **Error Lens** is installed alongside Jade Tools when Marketplace access is available. It displays compiler diagnostics beside their source lines and can be disabled or uninstalled independently. Offline users can install its VSIX separately.
 
+## Scratch Pad
+
+Choose **New Scratch Pad** under Tools, select a schema, type Jade code and press **Run**. Save the page to keep its code and optional notes in source control; run output is not saved with it. After two runs, use **Compare Previous Scratch Pad Run** to compare the code and results.
+
+Each run has separate local variables. Changes your code commits to Working data can remain for later runs. Interactive input is unavailable, and F5 does not execute scratch code.
+
 ## Browse and create
 
 - **Object Explorer:** search schemas and classes, navigate properties and methods, and open a focused member preview. **Open Original Source** opens the editable native file.
