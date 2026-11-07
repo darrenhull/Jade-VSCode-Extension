@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
+const {releaseNotesForVersion}=require('./ReleaseNotes.cjs');
 
 /** Publishes verified consumer artifacts without changing an existing release. */
 class ReleasePublisher {
@@ -54,7 +55,10 @@ class ReleasePublisher {
     if(ref.status===0&&ref.stdout.trim()!==sha)throw Error('The release tag points to a different commit.');
     if(existing&&ref.status!==0&&existing.target_commitish!==sha)throw Error('The draft release belongs to a different commit.');
     const assets=this.assets(directory);
-    if(!existing)this.command('gh',['release','create',tag,'--repo',repository,'--draft','--target',sha,'--title',tag,'--generate-notes']);
+    const changelog=path.join(this.root,'extension','CHANGELOG.md'),notesFile=path.join(directory,'RELEASE_NOTES.md');
+    fs.writeFileSync(notesFile,releaseNotesForVersion(fs.existsSync(changelog)?fs.readFileSync(changelog,'utf8'):'',version));
+    if(!existing)this.command('gh',['release','create',tag,'--repo',repository,'--draft','--target',sha,'--title',tag,'--notes-file',notesFile]);
+    else this.command('gh',['release','edit',tag,'--repo',repository,'--notes-file',notesFile]);
     this.command('gh',['release','upload',tag,...assets,'--repo',repository,'--clobber']);
     this.command('gh',['release','edit',tag,'--repo',repository,'--draft=false','--latest']);
     return {published:true,skipped:false,tag,sha};

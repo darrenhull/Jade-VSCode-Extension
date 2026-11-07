@@ -32,7 +32,7 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 - Test Explorer, CodeLens and Ctrl+F5 run native Jade tests and report individual failures.
 - Shift+F5 and the publish controls retain explicit target review and confirmation.
 - Object Explorer provides schema/class/member navigation and reusable focused previews.
-- Format Document/Selection indents complete Jade method bodies while preserving native headers, metadata and literal contents.
+- Format Document/Selection indents native CLS headers, declaration sections, collection keys, database mappings and complete method bodies while preserving Jade tokens, literal contents and line endings.
 - Database Objects provides read-only Source/Working inspection and paged collections.
 - The keyed collection designer creates native source; compilation and publication remain separate actions.
 - The experimental debugger retains its existing pinned native-runtime capabilities and limitations.

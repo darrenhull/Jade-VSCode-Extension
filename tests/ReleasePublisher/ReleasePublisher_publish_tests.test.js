@@ -25,3 +25,13 @@ test('rejects mismatched tags, unreviewed commits and altered assets before publ
 });
 
 test('published versions are skipped only after approved tag and existing assets are verified',t=>{for(const options of [{publishedApproved:false},{missingPublished:true},{tamperedPublished:true}]){const f=fixture(t,{existing:{draft:false,target_commitish:other},tagSha:other,...options});assert.throws(()=>f.publisher.publish({repository:'darrenhull/Jade-Local-MCP',sha}),/approved main|missing|checksum/i);assert.equal(f.calls.some(c=>c.args[1]==='upload'||c.args[1]==='edit'),false);}});
+
+test('GitHub release notes use the same current consumer changelog text instead of generated PR internals',t=>{
+ const f=fixture(t);fs.mkdirSync(path.join(f.root,'extension'));
+ fs.writeFileSync(path.join(f.root,'extension/CHANGELOG.md'),'# 1.2.3 — Jade Tools\n\n- Format whole CLS files.\n- Browse clear setup steps.\n\n# 1.2.2 — Old\n- Old feature.\n');
+ f.publisher.publish({repository:'darrenhull/Jade-VSCode-Extension',sha});
+ const create=f.calls.find(c=>c.args[0]==='release'&&c.args[1]==='create');
+ assert.equal(create.args.includes('--generate-notes'),false);
+ const notesFile=create.args[create.args.indexOf('--notes-file')+1];
+ assert.equal(fs.readFileSync(notesFile,'utf8'),'- Format whole CLS files.\n- Browse clear setup steps.');
+});

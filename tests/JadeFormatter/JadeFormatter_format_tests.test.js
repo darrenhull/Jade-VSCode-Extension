@@ -7,7 +7,7 @@ function apply(text,options={},range,uri='example.jade') {
     text=text.slice(0,edit.start)+edit.text+text.slice(edit.end);
   return text;
 }
-const cls=body=>`jadeVersionNumber "25.0.02";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeHeaders\n  Fish subclassOf Object transient;\ntypeDefinitions\nFish completeDefinition\n(\nattributeDefinitions\n   value: Integer number = 1;\n)\ntypeSources\nFish (\njadeMethodSources\nrun\n{\n${body}\n}\n)\n`;
+const cls=body=>`jadeVersionNumber "25.0.02";\nschemaDefinition\nDemo subschemaOf RootSchema partialDefinition;\ntypeHeaders\n    Fish subclassOf Object transient;\ntypeDefinitions\n    Fish completeDefinition\n    (\n    attributeDefinitions\n        value: Integer number = 1;\n    )\ntypeSources\nFish (\njadeMethodSources\nrun\n{\n${body}\n}\n)\n`;
 test('method formatting indents declarations, nested conditions, loops and epilog without changing tokens',()=>{
   const source='run();\nvars\nx : Integer;\nbegin\nif x = 1 then\nwhile x > 0 do\nx := x - 1; // keep  this\nendwhile;\nelseif x = 2 then\nx := 3;\nelse\nx := 4;\nendif;\nepilog\nx := 0;\nend;';
   const expected='run();\nvars\n    x : Integer;\nbegin\n    if x = 1 then\n        while x > 0 do\n            x := x - 1; // keep  this\n        endwhile;\n    elseif x = 2 then\n        x := 3;\n    else\n        x := 4;\n    endif;\nepilog\n    x := 0;\nend;';
@@ -15,7 +15,7 @@ test('method formatting indents declarations, nested conditions, loops and epilo
   assert.equal(apply(expected),expected,'idempotent');
   assert.equal(source.replace(/\s/g,''),expected.replace(/\s/g,''));
 });
-test('CLS formatting changes method whitespace only, preserving native headers and metadata',()=>{
+test('CLS formatting preserves already formatted native declarations while formatting method bodies',()=>{
   const source=cls('run();\nbegin\nreturn;\nend;');
   assert.equal(apply(source,{},undefined,'Fish.cls'),source.replace('\nreturn;','\n    return;'));
 });
@@ -62,7 +62,7 @@ test('multiline calls, operators and comments retain their relative continuation
   assert.equal(apply(source),expected);
   assert.equal(apply(expected),expected);
   const start=source.indexOf('      first,'),end=start+'      first,'.length;
-  assert.equal(apply(source,{}, {start,end}),source.slice(0,start)+'        first,'+source.slice(end));
+  assert.equal(apply(source,{}, {start,end}),source,'A continuation keeps its unchanged out-of-range anchor.');
 });
 
 test('large extracted classes visit a bounded number of array entries instead of rescanning each method',()=>{
@@ -73,4 +73,41 @@ test('large extracted classes visit a bounded number of array entries instead of
   try{formatted=apply(source,{},undefined,'ManyMethods.cls');}finally{Array.prototype[Symbol.iterator]=original;}
   assert.equal((formatted.match(/\n    return;/g)||[]).length,401);
   assert.ok(visits<200000,`Formatting visited ${visits} array entries for only 401 short methods.`);
+});
+
+test('method switch cases, read transactions and conditional execution nest safely',()=>{
+ const source='run();\nbegin\nbeginLock;\nexecuteWhen DebugFlag;\nswitch value do\ncase 1:\nif true then\nreturn;\nendif;\ncase 2: write "two";\ndefault:\nreturn;\nendswitch;\nendExecuteWhen;\nendLock;\nbeginLoad;\nreturn;\nendLoad;\nend;';
+ const expected='run();\nbegin\n    beginLock;\n        executeWhen DebugFlag;\n            switch value do\n                case 1:\n                    if true then\n                        return;\n                    endif;\n                case 2: write "two";\n                default:\n                    return;\n            endswitch;\n        endExecuteWhen;\n    endLock;\n    beginLoad;\n        return;\n    endLoad;\nend;';
+ assert.equal(apply(source),expected);
+ assert.equal(apply(expected),expected);
+});
+
+test('CLS source owners, method names, braces and signatures are formatted with their bodies',()=>{
+ const source=cls('    run();\n    begin\nreturn;\n    end;').replace('Fish (\njadeMethodSources\nrun\n{', '     Fish (\n     jadeMethodSources\n    run\n    {').replace('\n}\n)', '\n    }\n    )');
+ const expected=cls('run();\nbegin\n    return;\nend;');
+ assert.equal(apply(source,{},undefined,'Fish.cls'),expected);
+ assert.equal(apply(expected,{},undefined,'Fish.cls'),expected);
+});
+
+test('multiline conditions use continuation indentation without losing block nesting',()=>{
+ const source='run();\nbegin\nif value > 0\nand other < 42 then\nreturn;\nelseif value = 0\nor other = 1 then\nreturn;\nelse\nwhile value > 0\nand other < 10 do\nvalue := value - 1;\nendwhile;\nendif;\nend;';
+ const expected='run();\nbegin\n    if value > 0\n        and other < 42 then\n        return;\n    elseif value = 0\n        or other = 1 then\n        return;\n    else\n        while value > 0\n            and other < 10 do\n            value := value - 1;\n        endwhile;\n    endif;\nend;';
+ assert.equal(apply(source),expected);
+ assert.equal(apply(expected),expected);
+});
+
+test('opaque encrypted source bytes remain untouched while their native source envelope is aligned',()=>{
+ const source='    typeSources\n    Cow (\n    jadeMethodSources\n    hidden\n    {\n  __encrypted[6]AQAA\n     ABCDEF\n  __endEncrypted\n    }\n    )\n';
+ const expected='typeSources\nCow (\njadeMethodSources\nhidden\n{\n  __encrypted[6]AQAA\n     ABCDEF\n  __endEncrypted\n}\n)\n';
+ assert.equal(apply(source,{},undefined,'Cow.cls'),expected);
+ assert.equal(apply(expected,{},undefined,'Cow.cls'),expected);
+});
+
+test('signature and expression continuation range formatting remains stable without the anchor line',()=>{
+ for(const source of ['    run(\n        first: Integer) updating;\nbegin\nreturn;\nend;','run();\nbegin\n  consume(\n      value\n  );\nend;']){
+  const line=source.includes('first:')?'        first: Integer) updating;':'      value',start=source.indexOf(line),range={start,end:start+line.length};let once=source;
+  for(const e of formattingEdits(source,{tabSize:4,insertSpaces:true},range,'method.jade').reverse())once=once.slice(0,e.start)+e.text+once.slice(e.end);
+  let twice=once;for(const e of formattingEdits(once,{tabSize:4,insertSpaces:true},{start,end:once.indexOf('\n',start)},'method.jade').reverse())twice=twice.slice(0,e.start)+e.text+twice.slice(e.end);
+  assert.equal(twice,once);
+ }
 });

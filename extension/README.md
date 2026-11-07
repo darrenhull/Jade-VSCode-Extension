@@ -1,117 +1,64 @@
-# Jade Native Runner
+# Jade Tools
 
-Edit Jade source in VS Code, compile and run native tests through the packaged Jade CLI, and publish after reviewing the target changes. A compatible Windows Jade runtime is required. The Jade development IDE is not required.
+Edit, build, test and explore Jade applications in Visual Studio Code. Work with native Jade source files, see compiler errors in your editor, run unit tests and review changes before publishing them to your database.
 
-## Architecture
+A compatible **Windows Jade runtime** is required. The **Jade IDE is not required**. The extension includes its command-line tools; you do not need to install Node.js, Python or a separate CLI.
 
-```mermaid
-flowchart LR
-    UI[VS Code editor, Testing, debugger and views] --> Client[Thin CLI client and native gateways]
-    Client --> CLI[Packaged jade-cli.exe]
-    CLI --> Broker[Shared local broker and native session ownership]
-    Broker --> Native[Native Jade compiler, test runner, object manager and utilities]
-    Native --> Working[(Isolated Working database)]
-    Native -->|Read-only inspection, pull or reviewed publication| Source[(Configured Source database)]
-```
+## Get started
 
-The CLI is a pinned package included in this VSIX. The extension launches the bundled standalone `jade-cli.exe` directly, with its runtime files. End users do not need a sibling checkout, a globally installed CLI, Python or a separate Node.js installation. Node.js and npm are development build tools only. The broker retains warm native build/test state. The CLI and extension are independent Git repositories; SDK/native development belongs to the CLI product.
+1. Install the `.vsix` from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest) using **Extensions: Install from VSIX…**. Reload VS Code when prompted.
+2. Open your Jade source folder. In Settings, set **Jade Native: Install Path** to your Jade installation, or run **Jade: Detect Runtime Settings** from the Command Palette.
+3. Configure your Source database connection. Use **Jade: Extract All Sources** to pull source into a folder inside your workspace, or open an existing source checkout.
+4. Open a class file and press **F5** to compile. Use **Testing** or **Run Local Test** above a test to run it.
 
-## Install or update
+GitHub VSIX updates are installed manually. Installing a newer VSIX updates the same extension; there is no need to uninstall it first.
 
-Download the `.vsix` asset from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest), run **Extensions: Install from VSIX…** in the Command Palette, then reload VS Code if requested. The bundled native CLI updates with the extension; no separate CLI installation is needed. Installing from GitHub is manual, rather than a Marketplace auto-update.
+## Develop in the editor
 
-Error Lens (`usernamehw.errorlens`) is an install-alongside companion that displays compiler diagnostics inline. VS Code retrieves it from the Marketplace when available; it can be disabled or uninstalled independently. Offline users can install its VSIX separately. Jade compilation and testing work without it.
-
-## Start
-
-1. Open a folder containing native Jade source, or use **Jade: Extract All Sources** to pull source from a configured database.
-2. Set **jadeNative.installPath** to the compatible Jade installation. Configure **databasePath**, **iniPath** and **server** if their defaults are unsuitable, or use **Jade: Detect Runtime Settings**.
-3. Open a class file and press **F5** to compile it in the private Working database.
-4. Use **Testing**, **Run Local Test**, or **Ctrl+F5** to run native Jade tests.
-5. Use **Publish All Changed Files** or **Shift+F5** to review and confirm publication to Source.
-
-Source and Working are distinct databases. Compilation/test execution uses Working; publication updates the configured Source target. Test/application code can modify Working data. Database Objects inspection is read-only.
-
-## Source files and schemas
-
-Native CLS, SCM, SEC, DDX and JCF files remain the source of truth. Extraction writes user schema source into the selected folder inside the workspace, without timestamped output directories. Schema headers are siblings of their schema folders; classes/resources are grouped by native role. System metadata and tool state remain outside the user source tree.
-
-Use **Jade: Create Schema** to scaffold a native schema and runtime classes. Publish the resulting schema/resources through the reviewed workspace workflow. Explicit class rename migrations preserve native data; complete native schema loads can remove absent declarations, so review the publication plan.
-
-Pulling protects local changes and uses pull/publish baselines. Full extraction and initial schema/resource joins can be slow; they expose progress and cancellation. RootSchema cache refresh provides editor metadata; it is not a replacement for the executable Working database.
-
-## Editor and source browsing
-
-Syntax highlighting, completion, hover, signatures, definitions, references, implementations and incoming/outgoing calls use the source models. Dynamic dispatch is not predicted. Schema-qualified identities distinguish classes with the same short name in different schemas.
-
-**Object Explorer** groups schemas, classes, properties and methods. Its search icon opens a catalogue with schema filters, autocomplete and bounded pages. Selecting members reuses one focused preview tab per schema/class; unsaved edits appear in previews. **Open Original Source** opens the editable native file.
-
-Build/test/publish deliberately save their source inputs. The command-line client reads disk; it does not automatically see unsaved editor buffers.
-
-**Format Document** (**Shift+Alt+F** on Windows) and **Format Selection** format indentation inside complete Jade method bodies in `.cls` and `.jade` files. The formatter follows the editor's tabs/spaces and indent size. It preserves signatures, native declarations/metadata, comments, string contents and line endings. Ambiguous, incomplete or unsupported block structures are left unchanged. It does not automatically reformat extracted source or change declarations.
-
-## Tests and diagnostics
-
-Jade's **Workspace** scratch editor is distinct from a VS Code workspace and from named **JadeScript** methods. A signature-free Workspace execution command is not implemented in this extension. Native `Process.executeScript` supports this mode; an isolated proof compiled and executed it without a CLS publication. A future CLI operation must report the native compiler result and positions, execute in Working, and preserve cancellation and selected-buffer source mapping. Ordinary F5 remains class/method compilation rather than scratch execution.
-
-Native compiler errors appear in **Problems** and **Jade Compile** output. Errors retain their Jade codes and mapped method/file/line/column. Structural errors show generated locations when an original mapping is unavailable.
-
-Test Explorer discovers native unit-test methods, runs the native lifecycle and reports individual failures, assertion messages and source locations. Test results are never cached as executions. Only verified loaded-source state is reused, including when switching between test classes. Initial builds remain slower than warm runs.
-
-## Database Objects
-
-Choose **Source** or **Working** explicitly, then connect. Browse schemas/classes, search for a class, page persistent instances, inspect an OID and follow stored references. Collections retain native order and dictionary keys. Pin/history/copy actions and current-page filtering/sorting are available.
-
-Inspection does not invoke mapped getters or edit stored values. Native application security remains enforced. Identical OIDs in Source and Working identify different objects. Compile, publish and debugging coordinate native ownership; a session held by another client can produce a clear busy response. Disconnect it before starting a conflicting operation.
-
-Class catalogue UI pages are bounded to 100 rows, but the native metadata catalogue is still acquired eagerly. The inspector transport limit is currently 8 MiB. This is not native metadata streaming.
-
-## Keyed collection designer
-
-Run **Jade: Create Keyed Collection** from the Command Palette. Choose a schema, collection name, collection class and member/external key mode. Select ordered composite keys, ascending/descending order, duplicate-key policy and optional text case/locale settings. Inherited properties and reference paths are available. Advanced controls include compatible dictionary superclass and load factor.
-
-The designer previews/copies native source and creates a CLS file. Press F5 to compile; publication is a separate reviewed action. It currently handles keyed dictionaries, not general arrays, sets, runtime dynamic collections or ad hoc query indexes. Complete inverse/relationship and lifetime/key compatibility checks are not all performed in the form; native validation and runtime rules still apply.
-
-| Collection setup | Current scope |
+| Feature | What you can do |
 |---|---|
-| Member/external keys, ordered composite keys, direction and duplicate-key policy | Supported by the existing designer. |
-| Text comparison | Case-insensitive flags and positive LCIDs; explicit Binary/Latin1 special-mode source generation is not yet verified. |
-| Inheritance and key paths | Workspace ancestry and reference paths supported; inherited-key compatibility and automatic inverse maintenance still require native validation/source authoring. |
-| Sizing and tuning | Individual external-key length/precision and load factor; no complete aggregate key-budget, population/block-size or file-mapping workflow. |
-| Other collection families and indexes | Arrays, sets, dynamic dictionaries and ad hoc index lifecycle have no dedicated designer. Native source can still express supported declarations. |
+| Jade language support | Use highlighting, completion, hover, signatures, definitions and references in native source files. |
+| Compile | Press **F5** to compile saved source and its dependencies. Compiler errors appear in **Problems** and **Jade Compile** output. |
+| Format | Run **Format Document** or **Format Selection** to indent CLS headers, declarations, collections, database mappings and complete method bodies. Editor tabs/spaces are respected; literal text and Jade tokens are preserved. |
+| Test | Discover and run unit tests in **Testing**, use **Run Local Test**, and inspect individual failures and assertion messages. |
+| Debug | Set gutter breakpoints, step through supported methods/tests, inspect call stacks and expand objects and collections. |
 
-The [native dictionary-key documentation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/userguide/ch3definingclasses/definekeysfordictionaryclass.htm) describes choices beyond this form. Native API integers are not necessarily valid CLS tokens: the installed loader rejects literal `0`/`-1` locale tokens. The designer does not advertise those choices until their native extraction and semantics have been proved.
+**Format Document:** `Shift+Alt+F` on Windows. **Format Selection:** `Ctrl+K`, then `Ctrl+F`. Formatting changes indentation; it does not fix syntax errors. Incomplete or unknown structures and encrypted source contents are preserved.
 
-## Debugger
+For a wrapped statement or declaration, include its first line in the selection so the following lines can be indented together.
 
-The experimental native debugger supports gutter breakpoints, parameterless method launch, selected test debugging, stepping/pause, native caller stacks, selected-frame locals/parameters, object expansion and paged collections. The Testing Debug profile retains native test setup/teardown. Stored non-GUI applications can use their native startup/finalisation lifecycle.
+**Error Lens** is installed alongside Jade Tools when Marketplace access is available. It displays compiler diagnostics beside their source lines and can be disabled or uninstalled independently. Offline users can install its VSIX separately.
 
-Its private native ABI is pinned to the verified Jade DLL build. Unsupported builds fail explicitly. Arbitrary watch evaluation, exception-break settings, unrestricted process attach, variable editing and GUI application hosting are not implemented. Simple variable reads are supported. Persistent debug writes are restricted to Working; Source is rejected.
+## Browse and create
 
-## Runtime and settings
+- **Object Explorer:** search schemas and classes, navigate properties and methods, and open a focused member preview. **Open Original Source** opens the editable native file.
+- **Database Objects:** choose **Source** or **Working**, search for a class, browse persistent instances, follow stored references and page through collections. This browser is read-only.
+- **Jade: Create Keyed Collection:** choose the collection and member class, select ordered composite keys and preview the native CLS source. The designer supports keyed dictionaries; arrays, sets and dynamic indexes do not have dedicated designers.
+- **Jade: Create Schema:** create the native schema files and runtime classes in your workspace.
 
-The installed Jade runtime remains external. The CLI packages our helpers and native compatibility metadata, not Jade DLLs or databases. SingleUser Source must be free for initial backup; MultiUser Source supports the native quiesced online-backup path. Source clients stay connected while updates briefly pause. The extension does not silently switch server mode or rewrite the original Source INI.
+## Compile safely, publish deliberately
 
-Useful commands include **Jade: Refresh Type Cache**, **Jade: Show Working Database**, **Jade: Recreate Working Database**, **Jade: Disconnect Build and Test Runtime**, and **Jade: Disconnect Database Objects**.
+Builds, tests and debugging use a separate **Working** database. They do not publish your local source to **Source**. Executed Jade code can change Working data and access files or networks permitted by your runtime; Working is not an operating-system sandbox.
 
-The native state/cache location is configurable through the extension settings. Broker state is private per user. The CLI honours `JADE_TOOLS_STATE_DIRECTORY` for isolated test brokers. Do not use production Source databases as test fixtures.
+Use **Publish All Changed Files** or **Shift+F5** when you want to update Source. Review the destination and file changes before confirming publication. Build, test and publish commands save their source inputs.
 
-## Build this extension
+The first build can take longer while Working is prepared. Later runs reuse verified loaded source; tests still execute on every run. Disconnect an inspection session if it holds a conflicting single-user connection.
 
-Open this repository's root workspace and run:
+## Useful commands
 
-```text
-npm ci
-npm test
-npm run package
-```
+Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the available commands, including:
 
-Packaging reconstructs the CLI bundle from the pinned package artifact. Node modules, generated bundles, VSIX output, reports, databases and local research notes are ignored by Git. Use the separate CLI repository to develop or rebuild native helpers; changing an old local helper copy does not change the CLI artifact used by this extension.
+- **Jade: Detect Runtime Settings**
+- **Jade: Extract All Sources**
+- **Jade: Create Keyed Collection**
+- **Jade: Create Schema**
+- **Jade: Refresh Type Cache**
+- **Jade: Show Working Database**
+- **Jade: Disconnect Build and Test Runtime**
+- **Jade: Disconnect Database Objects**
 
-The default tests do not open Jade databases. Actual-host/native controls require explicit private fixture configuration. See the repository build scripts and test files for opt-in controls. Publishing this extension means packaging/installing its VSIX; it does not deploy source code into a Jade database.
+Debugger support requires a compatible runtime. GUI application hosting, arbitrary watch expressions and editing stored values in the data browser are not available. Native Jade validation remains authoritative for collection definitions and source changes.
 
-## Architecture diagram
+[Source, architecture and development documentation](https://github.com/darrenhull/Jade-VSCode-Extension) · [Report an issue](https://github.com/darrenhull/Jade-VSCode-Extension/issues)
 
-![Jade architecture](media/architecture.drawio.svg)
-
-[Editable draw.io source](media/architecture.drawio).
+Jade Tools is an independent third-party extension and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
