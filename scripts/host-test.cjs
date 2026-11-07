@@ -32,7 +32,10 @@ async function main(){
   const to=path.join(workspace,name);fs.mkdirSync(path.dirname(to),{recursive:true});fs.writeFileSync(to,fs.readFileSync(path.join(repository,'test/fixtures/workspace',name),'utf8').replaceAll('BaseUnitTest','HostFreshBaseUnitTest').replaceAll('FishTest','HostFreshFishTest'));
  }
  const code=process.env.JADE_TEST_CODE;if(!code||!fs.existsSync(code))throw Error('Set JADE_TEST_CODE to a VS Code executable for isolated extension-host tests.');
- const report=path.join(stage,'host-report.json'),started=Date.now();
+ // Every run owns a newly created, nonce-marked stage. A report that did not
+ // exist before launch belongs to this run; filesystem clocks can lag Date.now.
+ const report=path.join(stage,'host-report.json');
+ if(fs.existsSync(report))throw Error('Unexpected existing report in a fresh owned host stage.');
  artifacts.evidencePath=path.join(base,nativeOids?'evidence/vscode-native-oids-host.json':incremental?'evidence/vscode-incremental-host.json':workspaces?'evidence/vscode-workspaces-host.json':formatting?'evidence/vscode-formatting-host.json':cliIntegration?'evidence/vscode-cli-host.json':alternating?'evidence/vscode-alternating-tests-host.json':perf?'evidence/vscode-performance-host.json':testDebug?'evidence/vscode-test-debug-host.json':impact?'evidence/vscode-impact-host.json':objects?'evidence/vscode-objects-host.json':classes?'evidence/vscode-class-view-host.json':collections?'evidence/vscode-collections-host.json':debug?'evidence/vscode-debug-host.json':pull?'evidence/vscode-pull-host.json':project?'evidence/vscode-project-host.json':'evidence/vscode-host.json');
  const hostEnv={...process.env,JADE_HEADLESS_HOST_REPORT:report,JADE_HOST_PROCESS_FILE:path.join(stage,'host-process.json'),JADE_HOST_OWNER:artifacts.nonce,JADE_TOOLS_STATE_DIRECTORY:path.join(stage,'broker'),JADE_TOOLS_CONNECTIONS_FILE:path.join(stage,'connections.json')};delete hostEnv.ELECTRON_RUN_AS_NODE;
  if(creation){hostEnv.JADE_CREATION_DEBUG_PORT=String(creationPort);hostEnv.JADE_CREATION_SCREENSHOTS=path.join(base,'docs/images');artifacts.evidencePath=path.join(base,'evidence/vscode-creation-host.json');}
@@ -40,7 +43,7 @@ async function main(){
  await artifacts.wait(child,{signal:cancellation.signal});
  for(let i=0;i<(alternating?140:180);i++){
   if(cancellation.signal.aborted)throw Error('VS Code host cancelled.');
-  if(fs.existsSync(report)&&fs.statSync(report).mtimeMs>=started){if(fs.statSync(report).size>262144)throw Error('Host report exceeds the 256 KiB evidence limit.');const result=JSON.parse(fs.readFileSync(report,'utf8'));if(!result.passed)throw Error(JSON.stringify(result));console.log('Native working-database VS Code host passed; owned artifacts will be removed.');return;}
+  if(fs.existsSync(report)){if(fs.statSync(report).size>262144)throw Error('Host report exceeds the 256 KiB evidence limit.');const result=JSON.parse(fs.readFileSync(report,'utf8'));if(!result.passed)throw Error(JSON.stringify(result));console.log('Native working-database VS Code host passed; owned artifacts will be removed.');return;}
   await new Promise(resolve=>setTimeout(resolve,1000));
  }throw Error('No fresh VS Code host report.');
  });}finally{process.removeListener('SIGINT',cancel);process.removeListener('SIGTERM',cancel);}
