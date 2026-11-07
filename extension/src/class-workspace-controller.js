@@ -94,7 +94,13 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
       const column=panel.viewColumn;
       if(Number.isInteger(column)&&column>=1&&column<=9&&contexts[key]?.column!==column)remember(current.row,column,current.origin);
     });
-    const closed=session.panel.onDidDispose(()=>{if(views.get(key)?.panel===session.panel)views.delete(key);});
+    const closed=session.panel.onDidDispose(()=>{
+      if(views.get(key)?.panel!==session.panel)return;
+      views.delete(key);
+      // A real tab close retires only its restore slot. Controller shutdown
+      // preserves live slots for VS Code's native window reload restoration.
+      if(!disposed){delete contexts[key];void Promise.resolve(context.workspaceState?.update(STATE,contexts)).catch(()=>{});}
+    });
     return {dispose(){active?.dispose();closed.dispose();view.dispose();if(reservedIdentity)void recovery.release(reservedIdentity).catch(()=>{});}};
   });
   const registration=vscode.window.registerCustomEditorProvider(viewType,provider,{supportsMultipleEditorsPerDocument:true,webviewOptions:{retainContextWhenHidden:true}});

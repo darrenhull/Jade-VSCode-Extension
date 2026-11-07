@@ -44,3 +44,13 @@ test('moving a restored current-file class keeps its import identity and discove
  const f=fixture(stored),page=await f.restore(f.file,1);page.panel.move(3,false);
  const saved=Object.values(stored.get(STATE))[0];assert.equal(saved.column,3);assert.equal(saved.row.file,f.file);assert.equal(saved.row.packageAlias,'ImportedFish');assert.equal(saved.origin.filter.query,'extra');assert.equal(saved.origin.scrollTop,21);f.controller.dispose();
 });
+test('closing one shared-file class before moving its sibling clears only the closed restore identity',async()=>{
+ const f=fixture();await f.controller.open({name:'Fish'},{origin:{scope:'workspace',filter:{query:'fish'}}});await f.controller.open({name:'Bird'},{origin:{scope:'workspace',filter:{query:'bird'}}});
+ f.sessions[0].panel.dispose();f.sessions[1].panel.move(1,false);
+ const saved=Object.values(f.stored.get(STATE));assert.equal(saved.some(value=>value.row.name==='Fish'),false);assert.equal(saved.find(value=>value.row.name==='Bird').column,1);
+ f.controller.dispose();const reopened=fixture(f.stored),bird=await reopened.restore(f.file,1);assert.equal(bird.row.name,'Bird');assert.equal(bird.origin.filter.query,'bird');reopened.controller.dispose();
+});
+test('controller unload retains live class restore mappings rather than treating shutdown as tab close',async()=>{
+ const f=fixture();await f.controller.open({name:'Fish'});await f.controller.open({name:'Bird'});f.controller.dispose();
+ assert.deepEqual(Object.values(f.stored.get(STATE)).map(value=>value.row.name).sort(),['Bird','Fish']);
+});

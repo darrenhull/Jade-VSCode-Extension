@@ -67,6 +67,32 @@ This gives the effect often requested as string interpolation. Parenthesize arit
 
 [String concatenation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/string_concatenation_operator.htm) · [Primitive conversions](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/type_casts.htm) · [Literals](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/literals.htm)
 
+### Convert Real and Integer values to text
+
+Use the native `.String` conversion without parentheses for both `Real` and `Integer`. Do not generate `.asString()`, `.toString()` or `.String()` for this purpose. Existing String values concatenate directly.
+
+```jade
+vars
+    firstFloat : Real;
+    secondFloat : Real;
+    firstInt : Integer;
+    secondInt : Integer;
+    firstString : String;
+    secondString : String;
+begin
+    firstFloat := 1.5;
+    secondFloat := 2.5;
+    firstInt := 3;
+    secondInt := 4;
+    firstString := "hello";
+    secondString := "world";
+
+    write "The floats are " & firstFloat.String & " and " & secondFloat.String &
+        ", the integers are " & firstInt.String & " and " & secondInt.String &
+        ", and the strings are " & firstString & " and " & secondString & ".";
+end;
+```
+
 ### Format typed date/time values
 
 Given existing `born : Date` and `clock : Time` values:

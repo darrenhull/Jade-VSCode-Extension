@@ -1,4 +1,4 @@
-# 0.17.0 — Class and object workspaces
+# 0.17.2 — Class and object workspaces
 
 - Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.
 - Edit local methods, properties and references in the class workspace with the original source document's save and undo history, completion and compiler diagnostics.
@@ -9,7 +9,8 @@
 - Navigate read-only object and collection snapshots with retained history, page state and clear disconnected status.
 - See complete Scratch Pad compiler diagnostics and automatically hand over idle inspection connections before execution.
 - Install Jade language, Mermaid and draw.io project skills with tested language examples, diagram guidance and official references, preserving project customisations.
-- Switch Scratch Pad notes between Markdown source and preview, and insert Mermaid diagrams using VS Code's renderer.
+- Switch Scratch Pad notes between Markdown source and a labelled preview action, and insert Mermaid diagrams using VS Code's renderer.
+- Edit an existing Scratch Pad cell with Copilot, or prepare a fix request with the whole cell, current native error and Jade guidance.
 
 # 0.16.0 — Collection families and native rules
 

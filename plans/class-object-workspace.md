@@ -162,3 +162,12 @@ Default tests must not open a developer database. Native checks require explicit
 ## Scope limits
 
 This plan does not add stored-data editing, inline editors for constants/keys or class headers, arbitrary method execution, live watches, automatic source pulls, a new schema browser, impact graphs, new native database APIs, or changes to compile/publish semantics. Source remains workspace files; native execution remains owned by the existing C++ CLI and installed runtime.
+
+### Final review and Scratch Pad context additions
+
+- Closed native class tabs retire only their restoration slots; shutdown preserves live tabs for reload. A real two-reload same-file class test verifies close/move/restore identity.
+- New text in property/reference canvases follows the native document EOL even when the original selected declaration is single-line or empty. CRLF regression tests cover Enter and pasted multiline content.
+- Native Edit with Copilot focuses the existing cell. Fix with Copilot adds the entire exact current cell, native diagnostics, schema and concise Jade guidance to a reviewable native inline-chat prompt. Failure context is invalidated on source/schema change; external CLS preparation failures do not appear as cell fixes. No custom model client or automatic execution is added.
+- The bundled language skill explicitly rejects numeric .asString() conversions in favour of .String and links a practical CLS-format reference; the latter is not a claimed complete grammar.
+
+- Fix with Copilot selects the entire original cell before native inline editing, so a cursor or partial selection does not become an append target. Regression coverage includes repeated top-level bodies, a partial selection and an end caret; native accepted-selection replacement and Undo are verified without claiming a live AI response.

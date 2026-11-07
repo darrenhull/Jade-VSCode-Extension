@@ -7,7 +7,8 @@ async function run(context){
  const root=vscode.workspace.workspaceFolders[0].uri.fsPath,report=process.env.JADE_HEADLESS_HOST_REPORT||path.resolve(root,'../host-report.json'),phaseFile=path.join(root,'class-workspace-move-phase.json');
  const file=path.join(root,'SharedMoveClasses.cls'),uri=vscode.Uri.file(file),projectId=vscode.workspace.workspaceFolders[0].uri.toString(),sessions=[];
  assert.ok(context?.workspaceState,'The private development host must provide the real extension memento.');
- const restored=fs.existsSync(phaseFile);
+ const phase=fs.existsSync(phaseFile)?JSON.parse(fs.readFileSync(phaseFile,"utf8")):undefined;
+ const restored=Boolean(phase);
  if(!restored)fs.writeFileSync(file,'schemaDefinition\r\nMovePets subschemaOf RootSchema partialDefinition;\r\ntypeHeaders\r\nFish subclassOf Object transient;\r\nBird subclassOf Object transient;\r\ntypeDefinitions\r\nFish completeDefinition ( )\r\nBird completeDefinition ( )\r\ntypeSources\r\n');
  const controller=registerClassWorkspaces(vscode,context,{viewType:'jade.testClassWorkspace',model:{resolveClass:async row=>{
   const name=row.name||row.owner;if(!['Fish','Bird'].includes(name))throw Error('Unknown private move-proof class.');
@@ -24,7 +25,7 @@ async function run(context){
    await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
    await controller.open({name:'Fish',schema:'MovePets',file:uri.toString()},{origin:{scope:'workspace',kind:'catalogue',filter:{query:'fish',offset:100},selectedId:'Fish',scrollTop:31}});
    await wait(()=>sessions.some(value=>value.row.name==='Fish'),'first class tab');
-   await controller.open({name:'Bird',schema:'MovePets',file:uri.toString()});await wait(()=>sessions.some(value=>value.row.name==='Bird'),'second class sharing the original file');
+   await controller.open({name:'Bird',schema:'MovePets',file:uri.toString()},{origin:{scope:'workspace',kind:'catalogue',filter:{query:'bird',offset:0},selectedId:'Bird',scrollTop:19}});await wait(()=>sessions.some(value=>value.row.name==='Bird'),'second class sharing the original file');
    const fish=sessions.find(value=>value.row.name==='Fish'),bird=sessions.find(value=>value.row.name==='Bird');assert.equal(fish.panel.viewColumn,1);assert.equal(bird.panel.viewColumn,2);
    fish.panel.reveal(vscode.ViewColumn.One);await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
    await wait(()=>vscode.window.tabGroups.activeTabGroup.viewColumn===1&&vscode.window.tabGroups.activeTabGroup.activeTab?.label==='MovePets::Fish','the Fish tab is active before its native move');
@@ -39,6 +40,13 @@ async function run(context){
    // activation task pending prevents the normal UI harness from quitting early.
    void vscode.commands.executeCommand('workbench.action.reloadWindow');return await new Promise(()=>{});
   }
+  if(phase.phase==='closed-sibling'){
+   await wait(()=>sessions.some(value=>value.row.name==='Bird'&&value.panel.viewColumn===1),'remaining Bird class restores in the closed Fish group');
+   const bird=sessions.find(value=>value.row.name==='Bird'&&value.panel.viewColumn===1);
+   assert.equal(sessions.some(value=>value.row.name==='Fish'),false);assert.equal(savedClass('Fish'),undefined);assert.equal(savedClass('Bird').column,1);
+   assert.equal(bird.document.uri.toString(),uri.toString());assert.equal(bird.origin.filter.query,'bird');assert.equal(bird.origin.scrollTop,19);
+   fs.writeFileSync(report,JSON.stringify({passed:true,nativeMove:true,nativeWindowReload:true,sameFileMultipleClasses:true,fishColumn:3,birdColumn:2,discoveryOriginPreserved:true,sharedNativeTextDocument:true,closedSiblingRestoreRetired:true,remainingClassMovedToClosedColumn:1,remainingClassRestored:'Bird',nativeDatabaseOpened:false},null,2));controller.dispose();return;
+  }
   await wait(()=>sessions.some(value=>value.row.name==='Fish'&&value.panel.viewColumn===3)&&sessions.some(value=>value.row.name==='Bird'&&value.panel.viewColumn===2),'native reload restores both same-file class identities in their moved groups');
   const fish=sessions.find(value=>value.row.name==='Fish'&&value.panel.viewColumn===3),bird=sessions.find(value=>value.row.name==='Bird'&&value.panel.viewColumn===2);
   assert.strictEqual(fish.document,bird.document,'Restored classes retain the same native TextDocument');assert.equal(fish.document.uri.toString(),uri.toString());assert.equal(bird.document.uri.toString(),uri.toString());
@@ -46,7 +54,13 @@ async function run(context){
   const currentTabs=()=>vscode.window.tabGroups.all.flatMap(group=>group.tabs.filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==='jade.testClassWorkspace').map(tab=>({column:group.viewColumn,label:tab.label})));
   await wait(()=>currentTabs().some(tab=>tab.column===3&&tab.label==='MovePets::Fish')&&currentTabs().some(tab=>tab.column===2&&tab.label==='MovePets::Bird'),'restored tab titles reach the native workbench');
   assert.deepEqual(currentTabs().sort((a,b)=>a.column-b.column),[{column:2,label:'MovePets::Bird'},{column:3,label:'MovePets::Fish'}]);
-  fs.writeFileSync(report,JSON.stringify({passed:true,nativeMove:true,nativeWindowReload:true,sameFileMultipleClasses:true,fishColumn:3,birdColumn:2,discoveryOriginPreserved:true,sharedNativeTextDocument:true,nativeDatabaseOpened:false},null,2));controller.dispose();
+  fish.panel.reveal(vscode.ViewColumn.Three);await wait(()=>vscode.window.tabGroups.activeTabGroup.activeTab?.label==='MovePets::Fish','Fish active before native close');
+  await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+  await wait(()=>!currentTabs().some(tab=>tab.label==='MovePets::Fish'),'Fish tab actually closed');await wait(()=>savedClass('Fish')===undefined,'closed class restore slot retired');
+  bird.panel.reveal(bird.panel.viewColumn);await wait(()=>vscode.window.tabGroups.activeTabGroup.activeTab?.label==='MovePets::Bird','Bird active before move to the closed class group');
+  await vscode.commands.executeCommand('moveActiveEditor',{to:'position',by:'group',value:1});await wait(()=>bird.panel.viewColumn===1&&savedClass('Bird')?.column===1,'remaining Bird moved into group one');
+  await context.workspaceState.update(STATE,context.workspaceState.get(STATE));fs.writeFileSync(phaseFile,JSON.stringify({phase:'closed-sibling',file:uri.toString()}));
+  void vscode.commands.executeCommand('workbench.action.reloadWindow');return await new Promise(()=>{});
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));controller.dispose();throw error;}
 }
 module.exports={run};

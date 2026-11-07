@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.17.0",
+  "version": "0.17.2",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -296,7 +296,19 @@
       {
         "command": "jadeNative.previewScratchMarkdown",
         "title": "Jade: Preview Markdown",
+        "shortTitle": "Preview Markdown",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "jadeNative.fixScratchPadWithCopilot",
+        "title": "Jade: Fix with Copilot",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "jadeNative.editScratchPadWithCopilot",
+        "title": "Jade: Edit with Copilot",
+        "shortTitle": "Edit with Copilot",
+        "icon": "$(sparkle)"
       },
       {
         "command": "jadeNative.insertScratchMermaid",
@@ -542,6 +554,11 @@
       ],
       "notebook/cell/title": [
         {
+          "command": "jadeNative.editScratchPadWithCopilot",
+          "when": "notebookType == jade-workspace && notebookCellType == code",
+          "group": "inline@1"
+        },
+        {
           "command": "jadeNative.editScratchMarkdown",
           "when": "notebookType == jade-workspace && notebookCellType == markup && !notebookCellMarkdownEditMode",
           "group": "inline@1"
@@ -558,6 +575,11 @@
         }
       ],
       "notebook/toolbar": [
+        {
+          "when": "notebookType == jade-workspace",
+          "command": "jadeNative.previewScratchMarkdown",
+          "group": "navigation/execute@-2"
+        },
         {
           "when": "notebookType == jade-workspace",
           "command": "jadeNative.selectWorkspaceSchema",

@@ -5,6 +5,7 @@ const {WorkspaceRunHistory}=require('./WorkspaceRunHistory');
 const {WorkspaceDiagnostics}=require('./WorkspaceDiagnostics');
 const {WorkspaceContext}=require('./WorkspaceContext');
 const {ScratchPadMarkdown}=require('./ScratchPadMarkdown');
+const {ScratchPadFailures}=require('./ScratchPadFailures');
 const notebookType='jade-workspace';
 
 async function runSequential(cells,execute) {
@@ -43,7 +44,7 @@ function notebookOutputs(vscode,result,schema,elapsed) {
 function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,beforeOperation,afterOperation}) {
   const output=vscode.window.createOutputChannel('Scratch Pad');
   const diagnostics=vscode.languages.createDiagnosticCollection('jade-workspace');
-  const changes=new vscode.EventEmitter(),history=new WorkspaceRunHistory(),diagnosticState=new WorkspaceDiagnostics();
+  const changes=new vscode.EventEmitter(),history=new WorkspaceRunHistory(),diagnosticState=new WorkspaceDiagnostics(),failures=new ScratchPadFailures();
   const sourceContext=new WorkspaceContext({workspace:vscode.workspace,pickFolder:()=>vscode.window.showWorkspaceFolderPick({placeHolder:'Choose the project and Jade connection for this Scratch Pad'})});
   const runner=new JadeWorkspaceRunner({client,configFor:async document=>configFor(document,await sourceContext.resolve(document.uri)),beforeOperation,afterOperation}),plainSchemas=new Map();
   let order=0;
@@ -99,10 +100,12 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   }
   async function runCell(cell,schema) {
     if(cell.kind!==vscode.NotebookCellKind.Code)return;
+    const version=cell.document.version;failures.clear(cell.document.uri.toString());changes.fire();
     const execution=controller.createNotebookCellExecution(cell);execution.executionOrder=++order;execution.start(Date.now());
     await execution.clearOutput();const started=Date.now();let result;
     try {
       result=await runner.run({document:cell.document,schema,token:execution.token,onOutput:text=>output.append(text)});
+      failures.record(cell.document,result,schema,version);
       const elapsed=result.report?.elapsedMilliseconds??Date.now()-started,text=resultText(result);
       if(result.report?.outputCharacterLossPossible)output.appendLine('Native output encoding: '+result.report.outputEncoding+'. Characters outside that encoding may be replaced by Jade.');
       if(result.snapshot) {
@@ -124,7 +127,7 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     });
   };
   async function newWorkspace() {
-    const markup='# Scratch Pad\n\nChoose a schema, edit the code and click **Run**. Jade executes code in the local database. Nothing is published.\n\nEach run starts with fresh variables. Changes your code commits to the local database can remain between runs. After running twice, use **Compare Previous Run** to compare the code and results. Class definitions come from your saved project files.';
+    const markup='# Scratch Pad\n\nChoose a schema, edit the code and click **Run**. Jade executes code in the local database. Nothing is published.\n\nEach run starts with fresh variables. Changes your code commits to the local database can remain between runs. After running twice, use **Compare Previous Run** to compare the code and results. Class definitions come from your saved project files.\n\nUse **Preview Markdown** for notes and diagrams. **Run Cells In Section** runs code below a heading.';
     const data=new vscode.NotebookData([
       new vscode.NotebookCellData(vscode.NotebookCellKind.Markup,markup,'markdown'),
       new vscode.NotebookCellData(vscode.NotebookCellKind.Code,'begin\n    write "Hello from Jade";\nend;','jade-nz')
@@ -159,6 +162,11 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   }
   const safe=action=>(...args)=>Promise.resolve().then(()=>action(...args)).catch(error=>{void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};});
   const markdown=new ScratchPadMarkdown(vscode);
+  async function fixWithCopilot(cell){
+    const failure=cell?.document&&failures.get(cell.document,cell.notebook?.metadata?.schema);
+    if(!failure)throw Error('Run this unchanged Scratch Pad cell again to get a current native error before choosing Fix with Copilot. Errors in another source file must be fixed in that file.');
+    return new (require('./ScratchPadCopilot').ScratchPadCopilot)(vscode).fix(cell,{sourceUri:failure.sourceUri,sourceVersion:failure.version,sourceText:failure.sourceText,schema:failure.schema,code:failure.code,error:failure.message,diagnostics:failure.diagnostics});
+  }
   context.subscriptions.push(output,diagnostics,changes,controller,
     vscode.workspace.registerNotebookSerializer(notebookType,serializer,{transientOutputs:true}),
     vscode.workspace.registerTextDocumentContentProvider('jade-workspace-run',{provideTextDocumentContent:uri=>history.text(uri.path.slice(1))}),
@@ -166,19 +174,28 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
       if(cell.kind!==vscode.NotebookCellKind.Code)return [];
       const status=new vscode.NotebookCellStatusBarItem('$(database) Working · '+(cell.notebook.metadata.schema||'Choose schema'),vscode.NotebookCellStatusBarAlignment.Right);
       status.command={command:'jadeNative.selectWorkspaceSchema',title:'Select schema',arguments:[cell.notebook]};status.tooltip='Native execution in the private Working database. Each run starts with fresh local variables; committed Working data can survive runs.';
-      const items=[status];if(history.pair(cell.document.uri.toString())){const diff=new vscode.NotebookCellStatusBarItem('$(diff) Compare previous run',vscode.NotebookCellStatusBarAlignment.Left);diff.command={command:'jadeNative.compareWorkspaceRuns',title:'Compare exact executed source and output',arguments:[cell]};items.push(diff);}return items;
+      const copilot=new vscode.NotebookCellStatusBarItem('$(sparkle) Edit with Copilot',vscode.NotebookCellStatusBarAlignment.Left);
+      copilot.command={command:'jadeNative.editScratchPadWithCopilot',title:'Edit existing cell with Copilot',arguments:[cell]};copilot.tooltip='Edit this existing code cell with Copilot (Ctrl+I). Does not add or run a cell.';
+      const items=[copilot,status],failure=failures.get(cell.document,cell.notebook.metadata.schema);
+      if(failure){const fix=new vscode.NotebookCellStatusBarItem('$(sparkle) Fix with Copilot',vscode.NotebookCellStatusBarAlignment.Left);fix.command={command:'jadeNative.fixScratchPadWithCopilot',title:'Fix this failed cell with Copilot',arguments:[cell]};fix.tooltip='Give Copilot the latest native Jade '+failure.code+' error, schema and entire current cell. Review its proposal; nothing is run or published.';items.unshift(fix);}
+      if(history.pair(cell.document.uri.toString())){const diff=new vscode.NotebookCellStatusBarItem('$(diff) Compare previous run',vscode.NotebookCellStatusBarAlignment.Left);diff.command={command:'jadeNative.compareWorkspaceRuns',title:'Compare exact executed source and output',arguments:[cell]};items.push(diff);}return items;
     }}),
     vscode.commands.registerCommand('jadeNative.newWorkspace',safe(newWorkspace)),
     vscode.commands.registerCommand('jadeNative.editScratchMarkdown',safe(value=>markdown.edit(value))),
     vscode.commands.registerCommand('jadeNative.previewScratchMarkdown',safe(value=>markdown.preview(value))),
     vscode.commands.registerCommand('jadeNative.insertScratchMermaid',safe(value=>markdown.insertMermaid(value))),
+    vscode.commands.registerCommand('jadeNative.editScratchPadWithCopilot',safe(value=>new (require('./ScratchPadCopilot').ScratchPadCopilot)(vscode).edit(value))),
+    vscode.commands.registerCommand('jadeNative.fixScratchPadWithCopilot',safe(fixWithCopilot)),
     vscode.commands.registerCommand('jadeNative.runWorkspace',safe(options=>runEditor(false,options?.schema))),
     vscode.commands.registerCommand('jadeNative.runWorkspaceSelection',safe(options=>runEditor(true,options?.schema))),
     vscode.commands.registerCommand('jadeNative.scratchpadCompileInfo',()=>{void vscode.window.showInformationMessage('Scratch Pad code is compiled when you choose Run. F5 does not execute it. Class files still use F5 for compile-only checks.');return {compiled:false,executed:false};}),
     vscode.commands.registerCommand('jadeNative.selectWorkspaceSchema',safe(value=>{const notebook=notebookOf(value);return selectSchema(notebook,notebook?.uri||vscode.window.activeTextEditor?.document.uri);})),
     vscode.commands.registerCommand('jadeNative.compareWorkspaceRuns',safe(compare)),
-    {dispose:()=>{history.clear();plainSchemas.clear();diagnosticState.clear();sourceContext.clear();}}
+    {dispose:()=>{history.clear();plainSchemas.clear();diagnosticState.clear();sourceContext.clear();failures.clear();}}
   );
+  if(vscode.workspace.onDidChangeTextDocument)context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event=>{if(event.contentChanges.length&&failures.clear(event.document.uri.toString()))changes.fire();}));
+  if(vscode.workspace.onDidCloseTextDocument)context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>failures.clear(document.uri.toString())));
+  if(vscode.workspace.onDidChangeNotebookDocument)context.subscriptions.push(vscode.workspace.onDidChangeNotebookDocument(event=>{if(event.notebook.notebookType===notebookType)changes.fire();}));
   return {serializer,controller,newWorkspace,runEditor,compare,history,schemaFor:uri=>{
     const id=uri.toString();for(const notebook of vscode.workspace.notebookDocuments||[])if(notebook.uri.toString()===id||notebook.getCells().some(cell=>cell.document.uri.toString()===id))return notebook.metadata.schema;
     return plainSchemas.get(id);

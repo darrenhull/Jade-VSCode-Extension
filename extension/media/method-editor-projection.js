@@ -4,5 +4,5 @@
 function normalized(text){return text.replace(/\r\n/g,'\n');}
 function toSourceOffset(text,offset){let source=0,editor=0;while(source<text.length&&editor<offset){if(text[source]==='\r'&&text[source+1]==='\n')source++;source++;editor++;}return source;}
 function toEditorOffset(text,offset){return normalized(text.slice(0,offset)).length;}
-function sourceInsertion(text,source){return source.includes('\r\n')?text.replace(/\r?\n/g,'\r\n'):text;}
+function sourceInsertion(text,source,lineEnding){if(lineEnding==='\r\n'||lineEnding==='\n')return text.replace(/\r?\n/g,lineEnding);return source.includes('\r\n')?text.replace(/\r?\n/g,'\r\n'):text;}
 module.exports={normalized,toSourceOffset,toEditorOffset,sourceInsertion};

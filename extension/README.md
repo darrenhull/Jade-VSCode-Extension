@@ -36,13 +36,15 @@ Choose **New Scratch Pad** under Tools, select a schema, type Jade code and pres
 
 Markdown cells have **Edit Markdown** and **Preview** actions. To show a diagram, put it in a fenced `mermaid` block, or use **Insert Mermaid Diagram** to wrap raw diagram text. Rendering uses the installed Markdown renderer; current VS Code has built-in Mermaid support. The native **Run Cells In Section** action is different: it executes code cells below a heading.
 
+Choose **Edit with Copilot** below an existing code cell to edit it in place. After a native cell failure, **Fix with Copilot** prepares a reviewable prompt containing the entire cell, its exact error details, selected schema and Jade syntax guidance. Fix gives native editing the entire existing cell as its scope, including when the cursor was at the end or only a few words were selected; ordinary Edit keeps its selection behaviour. The fix prompt prefers the smallest necessary edits to any affected lines. If a complete body is needed, it must replace the whole cell in place, without inserted or appended duplicates. It does not send the request or execute code automatically. Changing the cell or schema invalidates the old failure context; rerun to capture a current error. Errors in another CLS file must be fixed in that source file. Copilot proposals still need review, acceptance and a native rerun.
+
 Each run has separate local variables. Changes your code commits to Working data can remain for later runs. Interactive input is unavailable, and F5 does not execute scratch code.
 
 Before execution, Jade prepares the saved workspace definitions. A compiler error in those files can prevent the scratch code from running; the result includes the native diagnostic and reported source location. Idle Database Objects inspection is released automatically before a run. An active build or test retains ownership until it finishes or is cancelled.
 
 ## Project skills
 
-In trusted local Jade projects, Jade Tools installs three bundled agent skills under `.github/skills/`: **jade-language**, **mermaid** and **drawio**. Detection uses `jade.json`, known native source or opened class headers. Jade language guidance includes types, syntax, advanced string construction, typed date/time formatting and official references. The diagram skills cover fenced Markdown previews and editable diagrams with exports. These are project files you can keep in source control.
+In trusted local Jade projects, Jade Tools installs three bundled agent skills under `.github/skills/`: **jade-language**, **mermaid** and **drawio**. Detection uses `jade.json`, known native source or opened class headers. Jade language guidance includes types, syntax, native numeric `.String` conversion, advanced string construction, typed date/time formatting, CLS extract structure and official references. The diagram skills cover fenced Markdown previews and editable diagrams with exports. These are project files you can keep in source control.
 
 The extension preserves customised skills and unsaved skill edits. It updates only unchanged files it manages, and does not install into untrusted workspaces. Copilot's agent can select the skill for Jade authoring; inline Tab suggestions use a different context path and are not guaranteed by the skill.
 

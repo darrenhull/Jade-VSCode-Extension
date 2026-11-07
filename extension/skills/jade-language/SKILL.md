@@ -14,9 +14,12 @@ Use the project's installed Jade version and native compiler as the authority. T
 - Preserve native schema headers, identifiers, class/property numbers and meaningful file structure. Change the requested member rather than rewriting an extracted file.
 - Use exact type names such as `Integer`, `String`, `Boolean`, `Decimal`, `Real`, `Date`, `Time` and `TimeStamp`. Language keywords such as `vars`, `begin`, `if`, `then` and `end` are lowercase.
 - Assignment uses `:=`; equality tests use `=`. Terminate declarations and instructions with semicolons. `write` accepts one expression, not a comma-separated argument list.
+- Convert `Integer`, `Integer64`, `Real` and `Decimal` values to text with the native `.String` conversion: `firstFloat.String`, `firstInt.String` or `(x + y).String`. This is not a method call: do not generate `.asString()`, `.toString()` or `.String()` for these conversions. String variables already contain text and need no conversion.
 - Construct dynamic strings with `&` and explicit primitive conversion such as `(x + y).String`. Do not assume C#, JavaScript or Python interpolation, or a `String::format` API. Verify any project-specific formatting helper before calling it.
 
 For examples and type/syntax links, read [the language reference](references/language-reference.md). Its string section covers dynamic messages, primitive conversions, typed date/time formatting and parameterized translatable strings.
+
+For native class files, read [CLS extract structure](references/cls-format.md) before changing sections, method declarations, completeness qualifiers or identity metadata.
 
 ## Check the result
 
