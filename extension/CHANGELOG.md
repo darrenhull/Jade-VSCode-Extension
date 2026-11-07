@@ -1,3 +1,11 @@
+# 0.14.0 — Scratch Pad
+
+- Try Jade code from Scratch Pad under Tools without publishing a class.
+- Choose a schema, run saved or unsaved code, and see output and errors beside the code.
+- Add notes and separate experiments; each run has its own local variables.
+- Compare the code and output from your two most recent runs.
+- Use Jade code completion while writing an experiment.
+
 # 0.13.3 — Jade Tools and complete CLS indentation
 
 - Format class and property declarations, collection keys, database mappings, package sections and method source structure using your editor's tabs/spaces settings.

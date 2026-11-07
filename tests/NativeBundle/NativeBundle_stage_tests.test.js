@@ -13,3 +13,13 @@ test('preserves the exact verified manifest bytes and its archive receipt after 
  const pinFile=path.join(f.root,'pin.json');fs.writeFileSync(pinFile,JSON.stringify({version:'0.2.0',tag:'v0.2.0',sha256:'a'.repeat(64),distributionSha256:crypto.createHash('sha256').update(bytes).digest('hex')}));
  bundleCli({...f,pinFile});assert.deepEqual(fs.readFileSync(path.join(f.destination,'distribution.json')),bytes);assert.doesNotThrow(()=>require('../../scripts/NativePin.cjs').verifyNativePin(f.destination,pinFile));
 });
+test('an explicit candidate environment override verifies candidate hashes without impersonating the official release pin',t=>{
+ const f=fixture(t),previous=process.env.JADE_CLI_DISTRIBUTION;process.env.JADE_CLI_DISTRIBUTION=f.source;
+ t.after(()=>{if(previous===undefined)delete process.env.JADE_CLI_DISTRIBUTION;else process.env.JADE_CLI_DISTRIBUTION=previous;});
+ assert.equal(bundleCli({destination:f.destination}),f.destination);
+ fs.writeFileSync(path.join(f.source,'native/jade-test-helper.exe'),'tampered');assert.throws(()=>bundleCli({destination:f.destination}),/checksum/i);
+});
+test('a feature minimum rejects an older native runtime before replacing a previously staged bundle',t=>{
+ const f=fixture(t);fs.mkdirSync(f.destination);fs.writeFileSync(path.join(f.destination,'keep'),'previous');
+ assert.throws(()=>bundleCli({...f,minimumVersion:'0.4.0'}),/requires.*0\.4\.0/);assert.equal(fs.readFileSync(path.join(f.destination,'keep'),'utf8'),'previous');
+});

@@ -35,6 +35,7 @@ Native development belongs to the independent Jade CLI repository. The pinned Wi
 - Format Document/Selection indents native CLS headers, declaration sections, collection keys, database mappings and complete method bodies while preserving Jade tokens, literal contents and line endings.
 - Database Objects provides read-only Source/Working inspection and paged collections.
 - The keyed collection designer creates native source; compilation and publication remain separate actions.
+- **Scratch Pad** under Jade's Tools opens native Jade Workspace code in a simple runnable editor, with output beside the code and a previous-run comparison.
 - The experimental debugger retains its existing pinned native-runtime capabilities and limitations.
 
 See the [extension's detailed documentation](extension/README.md) and [changelog](extension/CHANGELOG.md) for the existing feature scope. Repository separation does not add the missing array/set/index designers or general debugger features.
@@ -42,6 +43,26 @@ See the [extension's detailed documentation](extension/README.md) and [changelog
 Actual VS Code formatting verification (document/selection formatting, undo and idempotence):
 
 ![Formatted Jade method in the running VS Code extension host](docs/images/jade-formatting.png)
+
+## Scratch Pad
+
+Choose **Scratch Pad** under Jade's **Tools**, select a schema and click the play/**Run** action beside the code. Start with `begin write "Hello from Jade"; end;`. The native Jade compiler and runtime execute the exact editor snapshot in Working; no class or method is published. You can save the page as `.jadeworkspace`, add notes or further experiments using VS Code's built-in controls, and keep the source in Git. Outputs and run history are not written into the saved file.
+
+After editing and running again, **Compare previous run** opens VS Code's read-only diff with the actual executed source, status, duration and retained output from both runs. History holds only the latest two runs per source, with global bounds of 50 sources / 2 MiB; output excerpts are labelled. Results are executed again, never reused as cached runs.
+
+For ordinary `.jade` editors, use **Jade: Run Scratch Pad (Working)** or **Jade: Run Selection (Working)**. A selection may contain native Workspace statements; declarations must be available in that same execution. Each run starts with fresh local variables. Committed Working data can survive later runs. Source application definitions are saved disk files; the scratch code can be unsaved. In multi-root projects, saved pages use their own folder's connection; ambiguous untitled pages ask for a project explicitly.
+
+**F5 does not execute Scratch Pad code.** Compilation happens as part of the explicit Run action. Native errors become Problems at the original cell/editor position. Run All stops after a failed or cancelled run. Native output can be buffered until the native process finishes; output limits/truncation are reported. Jade's redirected standard output uses the Windows code page and can replace unrepresentable characters. Standard input is closed: native `read` receives EOF/defaults rather than an interactive editor prompt.
+
+The selected schema controls compilation and saved application definitions. Execution uses the native `RootSchemaApp` launcher; this is separate from the selected compilation schema. Resolve the intended schema explicitly in metadata queries.
+
+Scratch Pad requires native CLI **0.4.0 or newer**. Packaging rejects older bundled runtimes; development candidate testing uses the explicit `JADE_CLI_DISTRIBUTION` override and verifies all native runtime hashes. Source publication, extraction and debugging continue through their existing explicit workflows.
+
+This project is independently maintained; no affiliation with or endorsement by the Jade or VS Code vendors is claimed.
+
+![Scratch Pad running native Jade in Working](docs/images/jade-scratch-pad.png)
+
+![Compare previous Scratch Pad source and output](docs/images/jade-scratch-pad-compare.png)
 
 ## Repository boundaries
 

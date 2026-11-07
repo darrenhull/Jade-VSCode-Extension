@@ -51,7 +51,7 @@ class LanguageModel{
     this.resolved.set(id,result);return result;
   }
   context(model,offset){const raw=model.classes.find(cls=>cls.regions.some(([start,end])=>start<=offset&&offset<=end))||model.classes[0];
-    const owner=raw&&this.type(raw.name,model.schema),method=raw?.members.find(member=>member.kind==='method'&&member.bodyStart!==undefined&&member.bodyStart<=offset&&offset<=member.end);
+    const owner=model.workspace?this.type('JadeScript',model.schema):raw&&this.type(raw.name,model.schema),method=model.workspace?{bodyStart:0,signatureEnd:0,end:model.code.length,parameters:[]}:raw?.members.find(member=>member.kind==='method'&&member.bodyStart!==undefined&&member.bodyStart<=offset&&offset<=member.end);
     const variables=new Map();for(const parameter of method?.parameters||[])variables.set(parameter.name,{...parameter,kind:'variable',parameter:true});
     if(method){const body=model.code.slice(method.signatureEnd||method.bodyStart,offset);const vars=/\bvars\b([\s\S]*?)(?=\bbegin\b|$)/.exec(body)?.[1];if(vars)for(const variable of parseParameters(vars))variables.set(variable.name,{...variable,kind:'variable'});}
     return {model,offset,raw,owner,method,variables,schema:model.schema};

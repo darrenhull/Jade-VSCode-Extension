@@ -19,6 +19,7 @@ GitHub VSIX updates are installed manually. Installing a newer VSIX updates the 
 |---|---|
 | Jade language support | Use highlighting, completion, hover, signatures, definitions and references in native source files. |
 | Compile | Press **F5** to compile saved source and its dependencies. Compiler errors appear in **Problems** and **Jade Compile** output. |
+| Scratch Pad | Open **Jade: New Scratch Pad** to try Jade code in Working without publishing a class. Choose a schema, press **Run**, and compare the last two runs. |
 | Format | Run **Format Document** or **Format Selection** to indent CLS headers, declarations, collections, database mappings and complete method bodies. Editor tabs/spaces are respected; literal text and Jade tokens are preserved. |
 | Test | Discover and run unit tests in **Testing**, use **Run Local Test**, and inspect individual failures and assertion messages. |
 | Debug | Set gutter breakpoints, step through supported methods/tests, inspect call stacks and expand objects and collections. |
@@ -28,6 +29,12 @@ GitHub VSIX updates are installed manually. Installing a newer VSIX updates the 
 For a wrapped statement or declaration, include its first line in the selection so the following lines can be indented together.
 
 **Error Lens** is installed alongside Jade Tools when Marketplace access is available. It displays compiler diagnostics beside their source lines and can be disabled or uninstalled independently. Offline users can install its VSIX separately.
+
+## Scratch Pad
+
+Choose **New Scratch Pad** under Tools, select a schema, type Jade code and press **Run**. Save the page to keep its code and optional notes in source control; run output is not saved with it. After two runs, use **Compare Previous Scratch Pad Run** to compare the code and results.
+
+Each run has separate local variables. Changes your code commits to Working data can remain for later runs. Interactive input is unavailable, and F5 does not execute scratch code.
 
 ## Browse and create
 
