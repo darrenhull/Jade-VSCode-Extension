@@ -17,7 +17,32 @@ function registerClassView(vscode, context, language, options={}) {
   let timer, resources, browserProject, browserGeneration;
   const browser = new ClassBrowserModel({ scope: "workspace", pageSize: 100 }),
     classPages = new Map(),
-    classFilters = new Map();
+    classFilters = new Map(),
+    memberGroups = new Map(),
+    memberGroupData = new WeakMap();
+  function registeredGroup(id) {
+    const row = memberGroups.get(id)?.deref();
+    if (!row) { memberGroups.delete(id); return; }
+    return memberGroupData.get(row);
+  }
+  const memberPageSize = 98;
+  function memberGroup(row, items) {
+    const prior = registeredGroup(row.id), offset = Math.min(prior?.offset || 0, items.length ? Math.floor((items.length - 1) / memberPageSize) * memberPageSize : 0);
+    const end = Math.min(items.length, offset + memberPageSize);
+    const group = { ...row, description: items.length ? (offset + 1) + "–" + end + " of " + items.length : "No members", items: items.slice(offset, end) };
+    memberGroupData.set(group, { row: group, items, offset });
+    memberGroups.set(row.id, new WeakRef(group));
+    return group;
+  }
+  function memberPage(row) {
+    const group = registeredGroup(row.id);
+    if (!group) return [];
+    const { items, offset } = group, end = Math.min(items.length, offset + memberPageSize);
+    row.description = items.length ? (offset + 1) + "–" + end + " of " + items.length : "No members";
+    const control = (direction, target) => ({ kind: "memberPage", groupId: row.id, offset: target, direction, schema: row.schema, owner: row.owner,
+      label: (direction === "previous" ? "Previous " : "Next ") + memberPageSize + " members", description: row.description, id: row.id + "::page::" + direction + "::" + target });
+    return [...(offset ? [control("previous", offset - memberPageSize)] : []), ...items.slice(offset, end), ...(end < items.length ? [control("next", end)] : [])];
+  }
   function changed(uri) {
     if (/\.(scm|sec|ddx)$/i.test(uri.fsPath)) resources = undefined;
     pendingFiles.add(uri.toString());
@@ -179,7 +204,10 @@ function registerClassView(vscode, context, language, options={}) {
           base: "type-hierarchy",
         }[row.kind] || "symbol-constant",
       );
-      if (row.kind === "classPage") {
+      if (row.kind === "memberPage") {
+        item.iconPath = new vscode.ThemeIcon(row.direction === "previous" ? "arrow-up" : "arrow-down");
+        item.command = { command: "jadeNative.pageSourceMembers", title: row.label, arguments: [row.groupId, row.offset] };
+      } else if (row.kind === "classPage") {
         item.iconPath = new vscode.ThemeIcon(
           row.direction === "previous" ? "arrow-up" : "arrow-down",
         );
@@ -213,7 +241,7 @@ function registerClassView(vscode, context, language, options={}) {
         };
       }
       if (row.kind === "class") item.contextValue = "jadeSourceClass";
-      if (row.kind === "class") item.command={command:'jadeNative.openClassWorkspace',title:'Open class workspace',arguments:[row]};
+      if (row.kind === "class") { const { entries, ...identity } = row; item.command={command:'jadeNative.openClassWorkspace',title:'Open class workspace',arguments:[identity]}; }
       item.tooltip = row.schema
         ? row.schema +
           "::" +
@@ -242,14 +270,12 @@ function registerClassView(vscode, context, language, options={}) {
         return [
           ...(files.length
             ? [
-                {
+                memberGroup({
                   kind: "group",
                   label: "Schema & resources",
                   schema: row.name,
                   id: row.name + "::resources",
-                  description: String(files.length),
-                  items: files,
-                },
+                }, files),
               ]
             : []),
           ...page.items,
@@ -281,7 +307,7 @@ function registerClassView(vscode, context, language, options={}) {
             : []),
         ];
       }
-      if (row.kind === "group") return row.items;
+      if (row.kind === "group") return memberPage(row);
       if (row.kind === "class") {
         const groups = new Map();
         for (const entry of row.entries) {
@@ -295,15 +321,14 @@ function registerClassView(vscode, context, language, options={}) {
             groups.set(group.label, list);
           }
         }
-        return [...groups].map(([label, items]) => ({
+        return [...groups].map(([label, items]) => memberGroup({
           kind: "group",
           label,
           schema: row.schema,
           owner: row.name,
           id: (row.browserId||JSON.stringify([row.projectId,row.schema,row.name])) + "::" + label,
           description: String(items.length),
-          items,
-        }));
+        }, items));
       }
       return [];
     },
@@ -367,6 +392,15 @@ function registerClassView(vscode, context, language, options={}) {
     vscode.commands.registerCommand("jadeNative.browseSourceClasses", (row) =>
       catalogue.show({ schema: row?.schema }),
     ),
+    vscode.commands.registerCommand("jadeNative.pageSourceMembers", (groupId, offset) => {
+      if (typeof groupId !== "string" || !Number.isSafeInteger(offset) || offset < 0 || offset % memberPageSize) return;
+      const group = registeredGroup(groupId);
+      if (!group || offset >= group.items.length) return;
+      group.offset = offset;
+      group.row.items = group.items.slice(offset, offset + memberPageSize);
+      group.row.description = (offset + 1) + "–" + Math.min(group.items.length, offset + memberPageSize) + " of " + group.items.length;
+      events.fire(group.row);
+    }),
     vscode.commands.registerCommand(
       "jadeNative.pageSourceClasses",
       async (row) => {
@@ -399,7 +433,7 @@ function registerClassView(vscode, context, language, options={}) {
           member = classSections(text, row.file)
             .find((c) => c.name === row.owner)
             ?.groups.flatMap((g) => g.items)
-            .find((m) => m.name === row.name && m.kind === row.kind);
+            .find((m) => m.name === row.name && (m.kind === row.kind || row.kind==='typeMethod'&&m.kind==='method'&&m.typeMethod));
         if (!member) return;
         const editor = await vscode.window.showTextDocument(doc, {
             preview: true,
@@ -491,6 +525,7 @@ function registerClassView(vscode, context, language, options={}) {
         clearTimeout(timer);
 
         pendingFiles.clear();
+        memberGroups.clear();
       },
     },
   );

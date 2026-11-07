@@ -157,6 +157,10 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "editorSave": if (await services.save?.() === false) await send({ command: "notice", message: "The source document was not saved. Your edits remain in the document." }); break;
           case "editorUndo": await services.undo?.(); break;
           case "editorRedo": await services.redo?.(); break;
+          case "editorBuild": await services.build?.(); break;
+          case "editorPublish": await services.publish?.(); break;
+          case "editorRunTests": await services.runTests?.(); break;
+          case "editorActionBlocked": await send({ command: "notice", message: "Resolve the unapplied method draft before building, publishing or running tests." }); break;
           case "editorConflict": await send({ command: "notice", message: "Source changed while an edit was pending. Your method draft is preserved; open original source to resolve it." }); break;
           case "editorNotice": await send({ command: "notice", message: "Method draft is too large for protected editing. Open Original Source to edit this method." }); break;
           case "editorDefinition": if (localMethod() && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= (binding?.snapshot()?.text?.length || 0)) await services.definition?.(value.offset); break;

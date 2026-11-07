@@ -158,6 +158,12 @@ test("superclass navigation uses only resolved adapter identity",async()=>{
   const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,overview:{superclassIdentity:base}}),onSuperclass:async(...args)=>calls.push(args)});
   shell.attach({panel:h.panel,row});await h.message({command:"ready"});await h.message({command:"superclass",identity:{file:"C:/attacker.cls"}});assert.deepEqual(calls[0],[row,base]);
 });
+test("source actions dispatch only explicit requests through trusted backing-document services",async()=>{
+  const h=host(),calls=[],services=Object.fromEntries(["build","publish","runTests"].map(name=>[name,async(...args)=>calls.push({name,args})]));
+  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot});shell.attach({panel:h.panel,row,services});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});assert.deepEqual(calls,[]);
+  await h.message({command:"editorBuild",uri:"file:///attacker.cls"});await h.message({command:"editorPublish",uri:"file:///attacker.cls"});await h.message({command:"editorRunTests",uri:"file:///attacker.cls"});
+  assert.deepEqual(calls,[{name:"build",args:[]},{name:"publish",args:[]},{name:"runTests",args:[]}]);
+});
 
 test("reused class workspace Back restores its latest discovery origin",async()=>{
  const h=host(),origins=[],shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot,onBack:(_row,origin)=>origins.push(origin)});

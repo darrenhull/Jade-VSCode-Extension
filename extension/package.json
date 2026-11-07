@@ -353,6 +353,21 @@
         "command": "jadeNative.scratchpadCompileInfo",
         "key": "f5",
         "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && resourceExtname == .jade && editorLangId == jade-nz))"
+      },
+      {
+        "command": "jadeNative.buildWorkspace",
+        "key": "f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.publishClass",
+        "key": "shift+f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.runLocalTests",
+        "key": "ctrl+f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
       }
     ],
     "menus": {

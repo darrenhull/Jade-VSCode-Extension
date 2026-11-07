@@ -63,7 +63,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
       async restore(){const identity=draftIdentity(),draft=displayedDraft&&recovery.get(displayedDraft.identity),selected=session.binding.snapshot();if(!draft)return selected;if(identity.owner!==draft.identity.owner||identity.member!==draft.identity.member)throw Error('Select '+draft.identity.owner+'::'+draft.identity.member+' before restoring its draft.');const result=await session.binding.edit({version:selected.version,owner:selected.owner,member:selected.member,start:0,end:selected.text.length,text:draft.text});if(result.text===draft.text)await recovery.discard(identity);return result;},
     };
     const view=shell.attach({...session,row,origin:state.origin,selectedId:state.selectedId||state.sourceMemberId,services:{...session.services,editorScriptUri,draftRecovery}});
-    views.set(key,{panel:session.panel,view,row,backingFile:uri,sourceMemberId:state.sourceMemberId,origin:state.origin});
+    views.set(key,{panel:session.panel,view,row,binding:session.binding,backingFile:uri,sourceMemberId:state.sourceMemberId,origin:state.origin});
     lastActiveKey=key;
     const active=session.panel.onDidChangeViewState?.(event=>{if(event.webviewPanel.active)lastActiveKey=key;});
     const closed=session.panel.onDidDispose(()=>{if(views.get(key)?.panel===session.panel)views.delete(key);});
@@ -101,7 +101,8 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     opening=operation.catch(()=>{});
     return operation;
   }
-  const controller={open,openOwningSource(row,id){return open(row,{sourceMemberId:id,selectedId:id});},async openOriginal(){const selected=[...views.values()].find(value=>value.panel.active)||views.get(lastActiveKey)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
+  async function prepareActiveSource(uri){const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();for(const value of views.values())if((value.backingFile===uri.toString()||project&&value.row.projectId===project)&&(value.panel.active||value.binding?.snapshot?.()))if(await value.view.prepareSourceSwitch?.()===false)return false;return true;}
+  const controller={open,prepareActiveSource,openOwningSource(row,id){return open(row,{sourceMemberId:id,selectedId:id});},async openOriginal(){const selected=[...views.values()].find(value=>value.panel.active)||views.get(lastActiveKey)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
   context.subscriptions.push(controller);
   return controller;
 }

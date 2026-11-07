@@ -5,13 +5,14 @@ const path = require("node:path");
 const vscode = require("vscode");
 const { createClassWorkspaces } = require("../src/class-workspace");
 const { registerClassWorkspaces } = require("../src/class-workspace-controller");
+const {resolveJadeSource}=require("../src/active-jade-source");
 const { withClassWorkspace } = require("./class-workspace-ui-capture.cjs");
 
 async function run() {
   const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const report = path.resolve(workspace, "../host-report.json");
   const captures = process.env.JADE_CLASS_WORKSPACE_SCREENSHOTS;
-  const owned = [], messages = [], selections = [], memento = new Map(), warnings=[],sourceMoves=[];
+  const owned = [], messages = [], selections = [], memento = new Map(), warnings=[],sourceMoves=[],keyDispatches=[];
   let document, saved, binding, previousClipboard, viewId, currentView, allowInherited=false, removeMethod=false,allowExtra=false;
   const source = ["schemaDefinition", "Pets subschemaOf RootSchema partialDefinition;", "typeHeaders", "Fish subclassOf Object transient;", "typeDefinitions", "Fish completeDefinition", "(", "attributeDefinitions", "name: String[50];", "jadeMethodDefinitions", "getName() : String;", ")", "typeSources", "Fish (", "jadeMethodSources", "getName", "{", "getName() : String;", "begin", ' return "Bubbles";', "end;", "}", ")"].join("\r\n");
   const file = path.join(workspace, "ClassWorkspaceFish.cls");
@@ -25,9 +26,15 @@ async function run() {
   fs.writeFileSync(extraFile,'schemaDefinition\r\nPets subschemaOf RootSchema partialDefinition;\r\ntypeDefinitions\r\nFish partialDefinition\r\n(\r\njadeMethodDefinitions\r\nextra() : String;\r\n)\r\ntypeSources\r\nFish (\r\njadeMethodSources\r\nextra\r\n{\r\nextra() : String;\r\nbegin\r\n return "extra";\r\nend;\r\n}\r\n)');
   const extra={id:"extra-method",name:"extra",kind:"method",schema:"Pets",owner:"Fish",file:extraUri};
   try {
+    const productApi=await vscode.extensions.getExtension("jade-local-tools.jade-native-runner-cpp-preview").activate();
+    productApi.classView.previewController.dispose();
     // Use VS Code's supported renderer dialogs in this isolated test profile.
     await vscode.workspace.getConfiguration("window").update("dialogStyle","custom",vscode.ConfigurationTarget.Global);
     const context = { subscriptions:[], extensionUri: vscode.Uri.file(path.resolve(__dirname, "..")), workspaceState: { get: key => memento.get(key), update: async (key,value) => memento.set(key,value) } };
+    const sourceCommands=new Set(["jadeNative.buildWorkspace","jadeNative.publishClass","jadeNative.runLocalTests"]);
+    async function dispatchSourceAction(command,explicitUri,route){const source=await resolveJadeSource(vscode,explicitUri,{prepare:uri=>controller.prepareActiveSource(uri)});if(!source)throw Error("No original source was resolved for the private key dispatch proof.");keyDispatches.push({command,uri:source.uri.toString(),text:source.getText(),route});return{dispatched:true};}
+    for(const command of sourceCommands)owned.push(vscode.commands.registerCommand(command.replace("jadeNative.","jade.test."),()=>dispatchSourceAction(command,undefined,"global")));
+    const sourceVscode={...vscode,commands:{...vscode.commands,executeCommand(command,...args){return sourceCommands.has(command)?dispatchSourceAction(command,args[0],"canvas"):vscode.commands.executeCommand(command,...args);}}};
     const adapters = {
       async load(_row,state) {
         if(!fs.existsSync(file))throw Error("Workspace source file is not available. Restore the original file, then retry.");
@@ -44,7 +51,7 @@ async function run() {
       const shell=createClassWorkspaces({Uri:vscode.Uri,window:{showWarningMessage(...args){warnings.push(args[0]);return vscode.window.showWarningMessage(...args);}}},context,adapters),attach=shell.attach;
       shell.attach=session=>{document=session.document;saved=session.services.save;binding=session.binding;const view=attach(session);currentView=view;viewId=view.viewId;return view;};
       const model={resolveClass:async()=>({...row,name:"Fish",qualifiedName:"Pets::Fish"}),resolveMemberSource:async(_row,id)=>{if(!allowExtra||id!==extra.id)throw Error("The fixture method source is not resolved.");return{identity:{...row,name:"Fish",qualifiedName:"Pets::Fish"},member:extra,file:extraUri};}};
-      const controller=registerClassWorkspaces(vscode,context,{model,shell,viewType:"jade.testClassWorkspace"});owned.push(controller);return controller;
+      const controller=registerClassWorkspaces(sourceVscode,context,{model,shell});owned.push(controller);return controller;
     }
     let controller=createController();await controller.open(row);
     const evidence=await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{
@@ -136,7 +143,7 @@ async function run() {
       const draft=await rejectDraft(browser,"// recovered checkpoint ");
       assert.ok(draft.includes("recovered checkpoint"));await browser.screenshot(path.join(captures,"class-workspace-recovery.png"));return draft;
     });
-    const classTabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.testClassWorkspace");
+    const classTabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.classWorkspace");
     assert.equal(await vscode.window.tabGroups.close(classTabs),true,"clean source custom editor closes without unsaved prompt");
     controller.dispose();controller=createController();await controller.open(row);
     await withClassWorkspace(port,async browser=>{
@@ -188,7 +195,7 @@ async function run() {
       await selectEditable(browser);const before=document.getText();
       await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("// cancel protected source switch ");
       for(let attempt=0;attempt<100&&!document.isDirty;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.isDirty,true);const dirty=document.getText();assert.notEqual(dirty,before);
-      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.testClassWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),uri.toString());
+      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.classWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),uri.toString());
       await browser.evaluate('document.getElementById("search").value="extra";document.getElementById("search").dispatchEvent(new Event("input",{bubbles:true}))');await browser.wait('document.querySelector("[data-member-id=extra-method]")',"secondary partial-file method");
       await browser.evaluate('document.querySelector("[data-member-id=extra-method]").click()');await confirm(browser,"Cancel");
       for(let attempt=0;attempt<100&&!sourceMoves.length;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(sourceMoves.at(-1)?.cancelled,true);assert.equal(document.uri.toString(),uri.toString());assert.equal(document.getText(),dirty);assert.equal(document.isDirty,true);assert.equal(currentView.state().selectedId,"getName");
@@ -204,9 +211,16 @@ async function run() {
       for(let attempt=0;attempt<100&&!document.getText().includes("secondary method edit");attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.isDirty,true);assert.ok(document.getText().includes("secondary method edit"));
       await vscode.commands.executeCommand("undo");for(let attempt=0;attempt<100&&document.getText()!==initial;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.getText(),initial);
       await vscode.commands.executeCommand("redo");for(let attempt=0;attempt<100&&!document.getText().includes("secondary method edit");attempt++)await new Promise(resolve=>setTimeout(resolve,20));await saved();assert.equal(fs.readFileSync(extraFile,"utf8"),document.getText());assert.equal(fs.readFileSync(file,"utf8"),primarySaved);
-      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.testClassWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),extraUri);assert.equal(tabs[0].label,"Pets::Fish");await browser.screenshot(path.join(captures,"class-workspace-secondary-source.png"));
+      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.classWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),extraUri);assert.equal(tabs[0].label,"Pets::Fish");await browser.screenshot(path.join(captures,"class-workspace-secondary-source.png"));
+      assert.deepEqual(keyDispatches,[],"viewing, editing and navigation must not automatically build, publish or run tests");
+      async function assertKey(command,modifiers,route){const before=keyDispatches.length;await browser.key("F5",116,modifiers);for(let attempt=0;attempt<200&&keyDispatches.length===before;attempt++)await new Promise(resolve=>setTimeout(resolve,20));await new Promise(resolve=>setTimeout(resolve,150));assert.equal(keyDispatches.length,before+1,"one dispatch per actual F5 combination");const result=keyDispatches.at(-1);assert.equal(result.command,command);assert.equal(result.uri,extraUri,"key actions must use the actual secondary backing document");if(route)assert.equal(result.route,route);return result;}
+      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("// queued before F5 ");
+      assert.ok((await assertKey("jadeNative.buildWorkspace",0)).text.includes("queued before F5"),"F5 must await pending source edits");
+      await assertKey("jadeNative.publishClass",8);await assertKey("jadeNative.runLocalTests",2);
+      await browser.evaluate('document.getElementById("overview").click()');await browser.wait('document.getElementById("detail-title").textContent==="Class overview"',"overview key dispatch context");
+      await assertKey("jadeNative.buildWorkspace",0,"global");await assertKey("jadeNative.publishClass",8,"global");await assertKey("jadeNative.runLocalTests",2,"global");
     },{predicate:'Boolean(document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(viewId)+')'});
-    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,autoSavedIncompleteMethod:true,repairedSelectionRetained:true,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,unappliedDraftCaption:true,recoveryCaptionReset:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,nativeSourceSwitchCancel:true,sameLogicalClassSecondarySource:true,secondaryNativeEditUndoSave:true},null,2));
+    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,autoSavedIncompleteMethod:true,repairedSelectionRetained:true,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,unappliedDraftCaption:true,recoveryCaptionReset:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,nativeSourceSwitchCancel:true,sameLogicalClassSecondarySource:true,secondaryNativeEditUndoSave:true,sourceKeyDispatch:{count:keyDispatches.length,exactlyOnce:true,actualBackingUri:true,pendingEditsFlushed:true,overviewGlobalBindings:true,nativeCompilationExecuted:false}},null,2));
   } catch(error) {fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
   finally {if(previousClipboard!==undefined)await vscode.env.clipboard.writeText(previousClipboard);if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
 }

@@ -8,6 +8,7 @@ const { startCpp } = require('./cpp-runner');
 const { CliWorkingSession } = require('./cli-client');
 const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
+const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
 const keys = ['installPath', 'databasePath', 'iniPath', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
@@ -15,18 +16,17 @@ function defaults(resource) {
   return Object.fromEntries(keys.map(key => [key, settings.get(key)]));
 }
 
-function expand(value, folder) {
+function expand(value, folder, resource=jadeSourceUri(vscode)) {
   if (typeof value !== 'string') return value;
   return value.replace(/\$\{env:([^}]+)\}/g, (_, name) => process.env[name] || '')
     .replaceAll('${workspaceFolder}', folder?.uri.fsPath || '')
     .replaceAll('${userHome}', os.homedir())
-    .replaceAll('${file}', vscode.window.activeTextEditor?.document.uri.fsPath || '');
+    .replaceAll('${file}', resource?.fsPath || '');
 }
 
 async function detectSettings() {
   if (process.platform !== 'win32') throw new Error('This native proof currently supports Windows x64.');
-  const editor = vscode.window.activeTextEditor;
-  const resource = editor?.document.uri || vscode.workspace.workspaceFolders?.[0]?.uri;
+  const resource = jadeSourceUri(vscode) || vscode.workspace.workspaceFolders?.[0]?.uri;
   const folder = resource ? vscode.workspace.getWorkspaceFolder(resource) : undefined;
   if (!folder) throw new Error('Open a workspace folder before detecting Jade settings.');
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
@@ -69,6 +69,7 @@ function activate(context) {
   require('./navigation').registerNavigation(context,language);
   require('./impact-navigation').registerImpactNavigation(vscode,context,language);
   const classView=require('./class-view').registerClassView(vscode,context,language,{onInstances:row=>objectExplorer?.browseInstances(row)});
+  const resolveSource=uri=>resolveJadeSource(vscode,uri,{prepare:resource=>classView.previewController.prepareActiveSource(resource)});
   const diagnostics = vscode.languages.createDiagnosticCollection('jade-native');
   const publishOutput = vscode.window.createOutputChannel('Jade Publish');
   const compileOutput = vscode.window.createOutputChannel('Jade Compile');
@@ -90,11 +91,11 @@ function activate(context) {
     output: publishOutput, isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
     settings: folder => Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key, value]) => [key, expand(value, folder)])),
-    publishNativeProject: () => projectTools.publish()
+    resolveSource,publishNativeProject: uri => projectTools.publish(false,uri)
   });
   function classConfig(document) {
     const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder)]));
+    const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder, document.uri)]));
     let schema = schemaFromSource(document.getText()) || /\bRename\s+Class\s+(\w+)::/i.exec(document.getText())?.[1] || (document.uri.fsPath.toLowerCase().endsWith('.ddx') ? /<schema\b[^>]*\bname="([^"]+)"/.exec(document.getText())?.[1] : undefined);
     if(!schema){let directory=path.dirname(document.uri.fsPath);const root=folder?.uri.fsPath||directory;
       while(directory.length>=root.length){const header=[path.join(directory,'schemaDefinitions.sec'),path.join(path.dirname(directory),path.basename(directory)+'.scm')].find(file=>fs.existsSync(file));if(header){schema=schemaFromSource(fs.readFileSync(header,'utf8'));if(schema)break;}const parent=path.dirname(directory);if(parent===directory)break;directory=parent;}
@@ -115,7 +116,7 @@ function activate(context) {
   function inspectionConfig(document,selectedFolder){
     const folder=selectedFolder||(document?.uri&&vscode.workspace.getWorkspaceFolder(document.uri))||vscode.workspace.workspaceFolders?.[0];
     if(!folder)throw Error('Open a workspace folder and configure its Jade connection.');
-    const settings=Object.fromEntries(Object.entries(defaults(document?.uri||folder.uri)).map(([key,value])=>[key,expand(value,folder)]));
+    const settings=Object.fromEntries(Object.entries(defaults(document?.uri||folder.uri)).map(([key,value])=>[key,expand(value,folder,document?.uri||folder.uri)]));
     const installPath=settings.installPath||process.env.JADE_INSTALL;if(!installPath)throw Error('Set jadeNative.installPath or use Detect Runtime Settings.');
     return {...settings,installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
@@ -166,7 +167,7 @@ function activate(context) {
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
   });
   const projectTools=require('./project-tools').registerProjectTools(vscode,context,{
-    beforeOperation,
+    beforeOperation,resolveSource,
     prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),
     config:classConfig,output:publishOutput,isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
@@ -221,7 +222,7 @@ function activate(context) {
     beforeOperation: () => objectExplorer?.releaseForOperation(),
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
-    classConfig, workingFiles, startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
+    resolveSource,classConfig, workingFiles, startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
   });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
@@ -232,7 +233,7 @@ function activate(context) {
       return summary;
     }),
     vscode.commands.registerCommand('jadeNative.runLocalTests', async (uri, method) => {
-      try { return await testing.runFile(uri || vscode.window.activeTextEditor?.document.uri, method); }
+      try { const document=await resolveSource(uri);if(!document)throw Error('Open a saved CLS test class.');return await testing.runFile(document.uri, method); }
       catch (error) {
         testOutput.appendLine(error.message); testOutput.show(true);
         void vscode.window.showErrorMessage(error.message);
@@ -247,12 +248,12 @@ function activate(context) {
       }
     }),
     vscode.commands.registerCommand('jadeNative.executeLocalTests', async (uri, method, testCancellation, outputObserver) => {
+      const document = await resolveSource(uri);
       await objectExplorer?.releaseForOperation();
       if (publishing) { void vscode.window.showErrorMessage('A Jade operation is already running.'); return; }
       publishing = true;
       try {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
-        const document = uri ? await vscode.workspace.openTextDocument(uri) : vscode.window.activeTextEditor?.document;
         if (!document || document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) throw new Error('Open a saved CLS test class.');
         if (document.isDirty && !await document.save()) throw new Error('Save the test file before running.');
         const config = classConfig(document);
@@ -303,13 +304,13 @@ function activate(context) {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
       }
     }),
-    vscode.commands.registerCommand('jadeNative.refreshTypeCache', async () => {
+    vscode.commands.registerCommand('jadeNative.refreshTypeCache', async uri => {
+      const document = await resolveSource(uri);
       await beforeOperation();
       if (publishing) { void vscode.window.showErrorMessage('A Jade compile, publish or refresh is already running.'); return; }
       publishing = true;
       try {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
-        const document = vscode.window.activeTextEditor?.document;
         if (!document || document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) throw new Error('Open a CLS file to select the schema to cache.');
         const config = classConfig(document);
         compileOutput.clear(); compileOutput.show(true);
@@ -323,20 +324,21 @@ function activate(context) {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
       }
     }),
-    vscode.commands.registerCommand('jadeNative.publishClass', async () => {
+    vscode.commands.registerCommand('jadeNative.publishClass', async uri => {
+      let document;
+      try{document=await resolveSource(uri);}catch(error){publishOutput.appendLine(error.message);publishOutput.show(true);void vscode.window.showErrorMessage(error.message);return {success:false,error:error.message};}
       await beforeOperation();
-      if(/\.(scm|sec|ddx|jcf)$/i.test(vscode.window.activeTextEditor?.document.uri.fsPath||''))return vscode.commands.executeCommand('jadeNative.publishWorkspace');
-      const activeFolder=vscode.window.activeTextEditor&&vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri);
-      if(activeFolder&&(await require('./native-project').scanProject(activeFolder.uri.fsPath)).migrations.length)return vscode.commands.executeCommand('jadeNative.publishWorkspace');
+      if(/\.(scm|sec|ddx|jcf)$/i.test(document?.uri.fsPath||''))return vscode.commands.executeCommand('jadeNative.publishWorkspace',document.uri);
+      const activeFolder=document&&vscode.workspace.getWorkspaceFolder(document.uri);
+      if(activeFolder&&(await require('./native-project').scanProject(activeFolder.uri.fsPath)).migrations.length)return vscode.commands.executeCommand('jadeNative.publishWorkspace',document.uri);
       if (publishing) { await vscode.window.showErrorMessage('A Jade class publish is already running.'); return; }
       publishing = true;
-      const document = vscode.window.activeTextEditor?.document;
       try {
         if (process.platform !== 'win32') throw new Error('Jade class publishing requires Windows.');
         if (!document || document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) throw new Error('Open a saved .cls class file to publish.');
         if (document.isDirty && !await document.save()) throw new Error('The class file could not be saved; nothing was published.');
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-        const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder)]));
+        const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder, document.uri)]));
         const config = resolvePublishConfig({ ...settings, program: document.uri.fsPath });
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
         const confirmation = await vscode.window.showWarningMessage(
@@ -374,19 +376,19 @@ function activate(context) {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
       }
     }),
-    vscode.commands.registerCommand('jadeNative.recreateWorkingDatabase', async () => {
+    vscode.commands.registerCommand('jadeNative.recreateWorkingDatabase', async uri => {
+      const document=await resolveSource(uri);
       if(!publishing)await nativeTests.release();
       await beforeOperation();
       if(publishing)throw new Error('A Jade operation is already running.');
-      const document=vscode.window.activeTextEditor?.document;
       if(!document)throw new Error('Open a CLS file first.');
       const config=classConfig(document);
       if(config.workingDatabaseDirectory)throw new Error('Choose a new empty jadeNative.workingDatabaseDirectory to recreate a custom working base. The previous base is retained.');
       await context.workspaceState.update('jadeNative.workingDatabaseGeneration',require('node:crypto').randomUUID());
       compileOutput.appendLine('A fresh native working database will be created on the next compile or test. The previous working base is retained.');compileOutput.show(true);
     }),
-    vscode.commands.registerCommand('jadeNative.showWorkingDatabase', async () => {
-      const document=vscode.window.activeTextEditor?.document;
+    vscode.commands.registerCommand('jadeNative.showWorkingDatabase', async uri => {
+      const document=await resolveSource(uri);
       if(!document)throw new Error('Open a CLS file first.');
       const config=classConfig(document),location=await nativeTests.workingLocation(config);
       if(!fs.existsSync(location.root))throw new Error('Compile or run tests first to create the working database.');

@@ -51,7 +51,12 @@ class ClassWorkspaceEditorProvider {
     const requireActive=()=>{if(document.isClosed||panel?.active!==true)throw new Error('Select this class workspace before undo, redo or source navigation.');};
     const range = value => value ? { start: Math.max(0, document.offsetAt(value.start) - binding.snapshot().start), end: Math.min(binding.snapshot().text.length, document.offsetAt(value.end) - binding.snapshot().start) } : undefined;
     const inMethod=value=>!value||(document.offsetAt(value.start)>=binding.snapshot().start&&document.offsetAt(value.end)<=binding.snapshot().end);
+    const operation=(jadeCommand,debugCommand)=>{requireActive();return vscode.debug?.activeDebugSession?vscode.commands.executeCommand(debugCommand):vscode.commands.executeCommand(jadeCommand,document.uri);};
     return {
+      build:()=>operation('jadeNative.buildWorkspace','workbench.action.debug.continue'),
+      compile:()=>operation('jadeNative.compileClass','workbench.action.debug.continue'),
+      publish:()=>operation('jadeNative.publishClass','workbench.action.debug.stop'),
+      runTests:()=>operation('jadeNative.runLocalTests','workbench.action.debug.run'),
       save: () => document.save(),
       undo: () => {requireActive();return vscode.commands.executeCommand('undo');},
       redo: () => {requireActive();return vscode.commands.executeCommand('redo');},

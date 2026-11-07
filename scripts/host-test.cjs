@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),{spawn,execFileSync}=requi
 const {HostTestArtifacts}=require('./HostTestArtifacts.cjs');
 async function main(){
  const artifacts=new HostTestArtifacts();artifacts.assertFreeSpace();
- const classWorkspaceUi=process.argv.includes('--class-workspace-ui'),objectWorkspaceUi=process.argv.includes('--object-workspace-ui');
+ const classWorkspaceUi=process.argv.includes('--class-workspace-ui'),memberTreeUi=process.argv.includes('--member-tree-ui'),objectWorkspaceUi=memberTreeUi||process.argv.includes('--object-workspace-ui');
  const collectionFamilies=process.argv.includes('--collection-families'),creation=collectionFamilies||process.argv.includes('--creation'),nativeOids=process.argv.includes('--native-oids'),formatting=process.argv.includes('--formatting'),workspaces=process.argv.includes('--workspaces'),incremental=process.argv.includes('--incremental');
  require('./bundle-cli.cjs').bundleCli({minimumVersion:workspaces?require('../extension/package.json').jadeNative.minimumCliVersion:undefined});
  artifacts.nativeSha256=require('node:crypto').createHash('sha256').update(fs.readFileSync(path.resolve(__dirname,'../extension/vendor/jade-tools-cli/jade-cli.exe'))).digest('hex');
@@ -31,6 +31,8 @@ async function main(){
   // The private development host runs the same staged product normally, so
   // native Save/Discard/Cancel and source-recovery confirmation are real UI.
   const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+  const commandSpies={'jadeNative.buildWorkspace':'jade.test.buildWorkspace','jadeNative.publishClass':'jade.test.publishClass','jadeNative.runLocalTests':'jade.test.runLocalTests'};
+  manifest.contributes.keybindings=manifest.contributes.keybindings.map(binding=>({...binding,command:commandSpies[binding.command]||binding.command}));
   manifest.main='./test/ui-main.js';manifest.activationEvents=[...new Set([...(manifest.activationEvents||[]),'onStartupFinished'])];
   fs.writeFileSync(manifestPath,JSON.stringify(manifest));
   fs.writeFileSync(path.join(extension,'test/ui-main.js'),[
@@ -45,7 +47,7 @@ async function main(){
    "exports.deactivate=()=>original.deactivate?.();",
   ].join('\n'));
  }
- if(objectWorkspaceUi){for(const [source,target] of [['test/vscode-object-workspace-ui-smoke.js','implementation.js'],['scripts/creation-ui-capture.cjs','creation-ui-capture.cjs'],['scripts/class-workspace-ui-capture.cjs','class-workspace-ui-capture.cjs']])fs.copyFileSync(path.join(base,source),path.join(extension,'test',target));const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));manifest.main='./test/object-fixture-owner.cjs';manifest.contributes.views.jadeNative=[{id:'jade.testInspectionInstances',name:'Database Objects'}];fs.writeFileSync(manifestPath,JSON.stringify(manifest));fs.writeFileSync(path.join(extension,'test/object-fixture-owner.cjs'),'exports.activate=()=>{};');}
+ if(objectWorkspaceUi){for(const [source,target] of [[memberTreeUi?'test/vscode-member-tree-ui-smoke.js':'test/vscode-object-workspace-ui-smoke.js','implementation.js'],['scripts/creation-ui-capture.cjs','creation-ui-capture.cjs'],['scripts/class-workspace-ui-capture.cjs','class-workspace-ui-capture.cjs']])fs.copyFileSync(path.join(base,source),path.join(extension,'test',target));const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));manifest.main='./test/object-fixture-owner.cjs';manifest.contributes.views.jadeNative=[{id:'jade.testInspectionInstances',name:memberTreeUi?'Object Explorer':'Database Objects'}];fs.writeFileSync(manifestPath,JSON.stringify(manifest));fs.writeFileSync(path.join(extension,'test/object-fixture-owner.cjs'),'exports.activate=()=>{};');}
  if(cliIntegration||workspaces||incremental||nativeOids)fs.copyFileSync(path.join(base,'test/PrivateNativeFixture.js'),path.join(extension,'test/PrivateNativeFixture.js'));
  if(cliIntegration||workspaces||incremental)fs.copyFileSync(path.join(base,'test/cli-integration-fixture.js'),path.join(extension,'test/cli-integration-fixture.js'));
  if(alternating)fs.copyFileSync(path.join(base,'inspector/application-probe.ddx'),path.join(extension,'test/application-probe.ddx'));
@@ -65,7 +67,7 @@ async function main(){
  const hostEnv={...process.env,JADE_HEADLESS_HOST_REPORT:report,JADE_HOST_PROCESS_FILE:path.join(stage,'host-process.json'),JADE_HOST_OWNER:artifacts.nonce,JADE_TOOLS_STATE_DIRECTORY:path.join(stage,'broker'),JADE_TOOLS_CONNECTIONS_FILE:path.join(stage,'connections.json')};delete hostEnv.ELECTRON_RUN_AS_NODE;
  if(creation){hostEnv.JADE_CREATION_DEBUG_PORT=String(creationPort);hostEnv.JADE_CREATION_SCREENSHOTS=path.join(base,'docs/images');artifacts.evidencePath=path.join(base,collectionFamilies?'evidence/vscode-collection-families-host.json':'evidence/vscode-creation-host.json');}
  if(classWorkspaceUi){hostEnv.JADE_CLASS_WORKSPACE_DEBUG_PORT=String(creationPort);hostEnv.JADE_CLASS_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/class-workspace');artifacts.evidencePath=path.join(base,'evidence/vscode-class-workspace-ui-host.json');}
- if(objectWorkspaceUi){hostEnv.JADE_OBJECT_WORKSPACE_DEBUG_PORT=String(creationPort);hostEnv.JADE_OBJECT_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/object-workspace');artifacts.evidencePath=path.join(base,'evidence/vscode-object-workspace-ui-host.json');}
+ if(objectWorkspaceUi){hostEnv.JADE_OBJECT_WORKSPACE_DEBUG_PORT=String(creationPort);hostEnv.JADE_OBJECT_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/object-workspace');artifacts.evidencePath=path.join(base,memberTreeUi?'evidence/vscode-native-member-tree-ui-host.json':'evidence/vscode-object-workspace-ui-host.json');if(memberTreeUi)hostEnv.JADE_OBJECT_WORKSPACE_SCREENSHOTS=path.join(base,'docs/screenshots/class-workspace');}
  const child=spawn(code,[...((creation||classWorkspaceUi||objectWorkspaceUi)?['--remote-debugging-port='+creationPort]:[]),'--new-window','--user-data-dir',path.join(stage,'vscode-data'),'--extensions-dir',path.join(stage,'extensions'),'--extensionDevelopmentPath='+extension,...(classWorkspaceUi?[]:['--extensionTestsPath='+path.join(extension,'test/smoke.js')]),'--disable-workspace-trust','--skip-welcome','--skip-release-notes',workspace],{env:hostEnv,windowsHide:!creation&&!classWorkspaceUi&&!workspaces&&!incremental&&!nativeOids&&process.env.JADE_FORMATTING_UI_HOLD!=='1',stdio:'inherit'});
  await artifacts.wait(child,{signal:cancellation.signal});
  for(let i=0;i<(alternating?140:180);i++){

@@ -130,15 +130,15 @@ function registerPublishChanges(vscode, context, options) {
     state[target][fileKey(config)] = { hash, date: new Date().toISOString() };
     await context.workspaceState?.update(stateKey, state);
   }
-  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.publishChangedFiles', async () => {
+  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.publishChangedFiles', async uri => {
     let locked = false;
     const output = options.output;
     try {
-      if(options.publishNativeProject){const result=await options.publishNativeProject();if(result)return result;}
+      const source=await options.resolveSource?.(uri),active=source?.uri||require('./active-jade-source').jadeSourceUri(vscode,uri);
+      if(options.publishNativeProject){const result=await options.publishNativeProject(active);if(result)return result;}
       await options.beforeOperation?.();
       if (options.isBusy()) throw new Error('A Jade operation is already running.');
       const folders = vscode.workspace.workspaceFolders || [];
-      const active = vscode.window.activeTextEditor?.document.uri;
       let folder = active && vscode.workspace.getWorkspaceFolder(active);
       folder ||= folders.length === 1 ? folders[0] : (await vscode.window.showQuickPick(folders.map(item => ({ label: item.name, folder: item })), { title: 'Choose workspace to publish' }))?.folder;
       if (!folder) throw new Error('Open a workspace folder to publish its changed classes.');

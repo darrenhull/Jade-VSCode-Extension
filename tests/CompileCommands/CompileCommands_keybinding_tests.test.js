@@ -11,3 +11,7 @@ test('F5 builds changed workspace inputs while current-file compilation remains 
  assert.ok(manifest.contributes.commands.some(command=>command.command==='jadeNative.compileClass'));
  assert.ok(manifest.contributes.commands.some(command=>command.command==='jadeNative.buildWorkspace'));
 });
+test('class-workspace shortcuts retain build, reviewed publish and run-test semantics outside debugging',()=>{
+ const keys={'f5':'jadeNative.buildWorkspace','shift+f5':'jadeNative.publishClass','ctrl+f5':'jadeNative.runLocalTests'};
+ for(const [key,command]of Object.entries(keys)){const binding=manifest.contributes.keybindings.find(binding=>binding.key===key&&binding.when.includes('activeCustomEditorId == jade.classWorkspace'));assert.ok(binding);assert.equal(binding.command,command);assert.match(binding.when,/!inDebugMode/);assert.match(binding.when,/!jadeNative.publishing/);assert.doesNotMatch(binding.when,/editorTextFocus/);}
+});

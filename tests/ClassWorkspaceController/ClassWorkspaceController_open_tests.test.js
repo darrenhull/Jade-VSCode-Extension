@@ -39,3 +39,10 @@ test('reopening the same class refreshes its latest discovery origin without ano
  assert.equal(opens,1);assert.equal(origins[0].filter.query,'latest');
  assert.equal(Object.values(stored.get('jade.classWorkspaceContexts.v1'))[0].origin.filter.query,'latest');controller.dispose();
 });
+test('prepares all edited class views in the owning project before a workspace operation',async()=>{
+ let provider;const flushed=[],disposable={dispose(){}},stored=new Map(),uri=value=>({toString:()=>value});
+ const vscode={Uri:{parse:uri,joinPath:()=>uri('file:///media')},ViewColumn:{Active:-1,Beside:-2},workspace:{getWorkspaceFolder:resource=>({uri:uri(resource.toString().includes('/other/')?'file:///other':'file:///project')})},window:{registerCustomEditorProvider:(_id,value)=>{provider=value;return disposable;}},commands:{executeCommand:async(_command,resource)=>provider.createView({document:{uri:resource},panel:{active:true,viewColumn:1,webview:{asWebviewUri:uri=>uri},onDidDispose:()=>disposable},binding:{},services:{}})}};
+ const controller=registerClassWorkspaces(vscode,{extensionUri:{},subscriptions:[],workspaceState:{get:key=>stored.get(key),update:async(key,value)=>stored.set(key,value)}},{model:{resolveClass:async row=>({...row,schema:'Pets',file:row.projectId+'/'+row.name+'.cls'})},shell:{attach:session=>({prepareSourceSwitch:async()=>{flushed.push(session.row.name);return true;},dispose(){},state:()=>({})}),dispose(){}}});
+ await controller.open({name:'Fish',projectId:'file:///project'});await controller.open({name:'Bird',projectId:'file:///project'});await controller.open({name:'Other',projectId:'file:///other'});
+ await controller.prepareActiveSource(uri('file:///project/Fish.cls'));assert.deepEqual(flushed,['Fish','Bird']);controller.dispose();
+});

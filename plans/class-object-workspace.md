@@ -21,14 +21,16 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 | Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
 | Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
 | Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
-| Default regression | Final local check: 654 JavaScript passes, 42 explicit skips; 18 PowerShell passes |
+| Default regression | Final local check: 670 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
 | Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 126 product files matched the source checkout |
 | Recovery and partial sources | Actual normal development host passed rejected-edit/reopen recovery, exact Copy, native confirmed Restore/Discard, native undo, dirty primary-file Cancel, successful partial-file transition and secondary-file edit/undo/redo/save |
 | Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
 
 The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
 
-The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The verified candidate VSIX SHA256 is `e0838ca1363845155f27f89db3a51fd8762d13910ddb9263b5ef6b4f4796c3c9`. Both class and object UI receipts identify this exact artifact. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The verified candidate VSIX SHA256 is `36ff2f7473e36c9849863d4ac2aa2276b39a7f359a5d764a83c4cab2589d92a3`. Class, native member-tree and object UI receipts identify this exact artifact. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+
+The native member tree also limits responses to 100 rows including paging controls (98 members per full page), sends only group identity/offset for paging and does not reread source while paging. F5, Shift+F5 and Ctrl+F5 each dispatch exactly once from both the method canvas and Overview to the correct backing URI after pending edits drain. Their UI test stubs command dispatch; compilation/publication are not executed by that keyboard check. Existing native compiler, test, publish-confirmation and debugger behavior is retained.
 
 Reproduce the build with `npm ci`, `npm test` and `npm run package`. Set `JADE_TEST_CODE` to a VS Code executable. Set `JADE_CLASS_WORKSPACE_VSIX` or `JADE_OBJECT_WORKSPACE_VSIX` to the resulting VSIX and run `node scripts/host-test.cjs --class-workspace-ui` or `--object-workspace-ui`. These UI checks use private source fixtures and a deterministic read-only inspection transport. `scripts/smoke-vsix.ps1 -Vsix <path>` checks the portable native distribution without a database connection.
 
