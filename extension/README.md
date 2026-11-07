@@ -65,6 +65,24 @@ Use **Publish All Changed Files** or **Shift+F5** when you want to update Source
 
 The first build can take longer while Working is prepared. Later runs reuse verified loaded source; tests still execute on every run. Disconnect an inspection session if it holds a conflicting single-user connection.
 
+## How it connects
+
+![Jade Tools runtime architecture](https://raw.githubusercontent.com/darrenhull/Jade-VSCode-Extension/main/architecture/jade-tools.drawio.svg)
+
+The extension presents commands, source views, Testing and debugging in VS Code. Its bundled **native C++ CLI** manages configuration, dependencies, jobs and warm sessions. Our C++ helpers call the installed Jade compiler, Object Manager and utilities. Jade supplies the native compilation and execution semantics; vendor DLLs and databases are not packaged with the extension.
+
+Workspace files remain your application source and can be committed to Git. System metadata, broker state and Working databases stay outside the source checkout. The type cache supplies editor metadata; native builds and tests still use the real Working database.
+
+The optional [Jade Local MCP server](https://github.com/darrenhull/Jade-Local-MCP) has its own packaged runtime and compatible CLI, sharing native broker ownership with the extension. Copilot-global registration uses **~/.copilot/mcp-config.json**; the executable can remain in a stable installation folder such as **%LOCALAPPDATA%/JadeTools/mcp**. MCP inspection is read-only; its build/test tools use Working and it exposes no publication tool.
+
+[Editable Draw.io diagram](https://github.com/darrenhull/Jade-VSCode-Extension/blob/main/architecture/jade-tools.drawio) · [SVG and architecture details](https://github.com/darrenhull/Jade-VSCode-Extension/tree/main/architecture)
+
+After updating, reload all VS Code windows and reconnect other clients. If an older native CLI still owns the broker, finish its active work and use its **status** and **shutdown** commands before starting the new build. Use graceful CLI shutdown rather than terminating unrelated processes or deleting database files.
+
+## Planned class workspace
+
+[Story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30) describes a proposed integrated class workspace with grouped members, method editing and linked read-only object inspection. The current member preview is read-only; that shared-document editing experience is planned work.
+
 ## Useful commands
 
 Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the available commands, including:

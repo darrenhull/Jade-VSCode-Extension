@@ -1,112 +1,108 @@
-# Jade VS Code extension
+# Jade Tools for VS Code
 
-## Development test artifacts
+Edit native Jade source, compile and run tests, debug supported code, and inspect database objects from Visual Studio Code. The Jade IDE is not required. A compatible Windows Jade installation is required for native compilation and execution.
 
-Host checks create one disposable private profile, extension copy, workspace and native broker context. The harness keeps a compact report in `evidence/` and removes its run directory after success, failure or cancellation once its own host and native processes have exited. It never scans or deletes other runs, user databases or source folders. If ownership changes or a process remains alive, cleanup fails explicitly and reports the retained path.
+The extension includes a verified native C++ CLI and our native helpers. VS Code supplies the JavaScript extension host. Users do not need a separate Node.js, Python or CLI installation. Jade vendor DLLs and databases are not distributed with the extension.
 
-Each run checks for at least 2 GiB free before copying. This is an admission check, not a reservation against other applications or simultaneous runs; run database-heavy host checks sequentially and provide additional space for larger Source databases. No reusable database cache is required by this harness. If one is introduced, it belongs under `%LOCALAPPDATA%/JadeTools/test-cache` with bounded retention, not Temp or the source workspace.
+## Install and start
 
-Independent development workspace for the Jade Native Runner extension. The backend is the native C++ Jade CLI; VS Code supplies editor, Testing and debugger integration.
+1. Download the VSIX from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest).
+2. Run **Extensions: Install from VSIX...** and select it. Reload VS Code after an update; installing the same extension ID replaces the installed version.
+3. Open your source checkout. Set **Jade Native: Install Path**, then configure the Source database or run **Jade: Detect Runtime Settings**.
+4. Pull missing source with **Jade: Extract All Sources**, or work with your existing native files.
+5. Use **F5** to build, **Testing** to run tests, and the separate publish controls when you intend to update Source.
 
-This repository preserves the 0.10.1 extension source and native behaviour as the migration baseline. The original research folders are not build dependencies. The Jade CLI is versioned independently and supplied as an explicit pinned package artifact committed under `packages/`; the extension must not import sibling checkout source paths.
+GitHub releases require manual VSIX installation. A new CLI release opens a reviewed dependency update; it does not silently update an installed extension. Error Lens is an optional install-alongside companion for inline diagnostics.
 
-The extension itself uses VS Code's JavaScript extension host. Its backend is the native C++ `jade-cli.exe`, with no embedded Node runtime or JavaScript compiler/broker implementation. A compatible installed Jade runtime is still required; Jade owns compilation and execution.
+## Available features
 
-## Install or update
+| Area | Current behaviour |
+| --- | --- |
+| Editor | Syntax highlighting, completion, hover, signatures, definitions, references and call navigation from source models. |
+| Build | F5 saves native source inputs and builds new/changed files in the active project in Working. **Jade: Compile Current File** remains available for a focused check. |
+| Test | Native unit-test discovery, Run Local Test, Testing results, individual assertion messages and source locations. Each requested test executes again. |
+| Debug | Experimental gutter breakpoints, stepping, native caller stacks, selected-frame locals, object expansion and paged collections on compatible runtimes. |
+| Format | Document/selection indentation for native declarations and complete method bodies, preserving tokens, literals and line endings. |
+| Scratch Pad | Run native Workspace statements in Working, see output and compare the two most recent runs. F5 is for builds; Scratch Pad has its own Run action. |
+| Source browsing | Schema-qualified class search, paged catalogue and focused read-only member previews. Open Original Source edits the actual native file. |
+| Data browsing | Read-only Source/Working inspection, native object IDs, lazy reference traversal, history, pinned views and collection paging. |
+| Source designer | Create schemas, classes, member/external dictionaries, ordered object arrays and unique object sets. Review source before saving. |
+| Collection rules | Known inherited keys and lifetime permissions, supported key-size checks, Binary comparison, population/block sizing and reviewed existing-file class mappings. Unknown metadata stays explicit. |
+| Publication | Review the destination and changed files, then explicitly confirm publication to Source. |
 
-Download the `.vsix` asset from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest). In VS Code, run **Extensions: Install from VSIX…**, select the download, then reload the window if prompted. Installing the same extension ID updates it; no separate CLI installation is needed. GitHub releases do not automatically update an installed VSIX.
+See the [user guide](extension/README.md), [collection coverage and limits](docs/COLLECTION-COVERAGE.md) and [changelog](extension/CHANGELOG.md).
 
-The extension includes **Error Lens** (`usernamehw.errorlens`) as an extension-pack companion. VS Code installs it alongside Jade when Marketplace access is available, so native compiler diagnostics can appear beside the source line. Users can disable or uninstall the companion while keeping Jade working. Offline installations require the companion's VSIX separately if wanted. No paid AI extensions are required or installed.
+### Everyday shortcuts
 
-## Build and test
+| Shortcut | Action |
+| --- | --- |
+| F5 | Save native source inputs and build changed project files in Working. |
+| Ctrl+F5 | Run the current class's native tests in Working. |
+| Shift+F5 | Review and confirm publication to Source. |
+| Shift+Alt+F | Format Document on Windows. |
 
-Building and testing this development checkout requires Node.js 22 or later and npm:
+Build and test shortcuts apply in their supported source-editor context. Use the Command Palette or Testing view for explicit operations when another editor has focus.
 
-```text
-npm ci
+## Architecture
+
+![Jade Tools runtime architecture](architecture/jade-tools.drawio.svg)
+
+[Editable Draw.io source](architecture/jade-tools.drawio) · [SVG](architecture/jade-tools.drawio.svg) · [Architecture details and export instructions](architecture/README.md)
+
+The extension owns commands, source views, Testing and debugger presentation. Its bundled **jade-cli.exe** owns native orchestration: configuration, dependency selection, shared broker jobs, cancellation and warm sessions. Our C++ helpers call the installed Jade runtime; Jade provides the compiler, Object Manager and execution semantics.
+
+Native source files in the workspace are the application source of truth and can be committed to Git. Build/test inputs are saved files; editor previews can follow unsaved buffers, and Scratch Pad explicitly passes its current code snapshot. System metadata, broker state and Working databases live in private tool storage outside the source workspace.
+
+A separate **Working** database is prepared through a consistent native snapshot/restore of the configured **Source** database. Build, test, debug and scratch execution use Working. Source is used for explicit extraction, snapshot preparation, read-only inspection and reviewed publication. Running application code can modify Working data and use operating-system permissions; Working is not an operating-system sandbox.
+
+### Optional Copilot / MCP integration
+
+[Jade Local MCP](https://github.com/darrenhull/Jade-Local-MCP) is installed separately. Its official MCP SDK adapter has a packaged runtime and its own verified C++ CLI. Compatible CLI builds share the same per-user broker; the extension does not route its operations through MCP.
+
+For Copilot-global configuration, register the server in **~/.copilot/mcp-config.json**. Keep the complete MCP release together at a stable installation path such as **%LOCALAPPDATA%/JadeTools/mcp**. Configuration and program files have separate locations. With no explicit workspace argument, the server uses the client-provided working directory.
+
+MCP data tools are read-only for both Source and Working. Build/test tools execute in Working. Publication, arbitrary native execution and data editing are not exposed by the MCP server.
+
+## Source designer and native limits
+
+Choose **Jade: Create Schema, Class or Collection** from Tools or the Command Palette. Schema and member choices include project/schema identity and extracted package aliases. Imported members expose their exported interface; imported classes are not superclass choices.
+
+The designer shows inherited keys, known property attributes and class/subclass lifetime permissions. Default lifetime and allowed lifetimes are separate. Supported aggregate String key limits and sizing bounds are checked; native compilation remains authoritative. Binary comparison is available for supported keys. Latin1, unproved placement modes, dynamic dictionaries and ad hoc indexes remain unavailable.
+
+Selecting an existing database file reviews the new class and its authoritative schema SEC mapping together. Dirty buffers, changed disk source and stale review receipts block unreviewed writes. Saving preserves reviewed line endings and existing metadata encoding. It creates source only; compilation and publication are separate. No existing-data migration or new database file is implied.
+
+![Actual collection designer controls](docs/images/unified-creation-member-type-refresh.png)
+
+## Runtime troubleshooting
+
+Initial Working preparation and structural loads can take longer than warm builds. Warm sessions reuse verified loaded source; they do not reuse previous test outcomes.
+
+If an older CLI build owns the broker, finish its active operations and use the CLI's **status** and **shutdown** commands for a graceful handoff. Reload all VS Code windows and reconnect other clients so they use their updated packages. Do not terminate unrelated native processes or delete broker/database files to bypass the version check.
+
+For connection conflicts, use **Jade: Disconnect Build and Test Runtime** or **Jade: Disconnect Database Objects** as appropriate. A single-user Source database must be available during initial native backup. Supported multi-user connections use the native online-backup path; the extension does not silently change the Source server mode or INI.
+
+## Proposed workspace enhancement
+
+[Story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30) proposes an integrated class workspace with grouped members, in-context method editing and connected object/collection inspection. Its UX designs and acceptance criteria describe planned work. The shipped member preview is read-only; the proposed shared-document editor is not implemented.
+
+## Development
+
+Build this repository independently with the pinned Node version used by CI (currently 24.22.1) and npm:
+
+~~~text
+npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run package
-```
+~~~
 
-The default test command excludes native database opt-ins. Packaged VSIX output is written to `dist`, which is not committed. The extracted VSIX smoke verifies the official native manifest receipt and all runtime hashes; staging preserves the manifest bytes exactly. For an explicit unreleased CLI candidate, pass `-ExpectedDistribution <candidate-directory>` to `scripts/smoke-vsix.ps1`; this verifies candidate bytes without claiming an official release pin. Actual-host and connected-native controls require explicit configuration and private fixture databases; see the test scripts and the release verification notes.
+The standalone [Jade CLI repository](https://github.com/darrenhull/Jade-CLI) owns native development. The committed package under **packages/jade-cli-win-x64/** and its pin supply the backend; sibling checkouts are not build dependencies. Packaging verifies the official manifest receipt and native runtime hashes. VSIX output is written to **dist/** and is not committed.
 
-Native development belongs to the independent Jade CLI repository. The pinned Windows x64 distribution lives in `packages/jade-cli-win-x64/`. Packaging verifies its native-runtime identity and every manifest checksum before copying the executable and declared helpers into the VSIX. It excludes the old JavaScript SDK and any undeclared runtime files. For explicit candidate validation, set `JADE_CLI_DISTRIBUTION` to a native distribution folder; normal independent builds use the committed package. There is no sibling-checkout search or JavaScript CLI fallback. Vendor Jade DLLs, vendor SDK headers and databases are not included.
+Default tests do not opt in to a developer database. Connected/native and actual VS Code host checks require explicit configuration and disposable fixtures. The host harness owns its private profile, workspace and broker context, checks free space before copying, and removes its own artifacts after its processes exit. It reports retained paths if cleanup cannot complete. Regenerable caches belong outside source under private tool storage, with bounded retention.
 
-## User workflows retained
+### Review and releases
 
-- F5 saves native source buffers in the active file's project and builds its new and changed files in Working, including unrelated changed classes. An unchanged repeat skips loading. **Jade: Compile Current File** keeps the focused check available; publishing remains separate.
-- Test Explorer, CodeLens and Ctrl+F5 run native Jade tests and report individual failures.
-- Shift+F5 and the publish controls retain explicit target review and confirmation.
-- Object Explorer provides schema/class/member navigation and reusable focused previews.
-- Format Document/Selection indents native CLS headers, declaration sections, collection keys, database mappings and complete method bodies while preserving Jade tokens, literal contents and line endings.
-- Database Objects provides read-only Source/Working inspection and paged collections.
-- The keyed collection designer creates native source; compilation and publication remain separate actions.
-- **Create Schema, Class or Collection** provides a shared creation flow with searchable schema-qualified choices, a live definition summary and explicit native source review/save. The existing creation commands remain available; the initial unified flow covers ordinary classes and the dictionary settings already supported by the collection designer.
-- **Scratch Pad** under Jade's Tools opens native Jade Workspace code in a simple runnable editor, with output beside the code and a previous-run comparison.
-- The experimental debugger retains its existing pinned native-runtime capabilities and limitations.
+Pull requests target **main** and require owner approval and passing checks. CI validates a PR and its reviewed merge to main; feature pushes run only lightweight PR automation. Successful reviewed main builds publish a new version to GitHub Releases. Existing versions and release artifacts are immutable; documentation-only merges do not overwrite an existing release.
 
-See the [extension's detailed documentation](extension/README.md), [collection coverage](docs/COLLECTION-COVERAGE.md) and [changelog](extension/CHANGELOG.md) for the supported features and their boundaries. Dynamic indexes and general debugger features beyond the advertised capabilities remain unavailable.
+CLI release polling opens Draft dependency-update PRs with verified packages and a consumer version update. Implementation, integrity, CI and review findings must be complete before requesting owner review. GitHub's five-minute scheduling is best-effort, not a five-minute delivery guarantee; delayed or dropped runs can postpone detection. The workflow's Actions history distinguishes automatic schedule runs from explicit workflow_dispatch recovery runs. Extension, CLI and MCP are independently versioned products.
 
-## Shared source designer
-
-Open **Jade: Create Schema, Class or Collection** from the Command Palette or Jade Tools. Create a schema, ordinary class, member/external dictionary, object array or object set. Search choices are bounded and schema-qualified. Imported members retain their package alias and exporting context; key choices expose the exported interface. Missing metadata is shown as unknown, and imported classes are excluded from superclass choices.
-
-Review inherited keys and native lifetime permissions in the read-only rules panel. Default lifetime is distinct from allowed instance and subclass lifetimes. Sizing modes validate proven native source bounds; actual block layout still depends on Jade. Binary comparison is supported using its verified native source form; Latin1 remains unavailable. Unsupported placement and partition options explain their limits.
-
-Saving creates source without compiling or publishing. An existing database-file selection produces a reviewed class-map update in the authoritative schema SEC file alongside the new class. VS Code applies that update through WorkspaceEdit; dirty buffers, changed source and stale review receipts prevent an unreviewed write. Class mapping does not change native exclusive-instance owner placement. No existing-data migration or new database file is created.
-
-Actual running VS Code designer, with source review before saving:
-
-![Shared Jade source designer](docs/images/unified-creation-definition.png)
-
-![Reviewing native Jade collection source](docs/images/unified-creation-review.png)
-
-Actual VS Code formatting verification (document/selection formatting, undo and idempotence):
-
-![Formatted Jade method in the running VS Code extension host](docs/images/jade-formatting.png)
-
-## Scratch Pad
-
-Choose **Scratch Pad** under Jade's **Tools**, select a schema and click the play/**Run** action beside the code. Start with `begin write "Hello from Jade"; end;`. The native Jade compiler and runtime execute the exact editor snapshot in Working; no class or method is published. You can save the page as `.jadeworkspace`, add notes or further experiments using VS Code's built-in controls, and keep the source in Git. Outputs and run history are not written into the saved file.
-
-After editing and running again, **Compare previous run** opens VS Code's read-only diff with the actual executed source, status, duration and retained output from both runs. History holds only the latest two runs per source, with global bounds of 50 sources / 2 MiB; output excerpts are labelled. Results are executed again, never reused as cached runs.
-
-For ordinary `.jade` editors, use **Jade: Run Scratch Pad (Working)** or **Jade: Run Selection (Working)**. A selection may contain native Workspace statements; declarations must be available in that same execution. Each run starts with fresh local variables. Committed Working data can survive later runs. Source application definitions are saved disk files; the scratch code can be unsaved. In multi-root projects, saved pages use their own folder's connection; ambiguous untitled pages ask for a project explicitly.
-
-**F5 does not execute Scratch Pad code.** Compilation happens as part of the explicit Run action. Native errors become Problems at the original cell/editor position. Run All stops after a failed or cancelled run. Native output can be buffered until the native process finishes; output limits/truncation are reported. Jade's redirected standard output uses the Windows code page and can replace unrepresentable characters. Standard input is closed: native `read` receives EOF/defaults rather than an interactive editor prompt.
-
-The selected schema controls compilation and saved application definitions. Execution uses the native `RootSchemaApp` launcher; this is separate from the selected compilation schema. Resolve the intended schema explicitly in metadata queries.
-
-Scratch Pad requires native CLI **0.4.0 or newer**. Packaging rejects older bundled runtimes; development candidate testing uses the explicit `JADE_CLI_DISTRIBUTION` override and verifies all native runtime hashes. Source publication, extraction and debugging continue through their existing explicit workflows.
-
-This project is independently maintained; no affiliation with or endorsement by the Jade or VS Code vendors is claimed.
-
-![Scratch Pad running native Jade in Working](docs/images/jade-scratch-pad.png)
-
-![Compare previous Scratch Pad source and output](docs/images/jade-scratch-pad-compare.png)
-
-## Repository boundaries
-
-`Jade-CLI` owns the native C++ CLI, broker and backend. `Jade-VSCode-Extension` owns VS Code commands, editor integration, views, Testing and debugger presentation. `Jade-Local-MCP` is the separately implemented adapter using the official MCP SDK; it calls the same native CLI service.
-
-This repository can be cloned and built independently. Existing packaged third-party notices are preserved; the repository does not grant redistribution rights to the vendor's Jade runtime.
-
-## Migration acceptance
-
-The CLI migration is accepted only after standalone CLI compilation/testing and the actual VS Code extension paths produce equivalent native results, including compiler errors, failed assertions, cancellation, warm reuse and session handoff. Packaging and installation must verify that the extension contains the pinned CLI artifact and can run without the sibling CLI checkout.
-
-## GitHub Actions and releases
-
-`main` is the default branch and the target for review pull requests. Your code-owner approval is required before merging; automation must open a PR rather than push product changes directly to `main`.
-
-The build runs once for a pull request and once after its reviewed merge to `main`; feature-branch pushes run only lightweight PR automation. Manual validation remains available. The required `build` job tests and packages the VSIX, then exercises its extracted native CLI without Node on PATH or a database connection. A successful `main` build publishes a new package version and checksums to GitHub Releases, targeting that approved commit. Already published versions remain immutable: later merges verify their tag belongs to approved main and download/check their required assets before skipping publication. This does not publish to the VS Code Marketplace.
-
-This repository owns consumer release automation. The native CLI repository owns the CLI and Jade integration. `node scripts/update-cli.cjs --verify-lock` checks the pin version/tag, the exact manifest digest recorded when the official ZIP was verified, and every native runtime hash, including required helpers and debugger ABI metadata. The ZIP checksum is an installation receipt; verification does not reconstruct an archive from installed files.
-
-An independent poller requests a check every five minutes using this repository's scoped `GITHUB_TOKEN`. GitHub schedules are best-effort, not a five-minute delivery guarantee; delayed or dropped runs can postpone detection. The update workflow's Actions history identifies automatic `schedule` runs separately from explicit `workflow_dispatch` recovery runs. Each check authenticates release metadata and fetches checksums first. An unchanged release skips the ZIP download only when the local pin, manifest receipt and all required runtime files verify; corruption triggers verified repair. New releases are downloaded with bounded sizes, unsafe archive entries are rejected, and verified files are installed atomically. A dependency update bumps the consumer patch version and matching manifests/lockfile, then opens a Draft PR without requesting owner review or enabling auto-merge. Mark it ready only after implementation, dependency verification, checks and review fixes are complete. Its normal PR workflow performs the full validation once. GitHub may require the owner to approve the first workflow run for a bot-created PR. All review, build, publisher and updater automation comes from this repository at the current commit. There is no external workflow checkout, extra dispatch or cross-repository credential. GitHub schedules are best-effort; manual and repository-dispatch triggers are also available. A reviewed merge publishes the new consumer version after the main build succeeds; no Jade database is modified by this automation.
-
-## Architecture diagram
-
-![Architecture](extension/media/architecture.drawio.svg)
-
-[Edit the diagram in draw.io](extension/media/architecture.drawio). The SVG is the rendered companion to the editable source.
+Jade Tools is independent third-party tooling and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
