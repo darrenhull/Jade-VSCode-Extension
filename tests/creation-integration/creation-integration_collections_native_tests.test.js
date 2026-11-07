@@ -18,7 +18,7 @@ test('generated object collections preserve native order, uniqueness and class t
   const databaseFile=path.join(root,'schemas',schema,'databaseDefinitions.sec');fs.writeFileSync(databaseFile,fs.readFileSync(databaseFile,'utf8').replace('databaseFileDefinitions','databaseFileDefinitions\n "alternate";'));
   model=await refresh();
   for(const request of [{name:'GeneratedArray',collectionFamily:'objectArray',blockSize:16},{name:'GeneratedPopulationArray',collectionFamily:'objectArray',expectedPopulation:1000},{name:'GeneratedSet',collectionFamily:'objectSet',blockSize:16,loadFactor:66},{name:'GeneratedDefaultSet',collectionFamily:'objectSet',expectedPopulation:0}])writeCreation(root,model.preview({type:'collection',schema,membership:schema+'::CollectionItem',lifetime:'transient',keys:[],...request}));
-  writeCreation(root,model.preview({type:'collection',schema,name:'GeneratedBudget512',collectionFamily:'externalDictionary',membership:schema+'::CollectionItem',lifetime:'transient',keys:[{name:'first',type:'String',length:256},{name:'second',type:'String',length:256}]}));
+  writeCreation(root,model.preview({type:'collection',schema,name:'GeneratedBudget512',collectionFamily:'externalDictionary',membership:schema+'::CollectionItem',lifetime:'transient',keys:[{name:'first',type:'String',length:256,comparison:'binary',locale:2057,caseInsensitive:true},{name:'second',type:'String',length:256,comparison:'binary',locale:2057,caseInsensitive:true}]}));
   const alternate=model.storage({schema}).items.find(file=>file.name==='alternate');assert.ok(alternate?.id);
   const mapping=model.preview({type:'collection',schema,name:'GeneratedMappedSet',collectionFamily:'objectSet',membership:schema+'::CollectionItem',lifetime:'transient',keys:[],mapFile:alternate.id});
   const updates=mapping.files.filter(file=>file.operation==='update');assert.equal(updates.length,1);assert.equal(updates[0].file,databaseFile);
@@ -72,8 +72,8 @@ begin
  dictionary.putAtKey("a","x",a); dictionary.putAtKey("A","x",b);
  assertEquals(b,dictionary.first());
  assertEquals(a,dictionary.getAtKey("a","x")); assertEquals(b,dictionary.getAtKey("A","x"));
- dictionary.clear(); dictionary.putAtKey("ÃƒÂ©","x",a); dictionary.putAtKey("z","x",b);
- assertEquals(b,dictionary.first()); assertEquals(a,dictionary.getAtKey("ÃƒÂ©","x"));
+ dictionary.clear(); dictionary.putAtKey("\u00e9","x",a); dictionary.putAtKey("z","x",b);
+ assertEquals(b,dictionary.first()); assertEquals(a,dictionary.getAtKey("\u00e9","x"));
  classMap := mapped.class().getPropertyValue("classMapRefs").Object.sendMsg("first").Object;
  assertEquals("alternate",classMap.getPropertyValue("diskFile").Object.getPropertyValue("name"));
 epilog
@@ -108,7 +108,7 @@ end;`;
     const rejected=await client.request('build',{...config,projectBuild:true});assert.equal(rejected.passed,false,JSON.stringify(rejected));assert.equal(rejected.code,6206,JSON.stringify(rejected));assert.ok(rejected.report.diagnostics.some(d=>Number(d.compiler_error)===6206));fs.unlinkSync(invalid);
    }
    const recovered=await client.request('build',{...config,projectBuild:true});assert.equal(recovered.passed,true,JSON.stringify(recovered));
-   fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify({jadeVersion:'25.0.02',cliVersion:JSON.parse(fs.readFileSync(path.join(runtime,'distribution.json'),'utf8')).packageVersion,placementSource,placementResult:placement,nativeExtract,passed:true,nativeCLI:true,modelGeneratedSource:true,arrayOrderAndRepeatedObjects:true,setUniqueMembers:true,explicitBlockEntries:true,expectedPopulation:true,zeroNativeDefault:true,setBtreeLoadFactor:true,actualBlockStatistics:true,modelGeneratedExistingMap:true,externalNativeStringBudget512:true,externalNativeStringBudget513Rejected:6206,externalNativeStringBudget600Rejected:6206,binaryMetadataAndCaseSensitiveOrdering:true,recoveredAfterRejection:true,sourcePublished:false},null,2));}
+   fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify({jadeVersion:'25.0.02',cliVersion:JSON.parse(fs.readFileSync(path.join(runtime,'distribution.json'),'utf8')).packageVersion,placementSource,placementResult:placement,nativeExtract,passed:true,nativeCLI:true,modelGeneratedSource:true,arrayOrderAndRepeatedObjects:true,setUniqueMembers:true,explicitBlockEntries:true,expectedPopulation:true,zeroNativeDefault:true,setBtreeLoadFactor:true,actualBlockStatistics:true,modelGeneratedExistingMap:true,externalNativeStringBudget512:true,externalNativeStringBudget513Rejected:6206,externalNativeStringBudget600Rejected:6206,explicitBinaryCanonicalizesStaleLocaleAndCase:true,binaryMetadataAndCaseSensitiveOrdering:true,recoveredAfterRejection:true,sourcePublished:false},null,2));}
   finally{try{await client.request('shutdown',{});}finally{await client.close();}}
  });
 });
