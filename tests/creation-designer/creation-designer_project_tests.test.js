@@ -2,7 +2,76 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {mount}=require('../../extension/media/creation-designer');
 const {createDesignerSession}=require('../../extension/src/creation-designer');
-function mounted() {
+const {createCreationModel}=require('../../extension/src/creation-model');
+const {parseSource}=require('../../extension/src/source_symbols');
+const path=require('node:path');
+
+function comparisonFixture() {
+ let propertyType='Integer';
+ const models=new Map();
+ function build(project) {
+  const schema=(name,type)=>({name,parent:'RootSchema',folder:path.join(project.root,'schemas',name),header:{text:'jadeVersionNumber "25.0.02";'},entries:[],classes:[['Item',type],['TextItem','String']].map(([owner,fieldType])=>({owner,model:parseSource('schemaDefinition\n'+name+' subschemaOf RootSchema partialDefinition;\ntypeHeaders\n'+owner+' subclassOf Object transient;\ntypeDefinitions\n'+owner+' completeDefinition\n(\nattributeDefinitions\nname: '+(fieldType==='String'?'String[50]':fieldType)+';\n)\ntypeSources\n',owner+'.cls')}))});
+  const actual=createCreationModel({root:project.root,schemas:[schema('Pets',project.id==='B'?'String':propertyType),schema('Other','String')]});
+  models.set(project.id,actual);return actual;
+ }
+ const f=mounted({modelForProject:project=>{build(project);return Object.fromEntries(['schemas','keyChoices','describe','preview'].map(method=>[method,(...args)=>models.get(project.id)[method](...args)]));}});
+ f.replaceMetadata=()=>{propertyType='String';build({id:'A',root:'C:/Alpha'});};
+ f.input=(id,value)=>{const el=f.get(id);el.value=value;if(el.oninput)el.oninput();else el.emit('input');};
+ f.waitPreview=async()=>{await new Promise(r=>setTimeout(r,215));await f.settle();};
+ f.begin=async()=>{
+  await f.settle();f.get('kind').value='collection';f.get('kind').onchange();
+  f.input('name','ItemsByName');f.input('member','Item');f.input('key-0','name');
+  f.get('key-0').focus();f.get('key-0').emit('focus');await f.settle();f.get('key-results-0').children.find(row=>row.textContent==='name').onclick();
+  await f.waitPreview();assert.equal(f.get('key-comparison-0').parentElement.hidden,true);
+  f.get('key-case-0').checked=true;f.get('key-case-0').onchange();f.input('key-locale-0','2057');
+ };
+ f.assertTextPreview=async()=>{
+  await f.waitPreview();
+  assert.equal(f.get('key-comparison-0').parentElement.hidden,false);
+  assert.equal(f.get('key-comparison-0').children.find(row=>row.value==='binary').disabled,false);
+  assert.equal(f.get('key-case-0').parentElement.hidden,false);
+  assert.equal(f.get('key-case-0').checked,true);assert.equal(f.get('key-locale-0').value,2057);
+  const request=f.messages.filter(m=>m.command==='preview').at(-1).request;
+  assert.equal(request.keys[0].locale,2057);assert.equal(request.keys[0].caseInsensitive,true);
+  assert.match(f.get('live-source').textContent,/name caseInsensitive 2057;/);
+ };
+ return f;
+}
+test('typed member transition re-resolves Integer to String and preserves comparison controls and generated source',async()=>{
+ const f=comparisonFixture();try{await f.begin();f.input('member','TextItem');await f.assertTextPreview();}finally{f.dispose();}
+});
+test('catalogue refresh after a successful save re-resolves metadata without trying to create the saved class again',async()=>{
+ const f=mounted();try{
+  await f.reviewed();f.start();await Promise.resolve();await Promise.resolve();
+  const before=f.messages.filter(m=>m.command==='preview').length;
+  f.release();await f.settle();await new Promise(r=>setTimeout(r,215));await f.settle();
+  assert.equal(f.messages.filter(m=>m.command==='preview').length,before);
+  assert.match(f.get('status').textContent,/^Saved /);
+ }finally{f.dispose();}
+});
+test('late metadata cannot restore a previous member type and unresolved paths cannot enable Binary',async()=>{
+ const f=comparisonFixture();try{
+  await f.begin();await f.waitPreview();const previous=f.messages.filter(m=>m.command==='describe').at(-1);
+  f.input('member','TextItem');
+  f.deliver({command:'describe',sequence:previous.sequence,rules:{memberKeyTypes:[{name:'name',type:'Integer'}]}});
+  assert.equal(f.get('key-comparison-0').children.find(row=>row.value==='binary').disabled,true);
+  await f.assertTextPreview();
+  f.deliver({command:'describe',sequence:previous.sequence,rules:{memberKeyTypes:[{name:'name',type:'Integer'}]}});
+  assert.equal(f.get('key-comparison-0').parentElement.hidden,false);
+  f.input('key-0','missing');f.get('key-comparison-0').value='binary';f.get('key-comparison-0').onchange();
+  await f.waitPreview();assert.equal(f.get('save').disabled,true);assert.equal(f.get('key-comparison-0').children.find(row=>row.value==='binary').disabled,true);
+ }finally{f.dispose();}
+});
+for(const context of ['schema','project','catalogue'])test(context+' changes invalidate member-key types and re-resolve actual String metadata',async()=>{
+ const f=comparisonFixture();try{
+  await f.begin();
+  if(context==='schema')f.input('schema','Other');
+  if(context==='project'){f.get('project').value='B';f.get('project').onchange();await f.settle();}
+  if(context==='catalogue'){f.replaceMetadata();f.deliver({command:'catalogUpdated',project:'A',page:{items:[{name:'Pets'},{name:'Other'}]}});}
+  await f.assertTextPreview();
+ }finally{f.dispose();}
+});
+function mounted({modelForProject}={}) {
  const elements=new Map(),listeners={},messages=[],tasks=[],writes=[];let state;
  function element(id='') { const attributes=new Map(),events={};return {id,value:'',selectedOptions:[],children:[],dataset:{},classList:{toggle(){}},hidden:false,disabled:false,parentElement:{append(){},hidden:false},addEventListener(type,fn){events[type]=fn;},emit(type){events[type]?.({});},removeAttribute(k){attributes.delete(k);},setAttribute(k,v){attributes.set(k,v);},getAttribute(k){return attributes.get(k);},append(...els){this.children.push(...els);for(const el of els)el.parentElement=this;},replaceChildren(...els){this.children=els;if(id==='project'&&!this.value)this.value=els[0]?.value||'';},querySelector(){return element();},contains(){return false;},focus(){document.activeElement=this;},scrollIntoView(){}}; }
  const document={getElementById(id){const walk=el=>el.id===id?el:el.children.map(walk).find(Boolean);for(const el of elements.values()){const found=walk(el);if(found)return found;}if(!elements.has(id))elements.set(id,element(id));return elements.get(id);},createElement:()=>element(),querySelectorAll:()=>[]};
@@ -10,7 +79,7 @@ function mounted() {
  const root={JadeCreationRulesView:require('../../extension/media/creation-rules-view'),document,addEventListener:(type,fn)=>listeners[type]=fn,acquireVsCodeApi:()=>({getState:()=>undefined,setState:s=>state=structuredClone(s),postMessage:m=>{messages.push(m);if(session)tasks.push(session.handle(m));}})};
  let session,release,rejectSave=false,rejectProject=false;
  const projects=[{id:'A',name:'Alpha',root:'C:/Alpha'},{id:'B',name:'Beta',root:'C:/Beta'}];
- const model=p=>({schemas:()=>({items:[{name:'Pets'}]}),keyChoices:()=>({items:[{name:'name',type:'String'}]}),preview:()=>({summary:p.name,files:[{file:p.root+'/Created.cls',text:p.name,relativePath:'Created.cls'}]})});
+ const model=p=>modelForProject?.(p)||({schemas:()=>({items:[{name:'Pets'}]}),keyChoices:()=>({items:[{name:'name',type:'String'}]}),preview:()=>({summary:p.name,files:[{file:p.root+'/Created.cls',text:p.name,relativePath:'Created.cls'}]})});
  const deliver=data=>listeners.message({data});
  session=createDesignerSession({projects,post:deliver,modelProvider:async p=>{if(rejectProject&&p.id==="B")throw Error("Cannot read Beta");return model(p); },save:async root=>{await new Promise(r=>release=r);if(rejectSave)throw Error('save failed');writes.push(root);return{files:[root+'/Created.cls']};}});
  mount(root);

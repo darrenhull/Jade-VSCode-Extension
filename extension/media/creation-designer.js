@@ -102,7 +102,7 @@
     const pending = new Map(), combos = new Map();
     let draft = { type: "class", schema: "", name: "", superclass: "Object", lifetime: "transient", kind: "member", membership: "", keys: [{ name: "" }], duplicatesAllowed: false };
     let schemaPage = { items: [] }, selectedSchema, projectId, requestedProject, saveSequence, validPreview = false, saving = false;
-    let sizingMetadata = {}, sizingModes = root.JadeCreationRulesView.sizingChoices({}), sizingContext, sizingOptionsStamp;
+    let sizingMetadata = {}, sizingModes = root.JadeCreationRulesView.sizingChoices({}), sizingContext, sizingOptionsStamp, memberContext;
     const send = message => vscode.postMessage(["preview", "save", "search", "schemas", "properties", "invalidate", "describe", "storage"].includes(message.command) ? { ...message, project: projectId } : message);
     function setSaving(value) { saving = value; $("project").disabled = value; $("refresh-choices").disabled = value; }
     const option = (value, text = value) => { const o = document.createElement("option"); o.value = value; o.textContent = text; return o; };
@@ -160,7 +160,9 @@
       $("sizing-value-label").textContent = draft.sizingMode === "expectedPopulation" ? "Requested expected population" : "Requested entries per block";
       renderSizing(); renderKeys(); updateSteps();
     }
-    function changed() {
+    function changed({ preview = true } = {}) {
+      const contextKey = JSON.stringify([projectId, draft.type, draft.schema, draft.membership, draft.membershipSchema, collectionPresentation(draft).family]);
+      if (contextKey !== memberContext) { memberContext = contextKey; invalidateMemberKeyTypes(); renderKeys(); }
       validPreview = false; receipt = undefined; $("save").disabled = true;
       $("live-source").textContent = "Checking the current definition…";
       $("rule-details").textContent = "Checking native metadata for the current selection…";
@@ -172,7 +174,7 @@
       clearTimeout(timer); previewSequence = ++sequence;
       $("status").textContent = "Checking your definition…";
       const id = previewSequence;
-      timer = setTimeout(() => { if (!disposed && projectId !== undefined && requestedProject === undefined) { if (draft.type !== "schema") send({ command: "describe", sequence: id, request: definitionRequest(draft) }); send({ command: "preview", sequence: id, request: definitionRequest(draft) }); } }, 180);
+      timer = setTimeout(() => { if (!disposed && projectId !== undefined && requestedProject === undefined) { if (draft.type !== "schema") send({ command: "describe", sequence: id, request: definitionRequest(draft) }); if (preview) send({ command: "preview", sequence: id, request: definitionRequest(draft) }); } }, 180);
       persist();
     }
     function search(field, query, offset = 0) {
@@ -217,6 +219,23 @@
       const api = { render, close, dispose() { closed = true; clearTimeout(hideTimer); clearTimeout(searchTimer); close(); } }; combos.set(field, api); return api;
     }
     function invalidateChoices() { pending.clear(); for (const c of combos.values()) c.close(); }
+    function invalidateMemberKeyTypes() { for (const key of draft.keys || []) delete key._type; }
+    function updateMemberKeyTypes(rules) {
+      if (draft.kind === "external" || !Array.isArray(rules?.memberKeyTypes)) return;
+      let updated = false;
+      for (const [index, key] of (draft.keys || []).entries()) {
+        const metadata = rules.memberKeyTypes[index];
+        const type = metadata?.name === key.name ? metadata.type : undefined;
+        if (key._type === type) continue;
+        if (type) key._type = type; else delete key._type;
+        updated = true;
+      }
+      if (!updated) return;
+      const active = document.activeElement, start = active?.selectionStart, end = active?.selectionEnd;
+      renderKeys();
+      if (active?.id?.startsWith("key-")) { const control = $(active.id); control?.focus(); if (start !== null && start !== undefined) control?.setSelectionRange?.(start, end); }
+      persist();
+    }
     function renderReviewFiles(files) {
       $("files").replaceChildren(...files.map(file => {
         const section = document.createElement("section"), title = document.createElement("h3"), source = document.createElement("pre");
@@ -233,6 +252,7 @@
     }
     function renderRules(rules) {
       if (!rules) return;
+      updateMemberKeyTypes(rules);
       renderSizing(rules.sizing);
       root.JadeCreationRulesView.renderRulesView(document, $("rule-details"), rules);
       const parts = [];
@@ -327,16 +347,16 @@
     $("back").onclick = () => { step = step === 2 && draft.type === "collection" && collectionPresentation(draft).keys ? 1 : 0; updateSteps(); };
     $("cancel").onclick = () => send({ command: "cancel" });
     $("designer").onsubmit = event => { event.preventDefault(); if (!canSave({ step, receipt, validPreview, saving })) return; setSaving(true); saveSequence = previewSequence; $("save").disabled = true; send({ command: "save", sequence: saveSequence, receipt }); };
-    $("project").onchange = () => { if (saving) { $("project").value = projectId; return; } requestedProject = $("project").value; receipt = undefined; validPreview = false; clearTimeout(timer); previewSequence = undefined; $("save").disabled = true; projectSequence = ++sequence; pending.clear(); for (const c of combos.values()) c.close(); send({ command: "project", project: requestedProject, sequence: projectSequence }); };
+    $("project").onchange = () => { if (saving) { $("project").value = projectId; return; } memberContext = undefined; invalidateMemberKeyTypes(); renderKeys(); requestedProject = $("project").value; receipt = undefined; validPreview = false; clearTimeout(timer); previewSequence = undefined; $("save").disabled = true; projectSequence = ++sequence; pending.clear(); for (const c of combos.values()) c.close(); send({ command: "project", project: requestedProject, sequence: projectSequence }); };
     $("refresh-choices").onclick = () => $("project").onchange();
     root.addEventListener("message", ({ data }) => {
       if (!data || disposed) return;
       if (data.command === "projects") { $("project").replaceChildren(...data.projects.map(p => option(p.id, p.name))); const state = savedState; if (state?.draft && data.projects.some(p => p.id === state.projectId)) { draft = state.draft; step = state.step || 0; $("project").value = state.projectId; for (const [id, prop] of [["schema", "schema"], ["name", "name"], ["parent", "parent"], ["version", "version"], ["member", "membership"], ["superclass", "superclass"], ["kind", "type"], ["lifetime", "lifetime"], ["map-file", "mapFile"]]) $(id).value = draft[prop] || ""; $("dictionary").value = collectionPresentation(draft).selector; $("duplicates").checked = Boolean(draft.duplicatesAllowed); $("load-factor").value = draft.loadFactor ?? ""; $("sizing-mode").value = draft.sizingMode || "native"; $("sizing-value").value = draft.sizingValue ?? ""; } reflectKind(); $("project").onchange(); return; }
       if (data.command === "project") { if (data.sequence !== projectSequence || data.project !== requestedProject) return; projectId = data.project; requestedProject = undefined; $("project").value = projectId; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; if (!draft.schema && schemaPage.items.length) draft.schema = schemaPage.items[0].name; $("schema").value = draft.schema; selectedSchema = schemaPage.items.find(s => s.name === draft.schema); if (!draft.version && selectedSchema?.version) $("version").value = draft.version = selectedSchema.version; draft.parent ||= "RootSchema"; renderKeys(); changed(); return; }
-      if (data.command === "catalogUpdated") { if (data.project !== projectId) return; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; pending.clear(); for (const combo of combos.values()) combo.close(); if (data.created?.type === "schema" && draft.type === "schema" && draft.name === data.created.name) { draft.schema = data.created.name; $("schema").value = draft.schema; } selectedSchema = schemaPage.items.find(s => s.name === draft.schema); persist(); return; }
+      if (data.command === "catalogUpdated") { if (data.project !== projectId) return; schemaPage = data.page; $("catalog-notice").textContent = data.notice || ""; pending.clear(); for (const combo of combos.values()) combo.close(); if (data.created?.type === "schema" && draft.type === "schema" && draft.name === data.created.name) { draft.schema = data.created.name; $("schema").value = draft.schema; } selectedSchema = schemaPage.items.find(s => s.name === draft.schema); memberContext = undefined; changed({ preview: !data.created }); return; }
       if (["search", "schemas", "properties", "storage"].includes(data.command)) { if (pending.get(data.field) !== data.sequence) return; let page = data.page; if (data.command === "storage") { $("map-file-note").textContent = page.message || "Only existing native database files are offered. The reviewed mapping applies to this new class."; root.JadeCreationRulesView.renderPlacementView(document, $("exclusive-placement-view"), page); } if (data.field === "parent" && !page.offset && !page.items.some(r => r.name === "RootSchema") && (!$("parent").value || "rootschema".includes($("parent").value.toLowerCase()))) page = { ...page, items: [{ name: "RootSchema" }, ...page.items] }; combos.get(data.field)?.render(page); return; }
       if (data.command === "describe") { if (requestedProject === undefined && data.sequence === previewSequence) renderRules(data.rules); return; }
-      if (data.command === "preview") { if (requestedProject !== undefined || data.sequence !== previewSequence || data.project !== undefined && data.project !== projectId) return; const comparisonError = comparisonSelectionError(draft); if (comparisonError) { receipt = undefined; validPreview = false; error(comparisonError.message, comparisonError.field); $("status").textContent = "Choose an available comparison mode before reviewing source."; updateSteps(); return; } renderRules(data.rules); const sizingError = draft.type === "collection" && root.JadeCreationRulesView.sizingSelectionError(draft, sizingModes); if (sizingError) { receipt = undefined; validPreview = false; error(sizingError, "sizing-mode"); $("status").textContent = "Your sizing choice is preserved. Correct it or explicitly choose Jade default."; updateSteps(); return; } receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); renderReviewFiles(data.files); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)" + (data.files.some(file => file.operation === "update") ? ", including a reviewed existing metadata update." : "."); error(""); updateSteps(); return; }
+      if (data.command === "preview") { if (requestedProject !== undefined || data.sequence !== previewSequence || data.project !== undefined && data.project !== projectId) return; renderRules(data.rules); const comparisonError = comparisonSelectionError(draft); if (comparisonError) { receipt = undefined; validPreview = false; error(comparisonError.message, comparisonError.field); $("status").textContent = "Choose an available comparison mode before reviewing source."; updateSteps(); return; } const sizingError = draft.type === "collection" && root.JadeCreationRulesView.sizingSelectionError(draft, sizingModes); if (sizingError) { receipt = undefined; validPreview = false; error(sizingError, "sizing-mode"); $("status").textContent = "Your sizing choice is preserved. Correct it or explicitly choose Jade default."; updateSteps(); return; } receipt = data.receipt; validPreview = true; $("summary").textContent = data.summary; $("live-source").textContent = data.files.map(file => file.relativePath + "\n" + file.text).join("\n\n"); renderReviewFiles(data.files); $("status").textContent = "Ready to save " + data.files.length + " native source file(s)" + (data.files.some(file => file.operation === "update") ? ", including a reviewed existing metadata update." : "."); error(""); updateSteps(); return; }
       if (data.command === "saved") { if (data.sequence !== saveSequence) return; setSaving(false); validPreview = false; receipt = undefined; $("save").disabled = true; $("status").textContent = "Saved " + data.files.join(", ") + ". Build or publish separately."; if (data.notice) error(data.notice); return; }
       if (data.command === "error") { if (data.operation === "project") { if (data.sequence !== projectSequence) return; requestedProject = undefined; $("project").value = projectId ?? ""; if (!saving) projectId = undefined; } if (data.operation === "save" && data.sequence !== saveSequence) return; if (["preview", "describe"].includes(data.operation) && data.sequence !== previewSequence) return; if (data.operation === "describe") { $("rules-info").textContent = data.message; $("rule-details").textContent = "Native metadata for the current selection is unavailable: " + data.message; return; } if (["search", "schemas", "properties", "storage"].includes(data.operation) && pending.get(data.field) !== data.sequence) return; if (data.operation === "save") setSaving(false); validPreview = false; receipt = undefined; error(data.message, diagnosticField(data), data); $("status").textContent = data.operation === "project" ? "Choose a project or refresh source choices before continuing." : diagnosticPresentation(data).kind === "metadata-unavailable" ? "Your choices are preserved. Supply the missing metadata, then refresh source choices." : "Your choices are preserved. Correct the definition to continue."; updateSteps(); if (data.operation === "save") { $("error").tabIndex = -1; $("error").focus(); } }
     });

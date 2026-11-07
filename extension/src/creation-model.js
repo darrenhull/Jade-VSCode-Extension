@@ -1,7 +1,7 @@
 "use strict";
 const path = require("node:path");
 const { planSchema } = require("./native-project");
-const { generateCollection, collectionKeyChoices } = require("./collections");
+const { generateCollection, collectionKeyChoices, resolveKeyProperty } = require("./collections");
 const { LanguageModel } = require("./language-model");
 const { createCreationImports } = require("./creation-imports");
 const { createCollectionRules, familyFor, bases, nativeCollectionOptions } = require("./collection-rules");
@@ -134,6 +134,17 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
     if (member?.imported && member.metadataStatus !== "known") invalid("member", "Exported property metadata for " + selected.label + " is unavailable. Pull the exporting package source before choosing member keys.", { code: "JADE_IMPORT_METADATA_UNAVAILABLE", metadataStatus: "nativeRequired" });
     return page(collectionKeyChoices(member, c, options.schema).map(property => ({ ...property, label: property.name })), options);
   }
+  function describe(request) {
+    if (request.type === "schema") return { warnings: [], lifetime: { message: "Schemas define a namespace; class lifetime settings do not apply." } };
+    const rules = collectionRules.describe(request);
+    if (request.type !== "collection" || familyFor(request) !== "memberDictionary") return rules;
+    const selected = resolveChoice(request.schema, request.membership, "member class"), c = getCatalog();
+    const member = c.schemas.find(schema => schema.name === request.schema)?.members.find(value => value.name === selected.name && value.schema === selected.schema);
+    // Resolve the exact typed path, including paths beyond autocomplete's page
+    // or reference-hop limits. UI metadata never defines native key semantics.
+    rules.memberKeyTypes = (request.keys || []).map(key => ({ name: key.name, type: member ? resolveKeyProperty(member, key.name || "", c, request.schema)?.type : undefined }));
+    return rules;
+  }
   function preview(request) {
     let result, summary, rulesRequest = request;
     if (request.type === "schema") {
@@ -203,8 +214,8 @@ function createCreationModel(project, { sourceRoot = project.root, systemCache }
       if (mapping) result.files.push(mapping);
     }
     const files = result.files.map(entry => ({ ...entry, file: path.resolve(entry.file), relativePath: path.relative(project.root, entry.file) }));
-    return { ...result, files, summary, source: files[0].text, ...(request.type !== "schema" ? { rules: collectionRules.describe(rulesRequest) } : {}) };
+    return { ...result, files, summary, source: files[0].text, ...(request.type !== "schema" ? { rules: describe(rulesRequest) } : {}) };
   }
-  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview, importsNotice: imports.notice(), storage: options => { const catalog = storageCatalog(project, options.schema); return { ...catalog, ...page(catalog.items, options) }; }, describe: request => request.type === "schema" ? { warnings: [], lifetime: { message: "Schemas define a namespace; class lifetime settings do not apply." } } : collectionRules.describe(request) };
+  return { schemas: options => page(schemaRows(), options), search, keyChoices, preview, importsNotice: imports.notice(), storage: options => { const catalog = storageCatalog(project, options.schema); return { ...catalog, ...page(catalog.items, options) }; }, describe };
 }
 module.exports = { createCreationModel };
