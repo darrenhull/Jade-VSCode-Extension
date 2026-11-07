@@ -4,12 +4,14 @@ $ErrorActionPreference='Stop'
 if(!$Vsix){$Vsix=(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '../dist') -Filter '*.vsix'|Sort-Object LastWriteTime -Descending|Select-Object -First 1).FullName}
 if(!$Vsix -or !(Test-Path -LiteralPath $Vsix -PathType Leaf)){throw 'A packaged VSIX is required.'}
 $temporary=Join-Path ([IO.Path]::GetTempPath()) ('jade-vsix-portable-'+[guid]::NewGuid().ToString('N'))
-$oldPath=$env:PATH;$oldElectron=$env:ELECTRON_RUN_AS_NODE;$oldState=$env:JADE_TOOLS_STATE_DIRECTORY;$location=Get-Location
+$oldPath=$env:PATH;$oldElectron=$env:ELECTRON_RUN_AS_NODE;$oldState=$env:JADE_TOOLS_STATE_DIRECTORY;$oldConnections=$env:JADE_TOOLS_CONNECTIONS_FILE;$location=Get-Location
+$distributionVerified=$false;$privateContextReady=$false;$nativeAttempted=$false;$privateState=$null;$privateConnections=$null
 try{
  [IO.Compression.ZipFile]::ExtractToDirectory([IO.Path]::GetFullPath($Vsix),$temporary)
  $extension=Join-Path $temporary 'extension';$cli=Join-Path $extension 'vendor/jade-tools-cli/jade-cli.exe'
  if(!(Test-Path -LiteralPath $cli -PathType Leaf)){throw 'The VSIX has no bundled native Jade CLI.'}
  & (Join-Path $PSScriptRoot 'VerifyNativeDistribution.ps1') -Directory (Join-Path $extension 'vendor/jade-tools-cli') -PinFile $PinFile -ExpectedDistribution $ExpectedDistribution
+ $distributionVerified=$true
  $workspace=Join-Path $temporary 'workspace';[IO.Directory]::CreateDirectory($workspace)|Out-Null
  [IO.File]::WriteAllText((Join-Path $workspace 'jade.json'),(@{workspaceRoots=@('.');schema='PortableSchema';databasePath=(Join-Path $temporary 'database-must-not-be-opened')}|ConvertTo-Json))
  [IO.File]::WriteAllText((Join-Path $workspace 'PortableTests.cls'),@'
@@ -36,8 +38,10 @@ end;
 }
 )
 '@)
- $env:PATH=Join-Path $env:SystemRoot 'System32';$env:JADE_TOOLS_STATE_DIRECTORY=Join-Path $temporary 'broker';Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+ $privateState=Join-Path $temporary 'broker';$privateConnections=Join-Path $temporary 'connections.json'
+ $env:PATH=Join-Path $env:SystemRoot 'System32';$env:JADE_TOOLS_STATE_DIRECTORY=$privateState;$env:JADE_TOOLS_CONNECTIONS_FILE=$privateConnections;Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
  Set-Location -LiteralPath $workspace
+ $privateContextReady=$true;$nativeAttempted=$true
  $output=& $cli tests list --json
  if($LASTEXITCODE -ne 0){throw ('Extracted native CLI failed: '+($output -join "`n"))}
  $result=($output -join "`n")|ConvertFrom-Json
@@ -47,7 +51,9 @@ end;
 }finally{
  $cleanupFailure=$null
  try{
- if($cli -and (Test-Path -LiteralPath $cli)){
+ if($distributionVerified -and $privateContextReady -and $nativeAttempted -and $cli -and (Test-Path -LiteralPath $cli)){
+  # A failure may only clean up the verified payload in its owned context.
+  $env:JADE_TOOLS_STATE_DIRECTORY=$privateState;$env:JADE_TOOLS_CONNECTIONS_FILE=$privateConnections
   $status=& $cli status --json|ConvertFrom-Json
   if($LASTEXITCODE -ne 0 -or !$status.brokerPID){throw 'Could not identify the owned portable broker before cleanup.'}
   $brokerPID=[int]$status.brokerPID
@@ -64,6 +70,7 @@ end;
  Set-Location -LiteralPath $location.Path;$env:PATH=$oldPath
  if($null -eq $oldElectron){Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue}else{$env:ELECTRON_RUN_AS_NODE=$oldElectron}
  if($null -eq $oldState){Remove-Item Env:JADE_TOOLS_STATE_DIRECTORY -ErrorAction SilentlyContinue}else{$env:JADE_TOOLS_STATE_DIRECTORY=$oldState}
+ if($null -eq $oldConnections){Remove-Item Env:JADE_TOOLS_CONNECTIONS_FILE -ErrorAction SilentlyContinue}else{$env:JADE_TOOLS_CONNECTIONS_FILE=$oldConnections}
  if($cleanupFailure){throw $cleanupFailure}
  if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Recurse -Force}
 }
