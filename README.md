@@ -24,7 +24,7 @@ GitHub releases require manual VSIX installation. A new CLI release opens a revi
 | Debug | Experimental gutter breakpoints, stepping, native caller stacks, selected-frame locals, object expansion and paged collections on compatible runtimes. |
 | Format | Document/selection indentation for native declarations and complete method bodies, preserving tokens, literals and line endings. |
 | Scratch Pad | Run native Workspace statements in Working, see output and compare the two most recent runs. F5 is for builds; Scratch Pad has its own Run action. |
-| Class workspaces | Schema-qualified search, grouped member navigation and method editing backed by the original document, with native undo/save and protected partial-file transitions. |
+| Class workspaces | Schema-qualified search, grouped current-file members and method editing backed by the original document, with native undo/save. |
 | Data browsing | Read-only Source/Working inspection, native object IDs, lazy reference traversal, history, pinned views and collection paging. |
 | Source designer | Create schemas, classes, member/external dictionaries, ordered object arrays and unique object sets. Review source before saving. |
 | Collection rules | Known inherited keys and lifetime permissions, supported key-size checks, Binary comparison, population/block sizing and reviewed existing-file class mappings. Unknown metadata stays explicit. |
@@ -83,7 +83,7 @@ For connection conflicts, use **Jade: Disconnect Build and Test Runtime** or **J
 
 ## Class and object workspaces
 
-Open a class from search, the catalogue or Object Explorer to browse grouped members and edit local methods in context. The method canvas and original source share the real document, completion, diagnostics and native undo/save. Save writes the entire backing file; build and publication remain separate actions. Partial-file transitions use native save/cancel protection, and rejected edits have explicit recovery controls.
+Open a class from search, the catalogue or Object Explorer to browse its current-file declarations and edit local methods in context. The method canvas and original source share the real document, completion, diagnostics and native undo/save. Save writes the entire backing file; build and publication remain separate actions. Opening another file is explicit, and rejected edits have protected recovery controls.
 
 Instance browsing offers an explicit database target. Object and collection pages remain read-only snapshots with retained history, paging and stale-state handling. See the [user guide](extension/README.md#browse-and-create) and [implementation plan](plans/class-object-workspace.md).
 

@@ -23,11 +23,10 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
       const cls=value.classes.find(cls=>cls.name===name);
       for(const group of cls?.groups||[])for(const member of group.items){
         const kind=group.label==='Type methods'?'typeMethod':member.kind;
-        const items=groups.get(group.label),id=memberId({...member,kind});
-        items?.push({...member,kind,id,declaringClass:name,declaringSchema:entry.model.schema,inherited:false});
+        groups.get(group.label)?.push({...member,kind,id:memberId({...member,kind}),declaringClass:name,declaringSchema:entry.model.schema,inherited:false});
       }
     }
-    return {document,groups:[...groups].map(([label,items])=>{const sourceIds=new Set(items.filter(item=>item.bodyStart!==undefined).map(item=>item.id));return {label,items:items.filter(item=>item.bodyStart!==undefined||!['method','typeMethod'].includes(item.kind)||!sourceIds.has(item.id))};}),entries};
+    return {document,groups:[...groups].map(([label,items])=>({label,items})),entries};
   }
   async function resolveClass(row){
     await ready();
@@ -46,10 +45,12 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
     if(!entries.length)throw Error('Workspace class source is missing. Refresh Classes or open its original source.');
     if(entries.filter(entry=>!entry.cls.partial).length>1)throw Error('Ambiguous class: multiple complete declarations exist in this project.');
     const primary=entries.find(entry=>!entry.cls.partial)||entries[0],folder=folderOf(primary.model.uri);
-    return {qualifiedName:schema+'::'+name,name,schema,projectId:projects[0],projectRoot:folder?.uri.fsPath,projectName:folder?.name||'Workspace',file:primary.model.uri,superclass:primary.cls.parent,importIdentity:typeof row.importIdentity==='string'?row.importIdentity:undefined,packageAlias:typeof row.packageAlias==='string'?row.packageAlias:undefined,entries};
+    const selected=row.file?entries.find(entry=>entry.model.uri===row.file):primary;
+    if(!selected)throw Error('The selected source file does not define this workspace class.');
+    return {qualifiedName:schema+'::'+name,name,schema,projectId:projects[0],projectRoot:folder?.uri.fsPath,projectName:folder?.name||'Workspace',file:selected.model.uri,superclass:primary.cls.parent,importIdentity:typeof row.importIdentity==='string'?row.importIdentity:undefined,packageAlias:typeof row.packageAlias==='string'?row.packageAlias:undefined,entries};
   }
   async function snapshot(row,includeInherited){
-    const identity=await resolveClass(row),local=await classData(identity.entries,identity.name);
+    const identity=await resolveClass(row),local=await classData(identity.entries.filter(entry=>entry.model.uri===identity.file),identity.name);
     const groups=new Map(local.groups.map(group=>[group.label,[...group.items]])),known=new Set(local.groups.flatMap(g=>g.items).filter(m=>m.kind!=='base').map(m=>m.name));
     let inheritedAvailable=true,inheritedReason='',parent=identity.superclass,schema=identity.schema,superclassIdentity,resolvedAncestors=0;
     const seen=new Set([schema+'::'+identity.name]);
@@ -88,17 +89,6 @@ function createClassWorkspaceModel({vscode,language,readSource}) {
     return {...data,groups:data.groups.map(group=>({...group,total:group.items.length,items:group.items.filter(member=>page.has(member.id))})),total,offset,hasMore:offset+limit<total,selected:all.find(member=>member.id===state.selectedId),overview:{counts:data.groups.map(group=>({label:group.label,count:group.items.length})),source:data.identity.file,superclass:data.identity.superclass,superclassIdentity:data.superclassIdentity,superclassReason:data.superclassReason}};
   }
   async function preview(row,id){const data=await snapshot(row,true),member=data.groups.flatMap(g=>g.items).find(m=>m.id===id);if(!member)return;const value=parsed.get(member.file);return {...member,text:value?value.text.slice(member.bodyStart??member.start,member.bodyStart===undefined?member.end:member.end-1).trim():member.detail||member.name};}
-  async function resolveMemberSource(row,id){
-    const identity=await resolveClass(row),data=await snapshot(identity,true),candidates=data.groups.flatMap(group=>group.items).filter(member=>member.id===id&&['method','typeMethod'].includes(member.kind)&&!member.system&&member.bodyStart!==undefined&&typeof member.file==='string'&&member.file.startsWith('file:'));
-    const unique=new Map(candidates.map(member=>[member.file+':'+member.bodyStart,member]));
-    if(unique.size!==1)throw Error(unique.size?'Method source ownership is ambiguous. Resolve duplicate definitions before editing.':'A resolved local method source is required before editing.');
-    const member=[...unique.values()][0];
-    if(projectOf(member.file)!==identity.projectId)throw Error('The owning method source does not belong to this project.');
-    const loaded=await readSource(member.file),text=loaded.text??loaded.doc.getText();
-    const current=classSections(text,member.file).filter(cls=>cls.name===member.owner).flatMap(cls=>cls.groups.flatMap(group=>group.items)).filter(item=>item.name===member.name&&item.bodyStart!==undefined&&text[item.end-1]==='}');
-    if(current.length!==1)throw Error('The owning method source changed or is incomplete. Refresh the class before switching source files.');
-    return {identity,member:{...member,...current[0],id:member.id},file:member.file};
-  }
-  return {resolveClass,load,members:load,preview,resolveMemberSource};
+  return {resolveClass,load,members:load,preview};
 }
 module.exports={createClassWorkspaceModel,memberId};

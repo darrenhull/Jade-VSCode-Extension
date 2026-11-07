@@ -37,13 +37,15 @@ test('retains a resolved import identity without merging aliases into an unquali
  const first=await model.resolveClass({schema:'Pets',name:'Fish',file:'file:///one/Fish.cls',importIdentity:'PackageA::Fish',packageAlias:'Goldfish'});
  assert.equal(first.importIdentity,'PackageA::Fish');assert.equal(first.packageAlias,'Goldfish');assert.equal(first.file,'file:///one/Fish.cls');
 });
-test('keeps the exact secondary partial-file method ownership for explicit original-source navigation',async()=>{
+test('scopes declared members and previews to the explicitly selected current file',async()=>{
  const primary='file:///one/Fish.cls',secondary='file:///one/Fish-extra.cls';
  const partial='schemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ntypeDefinitions\nFish partialDefinition\n(\njadeMethodDefinitions\nextra() : String;\n)\ntypeSources\nFish (\njadeMethodSources\nextra\n{\nextra() : String;\nbegin\n return "extra";\nend;\n}\n)';
- const {model}=setup({[primary]:source('Pets','Fish','Object','','extra() : String;'),[secondary]:partial});
- const page=await model.load({name:'Fish',schema:'Pets',file:secondary},{});assert.equal(page.identity.file,primary);
+ const {model,reads}=setup({[primary]:source('Pets','Fish','Object','primaryOnly: String;','extra() : String;'),[secondary]:partial});
+ const page=await model.load({name:'Fish',schema:'Pets',file:secondary},{});assert.equal(page.identity.file,secondary);assert.equal(page.identity.superclass,'Object');assert.equal(reads(),1);
  const member=page.groups.flatMap(group=>group.items).find(member=>member.name==='extra');assert.ok(member);assert.equal(member.file,secondary);
-  assert.equal(page.groups.flatMap(group=>group.items).filter(member=>member.name==='extra').length,1,'Declaration metadata and the one real method source must form one navigation row');
+ assert.equal(page.groups.flatMap(group=>group.items).some(member=>member.name==='primaryOnly'),false);
  const detail=await model.preview(page.identity,member.id);assert.equal(detail.file,secondary);assert.match(detail.text,/return "extra"/);
-  const owning=await model.resolveMemberSource(page.identity,member.id);assert.equal(owning.file,secondary);assert.equal(owning.identity.file,primary);assert.equal(owning.identity.superclass,'Object');
+ const primaryPage=await model.load({name:'Fish',schema:'Pets',file:primary},{}),declaration=primaryPage.groups.flatMap(group=>group.items).find(member=>member.name==='extra');
+ assert.equal(declaration.file,primary);assert.equal(declaration.bodyStart,undefined);const primaryPreview=await model.preview(primaryPage.identity,declaration.id);assert.doesNotMatch(primaryPreview.text,/return "extra"/);
+ await assert.rejects(model.resolveClass({name:'Fish',schema:'Pets',file:'file:///one/Unrelated.cls'}),/does not define/);
 });

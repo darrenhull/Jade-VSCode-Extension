@@ -36,7 +36,14 @@ function registerObjectExplorer(vscode, context, services) {
     credentials,
     pendingUnpinnedRead,
     inspectionScope,
-    browseVersion = 0;
+    browseVersion = 0,
+    inspectionTransitions = Promise.resolve();
+  // Target, project and connection changes share one lane; callers retain request ownership across awaits.
+  function serializeInspectionTransition(operation) {
+    const pending = inspectionTransitions.then(operation);
+    inspectionTransitions = pending.catch(() => {});
+    return pending;
+  }
   const setLock = async (value) => {
     lock = value;
     await services.setBusy(value);
@@ -417,10 +424,13 @@ function registerObjectExplorer(vscode, context, services) {
     if (!value || typeof value.schema !== "string" || typeof value.className !== "string" || typeof value.projectRoot !== "string")
       throw Error("Choose a workspace class with an explicit project and schema.");
     const version = ++browseVersion;
+    const ownsTransition = () => version === browseVersion && !disposed;
     const requestedRoot = path.resolve(value.projectRoot);
     const unavailable = async error => {
+      if (!ownsTransition()) return { cancelled: true };
       const reason = diagnostic(error);
       const selected = await vscode.window.showErrorMessage(reason, "Open Jade settings");
+      if (!ownsTransition()) return { cancelled: true };
       if (selected === "Open Jade settings") await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:jade-local-tools.jade-native-runner-cpp-preview");
       return { available: false, reason, projectRoot: requestedRoot, target: session.target };
     };
@@ -429,6 +439,7 @@ function registerObjectExplorer(vscode, context, services) {
     catch (error) { return unavailable(error); }
     let workingPath;
     try { workingPath = (await services.workingLocation(config)).databasePath; } catch { workingPath = "Unavailable · compile first to create a working database"; }
+    if (!ownsTransition()) return { cancelled: true };
     const choices = [
       { label: "Working database", target: "working", description: value.schema + "::" + value.className,
         detail: workingPath },
@@ -440,19 +451,28 @@ function registerObjectExplorer(vscode, context, services) {
       placeHolder: "Choose the database for " + requestedRoot + " · read-only",
     });
     if (version !== browseVersion || disposed || !choice || !["working", "source"].includes(choice.target)) return { cancelled: true };
-    const sameProject = currentConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
-    if (session.client && (!sameProject || session.target !== choice.target)) await session.disconnect();
-    inspectionScope = requestedRoot;
-    if (session.target !== choice.target) await session.select(choice.target);
     try {
-      if (!session.client) await connect();
-      if (!classBrowser) await loadCatalog();
+      const connected = await serializeInspectionTransition(async () => {
+        if (!ownsTransition()) return false;
+        const sameProject = currentConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+        if (session.disconnecting || (session.client && (!sameProject || session.target !== choice.target))) await session.disconnect();
+        if (!ownsTransition()) return false;
+        if (session.target !== choice.target) await session.select(choice.target);
+        if (!ownsTransition()) return false;
+        inspectionScope = requestedRoot;
+        if (!session.client) await connect();
+        if (!ownsTransition()) return false;
+        if (!classBrowser) await loadCatalog();
+        return ownsTransition();
+      });
+      if (!connected) return { cancelled: true };
     } catch (error) { return unavailable(error); }
     if (version !== browseVersion || disposed) return { cancelled: true };
     const row = classBrowser.rows.find(item => item.schema === value.schema && item.name === value.className);
     if (!row) {
       const message = value.schema + "::" + value.className + " is not installed in the selected " + choice.label + ". Local source remains available. Publish explicitly to add it, or choose another inspection database.";
       const configure = await vscode.window.showInformationMessage?.(message, "Choose database");
+      if (!ownsTransition()) return { cancelled: true };
       if (configure === "Choose database") await vscode.commands.executeCommand("jadeNative.selectInspectionDatabase");
       return { available: false, reason: message, target: session.target, databasePath: currentTarget?.databasePath, projectRoot: requestedRoot };
     }
@@ -462,9 +482,15 @@ function registerObjectExplorer(vscode, context, services) {
     catch (error) { if (generation !== session.generation || version !== browseVersion || disposed) return { cancelled: true }; throw error; }
     if (!revealed || version !== browseVersion || generation !== session.generation || disposed) return { cancelled: true };
     const node = classNode(row);
-    await classPage(node);
-    if (version !== browseVersion || generation !== session.generation || disposed) return { cancelled: true };
-    await view.reveal(node, { select: true, focus: true, expand: true });
+    try {
+      await classPage(node);
+      if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
+      await view.reveal(node, { select: true, focus: true, expand: true });
+    } catch (error) {
+      if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
+      throw error;
+    }
+    if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
     return { ...revealed, available: true, target: session.target, databasePath: currentTarget.databasePath, projectRoot: requestedRoot };
   }
   async function findClass(value) {
@@ -1031,10 +1057,13 @@ function registerObjectExplorer(vscode, context, services) {
     },
     vscode.commands.registerCommand("jadeNative.selectInspectionDatabase", () =>
       action(async () => {
+        const version = ++browseVersion;
+        const ownsTransition = () => version === browseVersion && !disposed;
         let config;
         try {
           config = await configuration();
         } catch {}
+        if (!ownsTransition()) return { cancelled: true };
         const choice = await vscode.window.showQuickPick(
           [
             {
@@ -1057,26 +1086,27 @@ function registerObjectExplorer(vscode, context, services) {
             placeHolder: "Switching disconnects and clears inspection history",
           },
         );
-        if (!choice) return;
-        await session.select(choice.target);
-        currentTarget = undefined;
-        status.text =
-          "$(database) Jade Inspect: " +
-          (choice.target === "working" ? "Working" : "Source") +
-          " · Read-only";
-        refreshDescription();
-        events.fire();
-        return { selection: choice.target, readOnly: true };
+        if (!choice || !["source", "working"].includes(choice.target)) return;
+        return serializeInspectionTransition(async () => {
+          if (!ownsTransition()) return { cancelled: true };
+          await session.select(choice.target);
+          if (!ownsTransition()) return { cancelled: true };
+          currentTarget = undefined;
+          refreshDescription();
+          events.fire();
+          return { selection: choice.target, readOnly: true };
+        });
+
       }),
     ),
     vscode.commands.registerCommand("jadeNative.connectObjects", () =>
       action(connect),
     ),
     vscode.commands.registerCommand("jadeNative.disconnectObjects", () =>
-      action(() => session.disconnect()),
+      action(() => { ++browseVersion; return session.disconnect(); }),
     ),
     vscode.commands.registerCommand("jadeNative.cancelObjectInspection", () =>
-      action(() => session.disconnect()),
+      action(() => { ++browseVersion; return session.disconnect(); }),
     ),
     vscode.commands.registerCommand("jadeNative.refreshObjects", () =>
       action(async () => {
@@ -1155,6 +1185,7 @@ function registerObjectExplorer(vscode, context, services) {
     browseInstances,
     ownsLock: () => lock,
     releaseForOperation: async () => {
+      ++browseVersion;
       if (session.client || lock) {
         await session.disconnect();
         if (lock) {

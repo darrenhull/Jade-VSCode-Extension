@@ -3,7 +3,7 @@ const crypto = require("node:crypto");
 const KINDS = new Set(["all", "property", "reference", "method", "typeMethod", "constant", "key", "base"]);
 const STATE_KEY = "jade.classWorkspaces.v1";
 function classIdentity(row) {
-  return JSON.stringify([String(row.projectId || row.projectRoot || row.workspaceRoot || row.project || ""), String(row.schema || ""), String(row.owner || row.className || row.name || ""), String(row.importIdentity || ""), String(row.packageAlias || "")]);
+  return JSON.stringify([String(row.projectId || row.projectRoot || row.workspaceRoot || row.project || ""), String(row.schema || ""), String(row.owner || row.className || row.name || ""), String(row.importIdentity || ""), String(row.packageAlias || ""), String(row.file || "")]);
 }
 function normalizeState(value = {}) {
   return {
@@ -38,7 +38,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
   }
   function attach({ panel, document, binding, row: suppliedRow, origin, selectedId, services = {} }) {
     const row = suppliedRow || services.row || { file: document?.uri?.fsPath, ...services.identity };
-    const record = { panel, row, binding, viewId: crypto.randomUUID(), sourceSwitches: new Map(), key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
+    const record = { panel, row, binding, viewId: crypto.randomUUID(), flushes: new Map(), key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
     records.add(record);
     const asset = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", name));
     panel.webview.options = { ...panel.webview.options, enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")] };
@@ -84,12 +84,6 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     }
     async function select(id) {
       if (record.closed || id && !record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) && record.snapshot?.selected?.id !== id) return;
-      const nextMember = record.snapshot?.groups?.flatMap(group => group.items).find(member => member.id === id) || (record.snapshot?.selected?.id === id ? record.snapshot.selected : undefined);
-      const editOwningSource = adapters.onEditOwningSource || adapters.onOwningSource;
-      if (nextMember && ["method", "typeMethod"].includes(nextMember.kind) && !nextMember.system && nextMember.owner === (row.owner || row.name) && nextMember.file && document?.uri && nextMember.file !== document.uri.toString() && editOwningSource) {
-        const result = await editOwningSource(row, nextMember);
-        if (result?.opened || result?.cancelled || record.closed) return;
-      }
       record.state.selectedId = id;
       persist(record);
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
@@ -99,13 +93,12 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
         const preview = foreign && adapters.preview ? await adapters.preview(row, id, document) : undefined;
         if (record.closed || record.state.selectedId !== id) return;
-        const sameOwner = member.owner === (row.owner || row.name);
         const snapshot = foreign
-          ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : sameOwner ? "This method is in another source file for this class. Edit its owning source to use its own undo and save history." : "This member belongs to another source document. Open its declaring class to edit it with its own undo and save history.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: !member.system && !sameOwner, canEditOwningSource: !member.system && sameOwner && Boolean(editOwningSource) }
+          ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : "This method belongs to another source document and is read-only here. Open Original Source to view or edit that file explicitly.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: member.inherited === true && !member.system }
           : binding.select(member.owner || member.declaringClass || row.owner, member.name);
         const prepared = services.draftRecovery?.prepare && !foreign ? await services.draftRecovery.prepare(snapshot) : snapshot;
         if (record.closed || record.state.selectedId !== id) return;
-        record.editorEditable = prepared.available === true;
+        record.editorEditable = prepared.available === true && !prepared.readOnly;
         await send({ command: "editorSnapshot", snapshot: prepared });
         await send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] });
         if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() });
@@ -129,10 +122,9 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "instances": await adapters.onInstances?.(row); break;
           case "superclass": if (record.snapshot?.overview?.superclassIdentity) await adapters.onSuperclass?.(row, record.snapshot.overview.superclassIdentity); break;
           case "openDeclaring": { const member = selectedMember(); if (member?.inherited && !member.system) await adapters.onDeclaringClass?.(row, member); break; }
-          case "editOwningSource": { const member = selectedMember(); if (member && !member.system && member.file && member.owner === (row.owner || row.name)) await (adapters.onEditOwningSource || adapters.onOwningSource)?.(row, member); break; }
-          case "sourceSwitchReady": {
-            const request = typeof value.requestId === "string" ? record.sourceSwitches.get(value.requestId) : undefined;
-            if (request) { clearTimeout(request.timer); record.sourceSwitches.delete(value.requestId); value.ok === true ? request.resolve(true) : request.reject(Error("Resolve the pending method draft before switching its source document.")); }
+          case "pendingEditsReady": {
+            const request = typeof value.requestId === "string" ? record.flushes.get(value.requestId) : undefined;
+            if (request) { clearTimeout(request.timer); record.flushes.delete(value.requestId); value.ok === true ? request.resolve(true) : request.reject(Error("Resolve the pending method draft before running this source operation.")); }
             break;
           }
           case "backToClasses": await adapters.onBack?.(row, record.origin); break;
@@ -148,11 +140,11 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "copyDraft": if (services.draftRecovery) { await services.draftRecovery.copy(); await send({ command: "notice", message: "Recovered method draft copied. The source document has not changed." }); } break;
           case "discardDraft": if (services.draftRecovery) {
             const answer = await vscode.window.showWarningMessage("Discard the recovered method draft? The source document will not change.", { modal: true }, "Discard draft");
-            if (answer === "Discard draft") { await services.draftRecovery.discard(); if (binding?.snapshot()) await send({ command: "editorSnapshot", snapshot: binding.snapshot(), reset: true }); await send({ command: "editorDraftRecovery", draft: undefined }); }
+            if (answer === "Discard draft") { const resolved = await services.draftRecovery.discard() || binding?.snapshot(); if (resolved) { record.editorEditable = resolved.available === true && !resolved.readOnly; await send({ command: "editorSnapshot", snapshot: resolved, reset: true }); } await send({ command: "editorDraftRecovery", draft: undefined }); }
           } break;
           case "restoreDraft": if (services.draftRecovery && localMethod()) {
             const answer = await vscode.window.showWarningMessage("Replace the selected method with its recovered draft? Review the source and draft before restoring. Saving still writes the entire source document.", { modal: true }, "Restore draft");
-            if (answer === "Restore draft") { const snapshot = await services.draftRecovery.restore(); await send({ command: "editorSnapshot", snapshot, reset: true }); await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); }
+            if (answer === "Restore draft") { const snapshot = await services.draftRecovery.restore(); record.editorEditable = snapshot.available === true && !snapshot.readOnly; await send({ command: "editorSnapshot", snapshot, reset: true }); await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); }
           } break;
           case "editorSave": if (await services.save?.() === false) await send({ command: "notice", message: "The source document was not saved. Your edits remain in the document." }); break;
           case "editorUndo": await services.undo?.(); break;
@@ -187,13 +179,13 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (member && ["method", "typeMethod"].includes(member.kind) && member.name === snapshot.member && (member.owner || row.owner) === snapshot.owner && (!member.file || member.file === document?.uri?.toString())) send({ command: "editorSnapshot", snapshot });
     }));
     if (services.onDiagnostics) record.subscriptions.push(services.onDiagnostics(() => send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] })));
-    function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const request of record.sourceSwitches.values()) { clearTimeout(request.timer); request.reject(Error("The class workspace closed before its method edits were acknowledged.")); } record.sourceSwitches.clear(); for (const subscription of record.subscriptions) subscription?.dispose(); }
+    function close() { if (record.closed) return; record.closed = true; record.revision++; records.delete(record); persist(record); for (const request of record.flushes.values()) { clearTimeout(request.timer); request.reject(Error("The class workspace closed before its method edits were acknowledged.")); } record.flushes.clear(); for (const subscription of record.subscriptions) subscription?.dispose(); }
     record.subscriptions.push(panel.onDidDispose(close));
     record.refresh = load;
     record.close = close;
-    return { dispose: close, refresh: load, viewId: record.viewId, prepareSourceSwitch: () => {
-      if (!record.ready || record.closed) return Promise.reject(Error("The method editor is not ready to switch source documents."));
-      return new Promise((resolve, reject) => { const requestId = crypto.randomUUID(), timer = setTimeout(() => { record.sourceSwitches.delete(requestId); reject(Error("The method editor did not acknowledge its pending changes. Try again after resolving the draft.")); }, 15000); record.sourceSwitches.set(requestId, { resolve, reject, timer }); void send({ command: "prepareSourceSwitch", requestId }); });
+    return { dispose: close, refresh: load, viewId: record.viewId, flushPendingEdits: () => {
+      if (!record.ready || record.closed) return Promise.reject(Error("The method editor is not ready to flush its pending changes."));
+      return new Promise((resolve, reject) => { const requestId = crypto.randomUUID(), timer = setTimeout(() => { record.flushes.delete(requestId); reject(Error("The method editor did not acknowledge its pending changes. Try again after resolving the draft.")); }, 15000); record.flushes.set(requestId, { resolve, reject, timer }); void send({ command: "flushPendingEdits", requestId }); });
     }, setOrigin: value => { record.origin = value; }, select: async id => {
       if (!record.ready) { record.state.selectedId = typeof id === "string" ? id : ""; persist(record); return; }
       await send({ command: "prepareSelection", id });

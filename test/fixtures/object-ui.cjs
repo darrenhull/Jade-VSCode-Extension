@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -142,7 +142,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
   const controller = registerObjectExplorer(vscode, context, {
     sourceContext,
     pullSource,
-    config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return config; },
+    config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
     inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}),
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     isBusy: () => busy,
@@ -162,7 +162,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       c.closed = new Promise((r) => (c.closeResolve = r));
       c.stop = () => {
         c.stopCalled = true;
-        if (denied) queueMicrotask(() => c.finishClose());
+        if (denied || closeSubsequentAutomatically && clients.indexOf(c) > 0) queueMicrotask(() => c.finishClose());
         return c.closed;
       };
       c.finishClose = () => {
@@ -235,6 +235,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       await commands.get("jadeNative.selectInspectionDatabase")();
       await commands.get("jadeNative.connectObjects")();
     },
+    disposeExtension() { for (const item of context.subscriptions) item.dispose?.(); },
     async cleanup() {
       for (const client of clients)
         if (

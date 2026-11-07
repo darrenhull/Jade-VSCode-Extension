@@ -1,6 +1,6 @@
 # Class & Object Workspace
 
-Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. Implementation and local acceptance checks are complete in PR #32; current-head CI, review and merge remain recorded on that PR.
+Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30), **Build an integrated class and object workspace**. Overall complexity: **XL**. PR #32 includes the implementation; current-file scoping and the three review fixes are implemented, with final packaged checks completing before owner review and merge.
 
 ## Implementation checkpoint
 
@@ -9,7 +9,7 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 - Actual VS Code host checks have proved shared source/undo with the original editor, CRLF and Unicode mapping, clean external reload and preservation of dirty-versus-disk conflicts.
 - VS Code reuses a custom text editor for the same URI and view type in the same editor group. A different class in the same physical file therefore opens in a separate editor group; both pages share the original document. Separate classes in separate files open normal separate tabs. No projection URI or duplicate source buffer is introduced.
 - An inherited method belonging to another file is shown with its declaring identity and an explicit action to open that class workspace. Editing then occurs under that original document's native save/undo ownership.
-- A method in another partial file of the same class uses a native editor transition to that exact file. The native close/save/cancel result is honoured before replacing the class page. Cancelling preserves the old page, selection and dirty source. Actual UI proof covers native Cancel, subsequent successful transition and secondary-file edit/undo/redo/save without changing the primary file.
+- The user's final scope is **current file only**. Declared groups, counts and method editing use the current backing file. Other source files open only through explicit navigation, with independent file-qualified pages; the current page is never rebound or closed automatically.
 - Model and packaged UI checks cover project-qualified same-name classes, declared overrides, inherited ownership and bounded searches across 10,000 members. Native connected inspection is explicitly skipped without a validated disposable fixture; current-head CI/review remain delivery gates.
 
 ### Acceptance evidence checkpoint
@@ -21,14 +21,14 @@ Implementation plan for [story #30](https://github.com/darrenhull/Jade-VSCode-Ex
 | Editing and compact UI | Actual renderer rapid typing and Enter preserve exact CRLF source; whole-document save, 760/480/360 layouts and 200% zoom passed |
 | Runtime inspection UI | Actual product controller + read-only fixture transport: native-style OIDs, lazy references, cursor pages, page-only filter, pin/history/internal scroll, stale snapshots, three themes and 200% zoom passed |
 | Contrast | Measured representative actual body/description/button text above 4.5:1 and focus outline above 3:1 in dark, light and high-contrast themes |
-| Default regression | Final local check: 670 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
-| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 126 product files matched the source checkout |
-| Recovery and partial sources | Actual normal development host passed rejected-edit/reopen recovery, exact Copy, native confirmed Restore/Discard, native undo, dirty primary-file Cancel, successful partial-file transition and secondary-file edit/undo/redo/save |
+| Default regression | Final local check: 688 JavaScript passes, 42 explicit skips; 18 PowerShell passes. Private native-broker teardown waits for actual process exit before cleanup |
+| Portable artifact | Extracted VSIX native distribution receipts/hashes and database-free test discovery passed with Node absent from PATH; all 127 product files matched the source checkout |
+| Recovery and current-file sources | Rejected-edit/reopen recovery, exact Copy, confirmed Restore/Discard and native undo have working UI proofs. Regressions protect reopened/recreated recovery from fresh edits and preserve independent method permissions. Declared members stay in the current file; automatic cross-file transitions have been removed |
 | Connected native inspection | Explicitly skipped: no configured, validated disposable inspection fixture. No Source or ordinary Working database was used as a test substitute |
 
 The UI fixture transport validates presentation and routing; it does not claim native database semantic coverage. Screenshots are under `docs/screenshots/class-workspace/` and `docs/screenshots/object-workspace/`.
 
-The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The verified candidate VSIX SHA256 is `36ff2f7473e36c9849863d4ac2aa2276b39a7f359a5d764a83c4cab2589d92a3`. Class, native member-tree and object UI receipts identify this exact artifact. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
+The actual UI ran in isolated VS Code 1.145.2 on Windows x64. The final candidate VSIX SHA256 is `f163c8cfc7969715f1b1eb2fff61cde24010f6b0cc0394f840b7437838d6cbb4`. Native distribution checks and all 127 packaged product files were verified against the checkout. Native confirmation checks use an isolated normal development host because extension-test mode suppresses dialogs.
 
 The native member tree also limits responses to 100 rows including paging controls (98 members per full page), sends only group identity/offset for paging and does not reread source while paging. F5, Shift+F5 and Ctrl+F5 each dispatch exactly once from both the method canvas and Overview to the correct backing URI after pending edits drain. Their UI test stubs command dispatch; compilation/publication are not executed by that keyboard check. Existing native compiler, test, publish-confirmation and debugger behavior is retained.
 
@@ -65,59 +65,59 @@ After Phase 1 settles the interfaces, class-navigation work and read-only inspec
 
 ## Phase 1: prove the editing architecture first
 
-- [ ] Inspect the existing source preview, language providers and document lifecycle. Identify reusable behaviour before adding modules.
-- [ ] Compare supported TextDocument-backed custom editors and native-editor compositions against the proposed canvas. Prefer an established editor component and a small document bridge over custom editor mechanics.
-- [ ] Prove exact method-range offsets into the original source, including CRLF/LF, Unicode, methods before/after the selection and a signature/body changed while typing.
-- [ ] Prove that a change in either editing surface is applied once to the same document and appears in the other surface.
-- [ ] Prove undo/redo from both surfaces without duplicate edits or a competing history.
-- [ ] Prove completion, diagnostics and definition navigation retain original file locations. Explicitly document any required provider bridge; these features are not automatic in a webview.
-- [ ] Prove whole-document Save, Auto Save, read-only handling, save failures, closing and reload/hot-exit protection.
-- [ ] Prove two class pages backed by the same native source file, including inherited methods with the same declaring file, share the correct buffer without overwriting another page's selection.
-- [ ] Record the chosen architecture, rejected options and supported API boundaries in this folder. If the proof fails, stop production editor work and resolve the design; do not silently ship a read-only substitute for the accepted editing story.
+- [x] Inspect the existing source preview, language providers and document lifecycle. Identify reusable behaviour before adding modules.
+- [x] Compare supported TextDocument-backed custom editors and native-editor compositions against the proposed canvas. Prefer an established editor component and a small document bridge over custom editor mechanics.
+- [x] Prove exact method-range offsets into the original source, including CRLF/LF, Unicode, methods before/after the selection and a signature/body changed while typing.
+- [x] Prove that a change in either editing surface is applied once to the same document and appears in the other surface.
+- [x] Prove undo/redo from both surfaces without duplicate edits or a competing history.
+- [x] Prove completion, diagnostics and definition navigation retain original file locations. Explicitly document any required provider bridge; these features are not automatic in a webview.
+- [x] Prove whole-document Save, Auto Save, read-only handling, save failures, closing and reload/hot-exit protection.
+- [x] Prove two class pages backed by the same native source file, including inherited methods with the same declaring file, share the correct buffer without overwriting another page's selection.
+- [x] Record the chosen architecture, rejected options and supported API boundaries in this folder. If the proof fails, stop production editor work and resolve the design; do not silently ship a read-only substitute for the accepted editing story.
 
 ## Phase 2: class workspace and discovery
 
-- [ ] Reuse class catalogue, matcher and native QuickPick entry points; do not introduce another global class search.
-- [ ] Preserve project/scope, query, schema filter, page, selected row and scroll when opening a class and returning to discovery.
-- [ ] Render the qualified identity, separate Back to Classes action, project/source context and initial Overview.
-- [ ] Reuse class sections and stable member identities for Properties, References, Methods, Type methods, Constants, Collection keys and Inheritance. Hide empty groups and show unknown metadata explicitly.
-- [ ] Search the complete member index while returning/rendering bounded pages of at most 100 rows. Declared members are the default; enable inherited scope only when ownership is resolved.
-- [ ] Reuse a class tab by project/schema/class identity. Restore its own member, filters, scroll and rail width across selection changes and reloads.
-- [ ] Guard asynchronous responses by identity and revision, including disposal, refresh and project changes.
+- [x] Reuse class catalogue, matcher and native QuickPick entry points; do not introduce another global class search.
+- [x] Preserve project/scope, query, schema filter, page, selected row and scroll when opening a class and returning to discovery.
+- [x] Render the qualified identity, separate Back to Classes action, project/source context and initial Overview.
+- [x] Reuse class sections and stable member identities for Properties, References, Methods, Type methods, Constants, Collection keys and Inheritance. Hide empty groups and show unknown metadata explicitly.
+- [x] Search the complete member index while returning/rendering bounded pages of at most 100 rows. Declared members are the default; enable inherited scope only when ownership is resolved.
+- [x] Reuse a class tab by project/schema/class/import/source-file identity. Restore its own member, filters, scroll and rail width across selection changes and reloads.
+- [x] Guard asynchronous responses by identity and revision, including disposal, refresh and project changes.
 
 ## Phase 3: real method editing and source lifecycle
 
-- [ ] Implement the Phase 1 binding over the real source document; avoid a second application source store.
-- [ ] Show declaring class before editing inherited source and disable ambiguous, missing or read-only sources with an explanation.
-- [ ] Preserve active editing through temporarily incomplete code. Re-resolve source ranges against the current document revision before accepting an edit.
-- [ ] Follow clean external changes. Preserve dirty buffers and use an explicit conflict path when on-disk content changes.
-- [ ] Handle completed member deletion/rename, source-file move/deletion and reopened documents without displaying another member under the old selection.
-- [ ] Make whole-file save scope visible. Keep standard Auto Save, save failure, on-save actions, undo and normal unsaved-document protection.
-- [ ] Verify navigation changes neither force saving nor discard edits beyond the user's configured editor behaviour.
-- [ ] Confirm local editing/saving never starts a build, publish or database write.
+- [x] Implement the Phase 1 binding over the real source document; avoid a second application source store.
+- [x] Show declaring class before editing inherited source and disable ambiguous, missing or read-only sources with an explanation.
+- [x] Preserve active editing through temporarily incomplete code. Re-resolve source ranges against the current document revision before accepting an edit.
+- [x] Follow clean external changes. Preserve dirty buffers and use an explicit conflict path when on-disk content changes.
+- [x] Handle completed member deletion/rename, source-file move/deletion and reopened documents without displaying another member under the old selection.
+- [x] Make whole-file save scope visible. Keep standard Auto Save, save failure, on-save actions, undo and normal unsaved-document protection.
+- [x] Verify navigation changes neither force saving nor discard edits beyond the user's configured editor behaviour.
+- [x] Confirm local editing/saving never starts a build, publish or database write.
 
 ## Phase 4: instances, objects and collections
 
-- [ ] Reuse the current Object Explorer reveal action and existing native inspection sessions. Make connection, database, Source/Working target, schema and class explicit before browsing instances.
-- [ ] Retain 100-row lazy instance pages, Next and Return to first page. Do not add arbitrary page jumps, unrestricted instance search or inferred totals.
-- [ ] Use the existing native object IDs and property/type/value results. Preserve null, false, zero, empty, unavailable and unloaded states distinctly.
-- [ ] Follow references only on selection. Detect cycles by identity without recursively expanding the graph.
-- [ ] Preserve Back/Forward, history, selection/scroll restoration and pinned inspection pages. Keep each snapshot bound to its original target and session generation.
-- [ ] Reuse collection First/Next, page sizes 25/50/100 and page-only filtering/display order. Show keys/indexes only when supplied. Release cursors when their owning traversal is replaced or disposed.
-- [ ] Keep the last snapshot visible with a stale banner on connection loss; disable traversal until explicit reconnection.
-- [ ] Link Open class source through project/schema/class resolution. Offer existing pull/configuration actions where valid, without automatically pulling or changing scope.
-- [ ] Prove no object setters, mapped getters, arbitrary expression execution, compilation or publication are introduced by inspection.
+- [x] Reuse the current Object Explorer reveal action and existing native inspection sessions. Make connection, database, Source/Working target, schema and class explicit before browsing instances.
+- [x] Retain 100-row lazy instance pages, Next and Return to first page. Do not add arbitrary page jumps, unrestricted instance search or inferred totals.
+- [x] Use the existing native object IDs and property/type/value results. Preserve null, false, zero, empty, unavailable and unloaded states distinctly.
+- [x] Follow references only on selection. Detect cycles by identity without recursively expanding the graph.
+- [x] Preserve Back/Forward, history, selection/scroll restoration and pinned inspection pages. Keep each snapshot bound to its original target and session generation.
+- [x] Reuse collection First/Next, page sizes 25/50/100 and page-only filtering/display order. Show keys/indexes only when supplied. Release cursors when their owning traversal is replaced or disposed.
+- [x] Keep the last snapshot visible with a stale banner on connection loss; disable traversal until explicit reconnection.
+- [x] Link Open class source through project/schema/class resolution. Offer existing pull/configuration actions where valid, without automatically pulling or changing scope.
+- [x] Prove no object setters, mapped getters, arbitrary expression execution, compilation or publication are introduced by inspection.
 
 ## Phase 5: performance and accessible presentation
 
-- [ ] Reuse indexes and avoid workspace rescans on warm member navigation. Load/render the selected body and necessary backing documents only.
-- [ ] Measure cold indexing, warm member navigation, document binding and native traversal separately. Record hardware/data size and observed timings rather than invent a latency guarantee.
-- [ ] At 760 CSS px and above, provide the resizable 240-320 px rail and independent canvas scroll. Below 760 px, use the equivalent full-width member picker.
-- [ ] Below 480 px, keep secondary actions in a labelled More menu and object rows in property/type/value blocks.
-- [ ] Check 360 px width and 200 percent zoom: no shell overflow or clipped controls; source can scroll horizontally independently.
-- [ ] Verify keyboard tree/table semantics, Enter selection, contextual search shortcuts, Escape/focus return and live result announcements.
-- [ ] Use VS Code theme tokens, codicons and the editor font. Check light, dark and high contrast, including 4.5:1 text and 3:1 essential-control contrast.
-- [ ] Keep loading and panel changes stable, with clear error/empty/recovery states and no animated panel transitions.
+- [x] Reuse indexes and avoid workspace rescans on warm member navigation. Load/render the selected body and necessary backing documents only.
+- [ ] Native traversal timing remains unmeasured without a validated disposable fixture. Local metadata benchmark on Intel Core i7-8750H / Windows x64 / Node 24.22.1: 30,000-row catalogue construction 56.4 ms; full-index search/position lookup 6.2 ms in the first regression run. These are presentation-model timings, not database or startup guarantees.
+- [x] At 760 CSS px and above, provide the resizable 240-320 px rail and independent canvas scroll. Below 760 px, use the equivalent full-width member picker.
+- [x] Below 480 px, keep secondary actions in a labelled More menu and object rows in property/type/value blocks.
+- [x] Check 360 px width and 200 percent zoom: no shell overflow or clipped controls; source can scroll horizontally independently.
+- [x] Verify keyboard tree/table semantics, Enter selection, contextual search shortcuts, Escape/focus return and live result announcements.
+- [x] Use VS Code theme tokens, codicons and the editor font. Check light, dark and high contrast, including 4.5:1 text and 3:1 essential-control contrast.
+- [x] Keep loading and panel changes stable, with clear error/empty/recovery states and no animated panel transitions.
 
 ## TDD and evidence
 

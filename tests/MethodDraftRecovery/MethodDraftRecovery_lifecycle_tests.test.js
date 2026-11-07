@@ -39,3 +39,14 @@ test('does not remove recovery protection while a second view holds the same sou
  const recovery=new MethodDraftRecovery(state(),{maxCharacters:8,maxRecords:1,maxBytes:200000});await recovery.reserve(identity);await recovery.reserve(identity);await recovery.release(identity);
  await assert.rejects(recovery.reserve({...identity,member:'other'}),/full/);await recovery.release(identity);await recovery.reserve({...identity,member:'other'});
 });
+test('a reopened unapplied draft cannot be replaced by fresh backing-source typing or cleared by its acknowledgement',async()=>{
+ const storage=state(),first=new MethodDraftRecovery(storage);await first.save(identity,{text:'original recovered work',version:9});
+ const reopened=new MethodDraftRecovery(storage);await assert.rejects(reopened.reserve(identity),/Restore|discard/i);
+ await assert.rejects(reopened.save(identity,{text:'new text based on old backing file',version:1}),/Restore|discard/i);
+ assert.equal(await reopened.acknowledge(identity,{text:'new text based on old backing file',version:2}),false);assert.equal(reopened.get(identity).text,'original recovered work');
+ await reopened.discard(identity);await reopened.reserve(identity);await reopened.save(identity,{text:'new deliberate edit',version:3});assert.equal(reopened.get(identity).text,'new deliberate edit');
+});
+test('closing a view protects its remaining unapplied draft even when reopened in the same session',async()=>{
+ const recovery=new MethodDraftRecovery(state());await recovery.reserve(identity);await recovery.save(identity,{text:'pending draft',version:1});await recovery.release(identity);
+ await assert.rejects(recovery.reserve(identity),/Restore|discard/i);await assert.rejects(recovery.save(identity,{text:'replacement',version:2}),/Restore|discard/i);assert.equal(recovery.get(identity).text,'pending draft');
+});

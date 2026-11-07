@@ -22,6 +22,7 @@ test("class identity keeps projects, schemas and imported aliases separate", () 
   assert.notEqual(classIdentity(row), classIdentity({ ...row, schema: "Other" }));
   assert.notEqual(classIdentity(row), classIdentity({ ...row, importIdentity: "Alias" }));
   assert.notEqual(classIdentity({...row,importIdentity:"package",packageAlias:"One"}),classIdentity({...row,importIdentity:"package",packageAlias:"Two"}));
+  assert.notEqual(classIdentity(row),classIdentity({...row,file:"file:///project/Fish-partial.cls"}));
 });
 test("state clamps large pages and accepts only presentation fields", () => {
   assert.deepEqual(normalizeState({ offset: -1, limit: 100000, railWidth: 500, kind: "bad", query: "x", selectedId: "m1", file: "evil" }), { query: "x", kind: "all", includeInherited: false, offset: 0, limit: 100, railWidth: 320, scrollTop: 0, selectedId: "m1" });
@@ -135,24 +136,25 @@ test("recovery replacement and discard require explicit modal confirmation",asyn
   shell.attach({panel:h.panel,row,services:{draftRecovery:recovery}});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});await h.message({command:"restoreDraft"});await h.message({command:"discardDraft"});
   assert.equal(prompts.length,2);assert.ok(prompts.every(prompt=>prompt.options.modal));assert.deepEqual(calls,[]);
 });
-test("source switching waits for the exact mounted editor acknowledgement",async()=>{
+test("source operations wait for the exact mounted pending-edit acknowledgement",async()=>{
   const h=host(),shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot}),view=shell.attach({panel:h.panel,row});
-  await assert.rejects(view.prepareSourceSwitch(),/not ready/);await h.message({command:"ready"});
-  const result=view.prepareSourceSwitch(),request=h.sent.at(-1);assert.equal(request.command,"prepareSourceSwitch");
-  await h.message({command:"sourceSwitchReady",requestId:"unknown",ok:true});
-  await h.message({command:"sourceSwitchReady",requestId:request.requestId,ok:true});assert.equal(await result,true);
+  await assert.rejects(view.flushPendingEdits(),/not ready/);await h.message({command:"ready"});
+  const result=view.flushPendingEdits(),request=h.sent.at(-1);assert.equal(request.command,"flushPendingEdits");
+  await h.message({command:"pendingEditsReady",requestId:"unknown",ok:true});
+  await h.message({command:"pendingEditsReady",requestId:request.requestId,ok:true});assert.equal(await result,true);
 });
-test("conflicted and disposed method canvases cannot close their source document",async()=>{
+test("conflicted and disposed method canvases cannot approve source operations",async()=>{
   const h=host(),shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>snapshot}),view=shell.attach({panel:h.panel,row});await h.message({command:"ready"});
-  const conflicted=view.prepareSourceSwitch(),rejected=assert.rejects(conflicted,/pending method draft/);await h.message({command:"sourceSwitchReady",requestId:h.sent.at(-1).requestId,ok:false});await rejected;
-  const pending=view.prepareSourceSwitch(),closed=assert.rejects(pending,/closed/);shell.dispose();await closed;
+  const conflicted=view.flushPendingEdits(),rejected=assert.rejects(conflicted,/pending method draft/);await h.message({command:"pendingEditsReady",requestId:h.sent.at(-1).requestId,ok:false});await rejected;
+  const pending=view.flushPendingEdits(),closed=assert.rejects(pending,/closed/);shell.dispose();await closed;
 });
-test("cancelling an owning-source transition preserves previous class selection",async()=>{
+test("a method from another file never rebinds the current editor or invokes a source transition",async()=>{
   const h=host(),document={uri:{toString:()=>row.file},isDirty:true},foreign={id:"part",name:"secondary",owner:row.owner,kind:"method",file:"C:/part.cls"},calls=[];
-  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,groups:[{label:"Methods",items:[...snapshot.groups[0].items,foreign]}]}),onEditOwningSource:async(...args)=>{calls.push(args);return{opened:false,cancelled:true};}});
-  const view=shell.attach({panel:h.panel,row,document});await h.message({command:"ready"});await h.message({command:"select",id:"m1"});await h.message({command:"select",id:"part"});
-  assert.equal(view.state().selectedId,"m1");assert.equal(calls.length,1);assert.equal(calls[0][1].file,"C:/part.cls");
+  const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,groups:[{label:"Methods",items:[...snapshot.groups[0].items,foreign]}]}),preview:async()=>({text:"secondary(); begin end;"}),onEditOwningSource:async()=>calls.push("unexpected")});
+  const binding={snapshot:()=>undefined,select:()=>{throw Error("must not bind another file");}},view=shell.attach({panel:h.panel,row,document,binding});await h.message({command:"ready"});await h.message({command:"select",id:"part"});
+  assert.equal(view.state().selectedId,"part");assert.deepEqual(calls,[]);const current=h.sent.find(message=>message.command==="editorSnapshot").snapshot;assert.equal(current.available,false);assert.match(current.reason,/Open Original Source/);assert.equal(document.uri.toString(),row.file);
 });
+
 test("superclass navigation uses only resolved adapter identity",async()=>{
   const h=host(),calls=[],base={name:"Base",schema:"Shop",file:"C:/base.cls",projectId:row.projectId};
   const shell=createClassWorkspaces(h.vscode,h.context,{load:async()=>({...snapshot,overview:{superclassIdentity:base}}),onSuperclass:async(...args)=>calls.push(args)});

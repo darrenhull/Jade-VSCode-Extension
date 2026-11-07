@@ -77,7 +77,6 @@ function registerClassView(vscode, context, language, options={}) {
     onBack:restoreDiscovery,
     onDeclaringClass:(_row,member)=>previewController.open({name:member.owner,schema:member.schema,file:member.file}),
     onSuperclass:(_row,identity)=>previewController.open(identity),
-    onEditOwningSource:(row,member)=>previewController.openOwningSource(row,member.id),
   });
   const previewController=registerClassWorkspaces(vscode,context,{model,shell,onOriginal:openOriginal});
   const classRows=createClassDiscoveryRows(uri=>vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(uri)));

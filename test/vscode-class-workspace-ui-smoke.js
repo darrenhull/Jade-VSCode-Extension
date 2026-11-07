@@ -12,8 +12,8 @@ async function run() {
   const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const report = path.resolve(workspace, "../host-report.json");
   const captures = process.env.JADE_CLASS_WORKSPACE_SCREENSHOTS;
-  const owned = [], messages = [], selections = [], memento = new Map(), warnings=[],sourceMoves=[],keyDispatches=[];
-  let document, saved, binding, previousClipboard, viewId, currentView, allowInherited=false, removeMethod=false,allowExtra=false;
+  const owned = [], messages = [], selections = [], memento = new Map(), warnings=[],keyDispatches=[];
+  let document, saved, binding, previousClipboard, viewId, currentView, allowInherited=false, removeMethod=false;
   const source = ["schemaDefinition", "Pets subschemaOf RootSchema partialDefinition;", "typeHeaders", "Fish subclassOf Object transient;", "typeDefinitions", "Fish completeDefinition", "(", "attributeDefinitions", "name: String[50];", "jadeMethodDefinitions", "getName() : String;", ")", "typeSources", "Fish (", "jadeMethodSources", "getName", "{", "getName() : String;", "begin", ' return "Bubbles";', "end;", "}", ")"].join("\r\n");
   const file = path.join(workspace, "ClassWorkspaceFish.cls");
   fs.writeFileSync(file, source);
@@ -22,9 +22,6 @@ async function run() {
   const parentFile=path.join(workspace,"Parent.cls"),parentUri=vscode.Uri.file(parentFile).toString(),parentMethod="inheritedMethod() : String;\r\nbegin\r\n return \"Inherited\";\r\nend;";
   fs.writeFileSync(parentFile,"schemaDefinition\r\nPets subschemaOf RootSchema partialDefinition;\r\ntypeHeaders\r\nParent subclassOf Object transient;\r\ntypeDefinitions\r\nParent completeDefinition ( jadeMethodDefinitions inheritedMethod() : String; )\r\ntypeSources\r\nParent ( jadeMethodSources inheritedMethod {\r\n"+parentMethod+"\r\n} )");
   const inherited={id:"parent-method",name:"inheritedMethod",kind:"method",schema:"Pets",owner:"Parent",declaringClass:"Parent",file:parentUri,inherited:true,detail:parentMethod};
-  const extraFile=path.join(workspace,"Fish-extra.cls"),extraUri=vscode.Uri.file(extraFile).toString();
-  fs.writeFileSync(extraFile,'schemaDefinition\r\nPets subschemaOf RootSchema partialDefinition;\r\ntypeDefinitions\r\nFish partialDefinition\r\n(\r\njadeMethodDefinitions\r\nextra() : String;\r\n)\r\ntypeSources\r\nFish (\r\njadeMethodSources\r\nextra\r\n{\r\nextra() : String;\r\nbegin\r\n return "extra";\r\nend;\r\n}\r\n)');
-  const extra={id:"extra-method",name:"extra",kind:"method",schema:"Pets",owner:"Fish",file:extraUri};
   try {
     const productApi=await vscode.extensions.getExtension("jade-local-tools.jade-native-runner-cpp-preview").activate();
     productApi.classView.previewController.dispose();
@@ -38,19 +35,18 @@ async function run() {
     const adapters = {
       async load(_row,state) {
         if(!fs.existsSync(file))throw Error("Workspace source file is not available. Restore the original file, then retry.");
-        const available=members.filter(member=>!removeMethod||member.id!=="getName");if(allowInherited&&state.includeInherited)available.push(inherited);if(allowExtra)available.push(extra);
+        const available=members.filter(member=>!removeMethod||member.id!=="getName");if(allowInherited&&state.includeInherited)available.push(inherited);
         const matching=available.filter(member=>(state.kind==="all"||member.kind===state.kind)&&member.name.toLowerCase().includes(state.query.toLowerCase())), page=matching.slice(state.offset,state.offset+100);
         return {identity:{qualifiedName:"Pets::Fish",name:"Fish",schema:"Pets",projectName:"Workspace UI proof",file:uri.toString(),superclass:allowInherited?"Parent":"Object",lifetime:"Transient"},groups:[{label:"Properties",total:9999,items:page.filter(m=>m.kind==="property")},{label:"Methods",total:available.filter(m=>m.kind==="method").length,items:page.filter(m=>m.kind==="method")}],total:matching.length,offset:state.offset,hasMore:state.offset+100<matching.length,inheritedAvailable:allowInherited,inheritedReason:"No resolved inherited source is included in this fixture.",selected:available.find(m=>m.id===state.selectedId),overview:{counts:[{label:"Properties",count:9999},{label:"Methods",count:available.filter(m=>m.kind==="method").length}],...(allowInherited?{superclassIdentity:{name:"Parent",schema:"Pets",file:parentUri,projectId:workspace}}:{})}};
       },
       onOriginal: () => selections.push("original"), onInstances:()=>messages.push("instances"), onBack:()=>messages.push("back"),
       preview:async (_row,id)=>({text:[...members,inherited].find(member=>member.id===id)?.detail || ""}),
       onDeclaringClass:(_row,member)=>messages.push("declaring:"+member.owner),onSuperclass:(_row,base)=>messages.push("superclass:"+base.name),
-      onEditOwningSource:async(actualRow,member)=>{const moved=await controller.openOwningSource(actualRow,member.id);sourceMoves.push(moved);return moved;},
     };
     function createController(){
       const shell=createClassWorkspaces({Uri:vscode.Uri,window:{showWarningMessage(...args){warnings.push(args[0]);return vscode.window.showWarningMessage(...args);}}},context,adapters),attach=shell.attach;
       shell.attach=session=>{document=session.document;saved=session.services.save;binding=session.binding;const view=attach(session);currentView=view;viewId=view.viewId;return view;};
-      const model={resolveClass:async()=>({...row,name:"Fish",qualifiedName:"Pets::Fish"}),resolveMemberSource:async(_row,id)=>{if(!allowExtra||id!==extra.id)throw Error("The fixture method source is not resolved.");return{identity:{...row,name:"Fish",qualifiedName:"Pets::Fish"},member:extra,file:extraUri};}};
+      const model={resolveClass:async()=>({...row,name:"Fish",qualifiedName:"Pets::Fish"})};
       const controller=registerClassWorkspaces(sourceVscode,context,{model,shell});owned.push(controller);return controller;
     }
     let controller=createController();await controller.open(row);
@@ -153,12 +149,16 @@ async function run() {
       await browser.evaluate('document.querySelectorAll(".recovery-actions button")[0].click()');
       for(let attempt=0;attempt<100&&(await vscode.env.clipboard.readText())!==recoveredText;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
       assert.equal(await vscode.env.clipboard.readText(),recoveredText,"Copy must copy the durable source draft");
-      await selectEditable(browser);
+      await browser.wait('!document.getElementById("editor-region").hidden',"reopened recovery method canvas");
+      assert.equal(await browser.evaluate('document.querySelector(".cm-content").getAttribute("contenteditable")'),"false","reopened unapplied recovery must protect the native baseline");
+      const originalRecovery=await browser.evaluate('document.querySelector("#draft-recovery pre").textContent'),originalNative=document.getText();
+      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("SHOULD_NOT_REPLACE_RECOVERY");
+      assert.equal(document.getText(),originalNative);assert.equal(await browser.evaluate('document.querySelector("#draft-recovery pre").textContent'),originalRecovery);
       assert.equal(await browser.evaluate('document.getElementById("restore-draft").disabled'),false);
       await browser.evaluate('document.getElementById("restore-draft").click()');await confirm(browser,"Restore draft");
       await browser.wait('document.getElementById("draft-recovery").hidden',"explicit restore acknowledges the durable draft");
       assert.match(await browser.evaluate('document.getElementById("editor-status").textContent'),/^Editing the backing source document/);
-      assert.ok(document.getText().includes("recovered checkpoint"));assert.equal(document.isDirty,true);
+      assert.ok(document.getText().includes("recovered checkpoint"));assert.equal(document.isDirty,true);assert.equal(await browser.evaluate('document.querySelector(".cm-content").getAttribute("contenteditable")'),"true");
       await vscode.commands.executeCommand("undo");
       for(let attempt=0;attempt<100&&document.getText()!==beforeRecovery;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
       assert.equal(document.getText(),beforeRecovery,"Restore uses native source undo history");await saved();
@@ -189,38 +189,18 @@ async function run() {
       try{await controller.refresh();await browser.wait('!document.getElementById("failure").hidden',"missing source failure");assert.match(await browser.evaluate('document.getElementById("failure-message").textContent'),/source file is not available/);await browser.screenshot(path.join(captures,"class-workspace-missing-source.png"));}
       finally{fs.renameSync(missing,file);await controller.refresh();}
     },{predicate:'Boolean(document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(viewId)+')'});
-    allowExtra=true;await controller.refresh();
-    const primaryDocument=document;
     await withClassWorkspace(port,async browser=>{
-      await selectEditable(browser);const before=document.getText();
-      await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("// cancel protected source switch ");
-      for(let attempt=0;attempt<100&&!document.isDirty;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.isDirty,true);const dirty=document.getText();assert.notEqual(dirty,before);
-      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.classWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),uri.toString());
-      await browser.evaluate('document.getElementById("search").value="extra";document.getElementById("search").dispatchEvent(new Event("input",{bubbles:true}))');await browser.wait('document.querySelector("[data-member-id=extra-method]")',"secondary partial-file method");
-      await browser.evaluate('document.querySelector("[data-member-id=extra-method]").click()');await confirm(browser,"Cancel");
-      for(let attempt=0;attempt<100&&!sourceMoves.length;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(sourceMoves.at(-1)?.cancelled,true);assert.equal(document.uri.toString(),uri.toString());assert.equal(document.getText(),dirty);assert.equal(document.isDirty,true);assert.equal(currentView.state().selectedId,"getName");
-      await browser.screenshot(path.join(captures,"class-workspace-source-switch-cancel.png"));await saved();
-      await browser.evaluate('document.querySelector("[data-member-id=extra-method]").click()');
-    },{predicate:'Boolean(document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(viewId)+')'});
-    for(let attempt=0;attempt<200&&document.uri.toString()!==extraUri;attempt++)await new Promise(resolve=>setTimeout(resolve,25));assert.equal(document.uri.toString(),extraUri);assert.notStrictEqual(document,primaryDocument);
-    const primarySaved=primaryDocument.getText();
-    await withClassWorkspace(port,async browser=>{
-      await browser.wait('document.querySelector(".cm-content")?.textContent.includes("return \\\"extra\\\"") && document.querySelector(".cm-content").getAttribute("contenteditable")==="true"',"actual native secondary source editor");
-      assert.match(await browser.evaluate('document.getElementById("class-context").textContent'),/Fish-extra.cls/);
-      const initial=document.getText();await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("// secondary method edit ");
-      for(let attempt=0;attempt<100&&!document.getText().includes("secondary method edit");attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.isDirty,true);assert.ok(document.getText().includes("secondary method edit"));
-      await vscode.commands.executeCommand("undo");for(let attempt=0;attempt<100&&document.getText()!==initial;attempt++)await new Promise(resolve=>setTimeout(resolve,20));assert.equal(document.getText(),initial);
-      await vscode.commands.executeCommand("redo");for(let attempt=0;attempt<100&&!document.getText().includes("secondary method edit");attempt++)await new Promise(resolve=>setTimeout(resolve,20));await saved();assert.equal(fs.readFileSync(extraFile,"utf8"),document.getText());assert.equal(fs.readFileSync(file,"utf8"),primarySaved);
-      const tabs=vscode.window.tabGroups.all.flatMap(group=>group.tabs).filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==="jade.classWorkspace");assert.equal(tabs.length,1);assert.equal(tabs[0].input.uri.toString(),extraUri);assert.equal(tabs[0].label,"Pets::Fish");await browser.screenshot(path.join(captures,"class-workspace-secondary-source.png"));
+      await selectEditable(browser);
+      assert.equal(document.uri.toString(),uri.toString());
       assert.deepEqual(keyDispatches,[],"viewing, editing and navigation must not automatically build, publish or run tests");
-      async function assertKey(command,modifiers,route){const before=keyDispatches.length;await browser.key("F5",116,modifiers);for(let attempt=0;attempt<200&&keyDispatches.length===before;attempt++)await new Promise(resolve=>setTimeout(resolve,20));await new Promise(resolve=>setTimeout(resolve,150));assert.equal(keyDispatches.length,before+1,"one dispatch per actual F5 combination");const result=keyDispatches.at(-1);assert.equal(result.command,command);assert.equal(result.uri,extraUri,"key actions must use the actual secondary backing document");if(route)assert.equal(result.route,route);return result;}
+      async function assertKey(command,modifiers,route){const before=keyDispatches.length;await browser.key("F5",116,modifiers);for(let attempt=0;attempt<200&&keyDispatches.length===before;attempt++)await new Promise(resolve=>setTimeout(resolve,20));await new Promise(resolve=>setTimeout(resolve,150));assert.equal(keyDispatches.length,before+1,"one dispatch per actual F5 combination");const result=keyDispatches.at(-1);assert.equal(result.command,command);assert.equal(result.uri,uri.toString(),"key actions must use the current backing document");if(route)assert.equal(result.route,route);return result;}
       await browser.evaluate('document.querySelector(".cm-content").focus()');await browser.key("Home",36,2);await browser.type("// queued before F5 ");
       assert.ok((await assertKey("jadeNative.buildWorkspace",0)).text.includes("queued before F5"),"F5 must await pending source edits");
       await assertKey("jadeNative.publishClass",8);await assertKey("jadeNative.runLocalTests",2);
       await browser.evaluate('document.getElementById("overview").click()');await browser.wait('document.getElementById("detail-title").textContent==="Class overview"',"overview key dispatch context");
       await assertKey("jadeNative.buildWorkspace",0,"global");await assertKey("jadeNative.publishClass",8,"global");await assertKey("jadeNative.runLocalTests",2,"global");
     },{predicate:'Boolean(document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(viewId)+')'});
-    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,autoSavedIncompleteMethod:true,repairedSelectionRetained:true,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,unappliedDraftCaption:true,recoveryCaptionReset:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,nativeSourceSwitchCancel:true,sameLogicalClassSecondarySource:true,secondaryNativeEditUndoSave:true,sourceKeyDispatch:{count:keyDispatches.length,exactlyOnce:true,actualBackingUri:true,pendingEditsFlushed:true,overviewGlobalBindings:true,nativeCompilationExecuted:false}},null,2));
+    fs.writeFileSync(report,JSON.stringify({passed:true,...evidence,autoSavedIncompleteMethod:true,repairedSelectionRetained:true,durableRecovery:true,cleanSourceRecoveryReload:true,recoveryCopy:true,confirmedRestore:true,restoreNativeUndo:true,confirmedDiscard:true,reopenedDraftProtected:true,unappliedDraftCaption:true,recoveryCaptionReset:true,inheritedReadOnly:true,declaringClassAction:true,cleanRemovedMember:true,missingSourceRecovery:true,currentFileOnly:true,sourceKeyDispatch:{count:keyDispatches.length,exactlyOnce:true,actualBackingUri:true,pendingEditsFlushed:true,overviewGlobalBindings:true,nativeCompilationExecuted:false}},null,2));
   } catch(error) {fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
   finally {if(previousClipboard!==undefined)await vscode.env.clipboard.writeText(previousClipboard);if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
 }

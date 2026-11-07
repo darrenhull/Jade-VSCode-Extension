@@ -119,8 +119,8 @@ function setup() {
     workspace: {
       fs:{isWritableFileSystem:()=>true},
       findFiles: async () => [],
-      workspaceFolders: [],
-      getWorkspaceFolder: () => undefined,
+      workspaceFolders: [{name:'Workspace',uri:Uri.file('/workspace')}],
+      getWorkspaceFolder: uri => uri.fsPath==='/workspace'||uri.fsPath.startsWith('/workspace/')?{name:'Workspace',uri:Uri.file('/workspace')}:undefined,
       registerTextDocumentContentProvider: (scheme, provider) => {
         contentProvider = provider;
         provider.onDidChange(async (uri) => {
