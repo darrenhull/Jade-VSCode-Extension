@@ -11,3 +11,6 @@
 /test/fixtures/jade-byte-boundaries.jade -text
 /test/fixtures/jade-byte-overflow-positive.jade -text
 /test/fixtures/jade-byte-overflow-negative.jade -text
+
+# Lifecycle native proof fixtures have canonical LF bytes.
+/test/fixtures/lifecycle/** text eol=lf

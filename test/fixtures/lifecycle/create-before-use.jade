@@ -1,0 +1,10 @@
+vars
+    cow : LifecycleCow;
+begin
+    create cow transient;
+    write cow.moo();
+    cow.setName("Daisy");
+    write cow.moo();
+epilog
+    delete cow;
+end;

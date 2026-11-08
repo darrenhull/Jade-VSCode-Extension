@@ -1,0 +1,7 @@
+vars
+    cow : NamedLifecycleCow;
+begin
+    create cow transient;
+epilog
+    delete cow;
+end;

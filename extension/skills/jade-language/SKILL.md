@@ -28,6 +28,10 @@ For examples and type/syntax links, read [the language reference](references/lan
 
 For native class files, read [CLS extract structure](references/cls-format.md) before changing sections, method declarations, completeness qualifiers or identity metadata.
 
+## Object creation and updating methods
+
+Declaring `cow : Cow;` leaves a null reference. Use native `create cow transient;` before `cow.moo()`, not `new Cow()`. Read [creation, constructors and updating examples](references/language-reference.md#object-creation-initialisation-and-updating-methods) before generating object lifecycle code. A method changing `self` needs `updating`; that permission is separate from transaction state and parameter usage.
+
 ## Check the result
 
 Use available Jade Tools commands, the native CLI or the project's Jade MCP tools to compile and, when requested, execute the intended code. Report native error codes and source locations. A snippet or AI suggestion is not evidence of a successful compile.

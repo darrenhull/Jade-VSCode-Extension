@@ -1,3 +1,8 @@
+# 0.17.9 — Native lifecycle guidance
+
+- Guide Copilot to create objects before invoking methods, using native constructors and explicit lifetimes.
+- Explain updating setters, object parameter usage and persistent transactions with native-verified examples.
+
 # 0.17.8 — Automatic structural loading
 
 - Compile supported property and class-structure changes in Working without manually disconnecting or resetting the database.

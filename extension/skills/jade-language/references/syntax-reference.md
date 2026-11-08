@@ -93,6 +93,23 @@ A variable referencing a class does not create an object. Use native `create`/`d
 
 [create](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/create_instruction.htm) · [Collection](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encyclosys1/collection_class/collection_class.htm)
 
+## Updating methods and object parameters
+
+`updating` permits a method to mutate `self` and invoke updating methods on self. It does not start a transaction. A setter such as `setName(pName : String) updating;` needs that option; a caller that only updates a different object is not automatically an updating method.
+
+| Parameter usage | Meaning for an object reference |
+| --- | --- |
+| `constant` (default) | Cannot mutate the referenced object through this parameter or call its updating methods |
+| `input` | May update the referenced object; cannot replace the parameter reference |
+| `io` | May update the object and replace the caller's reference |
+| `output` | Returns a value/reference to the caller; do not read it as an incoming initial value |
+
+Choose usage from the contract, not merely to silence an error. Scalar parameters have their own assignment/value semantics. Constructors accept constant/input parameters, not io/output. Do not combine updating with typeMethod. Persistent create/update/delete additionally require a persistent transaction; shared transient updates use the separate transient transaction rules.
+
+See the [exact creation and updating examples](language-reference.md#object-creation-initialisation-and-updating-methods). Native creation calls constructors automatically; an ordinary domain initialise method is explicit. Use extended `cow := create NamedLifecycleCow("Bessie") transient;` for constructor arguments. Confirm permitted lifetimes rather than forcing every object transient.
+
+[create](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/create_instruction.htm) · [Updating](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/updating_option.htm) · [Constructors](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/userguide/ch4methodfeaturedef/using_constructors_and_destructors.htm)
+
 ## Transactions, exceptions and cleanup
 
 Persistent object updates require the appropriate persistent transaction. Shared transient updates use a transient transaction; ordinary process-local transient objects are a different lifetime. Do not add commit/abort instructions casually, or assume every failure rolls back earlier commits. A Workspace executes in Working and can retain committed data between runs.

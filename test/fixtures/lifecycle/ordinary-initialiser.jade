@@ -1,0 +1,12 @@
+vars
+    cow : LifecycleCow;
+begin
+    create cow transient;
+    write cow.moo();
+    cow.initialiseName("Explicit");
+    write cow.moo();
+    delete cow;
+    write (cow = null).String;
+epilog
+    delete cow;
+end;
