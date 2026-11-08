@@ -1,3 +1,10 @@
+# 0.17.7 — Copilot edits for Scratch Pad
+
+- Edit any line in an existing code cell without appending duplicate bodies, including when only a word was selected.
+- Edit Markdown and Mermaid source through VS Code's native notebook editor, with an explicit workspace-only setup action.
+- Fix native cell errors with complete cell and diagnostic context attached to a short request.
+- Supply expanded Jade syntax guidance, covering the official primitive inventory, descriptors, conversions and language syntax references.
+
 # 0.17.2 — Class and object workspaces
 
 - Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.

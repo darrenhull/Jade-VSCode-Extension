@@ -1,0 +1,68 @@
+{
+  "version": "0.17.6",
+  "kind": "actual-authenticated-native-notebook-editing-and-Jade-execution",
+  "setup": {
+    "cancelPreservedExactNotebook": true,
+    "cancelPreservedDisabledSetting": true,
+    "retryDisplayedNewModal": true,
+    "explicitEnableAndReload": true,
+    "configurationTarget": "Workspace",
+    "nativeSetting": true,
+    "globalPreferenceModified": false,
+    "cellCountRestoredAfterReload": 3
+  },
+  "markdown": {
+    "completeCellAndDiagramPreserved": true,
+    "originalBacktickFencesPreserved": true,
+    "nativePreviewLabels": [
+      "Source",
+      "Tests",
+      "Working"
+    ],
+    "otherCellIndexesByteIdentical": [
+      1,
+      2
+    ],
+    "sourceSha256": "0ea1dfbb75a8aa08ca0738fbaa950090ccbf30f92a58b51cb89fd897db2f204d"
+  },
+  "codeEdit": {
+    "startedWithEndCaret": true,
+    "fiveActualJadeGuidanceAttachments": true,
+    "oneCompleteBody": true,
+    "otherCellIndexesByteIdentical": [
+      0,
+      2
+    ],
+    "sourceSha256": "5da95858483f3814739cf5945ebebc8baf5c034702e0fc246d1d635a6be33e23",
+    "nativeUiPassed": true,
+    "nativeUiElapsedMilliseconds": 3310,
+    "output": "Hello from Jade 3\n"
+  },
+  "fix": {
+    "startedWithSelectedWord": "counter",
+    "actualCompilerError": 6026,
+    "shortNativePrompt": "Fix the attached problem",
+    "readonlyErrorAttachment": true,
+    "acceptedChange": "counter.asString() -> counter.String",
+    "onlyInvalidConversionChanged": true,
+    "otherCellIndexesByteIdentical": [
+      0,
+      2
+    ],
+    "nativeUiPassed": true,
+    "nativeUiElapsedMilliseconds": 2880,
+    "sourceSha256": "5da95858483f3814739cf5945ebebc8baf5c034702e0fc246d1d635a6be33e23",
+    "nativeReplay": {
+      "code": 0,
+      "passed": true,
+      "compiled": true,
+      "executed": true,
+      "output": "Hello from Jade 3\n",
+      "elapsedMilliseconds": 3343.4652,
+      "rawSha256": "097d0b9244f3641f735d05d3ebb36644bd276057de3e976650b28ca0d2ec3cb5"
+    }
+  },
+  "cellCount": 3,
+  "sourcePublished": false,
+  "ownedFixtures": true
+}

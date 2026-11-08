@@ -12,7 +12,7 @@ function harness(){
   Range:class{constructor(...args){this.args=args;}},Diagnostic:class{constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Error:0},
   Uri:{parse:value=>uri(value.slice(value.indexOf(':')+1),value.slice(0,value.indexOf(':'))),file:value=>uri(value)},
   notebooks:{createNotebookController:()=>({dispose(){}}),registerNotebookCellStatusBarItemProvider:noop},
-  workspace:{workspaceFolders:[folder],notebookDocuments:[],getWorkspaceFolder:()=>folder,registerNotebookSerializer:noop,registerTextDocumentContentProvider:noop},
+  workspace:{getConfiguration:()=>({get:()=>false}),workspaceFolders:[folder],notebookDocuments:[],getWorkspaceFolder:()=>folder,registerNotebookSerializer:noop,registerTextDocumentContentProvider:noop},
   commands:{registerCommand:noop},ProgressLocation:{Notification:1}
  };
  const workspaces=registerWorkspaces(vscode,{subscriptions:[],extension:{id:'test'}},{

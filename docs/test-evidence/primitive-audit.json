@@ -1,0 +1,193 @@
+{
+  "kind": "actual-native-jade-primitive-audit",
+  "recordedAt": "2026-11-07T23:54:07.621Z",
+  "primitiveCount": 18,
+  "sourcePublished": false,
+  "aiResponsesSimulated": false,
+  "validation": "Exact fixture bytes compiled/executed sequentially against the isolated Working database. Expected language failures are preserved, not marked as successful execution.",
+  "primitiveTypes": [
+    "Any",
+    "Binary",
+    "Boolean",
+    "Byte",
+    "Character",
+    "Date",
+    "Decimal",
+    "Integer",
+    "Integer64",
+    "MemoryAddress",
+    "Point",
+    "Real",
+    "String",
+    "StringUtf8",
+    "Time",
+    "TimeStamp",
+    "TimeStampInterval",
+    "TimeStampOffset"
+  ],
+  "records": [
+    {
+      "fixture": "test/fixtures/jade-primitive-matrix.jade",
+      "sourceSha256": "f1306dda1b7c6682bf81b09add55fa97f6b6e53442ee322411e717953f40fbc8",
+      "nativeResultSha256": "d9c9f74dabc4b0f393c492d8311f5076cecae1c87824cb694ceaeb043e114e56",
+      "exitCode": 0,
+      "code": 0,
+      "passed": true,
+      "compiled": true,
+      "executed": true,
+      "output": "Any=42\nBinaryLength=2\nBoolean=true\nByte=7\nCharacter=J\nDate=07 November 2026\nDecimal=12.50\nInteger=3\nInteger64=2147483648\nMemoryAddressNull=true\nPoint=3,4\nReal=1.5\nString=hello\nStringUtf8=Jade\nTime=13:14:15\nTimeStamp=07 November 2026, 13:14:15\nTimeStampInterval=0:00:00:00.000\nTimeStampOffset=07 November 2026, 13:14:15 +0000\n",
+      "elapsedMilliseconds": 3084.5789,
+      "diagnostics": []
+    },
+    {
+      "fixture": "test/fixtures/jade-byte-hex-unconverted.jade",
+      "sourceSha256": "9d1b1a054a78075ccc9010d038981a2a30a8620be0d03b2107d69f7f2a827813",
+      "nativeResultSha256": "f1315144444979694255ef4bdc434134ef8017b51cb15a5c264a85a9382d67d9",
+      "exitCode": 1,
+      "code": 6072,
+      "passed": false,
+      "compiled": false,
+      "executed": false,
+      "output": "",
+      "elapsedMilliseconds": 2905.2304,
+      "diagnostics": [
+        {
+          "code": 6072,
+          "message": "Incompatible types",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "fixture": "test/fixtures/jade-application-actual-date.jade",
+      "sourceSha256": "5d5009e917545a0ef255f362e71a4aa027ae539fa73b9f2064d74dc935e31ce9",
+      "nativeResultSha256": "d3386f2daa578735685a9192565fe561a80f2bc2c1b0551002f2aa04bee98d91",
+      "exitCode": 1,
+      "code": 6026,
+      "passed": false,
+      "compiled": false,
+      "executed": false,
+      "output": "",
+      "elapsedMilliseconds": 2791.9682,
+      "diagnostics": [
+        {
+          "code": 6026,
+          "message": "Unknown property or method",
+          "line": 4,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "fixture": "test/fixtures/jade-application-time-unconverted.jade",
+      "sourceSha256": "fbf02893f60bd707d2e08b00f3d7953e8dc3c96ebb5d44effb47f0b92cb98680",
+      "nativeResultSha256": "d80cd0215ab067e7f0aa626455e0ede59f7f08853a56104b485b2d598ddb7c5a",
+      "exitCode": 1,
+      "code": 6072,
+      "passed": false,
+      "compiled": false,
+      "executed": false,
+      "output": "",
+      "elapsedMilliseconds": 2843.3222,
+      "diagnostics": [
+        {
+          "code": 6072,
+          "message": "Incompatible types",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "fixture": "test/fixtures/jade-current-clock-conversions.jade",
+      "sourceSha256": "6db93e07caf4bb22ff12c3185cd775789b161b37db0800effeebf502d9afed67",
+      "nativeResultSha256": "9cdd936d10b6fe8c736fc4cf2773296d1158640bcaac66f18764cb888f0c3374",
+      "exitCode": 0,
+      "code": 0,
+      "passed": true,
+      "compiled": true,
+      "executed": true,
+      "output": "DateValid=true\nTime=23:49:50\nByte=255\n",
+      "elapsedMilliseconds": 2936.4813,
+      "diagnostics": []
+    },
+    {
+      "fixture": "test/fixtures/jade-primitive-defaults.jade",
+      "sourceSha256": "6ef4b090390b3388c8a6395c238a378b289a50071405d18bd0460124cdf4ea64",
+      "nativeResultSha256": "5b38d554703ff225ed48899b75fae0d239ac2f979cc44e3e16d06e79b755d616",
+      "exitCode": 0,
+      "code": 0,
+      "passed": true,
+      "compiled": true,
+      "executed": true,
+      "output": "AnyHasValue=false\nBinaryLength=0\nBoolean=false\nByte=0\nCharacterNull=true\nDate=07 November 2026\nDecimal=0.00\nInteger=0\nInteger64=0\nMemoryAddressNull=true\nPoint=0,0\nReal=0\nStringLength=0\nStringUtf8Length=0\nTime=23:51:24\nTimeStamp=07 November 2026, 23:51:24\nTimeStampInterval=0:00:00:00.000\nTimeStampOffset=07 November 2026, 23:51:24 +0000\n",
+      "elapsedMilliseconds": 2790.2098,
+      "diagnostics": []
+    },
+    {
+      "fixture": "test/fixtures/jade-byte-boundaries.jade",
+      "sourceSha256": "239250fa07fa04caebacbd7c00de4b99c28a60f1f2133e1c700d55e8e316070f",
+      "nativeResultSha256": "4c0f656978e638e4d886aaaf563ea5eb129bec3e66e846b3193e6443dd774487",
+      "exitCode": 0,
+      "code": 0,
+      "passed": true,
+      "compiled": true,
+      "executed": true,
+      "output": "0\n255\n",
+      "elapsedMilliseconds": 3261.7686,
+      "diagnostics": []
+    },
+    {
+      "fixture": "test/fixtures/jade-byte-overflow-positive.jade",
+      "sourceSha256": "c52071bb1cffc01daab27f76b8f6d393b2f525ff2c679bd48bbdc2e06b1488aa",
+      "nativeResultSha256": "05e0fde532685cf718e6af4e16a07096718885b9006290704c0d763ae82141cf",
+      "exitCode": 1,
+      "code": 4011,
+      "passed": false,
+      "compiled": true,
+      "executed": true,
+      "runtimeError": 4011,
+      "output": "",
+      "elapsedMilliseconds": 3387.0059,
+      "diagnostics": [
+        {
+          "code": 4011,
+          "runtimeError": 4011,
+          "message": "Result of expression overflows Byte precision",
+          "line": 6,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "fixture": "test/fixtures/jade-byte-overflow-negative.jade",
+      "sourceSha256": "ee0aecd82c4612a85e7b55153a9ccef769e9cc85937c7f4781bee68cc85dd51f",
+      "nativeResultSha256": "ea66134c95fd9fa5b0cff7f8d98506b3c638dc08de6cd9e716ac469402f5a98b",
+      "exitCode": 1,
+      "code": 4011,
+      "passed": false,
+      "compiled": true,
+      "executed": true,
+      "runtimeError": 4011,
+      "output": "",
+      "elapsedMilliseconds": 3565.2513,
+      "diagnostics": [
+        {
+          "code": 4011,
+          "runtimeError": 4011,
+          "message": "Result of expression overflows Byte precision",
+          "line": 6,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "anyDefaultProbe": {
+    "hasValue": false,
+    "typeName": "Any",
+    "asString": "",
+    "note": "Actual target-runtime observation; do not assume getType returns null."
+  },
+  "rawEvidenceLocation": "Retained locally under JadeTools verification/copilot-live-workflows/primitive-systematic-audit; private paths omitted."
+}

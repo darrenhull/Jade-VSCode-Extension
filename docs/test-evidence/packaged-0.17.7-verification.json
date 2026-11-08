@@ -1,0 +1,52 @@
+{
+  "version": "0.17.7",
+  "verifiedAt": "2026-11-08T11:02:28.356Z",
+  "baseMain": "a8685fc523cd9062d8c899f3f8a05046d3c361ad",
+  "integrationHead": "5cae167d345d155cbd967ffaf706f24796d4c6ca",
+  "vsix": {
+    "path": "dist/jade-native-runner-cpp-preview-0.17.7.vsix",
+    "sha256": "4056230449e6c42d33167535ea070ec593e233d554fd7f9d84c32cda0dfd2138",
+    "entries": 146
+  },
+  "regressions": {
+    "javascriptPassed": 925,
+    "powerShellPassed": 18,
+    "explicitOptionalSkips": 42,
+    "focusedScratchPadPassed": 113,
+    "mergedPR32CoreUnchanged": true
+  },
+  "notebookHost": {
+    "command": "JADE_CLASS_WORKSPACE_VSIX=<exact VSIX> JADE_SCRATCH_PAD_MERMAID_PROOF=1 node scripts/host-test.cjs --class-workspace-ui",
+    "workspaceSettingBeforeActivation": {
+      "inlineChat.notebookAgent": true
+    },
+    "report": "evidence/vscode-scratch-pad-mermaid-host.json",
+    "reportSha256": "6dd03b139bd3ba85bb46cc27de9b6d5a420c4d3db170b003d2493293888ad827",
+    "passed": true,
+    "authenticatedAIRequest": false,
+    "nativeBacktickAndTildeSvg": true,
+    "fiveCodeGuides": true,
+    "wholeCellAndMinimalControlledEdits": true,
+    "nativeUndo": true,
+    "ownedHostExited": true,
+    "ownedStageRemoved": true,
+    "packagedSkillFiles": [
+      "drawio/SKILL.md",
+      "jade-language/SKILL.md",
+      "jade-language/references/cls-format.md",
+      "jade-language/references/language-reference.md",
+      "jade-language/references/language-syntax.md",
+      "jade-language/references/primitive-types.md",
+      "jade-language/references/syntax-reference.md",
+      "mermaid/SKILL.md"
+    ]
+  },
+  "portable": {
+    "exitCode": 0,
+    "nativeDistributionReceiptAndRuntimeHashesPassed": true,
+    "nodeRemovedFromPath": true,
+    "databaseConnection": false,
+    "ownedBrokerAndStageCleaned": true
+  },
+  "historicalAuthenticatedAIProof": "docs/test-evidence/native-copilot-0.17.6.json"
+}

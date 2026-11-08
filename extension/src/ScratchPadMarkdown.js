@@ -13,7 +13,7 @@ class ScratchPadMarkdown {
  preview(value){return this.mode(value,'notebook.cell.quitEdit');}
  async insertMermaid(value){
   const cell=this.cell(value),source=cell.document.getText();
-  if(!/^\s*`{3,}mermaid\b/m.test(source)){
+  if(!/^[ \t]*(?:`{3,}|~{3,})[ \t]*mermaid(?:[ \t]|$)/m.test(source)){
    const raw=/^\s*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|journey|pie|gitGraph|mindmap|timeline|requirementDiagram|quadrantChart|C4\w*|sankey-beta|xychart-beta|block-beta|architecture-beta|packet-beta|kanban)\b/.test(source);
    const body=raw?source:'flowchart LR\n    A[Source] --> B[Working]';
    const diagram='```mermaid\n'+body+(body.endsWith('\n')?'':'\n')+'```';

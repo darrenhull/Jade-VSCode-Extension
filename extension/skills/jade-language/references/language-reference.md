@@ -7,7 +7,8 @@ This is a compact authoring guide for native Jade 2025. Use the linked official 
 | Type | Typical use |
 | --- | --- |
 | `Integer`, `Integer64` | Whole numbers; choose the range required by the application |
-| `Decimal`, `Real` | Decimal values or floating-point calculations; preserve the project's precision rules |
+| `Decimal[p,s]` | Fixed-precision local variable; descriptor required, e.g. `Decimal[12,2]` |
+| `Real` | Floating-point calculations; preserve the project's precision rules |
 | `Boolean` | `true` or `false` |
 | `Character`, `String` | Characters and text |
 | `Date`, `Time`, `TimeStamp` | Date/time values; check each type's own initialization and formatting methods |
@@ -15,6 +16,25 @@ This is a compact authoring guide for native Jade 2025. Use the linked official 
 | A schema-qualified application class | An object reference; respect schema visibility and native lifetime rules |
 
 [Primitive types and their methods](https://secure.jadeworld.com/developer-centre/JADE2025/Docs/EncycloPrim.pdf). Do not substitute an untyped value to bypass a missing or incorrectly cased type.
+
+## Decimal descriptors are required on local variables
+
+Use `amount : Decimal[12,2];`, not `amount : Decimal;`. Precision counts total digits, not only digits before the decimal point. Scale counts fractional digits. Precision is 1..23; scale is 0..precision. `Decimal[12]` means scale zero. Choose values for the application rather than copying 12,2 universally.
+
+```jade
+vars
+    amount : Decimal[12,2];
+    isReady : Boolean;
+begin
+    amount := 12.50;
+    isReady := true;
+    write "Amount: " & amount.String & "; ready: " & isReady.String;
+end;
+```
+
+Bare local Decimal causes native error 7699. Method parameter and return declarations have their own rules: do not mechanically add a storage descriptor everywhere a Decimal type appears. Decimal assignment rounds to the destination scale; preserve required precision and check native overflow/rounding behaviour.
+
+[Decimal type](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/encycloprim/decimal_type/decimal_type.htm) · [Parameters](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/parameters.htm) · [Broader syntax rules](syntax-reference.md)
 
 ## Workspace body versus method
 

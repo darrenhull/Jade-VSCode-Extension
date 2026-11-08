@@ -1,0 +1,139 @@
+{
+  "kind": "manual-authenticated-copilot-ui-and-exact-source-native-replay",
+  "extensionVersion": "0.17.3",
+  "recordedAt": "2026-11-07T23:45:32.413Z",
+  "method": "Operator accepted actual Copilot UI responses, saved existing cells, then replayed exact captured UTF-8 source with native Jade. No model response was simulated.",
+  "initialCellCount": 12,
+  "currentCellCount": 12,
+  "changedCellIndexesAtDecimalCapture": [
+    2,
+    6,
+    8,
+    10
+  ],
+  "unrelatedCellsPreserved": true,
+  "sourcePublished": false,
+  "cases": [
+    {
+      "cellIndex": 2,
+      "scenario": "cleanup_messy_code",
+      "sourceSha256": "f633ca82aaed67f2b7254fc5570bd15916a4738349ecdacfd439c79759a83373",
+      "initialSourceSha256": "997dc64574cdf0d6ec0f8af2efa5bc5899ed1be91eafbb6f852425d3cff92362",
+      "nativeOutputSha256": "f1fb1121880c91fcb0d31eae977ed21b0c2a3e5b6705506923c0dde77222b8d0",
+      "code": 0,
+      "compiled": true,
+      "executed": true,
+      "output": "Sum: 7\n",
+      "elapsedMilliseconds": 2884.3663
+    },
+    {
+      "cellIndex": 6,
+      "scenario": "fix_partial_selection_duplicate_bodies",
+      "sourceSha256": "b1bab8eb7357f6abbbef331038a00056ff41ef658cb423d8d6fb0c46dfd912c1",
+      "initialSourceSha256": "b4b278b3479284bd985e27f41002eb303a879bc4bb051c87c58195b0262f9ea1",
+      "nativeOutputSha256": "0644e656ac97f074cb6f2f0e80de1e404ab83bb120505da10ef9270fd019cba0",
+      "code": 0,
+      "compiled": true,
+      "executed": true,
+      "output": "Totals: 1.53\n",
+      "elapsedMilliseconds": 2792.509
+    },
+    {
+      "cellIndex": 8,
+      "scenario": "edit_default_scope_primitive_matrix_then_byte_fix",
+      "sourceSha256": "028aaff3d3844ea9b1bec694f657b6288ad39133ddf269a1860b256a167e8a6a",
+      "initialSourceSha256": "5a3b8c7c403a2def0177ce4b3daa4c7dd0cd80837942c421ab6887b63d338e6b",
+      "nativeOutputSha256": "d5644122024d0f72fc9515c22d90902923116de041225b16a0e48442b321f724",
+      "code": 0,
+      "compiled": true,
+      "executed": true,
+      "output": "Primitive values: 1.5, 3\nAdditional values: 12.50, true, J, 7\n",
+      "elapsedMilliseconds": 2830.9357,
+      "acceptedMinimalFix": "Only byteValue := 7; changed to byteValue := 7.Byte;",
+      "initialGenerationFailure": {
+        "code": 6072,
+        "message": "Incompatible types",
+        "reportedBy": "Native UI execution observed by operator"
+      },
+      "initialFailedSourceSha256": "34b8804cca442c44bcaee85d28c3ff3c881cfc6bc1836a3a460b608aeea1286c"
+    },
+    {
+      "cellIndex": 10,
+      "scenario": "fix_decimal_descriptor_at_end",
+      "sourceSha256": "73cd9021497938a42ddcef0d54c2a097f8bf2930889ede92981a2c705dfdbbd6",
+      "initialSourceSha256": "f96d9832494c19177b3d5435ce73b28874d2bcd9330dc3d878b37aced85694e7",
+      "nativeOutputSha256": "36788d945b85cc2a940ce9c8f0170b5666956753c4e854ceb30d369bd41cc547",
+      "code": 0,
+      "compiled": true,
+      "executed": true,
+      "output": "Amount: 12.50\n",
+      "elapsedMilliseconds": 2789.4322,
+      "acceptedMinimalFix": "Only amount : Decimal; changed to amount : Decimal[12,2];"
+    }
+  ],
+  "byteGuidance": {
+    "sourceSha256": "a1274e412406458fe78c20023596435a1541c3aec41d61fa3ef08c8687523b17",
+    "compiled": true,
+    "executed": true,
+    "output": "7\n8\n",
+    "elapsedMilliseconds": 2980.4468,
+    "kind": "Native reference example; not AI generation"
+  },
+  "pending": [
+    "edit_from_end_caret",
+    "markdown_header_and_mermaid"
+  ],
+  "rawEvidenceLocation": "Retained locally under JadeTools verification/copilot-live-workflows; private paths omitted here.",
+  "markdownInitialFailure": {
+    "cellIndex": 11,
+    "scenario": "markdown_header_and_mermaid",
+    "sourceSha256": "722f6d47674e2a79dcb075bc7897ecce74e714c421d2edaf9852ba71f5a155f9",
+    "initialSourceSha256": "ff163d5aa3d8956834df6515aff5935c01b58760292b4b69e6b2e19ac0dc6347",
+    "contentPassed": false,
+    "mermaidFencePresent": false,
+    "headingPresent": true,
+    "cellCountPreserved": true,
+    "jadeGuidanceAttached": false,
+    "sourcePublished": false,
+    "nativeCompilation": "Not applicable: Markdown cell",
+    "observedFailure": "Actual authenticated accepted response removed the requested Mermaid fence and graph.",
+    "capturedFailedFixture": "test/fixtures/copilot-live-markdown-missing-mermaid.md"
+  },
+  "markdownRecovery": {
+    "sourceSha256": "2b182cd9adf6149f6cabb7defb93ee423fdfd435af15e5f3fbcba7a6a1ca5b25",
+    "currentCellCount": 12,
+    "initialCellCount": 12,
+    "extensionVersion": "0.17.3",
+    "promptIncludedExplicitFenceCompatibilityInstructions": true,
+    "nativePreviewObserved": true,
+    "renderedLabels": [
+      "Source",
+      "Tests",
+      "Working"
+    ],
+    "fenceStyle": "tilde",
+    "initialFailurePreserved": true
+  },
+  "markdownAttachmentOnlyFailure": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "1bf5f96da42c7b8ff6322caf6a3429d7c303dc4b251893d72022058c5a7fad09",
+    "currentCellCount": 12,
+    "nativeMermaidSkillAttachmentObserved": true,
+    "userRequestIncludedPreserveFence": true,
+    "result": "Content failed: native accepted replacement omitted the diagram; attached guidance alone did not ensure nested-fence compatibility."
+  },
+  "markdownShortPromptFailure": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "1ea66da011660d57a2195ca26c5f48151653c5d76daddf71cd9cbd04adbdceec",
+    "currentCellCount": 12,
+    "result": "Native inline accepted only the inner flowchart body, dropping Markdown prose and fences."
+  },
+  "markdownNotebookSettingComparison": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "e1cf7ea9d28620caad70615e607517877acc3ff0dffdcfc16d06cd9487f94e6a",
+    "currentCellCount": 12,
+    "ownedWorkspaceSettingRequested": true,
+    "nativeAgentRoutingConfirmed": false,
+    "result": "Complete heading/prose/tilde Mermaid source accepted; routing not established, so not a proven general fix."
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "0.17.6",
+  "verifiedAt": "2026-11-08T00:42:15.870Z",
+  "vsix": {
+    "path": "dist/jade-native-runner-cpp-preview-0.17.6.vsix",
+    "sha256": "cabf8f9b47838a5bc0a9ee23cf33f73ece261344fdd476583cb13b64acd4a89f"
+  },
+  "notebookHost": {
+    "command": "JADE_CLASS_WORKSPACE_VSIX=<exact VSIX> JADE_SCRATCH_PAD_MERMAID_PROOF=1 node scripts/host-test.cjs --class-workspace-ui",
+    "workspaceSettingBeforeActivation": {
+      "inlineChat.notebookAgent": true
+    },
+    "report": "evidence/vscode-scratch-pad-mermaid-host.json",
+    "reportSha256": "6dd03b139bd3ba85bb46cc27de9b6d5a420c4d3db170b003d2493293888ad827",
+    "passed": true,
+    "authenticatedAIRequest": false,
+    "tildeMermaidNativeSvg": true,
+    "ownedHostExited": true,
+    "ownedStageRemoved": true
+  },
+  "portable": {
+    "command": "pwsh -NoProfile -File scripts/smoke-vsix.ps1 -Vsix <exact VSIX> -PinFile packages/jade-cli-pin.json",
+    "exitCode": 0,
+    "nativeDistributionReceiptAndRuntimeHashesPassed": true,
+    "nodeRemovedFromPath": true,
+    "databaseConnection": false,
+    "ownedBrokerAndStageCleaned": true
+  }
+}

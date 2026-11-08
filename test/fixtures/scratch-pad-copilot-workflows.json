@@ -1,0 +1,39 @@
+[
+  {
+    "id": "edit_from_end_caret",
+    "action": "edit",
+    "selection": "end",
+    "prompt": "Add a local Integer counter initialized to 3 and include its value in the existing output using native Jade syntax. Edit this existing cell in place.",
+    "source": "begin\n    write \"Hello from Jade\";\nend;",
+    "requiredDeclarations": [{"name":"counter","type":"Integer"}],
+    "preservedStrings": ["Hello from Jade"]
+  },
+  {
+    "id": "fix_partial_selection_duplicate_bodies",
+    "action": "fix",
+    "selection": "partial",
+    "prompt": "Fix this existing cell. Remove the accidentally duplicated top-level bodies, retain the intended calculations and use native primitive-to-string conversion. Keep one complete Workspace body.",
+    "source": "vars\n    firstFloat : Real;\n    firstInt : Integer;\nbegin\n    firstFloat := 1.5;\n    firstInt := 3;\n    write \"Totals: \" & firstFloat.asString() & firstInt.asString();\nend;\nbegin\n    write \"Totals: \" & firstFloat.String & firstInt.String;\nend;\nbegin\n    write \"Totals: \" & firstFloat.String & firstInt.String;\nend;",
+    "requiredDeclarations": [{"name":"firstFloat","type":"Real"},{"name":"firstInt","type":"Integer"}],
+    "preservedStrings": ["Totals: "]
+  },
+  {
+    "id": "edit_default_scope_primitive_matrix",
+    "action": "edit",
+    "selection": "default",
+    "prompt": "Extend this existing cell to demonstrate Real, Integer, Decimal[12,2], Boolean, Character and Byte local variables. Preserve the existing message and values, add suitable initialization and native output, and do not append a second Workspace body.",
+    "source": "vars\n    firstFloat : Real;\n    firstInt : Integer;\nbegin\n    firstFloat := 1.5;\n    firstInt := 3;\n    write \"Primitive values: \" & firstFloat.String & \", \" & firstInt.String;\nend;",
+    "requiredTypes": ["Real","Integer","Decimal[12,2]","Boolean","Character","Byte"],
+    "requiredDeclarations": [{"name":"firstFloat","type":"Real"},{"name":"firstInt","type":"Integer"}],
+    "preservedStrings": ["Primitive values: "]
+  },
+  {
+    "id": "fix_decimal_descriptor_at_end",
+    "action": "fix",
+    "selection": "end",
+    "prompt": "Fix the native Decimal declaration error in this existing cell using Decimal[12,2]. Preserve the calculation and output. Make the smallest necessary edit.",
+    "source": "vars\n    amount : Decimal;\nbegin\n    amount := 12.50;\n    write \"Amount: \" & amount.String;\nend;",
+    "requiredDeclarations": [{"name":"amount","type":"Decimal[12,2]"}],
+    "preservedStrings": ["Amount: "]
+  }
+]

@@ -26,6 +26,14 @@ flowchart LR
 
 Use the user's requested output format. Keep Mermaid source editable; export SVG/PNG only when needed. For an editable draw.io artifact, use the project's drawio skill rather than renaming Mermaid text to `.drawio`.
 
+## Editing a Scratch Pad Markdown cell with Copilot
+
+Preserve the entire existing cell: its headings, prose and all diagrams. Edit the existing cell in place, make the requested changes and do not create another cell. Never omit a diagram when rewriting surrounding text. Review the diff before accepting; use Undo if any content was dropped.
+
+Jade Tools uses VS Code's native notebook editing agent for Markdown edits. Apply changes to the existing selected cell through the native notebook edit tool. Preserve existing headings, prose and complete diagram blocks; both backtick and tilde fences are valid. Do not wrap the entire cell in an extra Markdown fence or replace the cell with only the diagram body. Do not execute code or create additional cells unless the user explicitly requests that action.
+
+The legacy inline editor can truncate nested fenced Markdown. Enable the supported native notebook editing option for this workspace and reload before editing through that path. Never work around it by deleting surrounding text or altering other cells.
+
 ## Official references
 
 - [Diagram syntax and supported types](https://mermaid.js.org/intro/syntax-reference.html)

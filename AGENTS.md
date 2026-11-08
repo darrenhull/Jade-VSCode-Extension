@@ -58,7 +58,7 @@ This repository owns editor commands, language/UI integration, Testing, views, D
 ## Builds, releases and maintenance
 
 - Target new pull requests at main. Preserve required code-owner approval; do not bypass it or push product changes directly to the protected default branch.
-- Open work-in-progress pull requests as **Draft**. Keep them Draft while implementation, required native dependencies, tests, packaging, UI evidence or review fixes remain incomplete. A push alone must not mark a Draft ready, request its owner review or queue auto-merge. Mark ready only after relevant work and verification are complete; ready PRs still require the owner's approval and passing protected checks.
+- Open work-in-progress pull requests as **Draft**. Once implementation and relevant current-head verification are complete, push and mark Ready to trigger automatic Codex review; do not require that fresh review before the Ready event that starts it. An explicit user request may start automated review in parallel with remaining verification. Keep human owner review requests and protected auto-merge withheld until current-head CI, required packaging/UI evidence and automated review are clear. New actionable findings return the PR to Draft during fixes, followed by verified push and Ready again. Track the exact head, gates and owner in TASK_STATUS.md. Ready never bypasses owner approval or protected checks.
 
 - Independent checkouts must build from committed inputs and lockfiles. packages/jade-cli-win-x64 is the pinned native runtime; verify format, identity and every manifest hash before staging. Do not restore the legacy CLI SDK dependency or ship development tooling in the VSIX.
 - Exclude credentials, user configuration, databases, caches, logs and research notes from Git. Track requested diagrams and build-required source, tests and notices.
@@ -77,11 +77,13 @@ These rules are not exhaustive. Review the complete change and its affected call
 - Check performance evidence and ensure ordinary navigation, single-file operations and paged lookups do not unexpectedly trigger expensive project-wide work.
 - Check release/update automation for unreviewed publication, unverified downloads, stale integrity and silently skipped failures.
 
+- Verify the current head and all published review threads before reporting review readiness. If the user reports new comments that the connector does not show, bypass stale connector review data with a fresh authenticated GitHub API read, including pagination and review timestamps. Never print or persist credentials.
+
 - Successful reviewed main builds publish new consumer versions automatically. Preserve immutable published releases, protected owner approval, single full PR validation and patch-version updates for native dependency PRs. Do not add duplicate feature-push builds or explicit PR workflow dispatch.
 
 ## Automated PR comments
 
-Post automated PR comments through GitHub Actions or an authorized GitHub App so they use the bot identity. Include attribution that Codex prepared the comment on behalf of @darrenhull. The user-authenticated GitHub connector posts as the user; do not use it for future automated comments or imply that it is a bot. If a bot-backed path is unavailable, report that limitation instead of impersonating a bot.
+Prefer GitHub Actions or an authorized GitHub App for bot-authored PR comments. The user also authorizes agents to comment using the user-authenticated account when appropriate. Every agent-authored comment must explicitly state "Prepared by Codex on behalf of @darrenhull". Never claim a user-authenticated comment is a bot, impersonate another reviewer or approve a PR on the owner's behalf.
 
 ## Required issue link
 
