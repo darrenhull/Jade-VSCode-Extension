@@ -38,3 +38,21 @@ Native output compatibility finding: the retained Object Manager node does not f
 
 
 Explicit disconnect is distinct from cancel/dispose: the existing inspect.close accepts args.disconnect:true to release only the selected physical target. An idle target can still be disconnected after its logical reader closed, without preparing or opening a missing Working database. The native backend refuses to close another consumer's active target, releasing only the caller's logical context before reporting that refusal. The extension also rejects explicit disconnect while its own compile/test/debug operation is active. No global disconnect is used by this Object Explorer action. Ninety-six focused inspection/target/history/transport regressions pass, including red-first coverage of this distinction.
+
+
+## Actual native adapter proof
+
+The explicitly opt-in `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the coherent native candidate in44.88seconds. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI` and a dedicated `JADE_TOOLS_STATE_DIRECTORY` inside a disposable `jade-cli-integration-seed-*` fixture. Default tests skip it explicitly. The fixture supplies SharedConnectionPet plus SharedConnectionTestsA/B nativeValue methods in configured schemas. It restores every edited source file and shuts down only its private broker; it never publishes Source or installs the candidate.
+
+| Observed operation | End-to-end | Native phase evidence |
+| --- | --- | --- |
+| Source / prepared Working reader startup |834ms /760ms | Separate native read-only identities |
+| Test A → B → A |1261ms /1185ms /1180ms | Native execution1159ms /1089ms /1092ms; each selected one test, completed and passed; same native epoch |
+| Method-only build |430ms | Native load342.8ms; reconnect0ms; same epoch |
+| Independent Scratch runs |5134ms /5011ms | Distinct returned output tokens; supported handoff and lazy reopen each time |
+| Structural change |11416ms | Native latest-schema reorganisation8850.6ms; reconnect517.6ms; changed epoch |
+| Working target disconnect |Succeeded | Source retained the same native epoch |
+
+These startup figures use an already prepared disposable Working base; they are not cold-backup timings. Initial class loading and structural setup were measured separately from warm test reuse. The test verifies actual per-method results and output rather than accepting a cached success flag. Candidate executable SHA256 was `a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487`; manifest SHA256 `a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0`. This is an unreleased candidate receipt, not the official0.4.3 distribution.
+
+Actual VS Code host/debugger ownership verification and a release-pinned native bundle remain delivery gates. No global preview installation or feature-complete claim follows from this adapter proof alone.
