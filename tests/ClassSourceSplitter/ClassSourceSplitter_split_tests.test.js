@@ -22,3 +22,28 @@ test('refuses unsupported source owner and broken method body',()=>{
  assert.throws(()=>splitClassSource(source.replace('Bird (','Other (')),/Unmatched/);
  assert.throws(()=>splitClassSource(source.replace('end;\r\n}','end;\r\n')),/Unbalanced/);
 });
+
+for(const eol of ['\n','\r\n'])for(const [section,declaration] of [['header',' Fish subclassOf Object;'],['definition',' Fish completeDefinition'],['source','Bird ('],['mapping',' Fish in "pets";']]){
+ test('refuses '+section+' slices crossing a multiline comment closing beside declaration ('+JSON.stringify(eol)+')',()=>{
+  const input=source.replace(declaration,'/* retained native comment\r\n*/'+declaration).replaceAll('\r\n',eol);
+  assert.throws(()=>splitClassSource(input),/comment|literal.*boundary/i);
+ });
+}
+for(const eol of ['\n','\r\n'])test('preserves complete multiline comments at safe native class boundaries ('+JSON.stringify(eol)+')',()=>{
+ const input=source.replace(' Fish subclassOf Object;','/* header comment\r\n*/\r\n Fish subclassOf Object;').replace(' Fish completeDefinition','/* declaration comment\r\n*/\r\n Fish completeDefinition').replace('Bird (','/* methods comment\r\n*/\r\nBird (').replace(' Bird in "pets";','/* map comment\r\n*/\r\n Bird in "pets";').replaceAll('\r\n',eol);
+ const {parseSource}=require('../../extension/src/source_symbols');
+ for(const part of splitClassSource(input)){const parsed=parseSource(part.text);assert.deepEqual(parsed.classes.map(cls=>cls.name),[part.name]);assert.equal(parsed.excluded.some(range=>range.kind==='comment'&&part.text.slice(range.start,range.start+2)==='/*'&&!range.closed),false);assert.ok(part.text.includes('/* header comment'+eol+'*/'));assert.ok(part.text.includes('/* declaration comment'+eol+'*/'));assert.ok(part.text.includes('/* methods comment'+eol+'*/'));}
+});
+
+for(const eol of ['\n','\r\n'])test('refuses boundaries before a later class or section marker ('+JSON.stringify(eol)+')',()=>{
+ for(const declaration of [' Bird subclassOf Object;',' Bird completeDefinition','typeHeaders']){
+  const input=source.replace(declaration,'/* comment retained whole\r\n*/'+declaration).replaceAll('\r\n',eol);
+  assert.throws(()=>splitClassSource(input),/comment or literal at a class boundary/);
+ }
+});
+for(const eol of ['\n','\r\n'])test('copies a later class mapping comment whole when no partition boundary crosses it ('+JSON.stringify(eol)+')',()=>{
+ const input=source.replace(' Bird in "pets";','/* map metadata\r\n*/ Bird in "pets";').replaceAll('\r\n',eol);
+ const {parseSource}=require('../../extension/src/source_symbols');
+ for(const part of splitClassSource(input)){const parsed=parseSource(part.text);assert.deepEqual(parsed.classes.map(cls=>cls.name),[part.name]);assert.equal(parsed.excluded.some(range=>range.kind==='comment'&&part.text.slice(range.start,range.start+2)==='/*'&&!range.closed),false);}
+ assert.ok(splitClassSource(input).find(part=>part.name==='Bird').text.includes('/* map metadata'+eol+'*/ Bird in "pets";'));
+});

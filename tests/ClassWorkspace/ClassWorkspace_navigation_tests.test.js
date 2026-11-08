@@ -59,7 +59,8 @@ test("filter changes reset pagination and malicious or unsupported actions are i
   await h.message({command:"publish"});
   await h.message({command:"select",id:"missing"});
   assert.equal(requests.at(-1).offset,0); assert.equal(requests.at(-1).limit,100);
-  assert.equal(requests.length,3);
+  assert.equal(requests.length,4, "Unknown IDs are validated through the bounded model lookup");
+  assert.equal(h.sent.filter(value=>value.command==="workspace").at(-1).snapshot.state.selectedId, "");
 });
 test("HTML provides nonce CSP and an external editor mount without interpolated source",()=>{
   const html=workspaceHtml({nonce:"safe",cspSource:"vscode-resource:",scriptUri:"script.js",styleUri:"style.css"});

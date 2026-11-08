@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-11-08T07:59:31.365Z",
+  "verifiedAt": "2026-11-08T09:22:14.452Z",
   "pullRequest": 32,
-  "baseHead": "35875841598aa1e49e21df1792084a32dfae4682",
+  "baseHead": "a551570166395cac38c77be032ee504568d5cf26",
   "findings": [
     {
       "comment": 4504392027,
@@ -26,19 +26,30 @@
     {
       "review": 5817046409,
       "regressions": "Reviewed multi-class splitting uses native complete-file contents, preserves source metadata/BOM/EOL and rejects unsupported, dirty/stale/colliding inputs. Concurrent edit and resource-ordering regressions were red before safeguards. Actual native Undo/Redo, Save All and LF under CRLF preference passed."
+    },
+    {
+      "comment": 4505641895,
+      "regressions": "Off-page and filter-excluded selection failed with the real model before the fix. Requested IDs are resolved against staged model input before updating selection; unknown/failed lookups retain the prior state and binding. Delayed selection/draft/removal notices cannot overwrite newer navigation. Nine selection regressions and 51 workspace/model tests pass. Actual native Preview Member outside the page and filter keeps the bounded member rail and source bytes unchanged."
+    },
+    {
+      "comment": 4505649622,
+      "regressions": "Eight LF/CRLF comment-closing/declaration partition cases failed before the guard. Existing lexer exclusion ranges now reject every unsafe raw class/section/mapping slice before edits; whole comments remain unchanged. Twenty splitter and eleven split-offer tests pass, including zero native edits for unsafe input."
     }
   ],
   "fullSuite": {
     "javascriptRegressionSuitePassed": true,
-    "javascriptPassed": 821,
+    "javascriptPassed": 845,
     "controllerPassed": 39,
+    "classWorkspaceAndModelPassed": 51,
     "objectExplorerFocusedPassed": 49,
+    "splitterPassed": 20,
+    "splitOfferPassed": 11,
     "powerShellPassed": 18,
     "explicitSkips": 42
   },
   "artifact": {
     "name": "jade-native-runner-cpp-preview-0.17.2.vsix",
-    "sha256": "70b1b15bfcfd7cf868dc974f698faf63f6ee21fea8ec04ff3dbbec8db1865ed9",
+    "sha256": "a1e1a021bb7943efa836d1ca41d780c65dae53770b74862d2cd7c216184a419a",
     "entries": 141
   },
   "nativeUI": {
@@ -102,6 +113,14 @@
         "docs/screenshots/class-workspace/class-source-split-offer.png",
         "docs/screenshots/class-workspace/class-source-split-review.png"
       ]
+    },
+    "externalMemberSelection": {
+      "offPageProperty": "property0274",
+      "filteredProperty": "property0273",
+      "boundedRail": true,
+      "filterPreserved": true,
+      "sourceBytesUnchanged": true,
+      "screenshot": "docs/screenshots/class-workspace/class-workspace-external-member-selection.png"
     }
   },
   "portable": {

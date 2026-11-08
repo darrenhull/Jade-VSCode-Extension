@@ -1,12 +1,20 @@
 'use strict';
 const {parseSource}=require('./source_symbols');
 const {topLevelMatches}=require('./source-context');
+const {excludedAt}=require('./source-lex');
 
 // A deliberately narrow, lossless partition of native class sections. The
 // lexer masks literals/comments; every retained declaration is copied verbatim.
 function splitClassSource(text){
  const model=parseSource(text),code=model.code;
  if(model.classes.length<2)return [];
+ function slice(start,end=text.length){
+  for(const offset of [start,end]){
+   const excluded=excludedAt(model,offset);
+   if(excluded&&excluded.start<offset&&offset<excluded.end)throw Error('Cannot split a comment or literal at a class boundary. Keep the combined file or place the declaration on a separate line.');
+  }
+  return text.substring(start,end);
+ }
  if(new Set(model.classes.map(c=>c.name.toLowerCase())).size!==model.classes.length)throw Error('Duplicate class declarations cannot be split.');
  const markers=topLevelMatches(code,/^[\t ]*([A-Za-z_]\w*)[\t ]*\r?$/gm);
  const sections=new Map(),allowed=new Set(['schemaDefinition','typeHeaders','typeDefinitions','databaseDefinitions','typeSources']);
@@ -23,11 +31,11 @@ function splitClassSource(text){
  const names=model.classes.map(c=>c.name),headers=new Map(),defs=new Map(),bodies=new Map(),prefixes=new Map();
  function partition(section,pattern,target,kind){
   const block=code.slice(section.body,section.end),matches=topLevelMatches(block,pattern);
-  prefixes.set(kind,text.slice(section.body,section.body+(matches[0]?.index??block.length)));
+  prefixes.set(kind,slice(section.body,section.body+(matches[0]?.index??block.length)));
   if(block.slice(0,matches[0]?.index??block.length).trim())throw Error('Unsupported '+kind+' preamble.');
   for(let i=0;i<matches.length;i++){
    const match=matches[i],name=match[1];if(!names.includes(name)||target.has(name))throw Error('Unmatched or duplicate '+kind+' declaration: '+name);
-   target.set(name,text.slice(section.body+match.index,section.body+(matches[i+1]?.index??block.length)));
+   target.set(name,slice(section.body+match.index,section.body+(matches[i+1]?.index??block.length)));
   }
  }
  partition(header,/^[\t ]*([A-Za-z_]\w*)\s+subclassOf\b[^;]*;/gm,headers,'header');
@@ -43,19 +51,20 @@ function splitClassSource(text){
  let maps=new Map(),dbPrefix='',dbSuffix='';
  const database=sections.get('databaseDefinitions');
  if(database){
-  const raw=text.slice(database.body,database.end),masked=code.slice(database.body,database.end);
+  const raw=slice(database.body,database.end),masked=code.slice(database.body,database.end);
+  const rawSlice=(start,end=raw.length)=>slice(database.body+start,database.body+end);
   if(masked.trim()){
    const container=/^\s*\w+\s*\(\s*classMapDefinitions\s*\r?\n/.exec(masked);
    if(!container)throw Error('Unsupported database definitions; only plain class mappings can be split.');
    const close=/\)[\t \r\n]*$/.exec(masked);if(!close)throw Error('Unbalanced database definitions.');
-   dbPrefix=raw.slice(0,container[0].length);dbSuffix=raw.slice(close.index);
+   dbPrefix=rawSlice(0,container[0].length);dbSuffix=rawSlice(close.index);
    const content=masked.slice(container[0].length,close.index),rows=[...content.matchAll(/^[\t ]*([A-Za-z_]\w*)[\t ]+in\b[^;]*;[\t ]*(?:\r?\n|$)/gm)];
-   let consumed='',previous=0;for(const row of rows){if(!names.includes(row[1])||maps.has(row[1]))throw Error('Unmatched database class map.');maps.set(row[1],raw.slice(container[0].length+previous,container[0].length+row.index+row[0].length));previous=row.index+row[0].length;consumed+=row[0];}
-   dbSuffix=raw.slice(container[0].length+previous);
+   let consumed='',previous=0;for(const row of rows){if(!names.includes(row[1])||maps.has(row[1]))throw Error('Unmatched database class map.');maps.set(row[1],rawSlice(container[0].length+previous,container[0].length+row.index+row[0].length));previous=row.index+row[0].length;consumed+=row[0];}
+   dbSuffix=rawSlice(container[0].length+previous);
    if(consumed.replace(/\s/g,'')!==content.replace(/\s/g,''))throw Error('Unsupported database class-map metadata.');
   }
  }
- const preamble=text.slice(0,header.start),marker=name=>text.slice(sections.get(name).start,sections.get(name).body);
- return names.map(name=>({name,text:preamble+marker('typeHeaders')+prefixes.get('header')+headers.get(name)+marker('typeDefinitions')+prefixes.get('complete definition')+defs.get(name)+(database?marker('databaseDefinitions')+(dbPrefix?dbPrefix+(maps.get(name)||'')+dbSuffix:text.slice(database.body,database.end)):'')+marker('typeSources')+prefixes.get('source')+(bodies.get(name)||'')}));
+ const preamble=slice(0,header.start),marker=name=>slice(sections.get(name).start,sections.get(name).body);
+ return names.map(name=>({name,text:preamble+marker('typeHeaders')+prefixes.get('header')+headers.get(name)+marker('typeDefinitions')+prefixes.get('complete definition')+defs.get(name)+(database?marker('databaseDefinitions')+(dbPrefix?dbPrefix+(maps.get(name)||'')+dbSuffix:slice(database.body,database.end)):'')+marker('typeSources')+prefixes.get('source')+(bodies.get(name)||'')}));
 }
 module.exports={splitClassSource};

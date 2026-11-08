@@ -38,7 +38,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
   }
   function attach({ panel, document, binding, row: suppliedRow, origin, selectedId, services = {} }) {
     const row = suppliedRow || services.row || { file: document?.uri?.fsPath, ...services.identity };
-    const record = { panel, row, binding, viewId: crypto.randomUUID(), flushes: new Map(), key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
+    const record = { panel, row, binding, viewId: crypto.randomUUID(), flushes: new Map(), key: classIdentity(row), state: normalizeState({ ...stored()[classIdentity(row)], ...(typeof selectedId === "string" ? { selectedId } : {}) }), ready: false, revision: 0, selectionRevision: 0, closed: false, snapshot: undefined, origin, subscriptions: [] };
     records.add(record);
     const asset = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", name));
     panel.webview.options = { ...panel.webview.options, enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")] };
@@ -54,17 +54,25 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         return false;
       }
     };
-    async function load() {
+    async function load(requestedId) {
+      const requestedSelection = typeof requestedId === "string";
       const revision = ++record.revision;
       const lastSelected = selectedMember();
       void send({ command: "loading", revision });
       try {
         if (!current(revision)) return;
-        const input = { ...record.state };
+        const input = { ...record.state, ...(requestedSelection ? { selectedId: requestedId } : {}) };
         const snapshot = adapters.load ? await adapters.load(row, input, document) : { identity: await adapters.resolveClass(row, document), ...await adapters.members(row, input, document) };
         if (!current(revision)) return;
         let remaining = 100;
         const groups = (snapshot.groups || []).map(group => { const items = (group.items || []).slice(0, remaining); remaining -= items.length; return { ...group, items }; }).filter(group => group.items.length);
+        if (requestedSelection) {
+          if (snapshot.selected?.id !== requestedId && !groups.some(group => group.items.some(member => member.id === requestedId))) {
+            if (record.snapshot) await send({ command: "workspace", revision, snapshot: record.snapshot });
+            return false;
+          }
+          record.state.selectedId = requestedId;
+        }
         record.state.offset = Number.isSafeInteger(snapshot.offset) ? snapshot.offset : record.state.offset;
         const bound = binding?.snapshot?.(), sourceSelected = lastSelected && ["method", "typeMethod", "property", "reference"].includes(lastSelected.kind);
         const anchored = bound?.available === true && sourceSelected && bound.member === lastSelected.name && bound.owner === (lastSelected.owner || row.owner || row.name) && (!lastSelected.file || lastSelected.file === document?.uri?.toString());
@@ -72,6 +80,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         if (record.state.selectedId && !snapshot.selected && !groups.some(group => group.items.some(member => member.id === record.state.selectedId)) && !retainActive) {
           record.state.selectedId = "";
           await send({ command: "notice", message: "The selected member is no longer available. Showing the class overview." });
+          if (!current(revision)) return;
         }
         const retainedSelected = retainActive && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
         record.snapshot = { ...snapshot, viewId: record.viewId, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
@@ -80,8 +89,15 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         persist(record);
         panel.title = snapshot.identity?.qualifiedName || row.owner || panel.title;
         await send({ command: "workspace", revision, snapshot: record.snapshot });
+        return true;
       } catch (error) {
-        if (current(revision)) await send({ command: "error", revision, message: error?.message || String(error) });
+        if (current(revision)) {
+          if (requestedSelection && record.snapshot) {
+            await send({ command: "workspace", revision, snapshot: record.snapshot });
+            if (current(revision)) await send({ command: "notice", message: error?.message || String(error) });
+          } else await send({ command: "error", revision, message: error?.message || String(error) });
+        }
+        return false;
       }
     }
     function selectedMember() {
@@ -93,29 +109,40 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       return member && ["method", "typeMethod", "property", "reference"].includes(member.kind) && !member.system && (!member.file || member.file === document?.uri?.toString()) ? member : undefined;
     }
     async function select(id) {
-      if (record.closed || id && !record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) && record.snapshot?.selected?.id !== id) return;
-      record.state.selectedId = id;
+      if (record.closed || disposed) return;
+      const selection = ++record.selectionRevision;
+      const visible = !id || record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) || record.snapshot?.selected?.id === id;
+      let revision = ++record.revision;
+      if (!visible) {
+        // The model resolves a selected member independently of its bounded,
+        // filtered page. Keep navigation state rather than expanding the rail.
+        revision++;
+        if (await load(id) !== true) return;
+      } else record.state.selectedId = id;
+      const selectedCurrent = () => current(revision) && record.selectionRevision === selection && record.state.selectedId === id;
+      if (!selectedCurrent()) return;
       persist(record);
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
+      if (!selectedCurrent()) return;
       const member = selectedMember();
       if (member && binding && ["method", "typeMethod", "property", "reference"].includes(member.kind)) {
         const memberFile = String(member.file || ""), documentFile = document?.uri?.toString();
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
         const preview = foreign && adapters.preview ? await adapters.preview(row, id, document) : undefined;
-        if (record.closed || record.state.selectedId !== id) return;
+        if (!selectedCurrent()) return;
         const snapshot = foreign
           ? { available: false, owner: member.owner, member: member.name, text: preview?.text || "", reason: member.system ? "System source is read-only. Edit a resolved local declaration instead." : "This method belongs to another source document and is read-only here. Open Original Source to view or edit that file explicitly.", declaringClass: member.declaringClass || member.owner, canOpenDeclaring: member.inherited === true && !member.system }
           : binding.select(member.owner || member.declaringClass || row.owner, member.name, member.kind);
         const prepared = services.draftRecovery?.prepare && !foreign ? await services.draftRecovery.prepare(snapshot) : snapshot;
-        if (record.closed || record.state.selectedId !== id) return;
+        if (!selectedCurrent()) return;
         record.editorEditable = prepared.available === true && !prepared.readOnly;
         await send({ command: "editorSnapshot", snapshot: prepared });
         await send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] });
-        if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() });
+        if (services.draftRecovery) { const draft = await services.draftRecovery.get(); if (selectedCurrent()) await send({ command: "editorDraftRecovery", draft }); }
       } else if (member && adapters.preview) {
         const revision = record.revision, selectedId = id;
         const preview = await adapters.preview(row, id, document);
-        if (current(revision) && record.state.selectedId === selectedId) await send({ command: "memberDetail", id, preview });
+        if (selectedCurrent() && current(revision) && record.state.selectedId === selectedId) await send({ command: "memberDetail", id, preview });
       }
     }
     async function message(value) {

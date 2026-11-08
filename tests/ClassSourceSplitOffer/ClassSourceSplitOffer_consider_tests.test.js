@@ -40,3 +40,8 @@ test('rejects a source edit occurring during the final asynchronous destination 
  f.vscode.workspace.fs.stat=async uri=>{stats++;if(stats===2){f.doc.version=2;f.doc.isDirty=true;f.doc.getText=()=>source+'// newly typed user source';}return stat(uri);};
  await assert.rejects(new ClassSourceSplitOffer(f.vscode).consider(f.doc.uri,'Fish'),/source changed/i);assert.equal(f.edits.length,0);
 });
+
+test('refuses unsafe multiline comment partitions before any native resource edit',async()=>{
+ const f=fixture(),input=source.replace(' Fish subclassOf Object;','/* header comment\r\n*/ Fish subclassOf Object;');f.doc.getText=()=>input;f.vscode.workspace.fs.readFile=async()=>Buffer.from(input);
+ await assert.rejects(new ClassSourceSplitOffer(f.vscode).consider(f.doc.uri,'Fish'),/comment or literal at a class boundary/);assert.equal(f.edits.length,0);
+});
