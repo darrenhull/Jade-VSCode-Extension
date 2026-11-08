@@ -1079,7 +1079,8 @@ function registerObjectExplorer(vscode, context, services) {
       dispose() {
         disposed = true;
         for (const record of panels) record.panel.dispose();
-        void session.disconnect();
+        // The shared CLI service may already be disposed during extension shutdown.
+        void session.disconnect().catch(() => {});
       },
     },
     vscode.commands.registerCommand("jadeNative.selectInspectionDatabase", () =>

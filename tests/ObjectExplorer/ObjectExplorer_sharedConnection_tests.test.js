@@ -15,3 +15,5 @@ for(const kind of ['settings','project file'])test('changed '+kind+' invalidate 
 });
 
 test('Refresh lazily opens inspection when no native reader exists',async()=>{const f=setup();try{await f.commands.get('jadeNative.refreshObjects')();assert.equal(f.clients.length,1);assert.ok(f.controller.session.client);assert.equal(f.busy(),false);}finally{await f.cleanup();}});
+
+test('extension disposal tolerates the shared service already closing without an unhandled rejection',async()=>{const f=setup();try{await f.connect();f.clients[0].stop=async()=>{throw Error('CLI service is disposed');};f.disposeExtension();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.controller.session.client,undefined);}finally{await f.cleanup();}});
