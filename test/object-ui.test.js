@@ -2,11 +2,11 @@
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path");
 const {setup, oid} = require("./fixtures/object-ui.cjs");
 
-test('Working inspection uses the native resolved target even when no legacy JavaScript marker exists',async()=>{
+test('Working inspection sends original Source configuration with its explicit native target',async()=>{
  const s=setup({nativeTarget:true});
- try{await s.commands.get('jadeNative.connectObjects')();assert.equal(s.sessionData[0].databasePath,path.join(s.root,'actual-native-working/system'));assert.equal(s.sessionData[0].readOnly,true);}finally{await s.cleanup();}
+ try{await s.commands.get('jadeNative.connectObjects')();assert.equal(s.sessionData[0].databasePath,path.join(s.root,'database'));assert.equal(s.sessionData[0].target,'working');assert.equal(s.sessionData[0].readOnly,true);}finally{await s.cleanup();}
 });
-test("build handoff waits for the native inspector process to close before releasing its database lock", async () => {
+test("exclusive handoff waits for the logical inspector session to close", async () => {
   const s = setup();
   try {
     await s.connect();
@@ -18,16 +18,16 @@ test("build handoff waits for the native inspector process to close before relea
     await Promise.resolve();
     assert.equal(s.clients[0].stopCalled, true);
     assert.equal(completed, false);
-    assert.equal(s.busy(), true);
+    assert.equal(s.busy(), false);
     s.clients[0].finishClose();
     await release;
     assert.equal(s.busy(), false);
-    assert.equal(fs.existsSync(s.configFiles[0]), false);
+    assert.equal(s.configFiles.length, 0);
   } finally {
     await s.cleanup();
   }
 });
-test("concurrent build handoffs both wait for the same closing native process", async () => {
+test("concurrent exclusive handoffs both wait for the same logical session close", async () => {
   const s = setup();
   try {
     await s.connect();
@@ -39,7 +39,7 @@ test("concurrent build handoffs both wait for the same closing native process", 
     await Promise.resolve();
     assert.equal(first, false);
     assert.equal(second, false);
-    assert.equal(s.busy(), true);
+    assert.equal(s.busy(), false);
     s.clients[0].finishClose();
     await Promise.all([a, b]);
     assert.equal(s.busy(), false);
@@ -114,7 +114,7 @@ test("cancel during connection setup cannot launch a helper or clear a subsequen
     const connecting = s.commands.get("jadeNative.connectObjects")();
     for (let i = 0; i < 10 && !s.controller.ownsLock(); i++)
       await Promise.resolve();
-    assert.equal(s.controller.ownsLock(), true);
+    assert.equal(s.controller.ownsLock(), false);
     await s.controller.releaseForOperation();
     s.setExternalBusy(true);
     s.allowBusy();
@@ -353,16 +353,16 @@ test("collection paging is bounded, deduplicated and cannot overwrite newer navi
     await s.cleanup();
   }
 });
-test("ephemeral native session files are removed after readiness", async () => {
+test("shared inspection passes configuration in memory without temporary files", async () => {
   const s = setup();
   try {
     await s.connect();
-    assert.equal(fs.existsSync(s.configFiles[0]), false);
+    assert.equal(s.configFiles.length, 0);
   } finally {
     await s.cleanup();
   }
 });
-test("native security sign-on retries once with a masked password and removes temporary credentials", async () => {
+test("native security sign-on retries once with a masked password and in-memory credentials", async () => {
   const s = setup({ authentication: true });
   try {
     await s.connect();

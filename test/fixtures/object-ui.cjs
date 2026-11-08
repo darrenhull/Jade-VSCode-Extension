@@ -19,7 +19,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sessionData = [],
     prompts = [];
   let busy = false,
-    allowBusy;
+    allowBusy, configurationListener, saveListener;
   const uri = (file) => ({
       scheme: "file",
       fsPath: file,
@@ -114,6 +114,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
         },
       },
       workspace: {
+        onDidChangeConfiguration: fn => { configurationListener=fn; return disposable; },
+        onDidSaveTextDocument: fn => { saveListener=fn; return disposable; },
         workspaceFolders: [folder],
         getWorkspaceFolder: () => folder,
       },
@@ -143,7 +145,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sourceContext,
     pullSource,
     config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
-    inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}),
+    inspectionTarget: async (config,selection) => { if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     isBusy: () => busy,
     setBusy: async (value) => {
@@ -151,9 +153,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       changes.push(value);
       if (value && delayedBusy) await new Promise((r) => (allowBusy = r));
     },
-    createTransport: (exe, file) => {
-      configFiles.push(file);
-      sessionData.push(JSON.parse(fs.readFileSync(file, "utf8")));
+    createTransport: options => {
+      sessionData.push({ ...options.config, target: options.target });
       const c = new EventEmitter();
       const denied = authentication && clients.length === 0;
       c.ready = denied
@@ -229,6 +230,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     prompts,
     root,
     allowBusy: () => allowBusy?.(),
+    changeConfiguration: event => configurationListener?.(event),
+    saveConfiguration: file => saveListener?.({uri:uri(file)}),
     busy: () => busy,
     setExternalBusy: (value) => (busy = value),
     async connect() {

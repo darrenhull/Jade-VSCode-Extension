@@ -184,7 +184,7 @@ function activate(context) {
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);}
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{
-    config:inspectionConfig,beforeConnect:()=>nativeTests.release(),isBusy:()=>publishing,
+    config:inspectionConfig,client:nativeTests,isBusy:()=>publishing,
     pullSource:({projectRoot}={})=>{
       if(!projectRoot)throw Error('Choose the originating project before pulling source.');
       return vscode.commands.executeCommand('jadeNative.extractAllSources',vscode.Uri.file(projectRoot));
@@ -198,15 +198,12 @@ function activate(context) {
       const file=(complete[0]||entries[0]).model.uri,contributing=new Set(files);
       return {available:true,file,dirty:vscode.workspace.textDocuments.some(document=>contributing.has(document.uri.toString())&&document.isDirty)};
     },
-    inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config),
-    setBusy:async value=>{publishing=value;}
+    inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config)
   });
   const workspaceOperationGuard=new (require('./WorkspaceOperationGuard').WorkspaceOperationGuard)({
-    isBusy:()=>publishing,inspectorOwnsLock:()=>objectExplorer?.ownsLock()===true,
-    releaseInspector:()=>objectExplorer?.releaseForOperation(),
+    isBusy:()=>publishing,
     claim:value=>{publishing=value;},
-    updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value),
-    releaseNative:()=>nativeTests.release()
+    updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value)
   });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
     client:nativeTests,
@@ -222,7 +219,7 @@ function activate(context) {
   language.setWorkspaceSchemaResolver(workspaces.schemaFor);
   language.setWorkspaceResourceResolver(workspaces.resourceFor);
   require('./compile-commands').registerCompileCommands(vscode, context, {
-    beforeOperation: () => objectExplorer?.releaseForOperation(),
+    beforeOperation: async () => {},
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
     resolveSource,classConfig, workingFiles, startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
@@ -252,7 +249,6 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('jadeNative.executeLocalTests', async (uri, method, testCancellation, outputObserver) => {
       const document = await resolveSource(uri);
-      await objectExplorer?.releaseForOperation();
       if (publishing) { void vscode.window.showErrorMessage('A Jade operation is already running.'); return; }
       publishing = true;
       try {
@@ -265,7 +261,7 @@ function activate(context) {
         testOutput.appendLine(`Running local tests from ${path.basename(config.program)} (no publish).`);
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
         await workingFiles(config);
-        const operation = startWorking({...config, methods: method,testSession:nativeTests,beforeNativeProcess:()=>nativeTests.release()}, 'test.run', text => {
+        const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
         });
         const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Running local Jade tests', cancellable: true }, async (_, cancellation) => {

@@ -19,17 +19,30 @@ class InspectionSession extends EventEmitter {
   }
   async connect() {
     if (this.disconnecting) await this.disconnecting;
+    if (this.connecting) return this.connecting;
     if (this.client) {
       await this.client.ready;
       return this.client;
     }
-    const generation = this.generation,
-      client = await this.options.connect(this.target);
+    const generation = this.generation, target = this.target;
+    const pending = this.connectOnce(generation, target);
+    this.connecting = pending;
+    try { return await pending; }
+    finally { if (this.connecting === pending) this.connecting = undefined; }
+  }
+  async connectOnce(generation, target) {
+    const client = await this.options.connect(target);
     if (generation !== this.generation) {
       await client.stop();
       throw Error("Database selection changed while connecting.");
     }
     this.client = client;
+    client.on("epoch", () => {
+      if (this.client !== client) return;
+      this.generation++;
+      this.resetHistory();
+      this.emit("invalidated");
+    });
     client.once("close", () => {
       if (this.client === client) {
         this.client = undefined;
@@ -87,6 +100,7 @@ class InspectionSession extends EventEmitter {
   async disconnect() {
     if (this.disconnecting) return this.disconnecting;
     this.generation++;
+    this.connecting = undefined;
     const client = this.client;
     this.client = undefined;
     this.resetHistory();

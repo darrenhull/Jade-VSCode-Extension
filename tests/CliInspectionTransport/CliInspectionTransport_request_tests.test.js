@@ -64,3 +64,7 @@ test('a replaced native connection reports its opaque epoch and a closed shared 
  epoch='node-2'; await transport.request('object',{oid:'9002.1'}); assert.equal(transport.connectionEpoch,'node-2'); assert.deepEqual(changes,[{previous:'node-1',current:'node-2'}]);
  f.child.emit('close',2); await assert.rejects(transport.request('object',{oid:'9002.1'}),/closed/i); assert.equal(transport.state,'closed');
 });
+test('stale native handles carry the previous epoch and are rejected without replay',async()=>{
+ const f=fixture((command,args)=>({passed:true,code:0,sessionId:args.sessionId,body:{readOnly:true,oidFormat:'jade-native',connectionEpoch:command==='inspect.object'?'new-node':'old-node',staleConnection:command==='inspect.object',schemas:[]}}));
+ const transport=f.create('working');try{await transport.ready;await assert.rejects(transport.request('object',{oid:'9002.1'}),/changed|refresh/i);const calls=f.calls.filter(c=>c.command==='inspect.object');assert.equal(calls.length,1);assert.equal(calls[0].body.args.connectionEpoch,'old-node');assert.equal(transport.connectionEpoch,'new-node');}finally{await transport.stop();}
+});

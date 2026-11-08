@@ -40,7 +40,8 @@ class CliInspectionTransport extends EventEmitter {
 
   async send(command,args) {
     if(this.state==='closed'||this.state==='stopping')throw Error('Inspection connection is closed.');
-    const request=this.service.request('inspect.'+command,{config:this.config,target:this.target,sessionId:this.sessionId,args},text=>this.emit('output',text));
+    const guardedArgs={...args,...(this.connectionEpoch?{connectionEpoch:this.connectionEpoch}:{})};
+    const request=this.service.request('inspect.'+command,{config:this.config,target:this.target,sessionId:this.sessionId,args:guardedArgs},text=>this.emit('output',text));
     this.pending.add(request.id);
     try {
       const result=await request.promise;
@@ -62,6 +63,7 @@ class CliInspectionTransport extends EventEmitter {
         this.initialCatalog=undefined;
         this.emit('epoch',{previous,current:body.connectionEpoch});
       }
+      if(body.staleConnection===true)throw Error('The native connection changed. Refresh the database view before inspecting this object again.');
       return body;
     } finally {this.pending.delete(request.id);}
   }
