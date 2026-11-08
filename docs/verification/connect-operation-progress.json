@@ -8,8 +8,8 @@
     "progressNotifications": 0
   },
   "green": {
-    "focusedCases": 11,
-    "javascriptPassed": 966,
+    "focusedCases": 14,
+    "javascriptPassed": 969,
     "powershellPassed": 18,
     "explicitOptInSkipped": 43,
     "failed": 0,
@@ -45,5 +45,10 @@
   "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
   "disposal": {
     "pendingCompletionDoesNotUpdateDisposedControls": true
+  },
+  "reviewRegressions": {
+    "pendingWorkingToSourceBrowse": true,
+    "cancelPendingUsernamePrompt": true,
+    "cancelPendingPasswordPrompt": true
   }
 }

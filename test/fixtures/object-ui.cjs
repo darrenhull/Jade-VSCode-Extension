@@ -48,6 +48,11 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
   const disposable = { dispose() {} },
     view = { dispose() {}, reveal: async () => {} },
     vscode = {
+      CancellationTokenSource: class {
+        constructor() { this.events = new Emitter(); this.token = { isCancellationRequested: false, onCancellationRequested: this.events.event }; }
+        cancel() { this.token.isCancellationRequested = true; this.events.fire(); }
+        dispose() { this.events.dispose(); }
+      },
       ProgressLocation: { Notification: 15 },
       EventEmitter: Emitter,
       ThemeIcon: class {

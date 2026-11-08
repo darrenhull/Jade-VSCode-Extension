@@ -17,7 +17,7 @@ function fixture(t) {
   const vscode = { EventEmitter: Emitter, ThemeIcon: class {}, TreeItem: class {
     constructor(label, state) { this.label = label; this.collapsibleState = state; }
   }, TreeItemCollapsibleState: { None: 0, Collapsed: 1 }, StatusBarAlignment: { Left: 1 },
-    Uri: { file: uri }, ViewColumn: { Active: 1 }, ProgressLocation: { Notification: 15 }, workspace: { workspaceFolders: [folder], getWorkspaceFolder: () => folder },
+    Uri: { file: uri }, ViewColumn: { Active: 1 }, ProgressLocation: { Notification: 15 }, CancellationTokenSource: class { constructor(){this.token={onCancellationRequested:()=>disposable};} cancel(){} dispose(){} }, workspace: { workspaceFolders: [folder], getWorkspaceFolder: () => folder },
     commands: { registerCommand: (name, fn) => { commands.set(name, fn); return disposable; },
       executeCommand: async (name, ...args) => commands.get(name)?.(...args) },
     window: { activeTextEditor: { document: { uri: uri(path.join(root, 'Fish.cls')) } },

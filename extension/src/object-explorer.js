@@ -87,6 +87,7 @@ function registerObjectExplorer(vscode, context, services) {
       if (generation !== session.generation) throw Error('Inspection connection was cancelled.');
       if (services.isBusy()) throw Error('Another Jade operation started while selecting database settings.');
       const operation = connectionOperation;
+      if (operation) operation.config = config;
       const target = await services.inspectionTarget(
         { ...config, ...(operation ? { signal: operation.controller.signal } : {}) },
         selection,
@@ -307,6 +308,8 @@ function registerObjectExplorer(vscode, context, services) {
     if (connectionOperation) return connectionOperation.promise;
     const operation = {
       controller: new AbortController(),
+      cancellation: new vscode.CancellationTokenSource(),
+      target: session.target,
       report: () => {},
     };
     connectionOperation = operation;
@@ -345,6 +348,7 @@ function registerObjectExplorer(vscode, context, services) {
         } finally { subscription.dispose(); }
       });
     })().finally(async () => {
+      operation.cancellation.dispose();
       if (connectionOperation !== operation) return;
       connectionOperation = undefined;
       await vscode.commands.executeCommand('setContext', 'jadeNative.connectingObjects', false);
@@ -357,11 +361,13 @@ function registerObjectExplorer(vscode, context, services) {
     const operation = connectionOperation;
     if (operation) operation.cancelling = true;
     operation?.report('Cancellation requested. Waiting for the current native step to finish safely…');
+    operation?.cancellation.cancel();
     operation?.controller.abort();
     await session.disconnect();
     if (operation) await operation.promise;
   }
   async function connectOnce() {
+    const cancellationToken = connectionOperation?.cancellation.token;
     try {
       await session.connect();
     } catch (error) {
@@ -373,16 +379,17 @@ function registerObjectExplorer(vscode, context, services) {
         prompt:
           "Your development security library requires a user name. Credentials are used only for this connection.",
         ignoreFocusOut: true,
-      });
-      if (user === undefined) throw Error("Inspection sign-on cancelled.");
+      }, cancellationToken);
+      if (user === undefined || cancellationToken?.isCancellationRequested || generation !== session.generation || target !== session.target)
+        throw Error("Inspection sign-on cancelled.");
       const password = await vscode.window.showInputBox({
         title: "Jade inspection password",
         prompt: "Password for " + user,
         password: true,
         ignoreFocusOut: true,
-      });
+      }, cancellationToken);
       if (
-        password === undefined ||
+        password === undefined || cancellationToken?.isCancellationRequested ||
         generation !== session.generation ||
         target !== session.target
       )
@@ -492,7 +499,10 @@ function registerObjectExplorer(vscode, context, services) {
     try {
       const connected = await serializeInspectionTransition(async () => {
         if (!ownsTransition()) return false;
-        const sameProject = currentConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+        const activeConfig = connectionOperation?.config || currentConfig;
+        const sameProject = activeConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+        if (connectionOperation && (!sameProject || connectionOperation.target !== choice.target)) await cancelConnection();
+        if (!ownsTransition()) return false;
         if (session.disconnecting || (session.client && (!sameProject || session.target !== choice.target))) await session.disconnect();
         if (!ownsTransition()) return false;
         if (session.target !== choice.target) await session.select(choice.target);
@@ -1162,6 +1172,7 @@ function registerObjectExplorer(vscode, context, services) {
     {
       dispose() {
         disposed = true;
+        connectionOperation?.cancellation.cancel();
         connectionOperation?.controller.abort();
         for (const record of panels) record.panel.dispose();
         // The shared CLI service may already be disposed during extension shutdown.

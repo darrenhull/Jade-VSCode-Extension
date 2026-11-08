@@ -41,3 +41,12 @@ test('closing the extension during pending preparation does not update disposed 
  const backup=gate();const s=setup({resolveInspectionTarget:async config=>{await backup.promise;return config;}});
  try{const pending=s.commands.get('jadeNative.connectObjects')();await turn();s.disposeExtension();Object.defineProperty(s.statuses[0],'text',{set(){throw Error('Status bar is disposed.');}});Object.defineProperty(s.controller.view,'description',{set(){throw Error('Tree view is disposed.');}});backup.finish();await pending;assert.deepEqual(s.errors,[]);assert.equal(s.clients.length,0);}finally{backup.finish();await s.cleanup();}
 });
+test('Browse Instances switches from pending Working preparation to a fresh Source connection',async()=>{
+ const backup=gate();const targets=[];const s=setup({resolveInspectionTarget:async(config,target)=>{targets.push(target);if(target==='working')await backup.promise;return config;}});let pending,browse;
+ try{pending=s.commands.get('jadeNative.connectObjects')();await turn();s.vscode.window.showQuickPick=async()=>({target:'source',label:'Source database'});browse=s.controller.browseInstances({schema:'Pets',className:'Fish',projectRoot:require('node:path').join(s.root,'source')});await turn();backup.finish();const [,result]=await Promise.all([pending,browse]);assert.equal(result.available,true);assert.equal(result.target,'source');assert.deepEqual(targets,['working','source']);assert.deepEqual(s.errors,[]);}finally{backup.finish();await Promise.allSettled([pending,browse]);await s.cleanup();}
+});
+for(const stage of ['username','password'])test('cancelling pending '+stage+' sign-on dismisses the prompt before operation handoff',async()=>{
+ const input=gate();const s=setup({authentication:true});let seenToken,pending;
+ s.vscode.window.showInputBox=async(options,token)=>{if((stage==='password')!==Boolean(options.password))return'developer';seenToken=token;token?.onCancellationRequested(()=>input.finish());return input.promise;};
+ try{pending=s.commands.get('jadeNative.connectObjects')();await turn();assert.ok(seenToken,'The sign-on prompt needs the connection cancellation token');let released=false;const release=s.controller.releaseForOperation().then(()=>{released=true;});await turn();assert.equal(seenToken.isCancellationRequested,true);assert.equal(released,true);await release;assert.deepEqual(await pending,{cancelled:true});assert.equal(s.clients.length,1);assert.equal(s.controller.session.client,undefined);assert.deepEqual(s.errors,[]);}finally{input.finish();await pending;await s.cleanup();}
+});
