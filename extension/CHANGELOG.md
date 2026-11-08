@@ -1,3 +1,9 @@
+# 0.17.8 — Automatic structural loading
+
+- Compile supported property and class-structure changes in Working without manually disconnecting or resetting the database.
+- Let native Jade perform required reorganisation and reconnect Working after a successful structural load.
+- Keep the retained fast path for method-body-only edits, with original native errors preserved on failed loads.
+
 # 0.17.7 — Copilot edits for Scratch Pad
 
 - Edit any line in an existing code cell without appending duplicate bodies, including when only a word was selected.
