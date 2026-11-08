@@ -82,3 +82,7 @@ These rules are not exhaustive. Review the complete change and its affected call
 ## Automated PR comments
 
 Post automated PR comments through GitHub Actions or an authorized GitHub App so they use the bot identity. Include attribution that Codex prepared the comment on behalf of @darrenhull. The user-authenticated GitHub connector posts as the user; do not use it for future automated comments or imply that it is a bot. If a bot-backed path is unavailable, report that limitation instead of impersonating a bot.
+
+## Required issue link
+
+Every pull request, including automated dependency updates, must link a real GitHub issue. Use the Development sidebar or a closing reference in the PR description. Verify the Linked issue check before requesting review. See `.github/PR_ISSUE_POLICY.md` for rerun instructions and the separate required-check administration step. Preserve current owner approval and all existing checks; do not merge or publish as part of configuring this policy.

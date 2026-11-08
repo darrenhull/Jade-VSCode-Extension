@@ -1,0 +1,41 @@
+name: Pull request issue policy
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: linked-issue-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  linked-issue:
+    name: Linked issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Metadata only: no checkout, PR code execution, secrets or write permissions.
+      - name: Require a GitHub-linked issue
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const result = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    closingIssuesReferences(first: 1) { nodes { number url } }
+                  }
+                }
+              }
+            `, { owner: context.repo.owner, repo: context.repo.repo, number: context.issue.number });
+            const issues = result.repository?.pullRequest?.closingIssuesReferences?.nodes;
+            if (!Array.isArray(issues) || issues.length === 0 || !issues[0]?.url) {
+              core.setFailed('Link a real issue before merging. Add "Closes #123" to the PR description (use the actual issue number), then rerun this check if needed.');
+            } else {
+              core.info('Linked issue: ' + issues[0].url);
+            }
