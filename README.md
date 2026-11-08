@@ -77,7 +77,9 @@ Selecting an existing database file reviews the new class and its authoritative 
 
 ## Runtime troubleshooting
 
-Initial Working preparation and structural loads can take longer than warm builds. Warm sessions reuse verified loaded source; they do not reuse previous test outcomes.
+The extension opens native connections when needed and reuses the Working connection across Object Explorer, compilation, tests and Scratch Pad. Inspection runs in a native read-only context; Source uses its own read-only connection. Opening Object Explorer first prepares a missing private Working database automatically.
+
+Initial Working preparation and structural loads can take longer than warm builds. Native structural loads reconnect automatically and invalidate old inspection cursors and snapshots. Refresh to retrieve current objects. Warm sessions reuse verified loaded source; every test still executes. Debugging and exclusive native utilities hand off the connection safely; subsequent operations reopen it lazily. A paused debugger is never silently disconnected.
 
 If an older CLI build owns the broker, finish its active operations and use the CLI's **status** and **shutdown** commands for a graceful handoff. Reload all VS Code windows and reconnect other clients so they use their updated packages. Do not terminate unrelated native processes or delete broker/database files to bypass the version check.
 
