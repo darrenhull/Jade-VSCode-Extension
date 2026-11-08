@@ -22,33 +22,36 @@ Structural loads, Scratch Pad and debugging use automatic native handoff followe
 - [x] Verify real native A -> B -> A execution, method-body reuse, structural reconnection, independent Scratch output and Source/Working separation in a disposable fixture.
 - [x] Verify private VS Code debugger regression and inspection handoff: preserve a paused debugger, stack/frame locals, object expansion, cycles, native collections and subsequent lazy inspection reopening.
 - [x] Commit this plan, source, grouped tests and editable/rendered architecture together. Capture actual changed UI in an owned private host.
-- [ ] Replace the approved 0.4.3 dependency with a verified official shared-connection CLI release after its approval. The tested candidate is not an official pin.
+- [x] Adopt the approved official CLI 0.5.0 release, verify its archive/executable/manifest and all runtime hashes, and require CLI 0.5.0 as the minimum supported native backend.
 - [x] Prepare coordinated 0.18.0 version and user-facing feature-only release notes; verify the existing release-notes contract red then green.
-- [ ] Complete official-bundle packaging and current-head checks/review. Only then request owner approval and protected squash merge.
+- [x] Build the 0.18.0 VSIX with the official bundle, verify its extracted payload outside the checkout without Node or a database, and run the actual packaged extension in a private VS Code host.
+- [ ] Complete current-head hosted CI/automated review, then request owner approval and protected squash merge. Live review status belongs in PR #44.
 
 ## Verification
 
-Red-first regressions cover lazy-open deduplication, idle ownership, own-request cancellation, stale native epochs, old target replies, config changes, explicit Disconnect versus cancel/dispose, and shutdown when the shared service closes first. The complete run after rebasing onto approved main passed **952 JavaScript tests and 18 PowerShell contracts**, with **43 explicit optional skips** and zero failures. The final official-bundle update will be checked separately. Default tests explicitly skip the opt-in licensed native fixture.
+Red-first regressions cover lazy-open deduplication, idle ownership, own-request cancellation, stale native epochs, old target replies, config changes, explicit Disconnect versus cancel/dispose, and shutdown when the shared service closes first. The complete run after rebasing onto approved main passed **952 JavaScript tests and 18 PowerShell contracts**, with **43 explicit optional skips** and zero failures. The same complete suite passed with the final official 0.5.0 bundle. Default tests explicitly skip the opt-in licensed native fixture.
 
-The reusable `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the coherent candidate in 44.88 seconds. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI`, and a private `JADE_TOOLS_STATE_DIRECTORY` within a disposable `jade-cli-integration-seed-*` fixture. The fixture supplies SharedConnectionPet and SharedConnectionTestsA/B. Every edited source file is restored and only the fixture broker is shut down; Source is never published.
+The reusable `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the final official CLI 0.5.0 in 62.79 seconds on a fresh disposable Working database. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI`, and a private `JADE_TOOLS_STATE_DIRECTORY` within a disposable `jade-cli-integration-seed-*` fixture. The fixture supplies SharedConnectionPet and SharedConnectionTestsA/B. Every edited source file is restored and only the fixture broker is shut down; Source is never published.
 
 | Observed operation | End-to-end | Native evidence |
 | --- | --- | --- |
-| Source / prepared Working startup | 834 / 760 ms | Separate native read-only identities |
-| Test A -> B -> A | 1261 / 1185 / 1180 ms | Native runs 1159 / 1089 / 1092 ms; each selects one test, completes and passes; same epoch |
-| Method-only build | 430 ms | Native load 342.8 ms, reconnect 0 ms; same epoch |
-| Independent Scratch runs | 5134 / 5011 ms | Distinct output tokens; automatic handoff and lazy reopen |
-| Structural change | 11416 ms | Reorganisation/load 8850.6 ms; reconnect 517.6 ms; changed epoch |
+| Source / first Working startup | 1283 / 18534 ms | Separate native read-only identities; Working includes initial private backup/restore preparation |
+| Test A -> B -> A | 1281 / 1170 / 1179 ms | Native runs 1178 / 1080 / 1090 ms; each selects one test, completes and passes; same epoch |
+| Method-only build | 446 ms | Native load 368.6 ms, reconnect 0 ms; same epoch |
+| Independent Scratch runs | 4916 / 5060 ms | Distinct output tokens; automatic handoff and lazy reopen |
+| Structural change | 11511 ms | Reorganisation/load 8870.2 ms; reconnect 543.6 ms; changed epoch |
 | Working disconnect | Succeeded | Source retains its native epoch |
 
-Startup figures use an already prepared fixture, not a cold backup. Initial structural setup is separate from warm test reuse. Test reports contain real per-method outcomes and native log evidence, rather than cached execution results.
+The first Working startup includes cold private backup/restore preparation; it is not a warm per-test cost. Initial structural setup is separate from warm test reuse. Test reports contain real per-method outcomes and native log evidence, rather than cached execution results.
 
-Tested candidate receipts:
+Official CLI 0.5.0 receipts:
 
-- Executable SHA256: `a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487`.
-- Manifest SHA256: `a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0`.
+- Approved release commit: `12b654c12319a28691e3667d08468759d5153f68`.
+- Archive SHA256: `284477707cb64f09c1387bd3d3c7d6a6ddddf1807efe721fd24b9e8d1eb50925`.
+- Executable SHA256: `fde8fd8cc41631bdb9f2f2b81f682b5109e497b9c014d7c3ad1a419f42648175`.
+- Manifest SHA256: `3e287506e10866f2a1ce375e75556e9d0023b4ddd88653c05c159fb166e7e344`.
 
-These identify an unreleased candidate, not the official 0.4.3 distribution. The candidate was staged only in owned private VS Code profiles. The user's installed extension and windows were not replaced, closed or reloaded by this proof.
+The extracted VSIX matches that official pin and every runtime hash. Its portable test discovers workspace tests with no Node on PATH and no database connection. The actual packaged 0.18.0 extension passes in an owned private VS Code host. The user's installed extension and windows were not replaced, closed or reloaded. Earlier candidate receipts remain explicitly historical in the sanitized verification JSON.
 
 ## UI and debugger evidence
 
@@ -60,4 +63,4 @@ The architecture Draw.io and SVG remain editable and synchronized. The installed
 
 ## Delivery status
 
-Actual adapter and private debugger/mixed-role proofs are complete. Final delivery waits for the approved official native bundle, final consumer packaging/checks and automated review. PR #44 remains Draft and owner review/auto-merge are withheld until those gates clear. A successful private candidate proof does not imply that the globally installed extension includes this feature.
+Implementation, official native pin, default tests, portable VSIX smoke, actual native adapter and packaged private debugger/UI proofs are complete. Push verified work, finish repository automation, then mark PR #44 Ready to trigger automated review. Resolve all current-head findings before requesting owner approval or protected auto-merge. Live checks and approval are tracked in PR #44; this plan does not claim that a global installation or release has occurred.

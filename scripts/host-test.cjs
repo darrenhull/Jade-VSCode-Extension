@@ -13,7 +13,7 @@ async function main(){
  const base=path.resolve(__dirname,'..'),repository=base,extension=path.join(stage,'extension'),workspace=path.join(stage,'workspace');
  let creationPort;
  if(creation||classWorkspaceUi||objectWorkspaceUi||sharedConnection){const server=require('node:net').createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});creationPort=server.address().port;await new Promise(resolve=>server.close(resolve));}
- const packagedVsix=creation?process.env.JADE_CREATION_VSIX:objectWorkspaceUi?process.env.JADE_OBJECT_WORKSPACE_VSIX:classWorkspaceUi?process.env.JADE_CLASS_WORKSPACE_VSIX:undefined;
+ const packagedVsix=sharedConnection?process.env.JADE_SHARED_CONNECTION_VSIX:creation?process.env.JADE_CREATION_VSIX:objectWorkspaceUi?process.env.JADE_OBJECT_WORKSPACE_VSIX:classWorkspaceUi?process.env.JADE_CLASS_WORKSPACE_VSIX:undefined;
  if(packagedVsix){
   // Exercise the packaged product, then append the private test entry point.
   // .NET validates ZIP destination containment; reject non-product entries and

@@ -1,8 +1,18 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.4.3 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.5.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
+
+## Native connection reuse
+
+The first inspection or build opens its native target when needed. Working inspection shares the retained compiler/test node through a separate thread-affine application signed on with native `DB_READ_ONLY`; the update application remains separate. Source inspection shares its own read-only node. A first Working inspection can prepare the ordinary private backup/restore copy automatically; it never publishes local files to Source. Cancellation during its Source backup is observed after that backup completes and before private restore; configured native timeouts still apply.
+
+Method-only builds, test switches and repeated inspection reuse a healthy compatible Working node. Structural loads close it for the native loader/reorganisation path and reopen it automatically. Scratch Pad still uses its native `jadclient` handoff, then the next compatible operation reconnects lazily. Debugging keeps its existing exclusive helper ownership; a paused debugger is not stopped to run another tool.
+
+Each inspection consumer owns its cursors. Closing a view or service channel releases only that consumer, retaining the healthy connection. An explicit `inspect.close` service request with `args.disconnect: true` releases the selected physical target when no other inspection consumer owns it; another target is left open. The same request can release an idle retained target after logical close when its original config and target are supplied. A refusal still releases the caller's logical resources.
+
+Inspection results include opaque `body.connectionEpoch`. Clients can send the last value as `args.connectionEpoch`; after reconnect, a stale request returns `staleConnection: true` with the new epoch before accessing old handles. Refresh from a fresh catalog rather than replaying a cursor. Native cursor tokens are independently scoped to their consumer and node lifetime.
 
 ## Commands
 
