@@ -24,11 +24,13 @@ GitHub releases require manual VSIX installation. A new CLI release opens a revi
 | Debug | Experimental gutter breakpoints, stepping, native caller stacks, selected-frame locals, object expansion and paged collections on compatible runtimes. |
 | Format | Document/selection indentation for native declarations and complete method bodies, preserving tokens, literals and line endings. |
 | Scratch Pad | Run native Workspace statements in Working, see output and compare the two most recent runs. F5 is for builds; Scratch Pad has its own Run action. |
-| Source browsing | Schema-qualified class search, paged catalogue and focused read-only member previews. Open Original Source edits the actual native file. |
+| Class workspaces | Schema-qualified search, grouped current-file members and editing backed by the original document, with native undo/save. Multi-class files offer a reviewed split into individual class files. |
 | Data browsing | Read-only Source/Working inspection, native object IDs, lazy reference traversal, history, pinned views and collection paging. |
 | Source designer | Create schemas, classes, member/external dictionaries, ordered object arrays and unique object sets. Review source before saving. |
 | Collection rules | Known inherited keys and lifetime permissions, supported key-size checks, Binary comparison, population/block sizing and reviewed existing-file class mappings. Unknown metadata stays explicit. |
 | Publication | Review the destination and changed files, then explicitly confirm publication to Source. |
+
+Opening a multi-class source offers **Review split** or **Keep combined**. The reviewed split keeps the selected class in the original file and creates sibling class files as one native, undoable edit; save all changes before compiling. It accepts saved UTF-8 complete-class extracts with supported class mappings. Partial declarations, other schema-level sections, unsupported encodings and destination conflicts are refused without overwriting files.
 
 See the [user guide](extension/README.md), [collection coverage and limits](docs/COLLECTION-COVERAGE.md) and [changelog](extension/CHANGELOG.md).
 
@@ -81,9 +83,11 @@ If an older CLI build owns the broker, finish its active operations and use the 
 
 For connection conflicts, use **Jade: Disconnect Build and Test Runtime** or **Jade: Disconnect Database Objects** as appropriate. A single-user Source database must be available during initial native backup. Supported multi-user connections use the native online-backup path; the extension does not silently change the Source server mode or INI.
 
-## Proposed workspace enhancement
+## Class and object workspaces
 
-[Story #30](https://github.com/darrenhull/Jade-VSCode-Extension/issues/30) proposes an integrated class workspace with grouped members, in-context method editing and connected object/collection inspection. Its UX designs and acceptance criteria describe planned work. The shipped member preview is read-only; the proposed shared-document editor is not implemented.
+Open a class from search, the catalogue or Object Explorer to browse its current-file declarations and edit local methods in context. The method canvas and original source share the real document, completion, diagnostics and native undo/save. Save writes the entire backing file; build and publication remain separate actions. Opening another file is explicit, and rejected edits have protected recovery controls.
+
+Instance browsing offers an explicit database target. Object and collection pages remain read-only snapshots with retained history, paging and stale-state handling. See the [user guide](extension/README.md#browse-and-create) and [implementation plan](plans/class-object-workspace.md).
 
 ## Development
 

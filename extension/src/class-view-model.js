@@ -1,8 +1,8 @@
 "use strict";
 const { parseSource } = require("./source_symbols");
 const { label: symbolLabel } = require("./language-model");
-function classSections(text, file) {
-  const model = parseSource(text, file),
+function classSections(text, file, parsedModel) {
+  const model = parsedModel || parseSource(text, file),
     sections = [
       ...model.code.matchAll(
         /\b(constantDefinitions|attributeDefinitions|referenceDefinitions|jadeMethodDefinitions|externalKeyDefinitions|memberKeyDefinitions|typeSources)\b/g,
@@ -41,6 +41,8 @@ function classSections(text, file) {
         kind:
           label === "Constants"
             ? "constant"
+            : label === "References"
+              ? "reference"
             : label === "Collection keys"
               ? "key"
               : member.kind,

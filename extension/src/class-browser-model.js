@@ -8,7 +8,7 @@ function pageSize(value, fallback) {
   return Math.min(MAX_PAGE_SIZE, value);
 }
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-const key = (schema, name) => JSON.stringify([schema, name]);
+const key = (schema, name, projectId = "") => JSON.stringify([schema, name, projectId]);
 class ClassBrowserModel {
   constructor({ scope = "workspace", pageSize: size = MAX_PAGE_SIZE } = {}) {
     this.scope = scope;
@@ -20,21 +20,21 @@ class ClassBrowserModel {
     for (const row of rows) {
       if (typeof row.schema !== "string" || !row.schema || typeof row.name !== "string" || !row.name)
         throw Error("Class browsing requires schema-qualified class names");
-      const identity = key(row.schema, row.name);
+      const identity = key(row.schema, row.name, row.projectId);
       if (!this.byIdentity.has(identity)) this.byIdentity.set(identity, {
-        ...row, browserId: JSON.stringify([this.scope, row.schema, row.name]),
+        ...row, browserId: JSON.stringify([this.scope, row.schema, row.name, ...(row.projectId ? [row.projectId] : [])]),
       });
     }
     this.rows = [...this.byIdentity.values()].sort((a, b) =>
       compare(a.schema.toLowerCase(), b.schema.toLowerCase()) ||
       compare(a.name.toLowerCase(), b.name.toLowerCase()) ||
-      compare(key(a.schema, a.name), key(b.schema, b.name)));
+      compare(key(a.schema, a.name, a.projectId), key(b.schema, b.name, b.projectId)));
     this.bySchema = new Map();
     this.text = new Map();
     for (const row of this.rows) {
       if (!this.bySchema.has(row.schema)) this.bySchema.set(row.schema, []);
       this.bySchema.get(row.schema).push(row);
-      this.text.set(row.browserId, (row.schema + "::" + row.name).toLowerCase());
+      this.text.set(row.browserId, (row.schema + "::" + row.name + " " + (row.searchText || "")).toLowerCase());
     }
     this.cache = new Map();
     return this;
@@ -72,8 +72,10 @@ class ClassBrowserModel {
   search(query, options = {}) {
     return this.page({ ...options, query, offset: 0 });
   }
-  find({ schema, name }) {
-    return this.byIdentity.get(key(schema, name));
+  find({ schema, name, projectId }) {
+    if (projectId !== undefined) return this.byIdentity.get(key(schema, name, projectId));
+    const matches = (this.bySchema.get(schema) || []).filter(row => row.name === name);
+    return matches.length === 1 ? matches[0] : undefined;
   }
   positionOf(identity, options = {}) {
     const row = this.find(identity);

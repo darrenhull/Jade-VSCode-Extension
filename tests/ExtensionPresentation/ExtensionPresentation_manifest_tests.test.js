@@ -5,6 +5,8 @@ test('installed extension presents Jade Tools without changing its update identi
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'extension/package.json'),'utf8'));
  assert.equal(manifest.displayName,'Jade Tools');assert.equal(manifest.publisher+'.'+manifest.name,'jade-local-tools.jade-native-runner-cpp-preview');
  assert.match(manifest.description,/edit.*build.*test.*Jade/i);assert.doesNotMatch(manifest.description,/C\+\+|broker|ABI|preview/i);
+ const language=manifest.contributes.languages.find(value=>value.id==='jade-nz');assert.deepEqual(language.aliases,['Jade']);
+ const grammar=JSON.parse(fs.readFileSync(path.join(root,'extension/syntaxes/jade.tmLanguage.json'),'utf8'));assert.equal(grammar.name,'Jade');
 });
 test('installed Details describes supported user workflows and setup without raw implementation diagrams',()=>{
  const readme=fs.readFileSync(path.join(root,'extension/README.md'),'utf8');

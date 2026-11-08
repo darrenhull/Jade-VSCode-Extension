@@ -28,3 +28,9 @@ test('failed native responses and transport errors remain failures and allow sub
  const failed=await runner.run({document:document(),schema:'Pets'});assert.equal(failed.passed,false);assert.match(failed.report.error,/unavailable/);
  assert.equal((await runner.run({document:document(),schema:'Pets'})).passed,true);
 });
+test('releases exactly the acquired operation lease after native failure and never releases a rejected acquisition',async()=>{
+ const lease={},released=[];let blocked=false;
+ const runner=new JadeWorkspaceRunner({client:{request(){throw Error('native failed');}},configFor:async()=>({schema:'Pets'}),beforeOperation:async()=>{if(blocked)throw Error('another operation owns the runtime');return lease;},afterOperation:async value=>released.push(value)});
+ assert.equal((await runner.run({document:document()})).passed,false);assert.deepEqual(released,[lease]);
+ blocked=true;assert.match((await runner.run({document:document()})).report.error,/owns/);assert.deepEqual(released,[lease]);
+});

@@ -1,220 +1,7 @@
 "use strict";
-const test = require("node:test"),
-  assert = require("node:assert/strict"),
-  { EventEmitter } = require("node:events");
-const { registerClassView } = require("../extension/src/class-view"),
-  { SourceIndex } = require("../extension/src/workspace-index");
-function fixture(schema, owner, value) {
-  return `schemaDefinition\n${schema} subschemaOf RootSchema partialDefinition;\ntypeHeaders\n${owner} subclassOf Object transient;\ntypeDefinitions\n${owner} completeDefinition\n(\nattributeDefinitions\n name: String;\njadeMethodDefinitions\n getName() : String;\n)\ntypeSources\n${owner} (\njadeMethodSources\ngetName\n{\ngetName() : String;\nbegin\n return "${value}";\nend;\n}\n)`;
-}
-function setup() {
-  class Uri {
-    constructor(scheme, pathname, query = "") {
-      this.scheme = scheme;
-      this.path = pathname;
-      this.fsPath = pathname;
-      this.query = query;
-    }
-    toString() {
-      return (
-        this.scheme +
-        "://" +
-        encodeURI(this.path) +
-        (this.query ? "?" + encodeURIComponent(this.query) : "")
-      );
-    }
-    static parse(text) {
-      const u = new URL(text);
-      return new Uri(
-        u.protocol.slice(0, -1),
-        decodeURI(u.pathname),
-        decodeURIComponent(u.search.slice(1)),
-      );
-    }
-    static file(value) {
-      return new Uri("file", value);
-    }
-    static from(value) {
-      return new Uri(value.scheme, value.path, value.query);
-    }
-  }
-  class Emitter {
-    constructor() {
-      this.e = new EventEmitter();
-      this.event = (fn) => {
-        this.e.on("value", fn);
-        return { dispose: () => this.e.off("value", fn) };
-      };
-    }
-    fire(value) {
-      this.e.emit("value", value);
-    }
-    dispose() {
-      this.e.removeAllListeners();
-    }
-  }
-  const docs = new Map(),
-    commands = new Map(),
-    changes = new Emitter(),
-    closes = new Emitter(),
-    disposable = { dispose() {} };
-  let contentProvider;
-  function doc(uri, text) {
-    const value = {
-      uri,
-      text,
-      getText() {
-        return this.text;
-      },
-      positionAt(offset) {
-        const lines = this.text.slice(0, offset).split("\n");
-        return { line: lines.length - 1, character: lines.at(-1).length };
-      },
-    };
-    docs.set(uri.toString(), value);
-    return value;
-  }
-  const first = doc(
-      new Uri("file", "/workspace/arbitrary/First.cls"),
-      fixture("Pets", "Fish", "one"),
-    ),
-    second = doc(
-      new Uri("file", "/workspace/different/Second.cls"),
-      fixture("Other", "Fish", "two"),
-    );
-  const index = new SourceIndex({
-    list: async () => [first.uri.toString(), second.uri.toString()],
-    read: async (uri) => docs.get(uri).getText(),
-  });
-  const vscode = {
-    EventEmitter: Emitter,
-    ThemeIcon: class {
-      constructor(name) {
-        this.name = name;
-      }
-    },
-    TreeItem: class {
-      constructor(label, state) {
-        this.label = label;
-        this.collapsibleState = state;
-      }
-    },
-    TreeItemCollapsibleState: { None: 0, Collapsed: 1 },
-    Range: class {
-      constructor(start, end) {
-        this.start = start;
-        this.end = end;
-      }
-    },
-    Selection: class {
-      constructor(start, end) {
-        this.start = start;
-        this.end = end;
-      }
-    },
-    TextEditorRevealType: { InCenterIfOutsideViewport: 1 },
-    ViewColumn: { Active: 1, Beside: 2 },
-    Uri,
-    workspace: {
-      findFiles: async () => [],
-      workspaceFolders: [],
-      getWorkspaceFolder: () => undefined,
-      registerTextDocumentContentProvider: (scheme, provider) => {
-        contentProvider = provider;
-        provider.onDidChange(async (uri) => {
-          const open = docs.get(uri.toString());
-          if (open) open.text = await provider.provideTextDocumentContent(uri);
-        });
-        return disposable;
-      },
-      openTextDocument: async (uri) => {
-        const key = uri.toString();
-        if (docs.has(key)) return docs.get(key);
-        return doc(uri, await contentProvider.provideTextDocumentContent(uri));
-      },
-      onDidChangeTextDocument: changes.event,
-      onDidCloseTextDocument: closes.event,
-      onDidCreateFiles: () => disposable,
-      onDidDeleteFiles: () => disposable,
-      onDidChangeWorkspaceFolders: () => disposable,
-      createFileSystemWatcher: () => ({
-        dispose() {},
-        onDidCreate: () => disposable,
-        onDidChange: () => disposable,
-        onDidDelete: () => disposable,
-      }),
-    },
-    window: {
-      createWebviewPanel: (type, title, column) => {
-        let receive, dispose;
-        const panel = {
-          title,
-          type,
-          column,
-          active: true,
-          webview: {
-            cspSource: "vscode:",
-            asWebviewUri: (uri) => uri,
-            onDidReceiveMessage: (fn) => {
-              receive = fn;
-              queueMicrotask(() => fn({ command: "ready" }));
-              return disposable;
-            },
-            postMessage: async (message) => {
-              if (message.command === "member")
-                queueMicrotask(() =>
-                  receive({ command: "rendered", revision: message.revision }),
-                );
-              return true;
-            },
-          },
-          onDidDispose: (fn) => {
-            dispose = fn;
-            return disposable;
-          },
-          onDidChangeViewState: () => disposable,
-          reveal() {},
-          dispose() {
-            dispose?.();
-          },
-        };
-        return panel;
-      },
-      createTreeView: () => ({ reveal: async () => {}, dispose() {} }),
-      showTextDocument: async (document) => {
-        const editor = { document, revealRange() {} };
-        vscode.window.activeTextEditor = editor;
-        return editor;
-      },
-      showQuickPick: async (options) => options[0],
-    },
-    languages: { setTextDocumentLanguage: async (doc) => doc },
-    commands: {
-      registerCommand: (name, fn) => {
-        commands.set(name, fn);
-        return disposable;
-      },
-      executeCommand: async (name, ...args) => commands.get(name)(...args),
-    },
-  };
-  const context = { subscriptions: [], extensionPath: "/extension" },
-    api = registerClassView(vscode, context, { index });
-  return {
-    api,
-    index,
-    commands,
-    docs,
-    first,
-    second,
-    vscode,
-    changes,
-    doc,
-    dispose() {
-      for (const value of context.subscriptions) value.dispose?.();
-      index.dispose();
-    },
-  };
-}
+const test=require("node:test"),assert=require("node:assert/strict");
+const {setup,fixture}=require("./fixtures/class-view.cjs");
+
 test("class member tree identities remain stable when preceding source text shifts", async () => {
   const s = setup();
   try {
@@ -247,6 +34,76 @@ test("class member tree identities remain stable when preceding source text shif
     s.dispose();
   }
 });
+test('source lookup cannot fall through to another project when runtime context names a project',async()=>{
+ const s=setup();try{
+   const first={uri:s.vscode.Uri.file('/workspace/arbitrary'),name:'One'},second={uri:s.vscode.Uri.file('/workspace/different'),name:'Two'};
+   s.vscode.workspace.workspaceFolders=[first,second];
+   s.vscode.workspace.getWorkspaceFolder=uri=>uri.fsPath.startsWith(first.uri.fsPath)?first:second;
+   const result=await s.commands.get('jadeNative.findSourceClass')('Fish','Pets',second.uri.fsPath);
+   assert.equal(result.opened,false);assert.equal(s.panels.length,0);
+ }finally{s.dispose();}
+});
+test('same-schema classes in different projects have distinct visible labels and group identities',async()=>{
+ const s=setup();try{
+   s.second.text=fixture('Pets','Fish','two');
+   const first={uri:s.vscode.Uri.file('/workspace/arbitrary'),name:'One'},second={uri:s.vscode.Uri.file('/workspace/different'),name:'Two'};
+   s.vscode.workspace.workspaceFolders=[first,second];s.vscode.workspace.getWorkspaceFolder=uri=>uri.fsPath.startsWith(first.uri.fsPath)?first:second;
+   const schema=(await s.api.provider.getChildren())[0],classes=await s.api.provider.getChildren(schema);
+   assert.equal(classes.length,2);
+   const labels=classes.map(row=>s.api.provider.getTreeItem(row).description);assert.deepEqual(new Set(labels),new Set(['One','Two']));
+   const a=await s.api.provider.getChildren(classes[0]),b=await s.api.provider.getChildren(classes[1]);
+   assert.notEqual(s.api.provider.getTreeItem(a[0]).id,s.api.provider.getTreeItem(b[0]).id);
+ }finally{s.dispose();}
+});
+test('method-only edits retain the warm class catalogue instead of rebuilding and sorting it',async()=>{
+ const s=setup();try{
+   await s.api.syncBrowser();const before=s.api.browser.rows;
+   s.first.text=s.first.text.replace('"one"','"changed"');s.first.version=2;s.index.document(s.first);
+   await s.api.syncBrowser();assert.equal(s.api.browser.rows,before);
+   assert.equal(s.api.browser.rows.find(row=>row.schema==='Pets').entries[0].model.text,s.first.text);
+ }finally{s.dispose();}
+});
+test('Open Original Source without a tree argument uses the active class workspace',async()=>{
+ const s=setup();try{
+   const schema=(await s.api.provider.getChildren()).find(row=>row.name==='Pets');
+   const row=(await s.api.provider.getChildren(schema))[0];
+   await s.commands.get('jadeNative.openClassWorkspace')(row);
+   await s.commands.get('jadeNative.openOriginalSource')();
+   assert.equal(s.vscode.window.activeTextEditor.document.uri.toString(),s.first.uri.toString());
+ }finally{s.dispose();}
+});
+test('original-source navigation resolves normalized type-method members',async()=>{
+ const s=setup();try{
+   s.first.text=s.first.text.replaceAll('getName() : String;','getName() : String typeMethod;');
+   const schema=(await s.api.provider.getChildren()).find(row=>row.name==='Pets'),row=(await s.api.provider.getChildren(schema))[0];
+   const method=(await s.api.provider.getChildren(row)).find(group=>group.label==='Type methods').items[0];
+   await s.commands.get('jadeNative.showClassMember')({...method,kind:'typeMethod'});
+   assert.equal(s.vscode.window.activeTextEditor?.document.uri.toString(),s.first.uri.toString());
+ }finally{s.dispose();}
+});
+test('Back to Classes restores the tree filter instead of opening another catalogue tab',async()=>{
+ const s=setup();try{
+   s.vscode.window.showInputBox=async()=> 'Fish';
+   await s.commands.get('jadeNative.filterSourceClasses')({schema:'Pets'});
+   const schema=(await s.api.provider.getChildren()).find(row=>row.name==='Pets'),row=(await s.api.provider.getChildren(schema))[0];
+   await s.commands.get('jadeNative.openClassWorkspace')(row);
+   s.vscode.window.showInputBox=async()=> 'not-a-class';await s.commands.get('jadeNative.filterSourceClasses')({schema:'Pets'});
+   assert.equal((await s.api.provider.getChildren(schema)).length,0);
+   await s.panels[0].receive({command:'backToClasses'});
+   assert.equal((await s.api.provider.getChildren(schema))[0].name,'Fish');assert.equal(s.panels.length,1);
+ }finally{s.dispose();}
+});
+test('Back to Classes reopens native class search with the accepted query',async()=>{
+ const s=setup(),pickers=[];try{
+   s.vscode.window.createQuickPick=()=>{const picker={selectedItems:[],onDidChangeValue(fn){this.change=fn;return {dispose(){}};},onDidAccept(fn){this.accept=fn;return {dispose(){}};},onDidHide(fn){this.hide=fn;return {dispose(){}};},show(){pickers.push(this);},dispose(){}};return picker;};
+   const opening=s.commands.get('jadeNative.findSourceClass')();
+   for(let i=0;i<100&&!pickers.length;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(pickers.length,1);
+   pickers[0].value='Pets::Fish';pickers[0].change(pickers[0].value);pickers[0].selectedItems=[pickers[0].items[0]];pickers[0].accept();await opening;
+   const returning=s.panels[0].receive({command:'backToClasses'});
+   for(let i=0;i<100&&pickers.length<2;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(pickers.length,2);
+   assert.equal(pickers[1].value,'Pets::Fish');pickers[1].hide();await returning;assert.equal(s.panels.length,1);
+ }finally{s.dispose();}
+});
 test("two schema-qualified member previews both update after interleaved unsaved edits", async () => {
   const s = setup();
   try {
@@ -262,27 +119,25 @@ test("two schema-qualified member previews both update after interleaved unsaved
     const previews = [];
     for (const row of rows) {
       await s.commands.get("jadeNative.previewClassMember")(row);
-      previews.push(
-        s.api.previewController.records.get(row.schema + "::" + row.owner),
-      );
+      previews.push(s.panels.at(-1));
     }
-    assert.notEqual(previews[0].key, previews[1].key);
+    assert.notEqual(previews[0].title, previews[1].title);
     s.first.text = s.first.text.replace('"one"', '"changed one"');
     s.index.document(s.first);
-    s.changes.fire({ document: s.first });
+    s.changes.fire({ document: s.first,contentChanges:[] });
     s.second.text = s.second.text.replace('"two"', '"changed two"');
     s.index.document(s.second);
-    s.changes.fire({ document: s.second });
+    s.changes.fire({ document: s.second,contentChanges:[] });
     for (
       let i = 0;
       i < 25 &&
-      (!previews.some((p) => p.content.text.includes("changed one")) ||
-        !previews.some((p) => p.content.text.includes("changed two")));
+      (!previews.some((p) => JSON.stringify(p.messages).includes("changed one")) ||
+        !previews.some((p) => JSON.stringify(p.messages).includes("changed two")));
       i++
     )
       await new Promise((r) => setTimeout(r, 20));
-    assert.ok(previews.some((p) => p.content.text.includes("changed one")));
-    assert.ok(previews.some((p) => p.content.text.includes("changed two")));
+    assert.ok(previews.some((p) => JSON.stringify(p.messages).includes("changed one")));
+    assert.ok(previews.some((p) => JSON.stringify(p.messages).includes("changed two")));
   } finally {
     s.dispose();
   }
@@ -295,7 +150,7 @@ test("clicking a method or property opens its focused preview while explicit ori
       ),
       cls = (await s.api.provider.getChildren(schema))[0],
       groups = await s.api.provider.getChildren(cls);
-    assert.equal(s.api.provider.getTreeItem(cls).command, undefined);
+    assert.equal(s.api.provider.getTreeItem(cls).command.command, 'jadeNative.openClassWorkspace');
     for (const label of ["Methods", "Properties"]) {
       const row = groups.find((group) => group.label === label).items[0],
         item = s.api.provider.getTreeItem(row);
@@ -304,13 +159,10 @@ test("clicking a method or property opens its focused preview while explicit ori
         item.command.command,
         ...item.command.arguments,
       );
-      const preview = s.api.previewController.records.get(
-        row.schema + "::" + row.owner,
-      );
-      assert.equal(preview.panel.type, "jadeSourceMember");
-      assert.ok(preview.content.text.includes(row.name));
-      assert.ok(!preview.content.text.includes("typeHeaders"));
-      await s.commands.get("jadeNative.openOriginalSource")();
+      const preview = s.panels.at(-1);
+      assert.equal(preview.type, "jade.classWorkspace");
+      assert.ok(!preview.webview.html.includes('typeHeaders'));
+      await s.commands.get("jadeNative.openOriginalSource")(row);
       assert.equal(
         s.vscode.window.activeTextEditor.document.uri.toString(),
         s.first.uri.toString(),

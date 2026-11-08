@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.16.0",
+  "version": "0.17.2",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -25,12 +25,19 @@
     "virtualWorkspaces": false
   },
   "activationEvents": [
+    "workspaceContains:jade.json",
     "workspaceContains:**/*.cls",
     "onLanguage:jade-nz",
     "onDebug:jade-native-experimental",
     "onNotebook:jade-workspace"
   ],
   "contributes": {
+    "customEditors": [{
+      "viewType": "jade.classWorkspace",
+      "displayName": "Class Workspace",
+      "selector": [{"filenamePattern": "*.cls"}],
+      "priority": "option"
+    }],
     "viewsContainers": {
       "activitybar": [
         {
@@ -82,6 +89,11 @@
         "icon": "$(filter)"
       },
       {
+        "command": "jadeNative.filterObjectInstances",
+        "title": "Jade: Filter Instances…",
+        "icon": "$(filter)"
+      },
+      {
         "command": "jadeNative.disconnectTestRunner",
         "title": "Jade: Disconnect Build and Test Runtime",
         "icon": "$(debug-disconnect)",
@@ -127,6 +139,11 @@
         "command": "jadeNative.previewClassMember",
         "title": "Preview Member",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "jadeNative.openClassWorkspace",
+        "title": "Jade: Open Class Workspace",
+        "icon": "$(symbol-class)"
       },
       {
         "command": "jadeNative.showClassMember",
@@ -272,6 +289,33 @@
         "title": "Jade: New Scratch Pad"
       },
       {
+        "command": "jadeNative.editScratchMarkdown",
+        "title": "Jade: Edit Markdown",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jadeNative.previewScratchMarkdown",
+        "title": "Jade: Preview Markdown",
+        "shortTitle": "Preview Markdown",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "jadeNative.fixScratchPadWithCopilot",
+        "title": "Jade: Fix with Copilot",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "jadeNative.editScratchPadWithCopilot",
+        "title": "Jade: Edit with Copilot",
+        "shortTitle": "Edit with Copilot",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "jadeNative.insertScratchMermaid",
+        "title": "Jade: Insert Mermaid Diagram",
+        "icon": "$(symbol-structure)"
+      },
+      {
         "command": "jadeNative.runWorkspace",
         "icon": "$(play)",
         "enablement": "!jadeNative.publishing",
@@ -303,7 +347,7 @@
       {
         "id": "jade-nz",
         "aliases": [
-          "Jade (NZ)"
+          "Jade"
         ],
         "extensions": [
           ".cls",
@@ -342,10 +386,30 @@
         "command": "jadeNative.scratchpadCompileInfo",
         "key": "f5",
         "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && resourceExtname == .jade && editorLangId == jade-nz))"
+      },
+      {
+        "command": "jadeNative.buildWorkspace",
+        "key": "f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.publishClass",
+        "key": "shift+f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.runLocalTests",
+        "key": "ctrl+f5",
+        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
       }
     ],
     "menus": {
       "view/item/context": [
+        {
+          "command": "jadeNative.filterObjectInstances",
+          "when": "view == jadeNative.objects && viewItem == jadeObjectClass",
+          "group": "inline@1"
+        },
         {
           "command": "jadeNative.copyObjectOid",
           "when": "view == jadeNative.objects && viewItem == jadeObjectInstance",
@@ -488,7 +552,34 @@
           "group": "navigation"
         }
       ],
+      "notebook/cell/title": [
+        {
+          "command": "jadeNative.editScratchPadWithCopilot",
+          "when": "notebookType == jade-workspace && notebookCellType == code",
+          "group": "inline@1"
+        },
+        {
+          "command": "jadeNative.editScratchMarkdown",
+          "when": "notebookType == jade-workspace && notebookCellType == markup && !notebookCellMarkdownEditMode",
+          "group": "inline@1"
+        },
+        {
+          "command": "jadeNative.previewScratchMarkdown",
+          "when": "notebookType == jade-workspace && notebookCellType == markup && notebookCellMarkdownEditMode",
+          "group": "inline@1"
+        },
+        {
+          "command": "jadeNative.insertScratchMermaid",
+          "when": "notebookType == jade-workspace && notebookCellType == markup",
+          "group": "scratchpad@2"
+        }
+      ],
       "notebook/toolbar": [
+        {
+          "when": "notebookType == jade-workspace",
+          "command": "jadeNative.previewScratchMarkdown",
+          "group": "navigation/execute@-2"
+        },
         {
           "when": "notebookType == jade-workspace",
           "command": "jadeNative.selectWorkspaceSchema",

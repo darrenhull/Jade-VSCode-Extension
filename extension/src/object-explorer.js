@@ -5,6 +5,7 @@ const fs = require("node:fs"),
 const { InspectionSession } = require("./object-session"),
   { InspectorTransport } = require("./object-transport");
 const { validateObjectIdentity } = require("./NativeObjectIdentity");
+const { InspectionHistory } = require("./inspection-history");
 const { fieldText } = require("../media/object-page");
 const { ClassBrowserModel } = require("./class-browser-model");
 const { pickClass } = require("./class-browser-ui");
@@ -14,7 +15,10 @@ function registerObjectExplorer(vscode, context, services) {
     output = vscode.window.createOutputChannel("Jade Objects"),
     panels = new Set(),
     pages = new Map(),
+    instanceCatalogues = new Map(),
     pageLoads = new Map(),
+    pageConsumers = new WeakMap(),
+    treeConsumer = {},
     classVersions = new Map(),
     classOffsets = new Map(),
     schemaNodes = new Map();
@@ -23,6 +27,7 @@ function registerObjectExplorer(vscode, context, services) {
     classCatalogue,
     currentConfig,
     currentTarget,
+    status,
     lock = false,
     lockOwner,
     showSystem = false,
@@ -32,7 +37,16 @@ function registerObjectExplorer(vscode, context, services) {
     catalogRequest,
     pageVersion = 0,
     credentials,
-    pendingUnpinnedRead;
+    pendingUnpinnedRead,
+    inspectionScope,
+    browseVersion = 0,
+    inspectionTransitions = Promise.resolve();
+  // Target, project and connection changes share one lane; callers retain request ownership across awaits.
+  function serializeInspectionTransition(operation) {
+    const pending = inspectionTransitions.then(operation);
+    inspectionTransitions = pending.catch(() => {});
+    return pending;
+  }
   const setLock = async (value) => {
     lock = value;
     await services.setBusy(value);
@@ -43,6 +57,7 @@ function registerObjectExplorer(vscode, context, services) {
     );
   };
   async function configuration() {
+    if (inspectionScope) return services.config(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
     let doc = vscode.window.activeTextEditor?.document;
     if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath)) {
       const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri),
@@ -169,6 +184,7 @@ function registerObjectExplorer(vscode, context, services) {
     },
   });
   function refreshDescription() {
+    if (status) status.text = "$(database) Jade Inspect: " + (session.target === "working" ? "Working" : "Source") + " · Read-only";
     if (!view) return;
     const label =
       session.target === "working" ? "Working database" : "Source database";
@@ -194,15 +210,18 @@ function registerObjectExplorer(vscode, context, services) {
     classOffsets.clear();
     schemaNodes.clear();
     pages.clear();
+    for (const record of instanceCatalogues.values()) void record.controller.update().catch(() => {});
     events.fire();
     refreshDescription();
     for (const record of panels) {
       record.cursor = undefined;
       void record.panel.webview.postMessage({
         command: "disconnected",
-        target: session.target,
+        target: record.connection?.target,
+        connection: record.connection,
+        object: record.object,
         message:
-          "Inspection connection changed or closed. Reconnect and open this object again.",
+          "Disconnected · Last retrieved values are retained. Reconnect explicitly and reopen this object to resume inspection.",
       });
     }
   }
@@ -219,6 +238,7 @@ function registerObjectExplorer(vscode, context, services) {
     pages.clear();
     pageLoads.clear();
     classVersions.clear();
+    for(const record of instanceCatalogues.values()) void record.controller.update().catch(()=>{});
     events.fire();
     await Promise.all(
       previous.map((page) => releaseNativeCursor(page.cursor, generation)),
@@ -230,6 +250,7 @@ function registerObjectExplorer(vscode, context, services) {
     pages.delete(oid);
     pageLoads.delete(oid);
     await releaseNativeCursor(previous?.cursor);
+    for(const record of instanceCatalogues.values()) if(record.generation===session.generation && record.oid===oid) void record.controller.update().catch(()=>{});
   }
   function loadCatalog() {
     const generation = session.generation,
@@ -265,8 +286,15 @@ function registerObjectExplorer(vscode, context, services) {
     catalogRequest = request;
     return request;
   }
-  function classPage(row, next = false) {
-    if (pageLoads.has(row.oid)) return pageLoads.get(row.oid);
+  function cancelPageConsumer(oid, owner) {
+    const pending=pageLoads.get(oid),consumers=pending && pageConsumers.get(pending);
+    if(!consumers)return;
+    consumers.delete(owner);
+    if(!consumers.size){classVersions.set(oid,(classVersions.get(oid)||0)+1);pageLoads.delete(oid);}
+  }
+  function classPage(row, next = false, owner = treeConsumer) {
+    if (pageLoads.has(row.oid)) { const pending=pageLoads.get(row.oid);pageConsumers.get(pending)?.add(owner);return pending; }
+    const consumers=new Set([owner]);
     const generation = session.generation,
       version = pageVersion,
       classVersion = classVersions.get(row.oid) || 0,
@@ -281,6 +309,7 @@ function registerObjectExplorer(vscode, context, services) {
       })
       .then(async (page) => {
         if (
+          consumers.size === 0 ||
           generation !== session.generation ||
           version !== pageVersion ||
           classVersion !== (classVersions.get(row.oid) || 0)
@@ -293,11 +322,14 @@ function registerObjectExplorer(vscode, context, services) {
           number: next ? (previous.number || 1) + 1 : 1,
         };
         pages.set(row.oid, current);
+        const record=instanceCatalogues.get(instanceCatalogueKey(row));
+        if(record) { record.page=current; void record.controller.update().catch(error=>output.appendLine(error.message)); }
         return current;
       })
       .finally(() => {
         if (pageLoads.get(row.oid) === request) pageLoads.delete(row.oid);
       });
+    pageConsumers.set(request,consumers);
     pageLoads.set(row.oid, request);
     return request;
   }
@@ -371,7 +403,7 @@ function registerObjectExplorer(vscode, context, services) {
     return "database:" + session.target + ":" + (currentTarget?.databasePath || "").toLowerCase();
   }
   function classNode(row) {
-    return { ...row, kind: "class", id: row.browserId,
+    return { ...row, kind: "class", id: row.browserId, inspectionGeneration: session.generation,
       description: row.collection ? "Collection" : row.persistentAllowed === false ? "Transient class" : undefined };
   }
   function classChildren(schema) {
@@ -388,7 +420,8 @@ function registerObjectExplorer(vscode, context, services) {
         command: "jadeNative.pageObjectClasses", args: [schema.name, page.nextOffset] }] : []),
     ];
   }
-  async function revealClass(selected, generation = session.generation) {
+  async function revealClass(selected, generation = session.generation, isCurrent = () => true) {
+    if (!isCurrent()) return;
     if (generation !== session.generation || !session.client || !classBrowser)
       throw Error("Database changed or inspection was cancelled.");
     const row = classBrowser.find(selected), schema = schemaNodes.get(selected.schema);
@@ -399,9 +432,83 @@ function registerObjectExplorer(vscode, context, services) {
     events.fire(schema);
     await view.reveal(schema, { select: false, focus: false, expand: true });
     if (generation !== session.generation) throw Error("Database changed or inspection was cancelled.");
+    if (!isCurrent()) return;
     const target = classChildren(schema).find(item => item.kind === "class" && item.name === row.name);
     await view.reveal(target, { select: true, focus: true, expand: false });
     return { schema: row.schema, name: row.name, offset: position.offset, readOnly: true };
+  }
+  async function browseInstances(value) {
+    if (!value || typeof value.schema !== "string" || typeof value.className !== "string" || typeof value.projectRoot !== "string")
+      throw Error("Choose a workspace class with an explicit project and schema.");
+    const version = ++browseVersion;
+    const ownsTransition = () => version === browseVersion && !disposed;
+    const requestedRoot = path.resolve(value.projectRoot);
+    const unavailable = async error => {
+      if (!ownsTransition()) return { cancelled: true };
+      const reason = diagnostic(error);
+      const selected = await vscode.window.showErrorMessage(reason, "Open Jade settings");
+      if (!ownsTransition()) return { cancelled: true };
+      if (selected === "Open Jade settings") await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:jade-local-tools.jade-native-runner-cpp-preview");
+      return { available: false, reason, projectRoot: requestedRoot, target: session.target };
+    };
+    let config;
+    try { config = await services.config(undefined, { name: path.basename(requestedRoot), uri: vscode.Uri.file(requestedRoot) }); }
+    catch (error) { return unavailable(error); }
+    let workingPath;
+    try { workingPath = (await services.workingLocation(config)).databasePath; } catch { workingPath = "Unavailable · compile first to create a working database"; }
+    if (!ownsTransition()) return { cancelled: true };
+    const choices = [
+      { label: "Working database", target: "working", description: value.schema + "::" + value.className,
+        detail: workingPath },
+      { label: "Source database", target: "source", description: value.schema + "::" + value.className,
+        detail: config.databasePath },
+    ];
+    const choice = await vscode.window.showQuickPick(choices, {
+      title: "Browse instances · " + value.schema + "::" + value.className,
+      placeHolder: "Choose the database for " + requestedRoot + " · read-only",
+    });
+    if (version !== browseVersion || disposed || !choice || !["working", "source"].includes(choice.target)) return { cancelled: true };
+    try {
+      const connected = await serializeInspectionTransition(async () => {
+        if (!ownsTransition()) return false;
+        const sameProject = currentConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+        if (session.disconnecting || (session.client && (!sameProject || session.target !== choice.target))) await session.disconnect();
+        if (!ownsTransition()) return false;
+        if (session.target !== choice.target) await session.select(choice.target);
+        if (!ownsTransition()) return false;
+        inspectionScope = requestedRoot;
+        if (!session.client) await connect();
+        if (!ownsTransition()) return false;
+        if (!classBrowser) await loadCatalog();
+        return ownsTransition();
+      });
+      if (!connected) return { cancelled: true };
+    } catch (error) { return unavailable(error); }
+    if (version !== browseVersion || disposed) return { cancelled: true };
+    const row = classBrowser.rows.find(item => item.schema === value.schema && item.name === value.className);
+    if (!row) {
+      const message = value.schema + "::" + value.className + " is not installed in the selected " + choice.label + ". Local source remains available. Publish explicitly to add it, or choose another inspection database.";
+      const configure = await vscode.window.showInformationMessage?.(message, "Choose database");
+      if (!ownsTransition()) return { cancelled: true };
+      if (configure === "Choose database") await vscode.commands.executeCommand("jadeNative.selectInspectionDatabase");
+      return { available: false, reason: message, target: session.target, databasePath: currentTarget?.databasePath, projectRoot: requestedRoot };
+    }
+    const generation = session.generation;
+    let revealed;
+    try { revealed = await revealClass(row, generation, () => version === browseVersion && generation === session.generation && !disposed); }
+    catch (error) { if (generation !== session.generation || version !== browseVersion || disposed) return { cancelled: true }; throw error; }
+    if (!revealed || version !== browseVersion || generation !== session.generation || disposed) return { cancelled: true };
+    const node = classNode(row);
+    try {
+      await classPage(node);
+      if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
+      await view.reveal(node, { select: true, focus: true, expand: true });
+    } catch (error) {
+      if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
+      throw error;
+    }
+    if (!ownsTransition() || generation !== session.generation) return { cancelled: true };
+    return { ...revealed, available: true, target: session.target, databasePath: currentTarget.databasePath, projectRoot: requestedRoot };
   }
   async function findClass(value) {
     if (!session.client) await connect();
@@ -575,6 +682,48 @@ function registerObjectExplorer(vscode, context, services) {
       return revealClass(row, metadata.generation);
     },
   });
+  function instanceCatalogueKey(row) { return JSON.stringify([session.generation, row.schema, row.oid]); }
+  async function filterInstances(row) {
+    if (!row || row.kind !== 'class' || row.inspectionGeneration !== session.generation || !session.client) throw Error('Choose a class in the connected Database Objects view.');
+    const generation=session.generation, key=instanceCatalogueKey(row);
+    let record=instanceCatalogues.get(key);
+    if (!record) {
+      if(instanceCatalogues.size>=12) throw Error('Close an instance search tab before opening another (12 tabs maximum).');
+      const page=pages.get(row.oid) || await classPage(row);
+      if (!page || generation!==session.generation || disposed) return;
+      const existing=instanceCatalogues.get(key);
+      if(existing){await existing.controller.show();return existing.controller;}
+      if(instanceCatalogues.size>=12){await discardClassPage(row.oid);throw Error('Close an instance search tab before opening another (12 tabs maximum).');}
+      const connection={target:session.target,path:currentTarget?.databasePath};
+      record={page,generation,oid:row.oid,closed:false};
+      const connected=()=>!disposed && generation===session.generation && !!session.client;
+      const active=()=>connected() && !record.closed;
+      record.controller=registerClassCatalogue(vscode,context,{
+        scope:'instances:'+key, label:row.schema+'::'+row.name+' · Instances',
+        presentation:{instance:true,title:row.schema+'::'+row.name+' · Instances', intro:'Filter the current native page of up to 100 instances. Search Object ID, class or schema. First and Next load native pages; filtering does not scan the database or read object properties.', searchLabel:'Object ID, class or schema · current page',placeholder:'Filter current page'},
+        getRows:()=>({scope:'instances:'+key,generation,
+          label:row.schema+'::'+row.name+' · '+connection.target+' · '+connection.path+' · Read-only',
+          rows:record.page.items.map(item=>({...item,schema:item.schema||row.schema,name:item.oid,className:item.className||row.name,searchText:item.className||row.name})),
+          nativePaging:{number:record.page.number||1,hasMore:!!record.page.hasMore && pages.get(row.oid)===record.page,stale:!active(),cursorReleased:active() && pages.get(row.oid)!==record.page}}),
+        nativePage:async next=>{ if(!active())return; if(!next)await discardClassPage(row.oid); if(!active())return; const page=await classPage(row,next,record); if(page&&active()){record.page=page;events.fire(row);} },
+        refreshPage:async()=>{if(!active())return;await discardClassPage(row.oid);if(!active())return;const page=await classPage(row,false,record);if(page&&active()){record.page=page;events.fire(row);}},
+        openClass:item=>{if(!active())throw Error('The instance snapshot is disconnected.');return inspect(item.oid);},
+        onClose:()=>{
+          record.closed=true;
+          if(instanceCatalogues.get(key)===record)instanceCatalogues.delete(key);
+          if(connected()){
+            cancelPageConsumer(row.oid,record);
+            const pending=pageLoads.get(row.oid);
+            if(!pending && pages.get(row.oid)===record.page)void discardClassPage(row.oid).catch(()=>{});
+          }
+          record.page={items:[],number:1,hasMore:false};
+        },
+      });
+      instanceCatalogues.set(key,record);
+    }
+    await record.controller.show();
+    return record.controller;
+  }
   if (view.onDidCollapseElement)
     context.subscriptions.push(
       view.onDidCollapseElement(({ element }) => {
@@ -583,7 +732,7 @@ function registerObjectExplorer(vscode, context, services) {
       }),
     );
   refreshDescription();
-  const status = vscode.window.createStatusBarItem(
+  status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     45,
   );
@@ -615,7 +764,7 @@ function registerObjectExplorer(vscode, context, services) {
     }
   }
   async function releaseCursor(record) {
-    if (record.cursor && session.client) {
+    if (record.cursor && session.client && record.generation === session.generation) {
       const cursor = record.cursor;
       record.cursor = undefined;
       try {
@@ -634,22 +783,27 @@ function registerObjectExplorer(vscode, context, services) {
     const name = value?.className || value?.name,
       schema = value?.schema;
     if (!name || !schema) throw Error("Select an object or class first.");
+    const projectRoot = value?.connection?.projectRoot || value?.projectRoot || inspectionScope || currentConfig?.workspaceRoots?.[0];
     const result = await vscode.commands.executeCommand(
       "jadeNative.findSourceClass",
       name,
       schema,
+      projectRoot,
     );
-    if (result?.opened === false)
-      void vscode.window.showInformationMessage?.(
+    if (result?.opened === false) {
+      const choice = await vscode.window.showInformationMessage?.(
         "No workspace source was found for " +
           schema +
           "::" +
           name +
           ". Pull the schema source to browse its definitions.",
+          ...(services.pullSource ? ["Pull source…"] : []),
       );
+      if (choice === "Pull source…") await services.pullSource?.({ schema, className: name, projectRoot });
+    }
     return result;
   }
-  async function inspect(oid, record, visit = true) {
+  async function inspect(oid, record, visit = true, origin) {
     if (validateObjectIdentity(oid))
       throw Error(validateObjectIdentity(oid));
     if (!session.client) await connect();
@@ -666,7 +820,10 @@ function registerObjectExplorer(vscode, context, services) {
     if (validateObjectIdentity(object.oid))
       throw Error("Native inspector returned an invalid object identity.");
     oid = object.oid;
-    if (generation !== session.generation) return;
+    let source = { available: false, reason: "Local source metadata is unavailable." };
+    try { source = await services.sourceContext?.({ schema: object.schema, className: object.className, projectRoot: inspectionScope || currentConfig?.workspaceRoots?.[0] }) || source; }
+    catch (error) { source = { available: false, reason: diagnostic(error) }; }
+    if (generation !== session.generation || recipient?.disposed) return;
     if (
       recipient
         ? recipient.readTicket !== ticket
@@ -696,7 +853,7 @@ function registerObjectExplorer(vscode, context, services) {
             ],
           },
         );
-        record = { panel, generation, pinned: false };
+        record = { panel, generation, pinned: false, history: new InspectionHistory() };
         record.rendered = new Promise((resolve, reject) => {
           record.renderResolve = resolve;
           record.renderReject = reject;
@@ -734,13 +891,17 @@ function registerObjectExplorer(vscode, context, services) {
                 return vscode.commands.executeCommand(
                   "jadeNative.objects.focus",
                 );
-              if (record.generation !== session.generation) return;
+              if (record.generation !== session.generation && !["copyOid", "copyValue", "copyKey", "source", "pin", "viewState", "ready", "rendered"].includes(message?.command)) return;
               if (message?.command === "rendered") {
                 clearTimeout(record.renderTimer);
                 record.renderResolve();
                 return;
               }
               if (message?.command === "ready") return sendObject(record);
+              if (message?.command === "viewState") {
+                if (message.oid === record.object?.oid) record.history.saveView(message);
+                return;
+              }
               if (message?.command === "copyOid") {
                 await copyOid(record.object);
                 return record.panel.webview.postMessage({
@@ -771,7 +932,7 @@ function registerObjectExplorer(vscode, context, services) {
                   text =
                     message.command === "copyKey"
                       ? String(item.key ?? item.index ?? "")
-                      : fieldText(item);
+                      : item.value === "" ? "" : fieldText(item);
                 await vscode.env.clipboard.writeText(text);
                 return record.panel.webview.postMessage({
                   command: "notice",
@@ -782,41 +943,24 @@ function registerObjectExplorer(vscode, context, services) {
                 });
               }
               if (message?.command === "source")
-                return openClassSource(record.object);
+                return openClassSource({ ...record.object, connection: record.connection });
               if (message?.command === "open")
                 return inspect(
                   message.oid,
                   record.pinned ? undefined : record,
                   true,
+                  { oid: record.object.oid, schema: record.object.schema, className: record.object.className, property: message.section === "properties" && record.object.properties?.[message.index]?.name, connection: record.connection },
                 );
-              if (message?.command === "back") {
-                const previous = session.back();
-                if (previous) return inspect(previous.oid, record, false);
-              }
-              if (message?.command === "forward") {
-                const next = session.forward();
-                if (next) return inspect(next.oid, record, false);
-              }
+              if (message?.command === "back") return restoreSnapshot(record, record.history.back());
+              if (message?.command === "forward") return restoreSnapshot(record, record.history.forward());
               if (message?.command === "refresh")
                 return inspect(record.object.oid, record, false);
               if (message?.command === "pin") {
+                record.readTicket = {};
                 record.pinned = !record.pinned;
                 return sendObject(record);
               }
-              if (message?.command === "history") {
-                if (
-                  !Number.isInteger(message.index) ||
-                  message.index < 0 ||
-                  message.index >= session.history.length
-                )
-                  return;
-                session.position = message.index;
-                return inspect(
-                  session.history[message.index].oid,
-                  record,
-                  false,
-                );
-              }
+              if (message?.command === "history") return restoreSnapshot(record, record.history.select(message.index));
               if (
                 ["next", "first", "pageSize"].includes(message?.command) &&
                 record.object.collection
@@ -833,6 +977,7 @@ function registerObjectExplorer(vscode, context, services) {
                   oid = record.object.oid,
                   token = {};
                 record.pendingAction = token;
+                record.error = undefined;
                 await sendObject(record);
                 try {
                   const cursor =
@@ -853,6 +998,17 @@ function registerObjectExplorer(vscode, context, services) {
                   record.page = page;
                   record.cursor = page.cursor;
                   record.readAt = new Date().toISOString();
+                  Object.assign(record.history.current(), {
+                    page,
+                    limit: record.limit,
+                    readAt: record.readAt,
+                    error: undefined,
+                  });
+                } catch (error) {
+                  if (record.revision === revision && generation === session.generation) {
+                    record.error = diagnostic(error);
+                    Object.assign(record.history.current(), { error: record.error });
+                  }
                 } finally {
                   if (record.pendingAction === token) {
                     record.pendingAction = undefined;
@@ -863,6 +1019,9 @@ function registerObjectExplorer(vscode, context, services) {
             }),
         );
         panel.onDidDispose(() => {
+          record.disposed = true;
+          record.revision = (record.revision || 0) + 1;
+          record.readTicket = {};
           clearTimeout(record.renderTimer);
           record.renderReject(Error("Object inspection was cancelled."));
           listener.dispose();
@@ -878,10 +1037,21 @@ function registerObjectExplorer(vscode, context, services) {
     if (record.revision !== revision || generation !== session.generation)
       throw Error("Object inspection was cancelled by newer navigation.");
     record.generation = generation;
+    record.connection = Object.freeze({
+      name: session.target === "working" ? "Working database" : "Source database",
+      path: currentTarget?.databasePath, target: session.target,
+      projectRoot: inspectionScope || currentConfig?.workspaceRoots?.[0],
+      connection: currentConfig?.connectionName || currentConfig?.name || "Configured connection",
+      session: generation, readOnly: true,
+    });
+    record.source = source;
+    record.origin = origin || (record.object?.oid === object.oid ? record.origin : undefined);
     record.object = object;
     record.readAt = new Date().toISOString();
     record.page = undefined;
+    record.error = undefined;
     if (object.collection) {
+      try {
       const page = await session.request("collection", {
         oid,
         limit: record.limit || 100,
@@ -892,34 +1062,52 @@ function registerObjectExplorer(vscode, context, services) {
       }
       record.page = page;
       record.cursor = page.cursor;
+      } catch (error) {
+        if (generation !== session.generation || record.disposed || record.revision !== revision) return;
+        record.error = diagnostic(error);
+      }
     }
+    record.history.visit({ object, source, page: record.page, connection: record.connection, readAt: record.readAt, limit: record.limit, origin: record.origin, error: record.error });
     record.panel.title = object.className + " · " + oid;
     record.panel.reveal();
     await sendObject(record);
     await record.rendered;
     return { oid, className: object.className, readOnly: true };
   }
+  async function restoreSnapshot(record, snapshot) {
+    if (!snapshot) return;
+    const revision = (record.revision || 0) + 1;
+    record.revision = revision;
+    record.readTicket = {};
+    await releaseCursor(record);
+    if (record.disposed || record.revision !== revision) return;
+    Object.assign(record, snapshot, { pendingAction: undefined });
+    record.panel.title = record.object.className + " · " + record.object.oid;
+    // Native cursors were released on navigation. Restart explicitly with First.
+    if (record.page) record.page = { ...record.page, hasMore: false, restartRequired: true };
+    return sendObject(record);
+  }
   async function sendObject(record) {
-    if (!record.object) return;
+    if (!record.object || record.disposed) return;
     return record.panel.webview.postMessage({
       command: "object",
       object: record.object,
+      source: record.source,
       page: record.page,
+      error: record.error,
+      stale: record.generation !== session.generation || !session.client,
       pinned: record.pinned,
       readAt: record.readAt,
       busy: Boolean(record.pendingAction),
       limit: record.limit || 100,
-      connection: {
-        name:
-          session.target === "working" ? "Working database" : "Source database",
-        path: currentTarget?.databasePath,
-        readOnly: true,
-      },
+      connection: record.connection,
+      origin: record.origin,
+      view: record.history.current()?.view,
       history: {
-        entries: session.history,
-        position: session.position,
-        back: session.position > 0,
-        forward: session.position < session.history.length - 1,
+        entries: record.history.entries.map(({ object }) => ({ oid: object.oid, schema: object.schema, className: object.className })),
+        position: record.history.position,
+        back: record.history.position > 0,
+        forward: record.history.position < record.history.entries.length - 1,
       },
     });
   }
@@ -937,10 +1125,13 @@ function registerObjectExplorer(vscode, context, services) {
     },
     vscode.commands.registerCommand("jadeNative.selectInspectionDatabase", () =>
       action(async () => {
+        const version = ++browseVersion;
+        const ownsTransition = () => version === browseVersion && !disposed;
         let config;
         try {
           config = await configuration();
         } catch {}
+        if (!ownsTransition()) return { cancelled: true };
         const choice = await vscode.window.showQuickPick(
           [
             {
@@ -963,26 +1154,27 @@ function registerObjectExplorer(vscode, context, services) {
             placeHolder: "Switching disconnects and clears inspection history",
           },
         );
-        if (!choice) return;
-        await session.select(choice.target);
-        currentTarget = undefined;
-        status.text =
-          "$(database) Jade Inspect: " +
-          (choice.target === "working" ? "Working" : "Source") +
-          " · Read-only";
-        refreshDescription();
-        events.fire();
-        return { selection: choice.target, readOnly: true };
+        if (!choice || !["source", "working"].includes(choice.target)) return;
+        return serializeInspectionTransition(async () => {
+          if (!ownsTransition()) return { cancelled: true };
+          await session.select(choice.target);
+          if (!ownsTransition()) return { cancelled: true };
+          currentTarget = undefined;
+          refreshDescription();
+          events.fire();
+          return { selection: choice.target, readOnly: true };
+        });
+
       }),
     ),
     vscode.commands.registerCommand("jadeNative.connectObjects", () =>
       action(connect),
     ),
     vscode.commands.registerCommand("jadeNative.disconnectObjects", () =>
-      action(() => session.disconnect()),
+      action(() => { ++browseVersion; return session.disconnect(); }),
     ),
     vscode.commands.registerCommand("jadeNative.cancelObjectInspection", () =>
-      action(() => session.disconnect()),
+      action(() => { ++browseVersion; return session.disconnect(); }),
     ),
     vscode.commands.registerCommand("jadeNative.refreshObjects", () =>
       action(async () => {
@@ -1005,6 +1197,7 @@ function registerObjectExplorer(vscode, context, services) {
       events.fire(schema);
       return { schema: schemaName, offset: page.offset, total: page.total };
     })),
+    vscode.commands.registerCommand("jadeNative.filterObjectInstances", row => action(() => filterInstances(row))),
     vscode.commands.registerCommand("jadeNative.moreObjectInstances", (row) =>
       action(async () => {
         await classPage(row, true);
@@ -1058,8 +1251,11 @@ function registerObjectExplorer(vscode, context, services) {
     provider,
     view,
     classCatalogue,
+    instanceCatalogue: row => instanceCatalogues.get(instanceCatalogueKey(row))?.controller,
+    browseInstances,
     ownsLock: () => lock,
     releaseForOperation: async () => {
+      ++browseVersion;
       if (session.client || lock) {
         await session.disconnect();
         if (lock) {
@@ -1073,10 +1269,10 @@ function registerObjectExplorer(vscode, context, services) {
 }
 function objectHtml(csp, nonce, asset) {
   return `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${asset("elements-lite.css")}"><link rel="stylesheet" href="${asset("objects.css")}"></head><body>
-<header class="page-header"><div><div class="eyebrow">JADE / OBJECT EXPLORER</div><h1 id="title">Loading object…</h1><p id="schema"></p></div><span class="badge readonly-badge">Read-only</span></header>
+<header class="page-header"><div><div class="eyebrow">JADE / OBJECT EXPLORER</div><h1 id="title">Loading object…</h1><p id="schema"></p><p id="project" class="help"></p><p id="source-context" class="help"></p></div><span class="badge readonly-badge">Read-only</span></header>
 <section class="connection-bar" aria-label="Database connection"><button class="environment" id="database" title="Select Working or Source database"><span id="environment">Working database</span><span aria-hidden="true">⌄</span></button><span class="connection-status" id="connection-status"><span class="status-dot"></span><span id="status-label">Connecting</span></span><p id="connection" class="connection-path"></p><button class="quiet-button" id="focusExplorer" title="Show schemas, classes and instances in the sidebar">Database Objects ↗</button></section>
-<nav class="object-toolbar" aria-label="Object navigation"><div class="toolbar-group"><button class="vscode-button secondary" id="back" title="Previous inspected object (Alt+Left)">← Back</button><button class="vscode-button secondary" id="forward" title="Next inspected object (Alt+Right)">Forward →</button><label class="history-label"><span class="sr-only">Inspection history</span><select id="history" aria-label="Inspection history"><option>History</option></select></label></div><div class="toolbar-group"><button class="vscode-button secondary" id="refresh" title="Retrieve the object's current database values">Refresh</button><button class="vscode-button secondary" id="pin" aria-pressed="false" title="Keep this tab when opening other objects">Pin tab</button><button class="vscode-button secondary" id="source" title="Open this class in the workspace source browser">Open class source</button></div></nav>
-<div class="identity-bar"><p class="identity" id="identity"></p><button class="quiet-button" id="copyOid" title="Copy the complete object identifier (Ctrl+Shift+C)">Copy ID</button></div><p id="state" class="state" role="status"></p><p id="pin-help" class="help"></p>
+<nav class="object-toolbar" aria-label="Object navigation"><div class="toolbar-group"><button class="vscode-button secondary" id="back" title="Previous inspected object (Alt+Left)">← Back</button><button class="vscode-button secondary" id="forward" title="Next inspected object (Alt+Right)">Forward →</button></div><div class="toolbar-group"><button class="vscode-button secondary" id="refresh" title="Retrieve the object's current database values">Refresh</button><details class="inspection-more" id="inspection-more" open><summary>More</summary><div class="more-actions"><label class="history-label"><span class="sr-only">Inspection history</span><select id="history" aria-label="Inspection history"><option>History</option></select></label><button class="vscode-button secondary" id="pin" aria-pressed="false" title="Keep this tab when opening other objects">Pin tab</button></div></details><button class="vscode-button secondary" id="source" title="Open this class in the workspace source browser">Open class source</button></div></nav>
+<div class="identity-bar"><p class="identity" id="identity"></p><button class="quiet-button" id="copyOid" title="Copy the complete object identifier (Ctrl+Shift+C)">Copy ID</button></div><p id="state" class="state" role="status"></p><p id="pin-help" class="help"></p><p id="origin" class="help"></p>
 <section class="card" id="object-properties"><div class="section-heading"><h2>Properties <span class="count" id="property-count"></span></h2><label class="filter-label"><span class="sr-only">Filter properties</span><input class="vscode-textfield" type="search" id="properties-filter" placeholder="Find a property or value…" aria-label="Filter property names, types and values"></label></div><div class="table-wrap"><table><caption class="sr-only">Object properties and values</caption><thead><tr><th scope="col">Property</th><th scope="col">Type</th><th scope="col">Value</th></tr></thead><tbody id="properties"></tbody></table></div></section>
 <section class="card" id="collection" hidden><div class="collection-heading"><div><h2>Collection entries <span class="count" id="entry-count"></span></h2><p class="help">Native keys and indexes. Open a reference to inspect its object.</p></div><div class="pager"><label class="page-size-label">Page size<select id="page-size" aria-label="Entries per page"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select></label><button class="vscode-button secondary" id="first" title="Restart collection traversal at its first entry">First</button><button class="vscode-button secondary" id="next" title="Retrieve the next page in native collection order">Next →</button></div></div>
 <div class="filters"><label class="filter-label"><span class="sr-only">Filter entries on this page</span><input class="vscode-textfield" type="search" id="entries-filter" placeholder="Filter this page…" aria-label="Filter entries on the current page"></label><label class="sort-label">Display order<select id="entries-sort"><option value="native">Native order</option><option value="key-asc">Key / index ↑</option><option value="key-desc">Key / index ↓</option><option value="value-asc">Value A → Z</option><option value="value-desc">Value Z → A</option><option value="type-asc">Type A → Z</option></select></label><details class="column-picker"><summary>Columns</summary><div><label><input id="show-key" type="checkbox" checked> Key / index</label><label><input id="show-type" type="checkbox" checked> Type</label></div></details></div><p class="help" id="display-note">Filtering and display order apply to this page only. Native collection order is unchanged.</p>

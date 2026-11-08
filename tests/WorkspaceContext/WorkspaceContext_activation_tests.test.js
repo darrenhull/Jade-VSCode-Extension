@@ -7,7 +7,7 @@ function activateScratchConfiguration(){
  const folderFor=value=>value?.scheme==='file'?[a,b].find(folder=>value.fsPath===folder.uri.fsPath||value.fsPath.startsWith(folder.uri.fsPath+'/')):undefined;
  const values=new Map([[a,{installPath:'C:/Jade-A'}],[b,{installPath:'C:/Jade-B',databasePath:'${workspaceFolder}/source/system',iniPath:'${workspaceFolder}/source/custom.ini',cacheDirectory:'state',server:'multiUser'}]]);
  const vscode={
-  workspace:{workspaceFolders:[a,b],notebookDocuments,getWorkspaceFolder:folderFor,getConfiguration(_section,resource){reads.push(resource);const settings=values.get(folderFor(resource))||{installPath:'C:/Wrong-Global-Jade',server:'singleUser'};return {get:key=>settings[key]};}},
+  workspace:{workspaceFolders:[a,b],notebookDocuments,textDocuments:[],isTrusted:false,onDidOpenTextDocument:()=>({dispose(){}}),onDidChangeWorkspaceFolders:()=>({dispose(){}}),getWorkspaceFolder:folderFor,getConfiguration(_section,resource){reads.push(resource);const settings=values.get(folderFor(resource))||{installPath:'C:/Wrong-Global-Jade',server:'singleUser'};return {get:key=>settings[key]};}},
   languages:{createDiagnosticCollection:()=>({}),registerCodeLensProvider:()=>({})},
   window:{createOutputChannel:()=>({})},commands:{registerCommand:()=>({})}
  };
@@ -18,6 +18,8 @@ function activateScratchConfiguration(){
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
   if(name==='./language-tools')return {registerLanguageTools:()=>language};
   if(name==='./cli-client')return {CliWorkingSession:class{}};
+  if(name==='./WorkspaceOperationGuard')return require('../../extension/src/WorkspaceOperationGuard');
+  if(name==='./ProjectSkillInstaller')return require('../../extension/src/ProjectSkillInstaller');
   if(name==='./jade-workspaces')return {registerWorkspaces(_vscode,_context,value){options=value;return {schemaFor(){},resourceFor(){}};}};
   return noop;
  },exported);

@@ -3,7 +3,21 @@ const vscode = acquireVsCodeApi(),
   $ = (id) => document.getElementById(id),
   { fieldText, visibleRows, pageSummary } = JadeObjectPage;
 let current;
-const send = (command, data = {}) => vscode.postMessage({ command, ...data });
+const compact = window.matchMedia?.("(max-width: 480px)");
+if (compact) {
+  const layout = () => { $("inspection-more").open = !compact.matches; };
+  layout(); compact.addEventListener("change", layout);
+}
+function saveView() {
+  if (!current) return;
+  vscode.postMessage({ command: "viewState", oid: current.object.oid, scrollY: window.scrollY,
+    propertiesScroll: $("properties").closest(".table-wrap").scrollTop,
+    entriesScroll: $("entries").closest(".table-wrap").scrollTop,
+    selection: document.activeElement?.closest?.("tr")?.dataset.selection || current.view?.selection || "",
+    propertiesFilter: $("properties-filter").value, entriesFilter: $("entries-filter").value,
+    entriesSort: $("entries-sort").value });
+}
+const send = (command, data = {}) => { saveView(); vscode.postMessage({ command, ...data }); };
 for (const command of [
   "back",
   "forward",
@@ -42,7 +56,7 @@ function valueCell(row, field, index, section) {
   td.className = "value-cell";
   if (field.error) {
     td.classList.add("error");
-    td.textContent = field.error;
+    td.textContent = "Unavailable: " + field.error;
     return;
   }
   const content = document.createElement("span");
@@ -50,12 +64,13 @@ function valueCell(row, field, index, section) {
   if (field.oid && !/^0+$/.test(field.oid)) {
     content.append(
       button(
-        field.value || field.type + " · " + field.oid.slice(0, 10) + "…",
-        "Inspect referenced object " + field.oid,
-        () => send("open", { oid: field.oid }),
+        field.value ?? (field.type + " · " + field.oid),
+        ((current.history.entries || []).some(item => item.oid === field.oid) ? "Previously inspected · Open referenced object " : "Inspect referenced object ") + field.oid,
+        () => send("open", { oid: field.oid, section, index }),
         "reference",
       ),
     );
+    content.firstChild.disabled = Boolean(current.stale);
   } else content.textContent = fieldText(field);
   td.append(
     content,
@@ -81,21 +96,26 @@ function render() {
     object.schema +
     " schema" +
     (object.collection ? " · Collection" : " · Object");
+  $("project").textContent = (current.connection.connection || "Configured connection") + (current.connection.projectRoot ? " · " + current.connection.projectRoot : "");
+  $("source-context").textContent = current.source?.available
+    ? "Local source · " + (current.source.dirty ? "Unsaved changes" : "Saved file") + " · " + current.source.file + " · Deployment not verified"
+    : "Local source unavailable · " + (current.source?.reason || "No resolved local declaration.");
   $("identity").textContent = "OID " + object.oid;
+  $("origin").textContent = current.origin ? "From " + current.origin.schema + "::" + current.origin.className + " · " + current.origin.oid + (current.origin.property ? " · " + current.origin.property : "") : "";
   $("environment").textContent = current.connection.name;
   $("connection").textContent = current.connection.path || "";
-  $("connection-status").classList.add("connected");
-  $("status-label").textContent = "Connected";
-  $("back").disabled = !current.history.back;
-  $("forward").disabled = !current.history.forward;
+  $("connection-status").classList.toggle("connected", !current.stale);
+  $("status-label").textContent = current.stale ? "Disconnected · stale snapshot" : "Connected";
+  $("back").disabled = current.stale || !current.history.back;
+  $("forward").disabled = current.stale || !current.history.forward;
   $("pin").textContent = current.pinned ? "Unpin tab" : "Pin tab";
   $("pin").setAttribute("aria-pressed", String(current.pinned));
   $("pin-help").textContent = current.pinned
     ? "Pinned: opening a reference keeps this tab and opens another inspector."
     : "Opening a reference reuses this tab. Pin it to compare objects side by side.";
-  $("state").textContent = busy
+  $("state").textContent = current.stale ? "Disconnected · Last retrieved snapshot retained. Choose a database and reopen the object to reconnect." : busy
     ? "Retrieving next native page…"
-    : "Read-only snapshot" +
+    : current.error ? "Collection read failed: " + current.error + ". Use First to retry." : "Read-only snapshot" +
       (current.readAt
         ? " · Retrieved " + new Date(current.readAt).toLocaleTimeString()
         : "") +
@@ -111,16 +131,20 @@ function render() {
     option.selected = index === current.history.position;
     $("history").append(option);
   }
-  $("history").disabled = !(current.history.entries || []).length;
+  $("history").disabled = current.stale || !(current.history.entries || []).length;
   const properties = object.properties || [],
     rows = visibleRows(properties, $("properties-filter").value);
   $("property-count").textContent = rows.length + " / " + properties.length;
   $("properties").replaceChildren();
   for (const { item, index } of rows) {
     const tr = document.createElement("tr");
+    tr.tabIndex = 0; tr.dataset.selection = "property:" + item.name;
+    tr.classList.toggle("selected", current.view?.selection === tr.dataset.selection);
     cell(tr, item.name);
-    cell(tr, item.type, "type");
+    tr.cells[0].dataset.label = "Property";
+    cell(tr, item.type, "type").dataset.label = "Type";
     valueCell(tr, item, index, "properties");
+    tr.lastChild.dataset.label = "Value";
     $("properties").append(tr);
   }
   if (!rows.length)
@@ -128,11 +152,12 @@ function render() {
       $("properties"),
       properties.length
         ? "No properties match this filter."
-        : "No declared properties.",
+        : "No stored properties in this snapshot.",
     );
   $("object-properties").hidden =
     Boolean(object.collection) && !properties.length;
   $("collection").hidden = !object.collection;
+  $("refresh").disabled = current.stale || Boolean(busy);
   if (!object.collection) return;
   const entries = visibleRows(
     page?.items || [],
@@ -142,7 +167,9 @@ function render() {
   $("entries").replaceChildren();
   for (const { item, index } of entries) {
     const tr = document.createElement("tr"),
-      key = cell(tr, item.key ?? item.index, "key-column");
+      key = cell(tr, item.key ?? item.index ?? "Not supplied", "key-column");
+    tr.tabIndex = 0; tr.dataset.selection = "entry:" + index;
+    key.dataset.label = "Key / index";
     key.append(
       button(
         "Copy",
@@ -151,8 +178,10 @@ function render() {
         "quiet-button copy-value",
       ),
     );
-    cell(tr, item.type, "type-column type");
+    key.lastChild.disabled = item.key === undefined && item.index === undefined;
+    cell(tr, item.type, "type-column type").dataset.label = "Type";
     valueCell(tr, item, index, "entries");
+    tr.lastChild.dataset.label = "Value";
     $("entries").append(tr);
   }
   if (!entries.length)
@@ -160,15 +189,16 @@ function render() {
       $("entries"),
       page?.items?.length
         ? "No entries match on this page. Clear the filter or load the next page."
-        : "This collection is empty.",
+        : current.error ? "Collection entries could not be loaded. Use First to retry." : "This collection is empty.",
     );
   $("entry-count").textContent = String(page?.items?.length || 0) + " on page";
-  $("page-status").textContent = pageSummary(page, entries.length);
+  $("page-status").textContent = page?.restartRequired ? "Retained page snapshot · First restarts native traversal." : pageSummary(page, entries.length);
   $("clear-filter").hidden = !$("entries-filter").value;
   $("page-size").value = current.limit || 100;
-  $("page-size").disabled = Boolean(busy);
-  $("first").disabled = Boolean(busy);
-  $("next").disabled = busy || !page?.hasMore;
+  $("refresh").disabled = current.stale || Boolean(busy);
+  $("page-size").disabled = current.stale || Boolean(busy);
+  $("first").disabled = current.stale || Boolean(busy);
+  $("next").disabled = current.stale || busy || !page?.hasMore;
   for (const element of document.querySelectorAll(".key-column"))
     element.hidden = !$("show-key").checked;
   for (const element of document.querySelectorAll(".type-column"))
@@ -181,12 +211,16 @@ for (const id of [
   "show-key",
   "show-type",
 ])
-  $(id).oninput = render;
+  $(id).oninput = () => { render(); saveView(); };
 $("clear-filter").onclick = () => {
   $("entries-filter").value = "";
   render();
+  saveView();
   $("entries-filter").focus();
 };
+let scrollTimer;
+window.addEventListener("scroll", () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(saveView, 80); }, true);
+window.addEventListener("blur", saveView);
 window.addEventListener("keydown", (event) => {
   if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
     event.preventDefault();
@@ -211,38 +245,19 @@ window.addEventListener("message", ({ data }) => {
       $("entries-sort").value = "native";
     }
     current = data;
+    $("properties-filter").value = data.view?.propertiesFilter || "";
+    $("entries-filter").value = data.view?.entriesFilter || "";
+    $("entries-sort").value = data.view?.entriesSort || "native";
     render();
+    window.scrollTo(0, data.view?.scrollY || 0);
+    $("properties").closest(".table-wrap").scrollTop = data.view?.propertiesScroll || 0;
+    $("entries").closest(".table-wrap").scrollTop = data.view?.entriesScroll || 0;
     send("rendered");
   }
   if (data.command === "notice") $("state").textContent = data.message;
-  if (data.command === "disconnected") {
-    current = undefined;
-    $("environment").textContent =
-      data.target === "source" ? "Source database" : "Working database";
-    $("state").textContent = data.message;
-    $("status-label").textContent = "Disconnected";
-    $("connection-status").classList.remove("connected");
-    $("connection").textContent = "";
-    for (const id of [
-      "back",
-      "forward",
-      "refresh",
-      "pin",
-      "first",
-      "next",
-      "source",
-      "copyOid",
-      "history",
-      "page-size",
-    ])
-      $(id).disabled = true;
-    $("properties").replaceChildren();
-    $("entries").replaceChildren();
-    $("collection").hidden = true;
-    $("identity").textContent =
-      "Reconnect and reopen this object in the selected database.";
-    $("pin-help").textContent =
-      "Inspection history was cleared when the database disconnected.";
+  if (data.command === "disconnected" && current) {
+    current.stale = true;
+    render();
   }
 });
 send("ready");

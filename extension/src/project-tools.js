@@ -7,6 +7,7 @@ const {resolveExtractConfig,startExtract}=require('./extract');
 const {organizeSources}=require('./source-layout');
 const {parseSource}=require('./source_symbols');
 const {targetKey}=require('./publish-changes');
+const {jadeSourceUri}=require('./active-jade-source');
 const {applyRenames,planRenames,projectRenames,sourceClasses}=require('./native-renames');
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
 function catalog(project){const values=new Map();for(const s of project.schemas)for(const c of s.classes)values.set(s.name+'::'+c.owner,c);return values;}
@@ -24,11 +25,12 @@ function reviewChanges(before,after,renames=[]){
  return rows;
 }
 function registerProjectTools(vscode,context,options){
- async function folder(){const active=vscode.window.activeTextEditor?.document.uri;const selected=active&&vscode.workspace.getWorkspaceFolder(active);if(selected)return selected;const list=vscode.workspace.workspaceFolders||[];if(list.length===1)return list[0];const choice=await vscode.window.showQuickPick(list.map(folder=>({label:folder.name,folder})),{title:'Choose Jade source workspace'});if(!choice)throw Error('Choose a workspace folder.');return choice.folder;}
+ async function folder(uri){const active=jadeSourceUri(vscode,uri);const selected=active&&vscode.workspace.getWorkspaceFolder(active);if(selected)return selected;const list=vscode.workspace.workspaceFolders||[];if(list.length===1)return list[0];const choice=await vscode.window.showQuickPick(list.map(folder=>({label:folder.name,folder})),{title:'Choose Jade source workspace'});if(!choice)throw Error('Choose a workspace folder.');return choice.folder;}
  async function save(root){for(const document of vscode.workspace.textDocuments)if(document.isDirty&&document.uri.scheme==='file'&&inside(root,document.uri.fsPath)&&/\.(cls|scm|sec|ddx|jcf)$/i.test(document.uri.fsPath)&&!await document.save())throw Error('Could not save '+document.uri.fsPath);}
- async function publish(required=false){
+ async function publish(required=false,uri){
+  const source=await options.resolveSource?.(uri),selected=await folder(source?.uri||jadeSourceUri(vscode,uri)),root=selected.uri.fsPath;
   await options.beforeOperation?.();
-  const selected=await folder(),root=selected.uri.fsPath;await save(root);const project=await scanProject(root);
+  await save(root);const project=await scanProject(root);
   if(!project.schemas.length){if(required||project.migrations?.length)throw Error('Create or pull native schema headers first.');return;}
   if(options.isBusy())throw Error('A Jade operation is already running.');await options.setBusy(true);
   const output=options.output;let temporary;
@@ -56,7 +58,7 @@ function registerProjectTools(vscode,context,options){
    return result;
   }finally{if(temporary&&path.dirname(path.resolve(temporary))===path.resolve(os.tmpdir())&&path.basename(temporary).startsWith('jade-publish-review-'))fs.rmSync(temporary,{recursive:true,force:true});await options.setBusy(false);}
  }
- context.subscriptions.push(vscode.commands.registerCommand('jadeNative.publishWorkspace',()=>publish(true).catch(error=>{options.output.appendLine(error.message);options.output.show(true);void vscode.window.showErrorMessage(error.message);return {success:false,error:error.message};})),
+ context.subscriptions.push(vscode.commands.registerCommand('jadeNative.publishWorkspace',uri=>publish(true,uri).catch(error=>{options.output.appendLine(error.message);options.output.show(true);void vscode.window.showErrorMessage(error.message);return {success:false,error:error.message};})),
  vscode.commands.registerCommand('jadeNative.createSchema',async(properties={})=>{
   try{
    const selected=await folder(),root=selected.uri.fsPath,project=await scanProject(root),name=properties.name||await vscode.window.showInputBox({title:'New Jade schema',prompt:'Schema name',validateInput:value=>/^[A-Za-z_]\w*$/.test(value)&&!['RootSchema','JadeSchema'].includes(value)?undefined:'Enter a valid user schema name.'});if(!name)return;

@@ -3,18 +3,46 @@ const path = require("node:path");
 const { schemaFromSource } = require("./config");
 const { isNestedSnapshot } = require("./source-snapshots");
 const { classSections } = require("./class-view-model");
-const { createSourceMemberPreviews } = require("./source-member-preview");
+const {createClassWorkspaceModel,memberId}=require('./class-workspace-model');
+const {createClassWorkspaces}=require('./class-workspace');
+const {registerClassWorkspaces}=require('./class-workspace-controller');
+const {createClassDiscoveryRows}=require('./class-discovery-rows');
 const { ClassBrowserModel } = require("./class-browser-model"),
   { pickClass } = require("./class-browser-ui");
 const { registerClassCatalogue } = require("./class-catalogue");
-function registerClassView(vscode, context, language) {
+function registerClassView(vscode, context, language, options={}) {
   const events = new vscode.EventEmitter(),
     pendingFiles = new Set(),
     parents = new WeakMap();
   let timer, resources, browserProject, browserGeneration;
   const browser = new ClassBrowserModel({ scope: "workspace", pageSize: 100 }),
     classPages = new Map(),
-    classFilters = new Map();
+    classFilters = new Map(),
+    memberGroups = new Map(),
+    memberGroupData = new WeakMap();
+  function registeredGroup(id) {
+    const row = memberGroups.get(id)?.deref();
+    if (!row) { memberGroups.delete(id); return; }
+    return memberGroupData.get(row);
+  }
+  const memberPageSize = 98;
+  function memberGroup(row, items) {
+    const prior = registeredGroup(row.id), offset = Math.min(prior?.offset || 0, items.length ? Math.floor((items.length - 1) / memberPageSize) * memberPageSize : 0);
+    const end = Math.min(items.length, offset + memberPageSize);
+    const group = { ...row, description: items.length ? (offset + 1) + "–" + end + " of " + items.length : "No members", items: items.slice(offset, end) };
+    memberGroupData.set(group, { row: group, items, offset });
+    memberGroups.set(row.id, new WeakRef(group));
+    return group;
+  }
+  function memberPage(row) {
+    const group = registeredGroup(row.id);
+    if (!group) return [];
+    const { items, offset } = group, end = Math.min(items.length, offset + memberPageSize);
+    row.description = items.length ? (offset + 1) + "–" + end + " of " + items.length : "No members";
+    const control = (direction, target) => ({ kind: "memberPage", groupId: row.id, offset: target, direction, schema: row.schema, owner: row.owner,
+      label: (direction === "previous" ? "Previous " : "Next ") + memberPageSize + " members", description: row.description, id: row.id + "::page::" + direction + "::" + target });
+    return [...(offset ? [control("previous", offset - memberPageSize)] : []), ...items.slice(offset, end), ...(end < items.length ? [control("next", end)] : [])];
+  }
   function changed(uri) {
     if (/\.(scm|sec|ddx)$/i.test(uri.fsPath)) resources = undefined;
     pendingFiles.add(uri.toString());
@@ -26,25 +54,33 @@ function registerClassView(vscode, context, language) {
       pendingFiles.clear();
     }, 60);
   }
+  const systemReadyProjects=new Set();
   const source = async (uri) => {
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+    const project=vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.toString()||'';
+    if(language.ready&&!systemReadyProjects.has(project)){
+      await language.ready(doc);systemReadyProjects.add(project);
+    }
     return { doc, text: doc.getText() };
   };
-  const previewController = createSourceMemberPreviews(vscode, context, {
-    readSource: source,
-    onOriginal: (row) =>
-      vscode.commands.executeCommand("jadeNative.showClassMember", row),
+  if(vscode.workspace.onDidChangeConfiguration)context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event=>{if(event.affectsConfiguration('jadeNative'))systemReadyProjects.clear();}));
+  const model=createClassWorkspaceModel({vscode,language,readSource:source});
+  async function openOriginal(row,id){
+    const member=id&&await model.preview(row,id);
+    if(member?.file)return vscode.commands.executeCommand('jadeNative.showClassMember',member);
+    const identity=await model.resolveClass(row);return vscode.window.showTextDocument(vscode.Uri.parse(identity.file),{preview:false});
+  }
+  const shell=createClassWorkspaces(vscode,context,{
+    load:model.load,preview:model.preview,
+    onOriginal:openOriginal,
+    onInstances:row=>options.onInstances?.({schema:row.schema,className:row.name,projectRoot:row.projectRoot,sourceUri:row.file}),
+    onBack:restoreDiscovery,
+    onDeclaringClass:(_row,member)=>previewController.open({name:member.owner,schema:member.schema,file:member.file}),
+    onSuperclass:(_row,identity)=>previewController.open(identity),
   });
-  const allClasses = () =>
-    [...language.index.project.groups.values()]
-      .map((entries) => ({
-        kind: "class",
-        name: entries[0].cls.name,
-        schema: entries[0].model.schema,
-        parent: entries[0].cls.parent,
-        entries,
-      }))
-      .filter((c) => c.schema);
+  const previewController=registerClassWorkspaces(vscode,context,{model,shell,onOriginal:openOriginal});
+  const classRows=createClassDiscoveryRows(uri=>vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(uri)));
+  const allClasses=()=>classRows(language.index.project.groups);
   async function syncBrowser() {
     await language.index.ready();
     await language.index.flush();
@@ -53,7 +89,11 @@ function registerClassView(vscode, context, language) {
       project !== browserProject ||
       project.generation !== browserGeneration
     ) {
-      browser.setClasses(allClasses());
+      const rows=allClasses();
+      const identity=row=>JSON.stringify([row.projectId,row.schema,row.name]);
+      const previous=new Map(browser.rows.map(row=>[identity(row),row]));
+      if(rows.length!==previous.size||rows.some(row=>!previous.has(identity(row))))browser.setClasses(rows);
+      else for(const row of rows)Object.assign(previous.get(identity(row)),row);
       browserProject = project;
       browserGeneration = project.generation;
     }
@@ -151,7 +191,7 @@ function registerClassView(vscode, context, language) {
       item.description =
         row.kind === "schema"
           ? classPage(row.schema).label
-          : row.description || row.detail;
+          : row.description || row.detail || (row.kind==='class'?row.projectName:undefined);
       item.iconPath = new vscode.ThemeIcon(
         {
           schema: "database",
@@ -163,7 +203,10 @@ function registerClassView(vscode, context, language) {
           base: "type-hierarchy",
         }[row.kind] || "symbol-constant",
       );
-      if (row.kind === "classPage") {
+      if (row.kind === "memberPage") {
+        item.iconPath = new vscode.ThemeIcon(row.direction === "previous" ? "arrow-up" : "arrow-down");
+        item.command = { command: "jadeNative.pageSourceMembers", title: row.label, arguments: [row.groupId, row.offset] };
+      } else if (row.kind === "classPage") {
         item.iconPath = new vscode.ThemeIcon(
           row.direction === "previous" ? "arrow-up" : "arrow-down",
         );
@@ -197,12 +240,14 @@ function registerClassView(vscode, context, language) {
         };
       }
       if (row.kind === "class") item.contextValue = "jadeSourceClass";
+      if (row.kind === "class") { const { entries, ...identity } = row; item.command={command:'jadeNative.openClassWorkspace',title:'Open class workspace',arguments:[identity]}; }
       item.tooltip = row.schema
         ? row.schema +
           "::" +
           (row.owner || row.name) +
           (row.owner ? "::" + (row.name || row.label) : "")
         : row.label;
+      if(row.kind==='class'&&row.projectName)item.tooltip+=' · '+row.projectName;
       return item;
     },
     async getChildren(row) {
@@ -224,14 +269,12 @@ function registerClassView(vscode, context, language) {
         return [
           ...(files.length
             ? [
-                {
+                memberGroup({
                   kind: "group",
                   label: "Schema & resources",
                   schema: row.name,
                   id: row.name + "::resources",
-                  description: String(files.length),
-                  items: files,
-                },
+                }, files),
               ]
             : []),
           ...page.items,
@@ -263,7 +306,7 @@ function registerClassView(vscode, context, language) {
             : []),
         ];
       }
-      if (row.kind === "group") return row.items;
+      if (row.kind === "group") return memberPage(row);
       if (row.kind === "class") {
         const groups = new Map();
         for (const entry of row.entries) {
@@ -277,15 +320,14 @@ function registerClassView(vscode, context, language) {
             groups.set(group.label, list);
           }
         }
-        return [...groups].map(([label, items]) => ({
+        return [...groups].map(([label, items]) => memberGroup({
           kind: "group",
           label,
           schema: row.schema,
           owner: row.name,
-          id: row.schema + "::" + row.name + "::" + label,
+          id: (row.browserId||JSON.stringify([row.projectId,row.schema,row.name])) + "::" + label,
           description: String(items.length),
-          items,
-        }));
+        }, items));
       }
       return [];
     },
@@ -301,23 +343,23 @@ function registerClassView(vscode, context, language) {
     treeDataProvider: provider,
     showCollapseAll: true,
   });
-  async function revealClass(selected) {
+  async function revealClass(selected,{focus=false,preserveFilter=false}={}) {
     await syncBrowser();
-    selected = browser.find({ schema: selected.schema, name: selected.name });
+    selected = browser.find({ schema: selected.schema, name: selected.name,projectId:selected.projectId });
     if (!selected)
       throw Error(
         "This class is no longer in the workspace. Refresh the catalogue.",
       );
     const schema = selected.schema;
-    classFilters.delete(schema);
+    if(!preserveFilter)classFilters.delete(schema);
     const position = browser.positionOf(
-      { schema, name: selected.name },
-      { schema },
+      { schema, name: selected.name,projectId:selected.projectId },
+      { schema,query:preserveFilter?classFilters.get(schema)||'':'' },
     );
     if (position) classPages.set(schema, position.offset);
     parents.set(selected, { kind: "schema", name: schema, schema });
     events.fire();
-    await view.reveal(selected, { expand: true, focus: false }).catch(() => {});
+    await view.reveal(selected, { expand: true, focus }).catch(() => {});
     return { schema, name: selected.name };
   }
   const catalogue = registerClassCatalogue(vscode, context, {
@@ -327,14 +369,37 @@ function registerClassView(vscode, context, language) {
       await syncBrowser();
       return browser.rows;
     },
-    openClass: revealClass,
+    openClass: async(row,origin)=>{await revealClass(row);return previewController.open(row,{origin});},
   });
+  function treeOrigin(row){return {scope:'workspace',kind:'tree',filter:{schema:row.schema,query:classFilters.get(row.schema)||'',offset:classPages.get(row.schema)||0},selectedId:row.browserId||''};}
+  async function restoreDiscovery(row,origin){
+    if(origin?.kind==='quickpick'){
+      await syncBrowser();let query=origin.filter?.query||'';
+      const selected=await pickClass(vscode,browser,{schema:origin.filter?.schema,query,onAccept:(_row,state)=>{query=state.query;}});
+      if(selected){await revealClass(selected);return previewController.open(selected,{origin:{...origin,filter:{...origin.filter,query},selectedId:selected.browserId}});}
+      return;
+    }
+    if(origin?.kind==='tree'){
+      classFilters.set(row.schema,origin.filter?.query||'');classPages.set(row.schema,origin.filter?.offset||0);
+      return revealClass(row,{focus:true,preserveFilter:true});
+    }
+    return catalogue.show(origin?.scope==='workspace'?{restore:origin}:{});
+  }
   context.subscriptions.push(
     events,
     view,
     vscode.commands.registerCommand("jadeNative.browseSourceClasses", (row) =>
       catalogue.show({ schema: row?.schema }),
     ),
+    vscode.commands.registerCommand("jadeNative.pageSourceMembers", (groupId, offset) => {
+      if (typeof groupId !== "string" || !Number.isSafeInteger(offset) || offset < 0 || offset % memberPageSize) return;
+      const group = registeredGroup(groupId);
+      if (!group || offset >= group.items.length) return;
+      group.offset = offset;
+      group.row.items = group.items.slice(offset, offset + memberPageSize);
+      group.row.description = (offset + 1) + "–" + Math.min(group.items.length, offset + memberPageSize) + " of " + group.items.length;
+      events.fire(group.row);
+    }),
     vscode.commands.registerCommand(
       "jadeNative.pageSourceClasses",
       async (row) => {
@@ -359,6 +424,7 @@ function registerClassView(vscode, context, language) {
       },
     ),
     previewController,
+    vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>row?previewController.open(row,{origin:treeOrigin(row)}):vscode.commands.executeCommand('jadeNative.findSourceClass')),
     vscode.commands.registerCommand(
       "jadeNative.showClassMember",
       async (row) => {
@@ -366,7 +432,7 @@ function registerClassView(vscode, context, language) {
           member = classSections(text, row.file)
             .find((c) => c.name === row.owner)
             ?.groups.flatMap((g) => g.items)
-            .find((m) => m.name === row.name && m.kind === row.kind);
+            .find((m) => m.name === row.name && (m.kind === row.kind || row.kind==='typeMethod'&&m.kind==='method'&&m.typeMethod));
         if (!member) return;
         const editor = await vscode.window.showTextDocument(doc, {
             preview: true,
@@ -381,27 +447,30 @@ function registerClassView(vscode, context, language) {
       },
     ),
     vscode.commands.registerCommand("jadeNative.previewClassMember", (row) =>
-      previewController.open(row),
+      previewController.open(row,{origin:treeOrigin(row),selectedId:memberId({...row,kind:row.typeMethod?'typeMethod':row.kind})}),
     ),
     vscode.commands.registerCommand("jadeNative.openOriginalSource", (row) =>
-      previewController.openOriginal(row),
+      row?vscode.commands.executeCommand('jadeNative.showClassMember',row):previewController.openOriginal(),
     ),
     vscode.commands.registerCommand(
       "jadeNative.findSourceClass",
-      async (name, schema) => {
+      async (name, schema, projectRoot) => {
         await syncBrowser();
-        let selected =
-          name && schema ? browser.find({ name, schema }) : undefined;
+        let origin;
+        const projectId=projectRoot&&vscode.workspace.workspaceFolders?.find(folder=>folder.uri.fsPath===projectRoot||folder.uri.toString()===projectRoot)?.uri.toString();
+        if(projectRoot&&!projectId)return {opened:false,reason:'The originating project is not open in this workspace.'};
+        let selected = name && schema ? browser.find({ name, schema,projectId }) : undefined;
         if (name && !selected && schema) {
           const seen = new Set();
           while (schema && !seen.has(schema)) {
             seen.add(schema);
             schema = language.index.project.parent(schema);
-            if (schema) selected = browser.find({ name, schema });
+            if (schema) selected = browser.find({ name, schema,projectId });
             if (selected) break;
           }
         }
         if (!selected) {
+          if(name&&projectId)return {opened:false,reason:'No matching source class exists in the originating project.'};
           const matches = name ? browser.search(name, { schema }) : undefined;
           if (name && matches.total === 1 && matches.items[0].name === name)
             selected = matches.items[0];
@@ -410,31 +479,21 @@ function registerClassView(vscode, context, language) {
               schema,
               title: "Find Jade class in workspace",
               query: name || "",
+              onAccept:(row,state)=>{origin={scope:'workspace',kind:'quickpick',filter:{schema:state.schema,query:state.query,offset:0},selectedId:row.browserId};},
             });
         }
         if (selected) {
           await revealClass(selected);
         }
         if (selected) {
-          const entry = selected.entries[0],
-            { doc, text } = await source(entry.model.uri),
-            current = classSections(text, entry.model.uri).find(
-              (cls) => cls.name === selected.name,
-            ),
-            offset = current?.selection ?? entry.cls.selection;
-          await vscode.window.showTextDocument(doc, {
-            selection: new vscode.Range(
-              doc.positionAt(offset),
-              doc.positionAt(offset),
-            ),
-          });
-          return { opened: true, uri: doc.uri.toString() };
+          return previewController.open(selected,{origin:origin||treeOrigin(selected)});
         }
         return { opened: false };
       },
     ),
     vscode.commands.registerCommand("jadeNative.refreshClassView", async () => {
       resources = undefined;
+      systemReadyProjects.clear();
       await language.index.rescan();
       if (catalogue.panel) await catalogue.refresh();
       events.fire();
@@ -455,6 +514,8 @@ function registerClassView(vscode, context, language) {
       events.fire();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      classRows.invalidate();
+      systemReadyProjects.clear();
       resources = undefined;
       events.fire();
     }),
@@ -463,6 +524,7 @@ function registerClassView(vscode, context, language) {
         clearTimeout(timer);
 
         pendingFiles.clear();
+        memberGroups.clear();
       },
     },
   );

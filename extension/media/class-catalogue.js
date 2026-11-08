@@ -11,6 +11,7 @@
     error = document.getElementById("error");
   let page,
     revision = 0,
+    nativePaging,
     timer;
   const send = (offset = 0) =>
     vscode.postMessage({
@@ -38,9 +39,11 @@
     .addEventListener("click", () =>
       vscode.postMessage({ command: "refresh" }),
     );
-  previous.addEventListener("click", () => send(page?.previousOffset || 0));
+  document.getElementById("clear").addEventListener("click", () => { query.value=""; clearTimeout(timer); send(); query.focus(); });
+  previous.addEventListener("click", () => nativePaging ? vscode.postMessage({command:"nativeFirst"}) : send(page?.previousOffset || 0));
   next.addEventListener("click", () => {
-    if (page?.nextOffset !== null) send(page.nextOffset);
+    if (nativePaging) vscode.postMessage({command:"nativeNext"});
+    else if (page?.nextOffset !== null) send(page.nextOffset);
   });
   window.addEventListener("message", (event) => {
     const value = event.data;
@@ -52,11 +55,17 @@
     if (value?.command !== "catalogue" || value.revision < revision) return;
     revision = value.revision;
     page = value.page;
+    nativePaging=value.nativePaging;
+    previous.textContent=nativePaging ? "First" : "Previous";
+    document.getElementById("refresh").disabled=!!nativePaging?.stale;
+    document.getElementById("empty").textContent=value.emptyMessage || "No matching classes.";
     error.hidden = true;
-    document.getElementById("title").textContent = value.label;
+    document.getElementById("title").textContent = value.presentation?.title || value.label;
+    document.getElementById("context").hidden=!value.presentation?.instance;
+    document.getElementById("context").textContent=value.presentation?.instance ? value.label : "";
     document.getElementById("count").textContent = value.loading
-      ? "Loading classes…"
-      : page.label;
+      ? (value.presentation?.instance ? "Loading instances…" : "Loading classes…")
+      : page.label + (nativePaging?.stale ? " · Disconnected snapshot — reopen from the connected database" : nativePaging?.cursorReleased ? " · Cursor released — choose First to restart" : "");
     if (document.activeElement !== query) query.value = value.filter.query;
     const selection =
       document.activeElement === schema
@@ -82,10 +91,12 @@
       const cell = document.createElement("th");
       cell.scope = "col";
       cell.textContent = {
-        name: "Class",
+        name: value.presentation?.instance ? "Object ID" : "Class",
+        className: "Class",
         schema: "Schema",
         parent: "Base class",
         kind: "Kind",
+        projectName: "Project",
       }[key];
       header.append(cell);
     }
@@ -101,17 +112,23 @@
           button.type = "button";
           button.textContent = row.name;
           button.title = "Explore " + row.schema + "::" + row.name;
+          button.disabled=!!nativePaging?.stale;
           button.addEventListener("click", () =>
-            vscode.postMessage({ command: "open", id: row.browserId }),
+            vscode.postMessage({ command: "open", id: row.browserId, scrollTop: document.scrollingElement.scrollTop }),
           );
           cell.append(button);
         } else cell.textContent = row[key] || "—";
         tr.append(cell);
       }
       rows.append(tr);
+      if (row.browserId === value.selectedId) {
+        tr.setAttribute('aria-selected','true');
+        tr.classList.add('selected');
+      }
     }
-    previous.disabled = value.loading || !page.hasPrevious;
-    next.disabled = value.loading || !page.hasMore;
+    if (Number.isFinite(value.scrollTop)) document.scrollingElement.scrollTop=value.scrollTop;
+    previous.disabled = value.loading || (nativePaging ? nativePaging.stale || (nativePaging.number<=1 && !nativePaging.cursorReleased) : !page.hasPrevious);
+    next.disabled = value.loading || (nativePaging ? nativePaging.stale || !nativePaging.hasMore : !page.hasMore);
     document.getElementById("empty").hidden =
       value.loading || page.items.length !== 0;
     vscode.setState({

@@ -1,13 +1,16 @@
 'use strict';
 const path=require('node:path');
+const {resolveJadeSource}=require('./active-jade-source');
 function registerCompileCommands(vscode,context,services){
- async function compile(projectBuild){
+ async function compile(projectBuild,uri){
   const output=services.output;
+  let document;
+  try{document=await (services.resolveSource?services.resolveSource(uri):resolveJadeSource(vscode,uri));}
+  catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
   await services.beforeOperation();
   if(services.isBusy()){void vscode.window.showErrorMessage('A Jade compile or publish is already running.');return;}
   await services.setBusy(true);
   try{
-   const document=vscode.window.activeTextEditor?.document;
    if(!document||document.uri.scheme!=='file'||!/\.(cls|scm|sec|ddx|jcf)$/i.test(document.uri.fsPath))throw Error('Open a native Jade source file to compile.');
    if(projectBuild&&!vscode.workspace.getWorkspaceFolder(document.uri))throw Error('Open a workspace folder to build its new and changed Jade sources.');
    const config=services.classConfig(document);config.projectBuild=projectBuild;
@@ -27,6 +30,6 @@ function registerCompileCommands(vscode,context,services){
   }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
   finally{await services.setBusy(false);}
  }
- context.subscriptions.push(vscode.commands.registerCommand('jadeNative.buildWorkspace',()=>compile(true)),vscode.commands.registerCommand('jadeNative.compileClass',()=>compile(false)));
+ context.subscriptions.push(vscode.commands.registerCommand('jadeNative.buildWorkspace',uri=>compile(true,uri)),vscode.commands.registerCommand('jadeNative.compileClass',uri=>compile(false,uri)));
 }
 module.exports={registerCompileCommands};

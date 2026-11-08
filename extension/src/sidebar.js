@@ -16,8 +16,14 @@ function registerSidebar(vscode, context, options) {
   let lastExtraction = context.workspaceState?.get("jadeNative.lastExtraction");
   let events;
   const refresh = () => events?.fire();
-  async function workspaceFolder() {
+  async function workspaceFolder(resource) {
     const folders = vscode.workspace.workspaceFolders || [];
+    if(resource){
+      const selected=vscode.workspace.getWorkspaceFolder(resource);
+      const open=selected&&folders.find(folder=>folder.uri.toString()===selected.uri.toString());
+      if(!open)throw Error('The originating project is not open in this workspace.');
+      return open;
+    }
     const active =
       vscode.window.activeTextEditor &&
       vscode.workspace.getWorkspaceFolder(
@@ -87,14 +93,14 @@ function registerSidebar(vscode, context, options) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jadeNative.extractAllSources",
-      async () => {
+      async (resource) => {
         let locked = false;
         let temporary;
         try {
           await options.beforeOperation?.();
           if (options.isBusy())
             throw new Error("A Jade operation is already running.");
-          const folder = await workspaceFolder();
+          const folder = await workspaceFolder(resource);
           if (!folder) return;
           const settings = options.settings(folder);
           const config = resolveExtractConfig(settings);
