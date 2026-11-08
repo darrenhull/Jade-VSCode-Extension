@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.18.0",
+  "version": "0.18.2",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -169,7 +169,8 @@
       {
         "command": "jadeNative.connectObjects",
         "title": "Jade: Connect Database Objects",
-        "icon": "$(plug)"
+        "icon": "$(plug)",
+        "enablement": "!jadeNative.connectingObjects"
       },
       {
         "command": "jadeNative.disconnectObjects",

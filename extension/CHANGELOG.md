@@ -1,3 +1,8 @@
+# 0.18.2 — Visible database connection progress
+
+- Show backup, restore and connection progress while opening Database Objects.
+- Share repeated Connect clicks and keep cancellation pending until the current native step finishes safely.
+
 # 0.18.0 — Shared native connections
 
 - Open Working automatically and keep its native connection available across Object Explorer, compilation and tests.
