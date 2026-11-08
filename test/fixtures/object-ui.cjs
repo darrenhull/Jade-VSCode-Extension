@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -18,6 +18,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     copied = [],
     sessionData = [],
     targetDisconnections = [],
+    progressOperations = [],
+    contexts = new Map(),
     prompts = [];
   let busy = false,
     allowBusy, configurationListener, saveListener;
@@ -46,6 +48,12 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
   const disposable = { dispose() {} },
     view = { dispose() {}, reveal: async () => {} },
     vscode = {
+      CancellationTokenSource: class {
+        constructor() { this.events = new Emitter(); this.token = { isCancellationRequested: false, onCancellationRequested: this.events.event }; }
+        cancel() { this.token.isCancellationRequested = true; this.events.fire(); }
+        dispose() { this.events.dispose(); }
+      },
+      ProgressLocation: { Notification: 15 },
       EventEmitter: Emitter,
       ThemeIcon: class {
         constructor(name) {
@@ -64,6 +72,12 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       Uri: { file: uri },
       env: { clipboard: { writeText: async (text) => copied.push(text) } },
       window: {
+        withProgress: async (options, run) => {
+          const reports = [], listeners = new Set();
+          const operation = { options, reports, cancel: () => { for (const listener of listeners) listener(); } };
+          progressOperations.push(operation);
+          return run({ report: value => reports.push(value) }, { onCancellationRequested: listener => { listeners.add(listener); return { dispose: () => listeners.delete(listener) }; } });
+        },
         activeTextEditor: {
           document: { uri: uri(path.join(folder.uri.fsPath, "Fish.cls")) },
         },
@@ -125,7 +139,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
           commands.set(name, fn);
           return disposable;
         },
-        executeCommand: async (name, ...args) => commands.get(name)?.(...args),
+        executeCommand: async (name, ...args) => { if (name === 'setContext') contexts.set(args[0], args[1]); return commands.get(name)?.(...args); },
       },
     };
   const config = {
@@ -146,7 +160,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sourceContext,
     pullSource,
     config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
-    inspectionTarget: async (config,selection) => { if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
+    inspectionTarget: async (config,selection,output) => { if(resolveInspectionTarget) return resolveInspectionTarget(config,selection,output); if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     disconnectTarget: async (config,target) => { targetDisconnections.push({config,target}); },
     isBusy: () => busy,
@@ -232,6 +246,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sessionData,
     targetDisconnections,
     prompts,
+    progressOperations,
+    contexts,
     root,
     allowBusy: () => allowBusy?.(),
     changeConfiguration: event => configurationListener?.(event),

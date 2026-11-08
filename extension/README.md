@@ -68,6 +68,8 @@ Use the filter icon beside a database class to open its instance results with th
 - Type choices use workspace source, schema ancestry, extracted package exports and the verified RootSchema cache. Imported members retain their alias and exporter context, including inherited aliases. Key choices expose exported properties; imported classes cannot be superclasses. Missing cache/export metadata is explained. Native compilation remains authoritative.
 - **Object Explorer:** search schemas and classes, navigate properties and methods, and open a focused member preview. **Open Original Source** opens the editable native file.
 - **Database Objects:** choose **Source** or **Working**, search for a class, browse persistent instances, follow stored references and page through collections. This browser is read-only.
+
+Connecting shows native backup/restore and connection progress. Repeated Connect commands share the current attempt. **Cancel** waits for the current native step to finish safely; an in-progress Source backup may need to complete first. Failures show the native cause so you can address it before retrying.
 - **Jade: Create Keyed Collection:** retain the existing dictionary workflow for ordered composite keys and native CLS preview. Use the shared designer for arrays, sets and the expanded native rules. Dynamic indexes remain unavailable.
 - **Jade: Create Schema:** create the native schema files and runtime classes in your workspace.
 

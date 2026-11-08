@@ -80,7 +80,7 @@ class CliWorkingSession{
  }
  workingLocation(config){return this.resolveNative('working.location',config,'working');}
  prepareWorking(config,output){return this.resolveNative('working.prepare',config,'working',{},output);}
- inspectionTarget(config,target){return this.resolveNative('inspect.target',config,'config',{target});}
+ inspectionTarget(config,target,output){return this.resolveNative('inspect.target',config,'config',{target},output);}
  runNative(executable,args,options={},output=()=>{}){
   const config=configDto({...options,installPath:options.installPath||path.dirname(path.dirname(executable))});
   for(const name of ['path','ini','server']){const value=args.find(value=>value.startsWith(name+'='))?.slice(name.length+1);if(value)config[{path:'databasePath',ini:'iniPath',server:'server'}[name]]=value;}

@@ -198,7 +198,7 @@ function activate(context) {
       const file=(complete[0]||entries[0]).model.uri,contributing=new Set(files);
       return {available:true,file,dirty:vscode.workspace.textDocuments.some(document=>contributing.has(document.uri.toString())&&document.isDirty)};
     },
-    inspectionTarget:(config,selection)=>nativeTests.inspectionTarget(config,selection),workingLocation:config=>nativeTests.workingLocation(config)
+    inspectionTarget:(config,selection,output)=>nativeTests.inspectionTarget(config,selection,output),workingLocation:config=>nativeTests.workingLocation(config)
   });
   const workspaceOperationGuard=new (require('./WorkspaceOperationGuard').WorkspaceOperationGuard)({
     isBusy:()=>publishing,

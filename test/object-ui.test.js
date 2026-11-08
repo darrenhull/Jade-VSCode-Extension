@@ -115,9 +115,10 @@ test("cancel during connection setup cannot launch a helper or clear a subsequen
     for (let i = 0; i < 10 && !s.controller.ownsLock(); i++)
       await Promise.resolve();
     assert.equal(s.controller.ownsLock(), false);
-    await s.controller.releaseForOperation();
+    const releasing = s.controller.releaseForOperation();
     s.setExternalBusy(true);
     s.allowBusy();
+    await releasing;
     await connecting;
     assert.equal(s.clients.length, 0);
     assert.equal(s.busy(), true);
