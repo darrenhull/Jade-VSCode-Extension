@@ -44,7 +44,7 @@ Do not assume a literal containing a decimal point is already a fixed-precision 
 
 ### Byte initialization and arithmetic
 
-A `Byte` is an unsigned value in the range 0 through 255. Do not assume an Integer literal is assignment-compatible with a Byte local: the live primitive workflow's unconverted assignment failed with native 6072 (Incompatible types). Convert the numeric expression explicitly using `.Byte`, without parentheses after the type name. Check the permitted range first when the input is not a known in-range constant; overflow raises an exception.
+A `Byte` is an unsigned value in the range 0 through 255. An unconverted Integer literal is not assignment-compatible with a Byte local and can produce native error 6072 (Incompatible types). Convert the numeric expression explicitly using `.Byte`, without parentheses after the type name. Check the permitted range first when the input is not a known in-range constant; overflow raises an exception.
 
 Byte operands are implicitly converted to Integer for arithmetic, so an arithmetic result assigned back to a Byte also needs an intentional conversion and range check. This example starts at 7, so its increment remains in range:
 
@@ -59,7 +59,7 @@ begin
 end;
 ```
 
-This is a native verification fixture, not evidence of an AI generation result. Compile it with the target runtime before relying on the example. A hexadecimal or Binary literal is not a substitute for checking the expression's actual type.
+Compile examples with the target runtime before relying on them. A hexadecimal or Binary literal is not a substitute for checking the expression's actual type.
 
 [Byte type and arithmetic](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/byte_type/byte_type.htm) · [Primitive conversion rules](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/converting_primitive_types.htm)
 

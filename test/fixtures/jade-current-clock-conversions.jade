@@ -1,0 +1,14 @@
+vars
+    dateValue : Date;
+    timeValue : Time;
+    stampValue : TimeStamp;
+    byteValue : Byte;
+begin
+    stampValue := app.actualTime;
+    dateValue := stampValue.Date;
+    timeValue := stampValue.Time;
+    byteValue := (#FF).Byte;
+    write "DateValid=" & dateValue.isValid.String;
+    write "Time=" & timeValue.String;
+    write "Byte=" & byteValue.String;
+end;

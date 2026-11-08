@@ -20,6 +20,10 @@ Use the project's installed Jade version and native compiler as the authority. T
 
 For declaration, control flow, objects, transactions and exception rules, read [the syntax reference and official-document map](references/syntax-reference.md). It identifies context-dependent rules and routes less-common constructs to the authoritative documentation; this skill is not a complete replacement for the language manual.
 
+Before generating primitive examples, read [the complete 18-type checklist](references/primitive-types.md). It covers local declaration/default differences, bounds, Byte conversions, Decimal descriptors, current-clock APIs and the limits of each verified example.
+
+For systematic coverage of declaration, expression and instruction families, use [the language syntax coverage index](references/language-syntax.md). Follow its official topic links and version gates rather than treating a short example as the whole grammar.
+
 For examples and type/syntax links, read [the language reference](references/language-reference.md). Its string section covers dynamic messages, primitive conversions, typed date/time formatting and parameterized translatable strings.
 
 For native class files, read [CLS extract structure](references/cls-format.md) before changing sections, method declarations, completeness qualifiers or identity metadata.

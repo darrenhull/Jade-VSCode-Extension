@@ -1,7 +1,7 @@
 'use strict';
 /** Opens VS Code's own inline editing UI for one existing Scratch Pad cell. */
 class ScratchPadCopilot {
-  constructor(vscode,{guidance=[],contextFor}={}){this.vscode=vscode;this.guidance=[...guidance];this.contextFor=contextFor;}
+  constructor(vscode,{guidance=[],markdownGuidance=[],contextFor}={}){this.vscode=vscode;this.guidance=[...guidance];this.markdownGuidance=[...markdownGuidance];this.contextFor=contextFor;}
   fix(cell,failure){if(!failure)return Promise.reject(Error('Rerun the Scratch Pad to capture its current error before choosing Fix with Copilot.'));return this.edit(cell,{failure});}
   failureMessage(cell,failure){
     if(!failure||failure.sourceUri!==cell.document.uri.toString()||failure.sourceVersion!==cell.document.version||failure.sourceText!==cell.document.getText()||failure.schema!==cell.notebook.metadata?.schema)throw Error('The Scratch Pad, schema or its error context changed. Rerun it before choosing Fix with Copilot.');
@@ -42,11 +42,12 @@ class ScratchPadCopilot {
       if(notebook.isClosed||vscode.window.activeNotebookEditor?.notebook!==notebook||vscode.window.activeTextEditor!==editor||editor.document.uri.toString()!==target)throw Error('The focused Scratch Pad cell changed while preparing its error context. Select the cell and try Fix with Copilot again.');
     }
     editor.selections=[new vscode.Selection(cell.document.positionAt(0),cell.document.positionAt(cell.document.getText().length))];
-    const attachments=cell.kind===vscode.NotebookCellKind.Code&&this.guidance.length?{attachments:[...this.guidance]}:{};
+    const isCode=cell.kind===vscode.NotebookCellKind.Code,guidance=isCode?this.guidance:this.markdownGuidance;
+    const attachments=guidance.length?{attachments:[...guidance]}:{};
     if(failure){
       await vscode.commands.executeCommand('inlineChat.start',{message:'Fix the errors in this cell.',autoSend:false,attachDiagnostics:true,attachments:[...(attachments.attachments||[]),context]});
     }else if(attachments.attachments){
-      await vscode.commands.executeCommand('inlineChat.start',{...attachments,autoSend:false,attachDiagnostics:true});
+      await vscode.commands.executeCommand('inlineChat.start',{...attachments,autoSend:false,attachDiagnostics:isCode});
     }else{
       await vscode.commands.executeCommand('inlineChat.start');
     }

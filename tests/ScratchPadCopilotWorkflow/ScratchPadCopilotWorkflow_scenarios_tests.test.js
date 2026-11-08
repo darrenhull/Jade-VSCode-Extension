@@ -16,7 +16,7 @@ for(const scenario of scenarios)test('user workflow '+scenario.id+' scopes nativ
 });
 test('acceptance checks reject duplicated bodies, descriptor omissions and foreign string conversions',()=>{
  const scenario={requiredDeclarations:[],preservedStrings:[]},workflow=new ScratchPadCopilotWorkflow(scenario),counts={initialCellCount:1,currentCellCount:1};
- for(const source of ['begin end;\nbegin end;','vars\n amount : Decimal;\nbegin end;','begin\n write x.asString();\nend;'])assert.throws(()=>workflow.assertSource(source,counts));
+ for(const source of ['begin end;\nbegin end;','vars\n amount : Decimal;\nbegin end;','vars\n x : Integer;\nbegin\n write x.asString();\nend;'])assert.throws(()=>workflow.assertSource(source,counts));
  assert.throws(()=>workflow.assertSource('begin end;',{initialCellCount:1,currentCellCount:2}),/cell count/);
 });
 test('acceptance never equates a proposal or accepted native editor mutation with a successful native compile',()=>{
@@ -24,3 +24,4 @@ test('acceptance never equates a proposal or accepted native editor mutation wit
  workflow.assertSource(source.text,source);assert.throws(()=>workflow.assertAccepted(source),/native compilation/);assert.throws(()=>workflow.assertAccepted({...source,nativeResult:{code:0,passed:true,report:{}}}),/compilation evidence/);
 });
 test('source expectations accept equivalent grouped declarations and descriptor spacing without requiring an exact AI response',()=>{const workflow=new ScratchPadCopilotWorkflow({requiredDeclarations:[{name:'firstFloat',type:'Real'},{name:'amount',type:'Decimal[12,2]'}],requiredTypes:['Boolean','Character','Byte']});workflow.assertSource('vars\n firstFloat, otherFloat : Real;\n amount : Decimal [ 12, 2 ];\n flag : Boolean;\n character : Character;\n b : Byte;\nbegin\n write amount.String;\nend;',{initialCellCount:1,currentCellCount:1});});
+test('conversion assertions allow native Any.asString while retaining declared numeric receiver regressions',()=>{const workflow=new ScratchPadCopilotWorkflow({}),counts={initialCellCount:1,currentCellCount:1};workflow.assertSource('vars\n value : Any;\nbegin\n value := 42;\n write value.asString();\nend;',counts);for(const type of ['Real','Integer'])assert.throws(()=>workflow.assertSource('vars\n firstFloat, firstInt : '+type+';\nbegin\n write firstFloat.asString() & firstInt.toString();\nend;',counts),/native primitive/);});

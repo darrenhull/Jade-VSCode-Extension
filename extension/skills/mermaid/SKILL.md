@@ -26,6 +26,12 @@ flowchart LR
 
 Use the user's requested output format. Keep Mermaid source editable; export SVG/PNG only when needed. For an editable draw.io artifact, use the project's drawio skill rather than renaming Mermaid text to `.drawio`.
 
+## Editing a Scratch Pad Markdown cell with Copilot
+
+Preserve the entire existing cell: its headings, prose and all diagrams. Edit the existing cell in place, make the requested changes and do not create another cell. Never omit a diagram when rewriting surrounding text. Review the diff before accepting; use Undo if any content was dropped.
+
+For VS Code notebook inline editing, the native response decoder treats triple backticks as the outer edit boundary. To keep a nested diagram intact, wrap the complete replacement response in one outer triple-backtick `markdown` block and use tilde fences (`~~~mermaid` and `~~~`) for every inner Mermaid diagram. Tilde fences are valid Markdown and render as Mermaid in the native notebook preview. A nested triple-backtick diagram can prematurely end the applied replacement and lose the rest of the cell. Existing diagram contents and behavior must be preserved when changing their fence delimiters. This compatibility rule applies to notebook inline editing, not ordinary Markdown files or standalone `.mmd` source.
+
 ## Official references
 
 - [Diagram syntax and supported types](https://mermaid.js.org/intro/syntax-reference.html)
