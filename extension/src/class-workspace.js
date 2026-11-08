@@ -56,6 +56,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     };
     async function load(requestedId) {
       const requestedSelection = typeof requestedId === "string";
+      let selection;
       const revision = ++record.revision;
       const lastSelected = selectedMember();
       void send({ command: "loading", revision });
@@ -72,6 +73,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
             return false;
           }
           record.state.selectedId = requestedId;
+          selection = ++record.selectionRevision;
         }
         record.state.offset = Number.isSafeInteger(snapshot.offset) ? snapshot.offset : record.state.offset;
         const bound = binding?.snapshot?.(), sourceSelected = lastSelected && ["method", "typeMethod", "property", "reference"].includes(lastSelected.kind);
@@ -89,7 +91,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         persist(record);
         panel.title = snapshot.identity?.qualifiedName || row.owner || panel.title;
         await send({ command: "workspace", revision, snapshot: record.snapshot });
-        return true;
+        return requestedSelection ? { selection } : true;
       } catch (error) {
         if (current(revision)) {
           if (requestedSelection && record.snapshot) {
@@ -110,16 +112,22 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     }
     async function select(id) {
       if (record.closed || disposed) return;
-      const selection = ++record.selectionRevision;
       const visible = !id || record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) || record.snapshot?.selected?.id === id;
-      let revision = ++record.revision;
+      ++record.revision;
+      let selection;
       if (!visible) {
         // The model resolves a selected member independently of its bounded,
         // filtered page. Keep navigation state rather than expanding the rail.
-        revision++;
-        if (await load(id) !== true) return;
-      } else record.state.selectedId = id;
-      const selectedCurrent = () => current(revision) && record.selectionRevision === selection && record.state.selectedId === id;
+        const resolved = await load(id);
+        if (!resolved) return;
+        selection = resolved.selection;
+      } else {
+        record.state.selectedId = id;
+        selection = ++record.selectionRevision;
+      }
+      // Catalogue refreshes have their own revision. Once resolved, the
+      // editor belongs to this selection until another valid selection wins.
+      const selectedCurrent = () => !disposed && !record.closed && record.selectionRevision === selection && record.state.selectedId === id;
       if (!selectedCurrent()) return;
       persist(record);
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
@@ -140,9 +148,8 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         await send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] });
         if (services.draftRecovery) { const draft = await services.draftRecovery.get(); if (selectedCurrent()) await send({ command: "editorDraftRecovery", draft }); }
       } else if (member && adapters.preview) {
-        const revision = record.revision, selectedId = id;
         const preview = await adapters.preview(row, id, document);
-        if (selectedCurrent() && current(revision) && record.state.selectedId === selectedId) await send({ command: "memberDetail", id, preview });
+        if (selectedCurrent()) await send({ command: "memberDetail", id, preview });
       }
     }
     async function message(value) {

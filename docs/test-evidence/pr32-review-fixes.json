@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-11-08T09:22:14.452Z",
+  "verifiedAt": "2026-11-08T10:05:12.252Z",
   "pullRequest": 32,
-  "baseHead": "a551570166395cac38c77be032ee504568d5cf26",
+  "baseHead": "eadf8a12b2feb67e1d3f5bfe28a52fefbbd17ab3",
   "findings": [
     {
       "comment": 4504392027,
@@ -34,14 +34,24 @@
     {
       "comment": 4505649622,
       "regressions": "Eight LF/CRLF comment-closing/declaration partition cases failed before the guard. Existing lexer exclusion ranges now reject every unsafe raw class/section/mapping slice before edits; whole comments remain unchanged. Twenty splitter and eleven split-offer tests pass, including zero native edits for unsafe input."
+    },
+    {
+      "comment": 4505770989,
+      "regressions": "Held editor preparation plus unrelated search/filter/refresh/rejected lookup reproduced stale source before the fix. Catalogue lookup revisions now cancel only unresolved model reads; a validated selection owns its editor across unrelated refreshes. Committed off-page metadata publication and rejected/valid successor matrices also pass. Eighteen selection regressions and 99 combined workspace/model/controller tests passed; actual native recovery persistence held during a filter change then resumed with the correct selected member code and unchanged source."
+    },
+    {
+      "comment": 4505770993,
+      "regressions": "Registered ObjectExplorer history payload regressions reproduced 2.6 MB and 10.4 MB serialized history at 25/100 retained large objects. Dropdown messages now carry only native oid/schema/className, reducing fixture history to 1.4 KB/5.4 KB while complete native snapshots and Back/Forward view state remain extension-side. Four new history payload tests and all 53 ObjectExplorer tests pass."
     }
   ],
   "fullSuite": {
     "javascriptRegressionSuitePassed": true,
-    "javascriptPassed": 845,
+    "javascriptPassed": 858,
     "controllerPassed": 39,
-    "classWorkspaceAndModelPassed": 51,
-    "objectExplorerFocusedPassed": 49,
+    "classWorkspaceAndModelPassed": 60,
+    "selectionRegressionPassed": 18,
+    "objectExplorerFocusedPassed": 53,
+    "historyPayloadRegressionPassed": 4,
     "splitterPassed": 20,
     "splitOfferPassed": 11,
     "powerShellPassed": 18,
@@ -49,7 +59,7 @@
   },
   "artifact": {
     "name": "jade-native-runner-cpp-preview-0.17.2.vsix",
-    "sha256": "a1e1a021bb7943efa836d1ca41d780c65dae53770b74862d2cd7c216184a419a",
+    "sha256": "7f4b494b780ff0c28b424b10de3549612e2e09f9e4a685d146633caac289dd97",
     "entries": 141
   },
   "nativeUI": {
@@ -120,7 +130,9 @@
       "boundedRail": true,
       "filterPreserved": true,
       "sourceBytesUnchanged": true,
-      "screenshot": "docs/screenshots/class-workspace/class-workspace-external-member-selection.png"
+      "selectionDuringCatalogueRefresh": true,
+      "screenshot": "docs/screenshots/class-workspace/class-workspace-external-member-selection.png",
+      "preparedAfterFilterScreenshot": "docs/screenshots/class-workspace/class-workspace-prepared-member-after-filter.png"
     }
   },
   "portable": {
@@ -133,5 +145,15 @@
     "ownedHostProcessesExited": true,
     "ownedStagesRemoved": true,
     "verifiedOwnedStageCount": 4
+  },
+  "serializedHistoryFixtureBytes": {
+    "retained25": {
+      "before": 2608855,
+      "after": 1380
+    },
+    "retained100": {
+      "before": 10435286,
+      "after": 5386
+    }
   }
 }

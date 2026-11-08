@@ -11,8 +11,8 @@ async function run(){
  subscriptions.push(vscode.workspace.onDidChangeTextDocument(event=>{if(event.document.uri.toString()===uri.toString()&&event.contentChanges.length)documentChanges.push({version:event.document.version,changes:event.contentChanges.map(change=>({offset:change.rangeOffset,length:change.rangeLength,text:change.text}))});}));
  const index=new SourceIndex({list:async()=>[uri.toString()],read:async()=>{reads++;return text;}});
  const host={...vscode,commands:{...vscode.commands,registerCommand(name,handler){return vscode.commands.registerCommand(name,(...args)=>{if(name!=='jadeNative.openClassWorkspace')return handler(...args);const call={argumentCount:args.length};workspaceCommandCalls.push(call);return Promise.resolve().then(()=>handler(...args)).then(result=>{call.result=result;return result;},error=>{call.error=error.message;throw error;});});}},window:Object.assign(Object.create(vscode.window),{createTreeView:(_id,options)=>vscode.window.createTreeView("jade.testInspectionInstances",options)})};
- const context={subscriptions,extensionPath:path.resolve(__dirname,".."),extensionUri:vscode.Uri.file(path.resolve(__dirname,"..")),workspaceState:{get:key=>stored.get(key),update:async(key,value)=>stored.set(key,value)}};
- let client;
+ const context={subscriptions,extensionPath:path.resolve(__dirname,".."),extensionUri:vscode.Uri.file(path.resolve(__dirname,"..")),workspaceState:{get:key=>stored.get(key),update:async(key,value)=>{if(key==='jade.methodDraftRecovery.v1'&&recoveryDelay&&!recoveryDelay.started){recoveryDelay.started=true;await recoveryDelay.promise;}stored.set(key,value);}}};
+ let client,recoveryDelay;
  try{
   const api=registerClassView(host,context,{index});
   const schema=(await api.provider.getChildren()).find(row=>row.name==="Pets"),cls=(await api.provider.getChildren(schema)).find(row=>row.name==="Fish");
@@ -65,9 +65,22 @@ async function run(){
    await browser.screenshot(path.join(captures,'class-workspace-external-member-selection.png'));
   });
   assert.deepEqual(documentChanges,[]);assert.equal(editor.document.getText(),text);assert.equal(editor.document.isDirty,false);
+  let releaseRecovery;recoveryDelay={started:false,promise:new Promise(resolve=>{releaseRecovery=resolve;}),release:()=>releaseRecovery()};
+  const preparedTarget=rows.find(row=>row.name==='property0272');assert.ok(preparedTarget);await vscode.commands.executeCommand('jadeNative.previewClassMember',preparedTarget);
+  for(let attempt=0;attempt<100&&!recoveryDelay.started;attempt++)await new Promise(resolve=>setTimeout(resolve,30));assert.equal(recoveryDelay.started,true,'Actual recovery persistence must be held during selection preparation');
+  try{await withClassWorkspace(Number(process.env.JADE_OBJECT_WORKSPACE_DEBUG_PORT),async browser=>{
+   await browser.wait('document.getElementById("detail-title").textContent==="property0272"&&document.getElementById("method-editor").textContent.includes("property0273")','metadata selects the next member while real recovery storage is pending');
+   await browser.evaluate('document.getElementById("search").focus()');await browser.key('a',65,2);await browser.type('property0001');
+   await browser.wait('document.getElementById("workspace").getAttribute("aria-busy")==="false"&&document.querySelectorAll("#member-tree [role=treeitem]").length===1&&document.getElementById("member-tree").textContent.includes("property0001")','a newer catalogue filter completes during member preparation');
+   recoveryDelay.release();
+   await browser.wait('document.getElementById("detail-title").textContent==="property0272"&&document.getElementById("method-editor").textContent.includes("property0272")','the selected member editor finishes after the unrelated catalogue refresh');
+   assert.equal(await browser.evaluate('document.getElementById("search").value'),'property0001');assert.equal(await browser.evaluate('document.querySelectorAll("#member-tree [role=treeitem]").length'),1);
+   await browser.screenshot(path.join(captures,'class-workspace-prepared-member-after-filter.png'));
+  });}finally{recoveryDelay.release();}
+  assert.deepEqual(documentChanges,[]);assert.equal(editor.document.getText(),text);assert.equal(editor.document.isDirty,false);
   const artifact=process.env.JADE_OBJECT_WORKSPACE_VSIX?{name:path.basename(process.env.JADE_OBJECT_WORKSPACE_VSIX),sha256:crypto.createHash("sha256").update(fs.readFileSync(process.env.JADE_OBJECT_WORKSPACE_VSIX)).digest("hex")}:undefined;
-  fs.writeFileSync(report,JSON.stringify({passed:true,artifact,members:275,dataPageLimit:98,totalRowLimit:100,pageCounts:[99,100,80],nativeTreeRendered:true,nextPrevious:true,pagerArguments:"groupId + offset only",sourceReadsWhilePaging:reads-beforeReads,sourceEditsDuringPaging:documentChanges.length,sourceBytesUnchanged:true,sourceDocumentClean:true,nativeDatabaseOpened:false,externalMemberSelection:{offPageProperty:"property0274",filteredProperty:"property0273",boundedRail:true,filterPreserved:true,sourceBytesUnchanged:true},commandPalette:{actualPaletteInvokedNoArguments:true,existingClassSelector:true,cancelCreatesNoTab:true,selectionOpensExactSource:true,rowArgumentReusesClass:true,sourceBytesUnchanged:true},screenshots:["native-member-tree-first.png","native-member-tree-middle.png","native-member-tree-last.png","class-workspace-palette-picker.png","class-workspace-palette-opened.png","class-workspace-external-member-selection.png"]},null,2));
+  fs.writeFileSync(report,JSON.stringify({passed:true,artifact,members:275,dataPageLimit:98,totalRowLimit:100,pageCounts:[99,100,80],nativeTreeRendered:true,nextPrevious:true,pagerArguments:"groupId + offset only",sourceReadsWhilePaging:reads-beforeReads,sourceEditsDuringPaging:documentChanges.length,sourceBytesUnchanged:true,sourceDocumentClean:true,nativeDatabaseOpened:false,externalMemberSelection:{offPageProperty:"property0274",filteredProperty:"property0273",boundedRail:true,filterPreserved:true,sourceBytesUnchanged:true,selectionDuringCatalogueRefresh:true},commandPalette:{actualPaletteInvokedNoArguments:true,existingClassSelector:true,cancelCreatesNoTab:true,selectionOpensExactSource:true,rowArgumentReusesClass:true,sourceBytesUnchanged:true},screenshots:["native-member-tree-first.png","native-member-tree-middle.png","native-member-tree-last.png","class-workspace-palette-picker.png","class-workspace-palette-opened.png","class-workspace-external-member-selection.png","class-workspace-prepared-member-after-filter.png"]},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
- finally{client?.close();for(const item of subscriptions.reverse())item.dispose?.();index.dispose();}
+ finally{recoveryDelay?.release();client?.close();for(const item of subscriptions.reverse())item.dispose?.();index.dispose();}
 }
 module.exports={run};

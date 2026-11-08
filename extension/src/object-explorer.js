@@ -1104,7 +1104,7 @@ function registerObjectExplorer(vscode, context, services) {
       origin: record.origin,
       view: record.history.current()?.view,
       history: {
-        entries: record.history.entries.map(item => item.object),
+        entries: record.history.entries.map(({ object }) => ({ oid: object.oid, schema: object.schema, className: object.className })),
         position: record.history.position,
         back: record.history.position > 0,
         forward: record.history.position < record.history.entries.length - 1,
