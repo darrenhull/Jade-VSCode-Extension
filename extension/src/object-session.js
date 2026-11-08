@@ -97,7 +97,7 @@ class InspectionSession extends EventEmitter {
     if (this.position < this.history.length - 1) this.position++;
     return this.history[this.position];
   }
-  async disconnect() {
+  async disconnect(options) {
     if (this.disconnecting) return this.disconnecting;
     this.generation++;
     this.connecting = undefined;
@@ -106,7 +106,7 @@ class InspectionSession extends EventEmitter {
     this.resetHistory();
     this.emit("change");
     if (client) {
-      const closing = Promise.resolve(client.stop());
+      const closing = Promise.resolve(client.stop(options));
       this.disconnecting = closing;
       try {
         await closing;

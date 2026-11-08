@@ -1131,7 +1131,20 @@ function registerObjectExplorer(vscode, context, services) {
       action(connect),
     ),
     vscode.commands.registerCommand("jadeNative.disconnectObjects", () =>
-      action(() => { ++browseVersion; return session.disconnect(); }),
+      action(async () => {
+        if (services.isBusy()) throw Error('Wait for the current Jade operation or cancel it first.');
+        ++browseVersion;
+        const target = session.target, generation = session.generation;
+        const config = currentConfig || await configuration();
+        if (target !== session.target || generation !== session.generation) throw Error('Database selection changed while disconnecting.');
+        if (services.isBusy()) throw Error('Wait for the current Jade operation or cancel it first.');
+        const client = session.client;
+        await session.disconnect({ disconnect: true });
+        if (!client) {
+          if (services.disconnectTarget) await services.disconnectTarget(config, target);
+          else await CliInspectionTransport.disconnectTarget(services.client, { config, target });
+        }
+      }),
     ),
     vscode.commands.registerCommand("jadeNative.cancelObjectInspection", () =>
       action(() => { ++browseVersion; return session.disconnect(); }),

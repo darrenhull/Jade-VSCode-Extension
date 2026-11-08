@@ -80,7 +80,13 @@ class CliInspectionTransport extends EventEmitter {
     return this.send(command,args);
   }
 
-  stop() {
+  static async disconnectTarget(service,{config,target}) {
+    if(!['source','working'].includes(target))throw Error('Invalid database selection.');
+    const result=await service.request('inspect.close',{config:configDto(config),target,sessionId:'vscode-disconnect-'+randomUUID(),args:{disconnect:true}}).promise;
+    if(result?.passed!==true||result.code!==0){const error=Error(result?.report?.error||'Native inspection could not disconnect its target.');error.code=result?.code;throw error;}
+  }
+
+  stop({disconnect=false}={}) {
     if(this.closing)return this.closing;
     if(this.state==='closed')return Promise.resolve();
     this.state='stopping';
@@ -89,7 +95,7 @@ class CliInspectionTransport extends EventEmitter {
       void this.service.request('cancel',{operationId}).promise.catch(()=>{});
     this.closing=(async()=>{
       try {
-        const result=await this.service.request('inspect.close',{config:this.config,target:this.target,sessionId:this.sessionId}).promise;
+        const result=await this.service.request('inspect.close',{config:this.config,target:this.target,sessionId:this.sessionId,...(disconnect?{args:{disconnect:true}}:{})}).promise;
         if(result?.passed!==true||result.code!==0)throw Error(result?.report?.error||'Native inspection could not close its session.');
       } finally {this.close(0);}
     })();

@@ -17,6 +17,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     errors = [],
     copied = [],
     sessionData = [],
+    targetDisconnections = [],
     prompts = [];
   let busy = false,
     allowBusy, configurationListener, saveListener;
@@ -147,6 +148,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
     inspectionTarget: async (config,selection) => { if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
+    disconnectTarget: async (config,target) => { targetDisconnections.push({config,target}); },
     isBusy: () => busy,
     setBusy: async (value) => {
       busy = value;
@@ -161,7 +163,8 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
         ? Promise.reject(Object.assign(Error("Access denied"), { code: 1713 }))
         : Promise.resolve();
       c.closed = new Promise((r) => (c.closeResolve = r));
-      c.stop = () => {
+      c.stop = options => {
+        c.stopOptions = options;
         c.stopCalled = true;
         if (denied || closeSubsequentAutomatically && clients.indexOf(c) > 0) queueMicrotask(() => c.finishClose());
         return c.closed;
@@ -227,6 +230,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     errors,
     copied,
     sessionData,
+    targetDisconnections,
     prompts,
     root,
     allowBusy: () => allowBusy?.(),
