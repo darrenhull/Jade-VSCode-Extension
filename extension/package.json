@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.17.9",
+  "version": "0.18.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -792,6 +792,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.4.2"
+    "minimumCliVersion": "0.5.0"
   }
 }

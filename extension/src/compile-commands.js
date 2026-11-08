@@ -18,7 +18,7 @@ function registerCompileCommands(vscode,context,services){
    output.appendLine(projectBuild?`Building new and changed Jade sources in ${config.workspaceRoots[0]} (Working; no publish) ...`:`Checking class methods in ${path.basename(config.program)} (no publish) ...`);
    await services.workingFiles(config);
    for(const file of config.files)services.diagnostics.delete(vscode.Uri.file(file));
-   const operation=services.startWorking({...config,testSession:services.nativeTests,beforeNativeProcess:()=>services.nativeTests.release()},'compile',text=>output.append(text),services.reportDiagnostic);
+   const operation=services.startWorking({...config,testSession:services.nativeTests},'compile',text=>output.append(text),services.reportDiagnostic);
    const result=await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Compiling in native Jade working database',cancellable:true},async(_,token)=>{
     const subscription=token.onCancellationRequested(()=>operation.stop());if(token.isCancellationRequested)operation.stop();
     try{return await operation.completion;}finally{subscription.dispose();}

@@ -1,17 +1,13 @@
 'use strict';
-/** Transfers an idle inspection connection into an exclusively owned operation. */
+/** Claims an IDE operation; the native CLI owns connection reuse and handoff. */
 class WorkspaceOperationGuard {
-  constructor({isBusy,inspectorOwnsLock,releaseInspector,claim,updateContext,releaseNative}) {
-    Object.assign(this,{isBusy,inspectorOwnsLock,releaseInspector,claim,updateContext,releaseNative});
+  constructor({isBusy,claim,updateContext}) {
+    Object.assign(this,{isBusy,claim,updateContext});
   }
   async acquire() {
-    const rejectBusy=()=>{throw Error('Wait for the current Jade operation or cancel it first.');};
-    if(this.lease||this.isBusy()&&!this.inspectorOwnsLock())rejectBusy();
-    await this.releaseInspector();
-    // An operation may have claimed the runtime while disconnect was awaiting I/O.
-    if(this.lease||this.isBusy())rejectBusy();
+    if(this.lease||this.isBusy())throw Error('Wait for the current Jade operation or cancel it first.');
     const lease={};this.lease=lease;this.claim(true);
-    try {await this.updateContext(true);await this.releaseNative();return lease;}
+    try {await this.updateContext(true);return lease;}
     catch(error){try{await this.release(lease);}catch{}throw error;}
   }
   async release(lease) {

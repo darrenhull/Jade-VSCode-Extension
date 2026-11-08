@@ -1,9 +1,8 @@
 "use strict";
-const fs = require("node:fs"),
-  path = require("node:path"),
+const path = require("node:path"),
   crypto = require("node:crypto");
 const { InspectionSession } = require("./object-session"),
-  { InspectorTransport } = require("./object-transport");
+  { CliInspectionTransport } = require("./CliInspectionTransport");
 const { validateObjectIdentity } = require("./NativeObjectIdentity");
 const { InspectionHistory } = require("./inspection-history");
 const { fieldText } = require("../media/object-page");
@@ -49,7 +48,6 @@ function registerObjectExplorer(vscode, context, services) {
   }
   const setLock = async (value) => {
     lock = value;
-    await services.setBusy(value);
     await vscode.commands.executeCommand(
       "setContext",
       "jadeNative.inspecting",
@@ -82,88 +80,35 @@ function registerObjectExplorer(vscode, context, services) {
   }
   const session = new InspectionSession({
     connect: async (selection) => {
-      const generation = session.generation,
-        owner = {};
-      if (services.isBusy())
-        throw Error(
-          "Another Jade operation is running. Wait for it to finish before connecting Object Explorer.",
-        );
-      await services.beforeConnect?.();
+      const generation = session.generation, owner = {};
+      if (services.isBusy()) throw Error('Another Jade operation is running. Wait for it to finish before connecting Object Explorer.');
       const config = await configuration();
-      if (generation !== session.generation)
-        throw Error("Inspection connection was cancelled.");
-      if (services.isBusy())
-        throw Error(
-          "Another Jade operation started while selecting database settings.",
-        );
+      if (generation !== session.generation) throw Error('Inspection connection was cancelled.');
+      if (services.isBusy()) throw Error('Another Jade operation started while selecting database settings.');
       const target = await services.inspectionTarget(config, selection);
-      if(generation !== session.generation)throw Error('Inspection connection was cancelled.');
-      if(services.isBusy())throw Error('Another Jade operation started while resolving the database target.');
+      if (generation !== session.generation) throw Error('Inspection connection was cancelled.');
+      if (services.isBusy()) throw Error('Another Jade operation started while resolving the database target.');
       lockOwner = owner;
       await setLock(true);
-      let client, file;
+      let client;
       try {
-        if (generation !== session.generation || lockOwner !== owner)
-          throw Error("Inspection connection was cancelled.");
+        if (generation !== session.generation || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
         currentConfig = config;
-        currentTarget = target;
+        currentTarget = { ...target, selection };
         refreshDescription();
-        const directory = path.join(
-          context.globalStorageUri.fsPath,
-          "inspection-sessions",
-        );
-        fs.mkdirSync(directory, { recursive: true });
-        file = path.join(directory, crypto.randomUUID() + ".json");
-        // Consumed once by the native helper; removed on readiness or startup failure.
         const authentication = credentials;
         credentials = undefined;
-        fs.writeFileSync(
-          file,
-          JSON.stringify({
-            installPath: target.installPath,
-            databasePath: target.databasePath,
-            iniPath: target.iniPath,
-            server: target.server,
-            schema: target.schema,
-            readOnly: true,
-            ...(authentication || {}),
-          }),
-          { flag: "wx", mode: 0o600 },
-        );
-        client = services.createTransport
-          ? services.createTransport(
-              path.join(
-                context.extensionPath,
-                "vendor/jade-tools-cli/native/jade-inspect-helper.exe",
-              ),
-              file,
-            )
-          : new InspectorTransport(
-              path.join(
-                context.extensionPath,
-                "vendor/jade-tools-cli/native/jade-inspect-helper.exe",
-              ),
-              file,
-            );
-        client.on("output", (text) => output.append(text));
-        client.on("failure", (error) => output.appendLine(error.message));
-        const removeSession = () => {
-          try {
-            fs.unlinkSync(file);
-          } catch (error) {
-            if (error.code !== "ENOENT")
-              output.appendLine(
-                "Could not remove temporary inspection session: " + error.code,
-              );
-          }
+        const options = {
+          config: { ...config, ...(authentication || {}), readOnly: true },
+          target: selection,
+          catalogArgs: { includeSystem: showSystem },
         };
-        void client.ready.then(removeSession, removeSession);
-        client.once("close", () => {
-          try {
-            fs.unlinkSync(file);
-          } catch (error) {
-            if (error.code !== "ENOENT") output.appendLine(error.message);
-          }
+        client = services.createTransport
+          ? services.createTransport(options)
+          : new CliInspectionTransport(services.client, options);
+        client.on('output', text => output.append(text));
+        client.on('failure', error => output.appendLine(error.message));
+        client.once('close', () => {
           if (lockOwner === owner) {
             lockOwner = undefined;
             void setLock(false);
@@ -171,10 +116,6 @@ function registerObjectExplorer(vscode, context, services) {
         });
         return client;
       } catch (error) {
-        if (file)
-          try {
-            fs.unlinkSync(file);
-          } catch {}
         if (lockOwner === owner) {
           lockOwner = undefined;
           await setLock(false);
@@ -195,7 +136,7 @@ function registerObjectExplorer(vscode, context, services) {
         : "Select database settings when connecting") +
       "\n" +
       (session.client
-        ? "Connected. Compile and test automatically disconnect inspection."
+        ? "Connected. Compatible tools reuse the native connection."
         : "Disconnected");
   }
   function invalidate() {
@@ -252,8 +193,9 @@ function registerObjectExplorer(vscode, context, services) {
     await releaseNativeCursor(previous?.cursor);
     for(const record of instanceCatalogues.values()) if(record.generation===session.generation && record.oid===oid) void record.controller.update().catch(()=>{});
   }
-  function loadCatalog() {
-    const generation = session.generation,
+  function loadCatalog(reloadEpoch = true) {
+    const client = session.client, target = session.target,
+      generation = session.generation,
       version = ++catalogVersion;
     const request = session
       .request("catalog", { includeSystem: showSystem })
@@ -278,6 +220,10 @@ function registerObjectExplorer(vscode, context, services) {
           return data;
         },
         (error) => {
+          if (error.code === 'JADE_INSPECTION_EPOCH_CHANGED' && client === session.client && target === session.target && !disposed) {
+            if (catalogRequest && catalogRequest !== request) return catalogRequest;
+            if (reloadEpoch) return loadCatalog(false);
+          }
           if (version !== catalogVersion && generation === session.generation)
             return catalogRequest;
           throw error;
@@ -340,6 +286,7 @@ function registerObjectExplorer(vscode, context, services) {
       refreshDescription();
     }
   });
+  session.on("invalidated", invalidate);
   async function connect() {
     try {
       await session.connect();
@@ -1111,6 +1058,23 @@ function registerObjectExplorer(vscode, context, services) {
       },
     });
   }
+  async function configurationChanged() {
+    ++browseVersion;
+    credentials = undefined;
+    currentTarget = undefined;
+    await session.disconnect();
+    refreshDescription();
+  }
+  for (const subscription of [
+    vscode.workspace.onDidChangeConfiguration?.(event => {
+      if (event.affectsConfiguration("jadeNative")) return configurationChanged().catch(error => output.appendLine(error.message));
+    }),
+    vscode.workspace.onDidSaveTextDocument?.(document => {
+      if (document.uri.scheme === "file" && path.basename(document.uri.fsPath).toLowerCase() === "jade.json" &&
+          currentConfig?.workspaceRoots?.some(root => path.resolve(root, "jade.json") === path.resolve(document.uri.fsPath)))
+        return configurationChanged().catch(error => output.appendLine(error.message));
+    }),
+  ]) if (subscription) context.subscriptions.push(subscription);
   context.subscriptions.push(
     events,
     output,
@@ -1120,7 +1084,8 @@ function registerObjectExplorer(vscode, context, services) {
       dispose() {
         disposed = true;
         for (const record of panels) record.panel.dispose();
-        void session.disconnect();
+        // The shared CLI service may already be disposed during extension shutdown.
+        void session.disconnect().catch(() => {});
       },
     },
     vscode.commands.registerCommand("jadeNative.selectInspectionDatabase", () =>
@@ -1171,7 +1136,20 @@ function registerObjectExplorer(vscode, context, services) {
       action(connect),
     ),
     vscode.commands.registerCommand("jadeNative.disconnectObjects", () =>
-      action(() => { ++browseVersion; return session.disconnect(); }),
+      action(async () => {
+        if (services.isBusy()) throw Error('Wait for the current Jade operation or cancel it first.');
+        ++browseVersion;
+        const target = session.target, generation = session.generation;
+        const config = currentConfig || await configuration();
+        if (target !== session.target || generation !== session.generation) throw Error('Database selection changed while disconnecting.');
+        if (services.isBusy()) throw Error('Wait for the current Jade operation or cancel it first.');
+        const client = session.client;
+        await session.disconnect({ disconnect: true });
+        if (!client) {
+          if (services.disconnectTarget) await services.disconnectTarget(config, target);
+          else await CliInspectionTransport.disconnectTarget(services.client, { config, target });
+        }
+      }),
     ),
     vscode.commands.registerCommand("jadeNative.cancelObjectInspection", () =>
       action(() => { ++browseVersion; return session.disconnect(); }),
@@ -1179,7 +1157,7 @@ function registerObjectExplorer(vscode, context, services) {
     vscode.commands.registerCommand("jadeNative.refreshObjects", () =>
       action(async () => {
         await resetPages();
-        if (session.client) await loadCatalog();
+        await connect();
         events.fire();
       }),
     ),
@@ -1256,12 +1234,10 @@ function registerObjectExplorer(vscode, context, services) {
     ownsLock: () => lock,
     releaseForOperation: async () => {
       ++browseVersion;
-      if (session.client || lock) {
-        await session.disconnect();
-        if (lock) {
-          lockOwner = undefined;
-          await setLock(false);
-        }
+      await session.disconnect();
+      if (lock) {
+        lockOwner = undefined;
+        await setLock(false);
       }
       return !disposed;
     },

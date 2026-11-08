@@ -1,0 +1,99 @@
+{
+  "kind": "official release-pinned extension artifact verification",
+  "nativeAdapter": {
+    "passed": true,
+    "durationMilliseconds": 62789.3526,
+    "sourceStartupMilliseconds": 1283,
+    "coldWorkingStartupIncludingPreparationMilliseconds": 18534,
+    "testsAbaMilliseconds": [
+      1281,
+      1170,
+      1179
+    ],
+    "nativeTestsAbaMilliseconds": [
+      1178,
+      1080,
+      1090
+    ],
+    "methodBuildMilliseconds": 446,
+    "methodLoadMilliseconds": 368.5734,
+    "methodReconnectMilliseconds": 0,
+    "scratchMilliseconds": [
+      4916,
+      5060
+    ],
+    "structuralBuildMilliseconds": 11511,
+    "structuralLoadMilliseconds": 8870.2083,
+    "structuralReconnectMilliseconds": 543.5868,
+    "targetedDisconnectPreservedSource": true
+  },
+  "privateVsCodeHost": {
+    "firstRefreshAfterNativeReconnect": true,
+    "sharedInspectionDebugHandoff": true,
+    "pausedDebuggerProtected": true,
+    "lazyInspectionAfterDebug": true,
+    "callerSourcePositions": true,
+    "nativeCollectionsAndKeys": true,
+    "fullNativeStack": true,
+    "selectedCallerLocals": true,
+    "expandableObjects": true,
+    "cyclicReferences": true,
+    "passed": true,
+    "version": "0.18.0",
+    "breakpoint": true,
+    "editorBreakpointToggle": true,
+    "stepOver": true,
+    "locals": [
+      0,
+      40,
+      42
+    ],
+    "stringInspectionAndReturn": true,
+    "sourceLinesCorrect": true,
+    "noPython": true
+  },
+  "defaultTests": {
+    "javascriptPassed": 955,
+    "powershellPassed": 18,
+    "explicitOptionalSkipped": 43,
+    "failed": 0
+  },
+  "screenshots": [
+    "../screenshots/shared-connection/inspection-before-debug.png",
+    "../screenshots/shared-connection/inspection-after-debug.png"
+  ],
+  "delivery": {
+    "globalPreviewInstalled": false,
+    "officialSharedConnectionCliPinVerified": true,
+    "packageVerified": true,
+    "reviewTrackedInPullRequest": 44
+  },
+  "prereleaseEvidence": {
+    "executableSha256": "a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487",
+    "manifestSha256": "a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0"
+  },
+  "officialCliRelease": {
+    "version": "0.5.0",
+    "tag": "v0.5.0",
+    "approvedCommit": "12b654c12319a28691e3667d08468759d5153f68",
+    "archiveSha256": "284477707cb64f09c1387bd3d3c7d6a6ddddf1807efe721fd24b9e8d1eb50925",
+    "executableSha256": "fde8fd8cc41631bdb9f2f2b81f682b5109e497b9c014d7c3ad1a419f42648175",
+    "manifestSha256": "3e287506e10866f2a1ce375e75556e9d0023b4ddd88653c05c159fb166e7e344",
+    "allRuntimeHashesVerified": true
+  },
+  "extensionArtifact": {
+    "version": "0.18.0",
+    "file": "jade-native-runner-cpp-preview-0.18.0.vsix",
+    "sha256": "a608bd26b7a2664d287d20c23fb265ac7ab46dd55985553d485cdd83fae6b0ae",
+    "portableNoNodeNoDatabaseSmoke": true,
+    "actualPackagedVsCodeHost": true
+  },
+  "reviewRegression": {
+    "commentId": 4506982499,
+    "catalogueEpochRetryLimit": 1,
+    "oldObjectAndCursorRequestsNeverReplayed": true,
+    "changedTargetNotFollowed": true,
+    "continuousReplacementBounded": true,
+    "actualPackagedSingleRefreshAfterNativeReconnect": true
+  }
+}
