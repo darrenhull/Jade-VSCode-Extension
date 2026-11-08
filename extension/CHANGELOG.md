@@ -1,3 +1,8 @@
+# 0.19.1 — First-run connection setup
+
+- Offer Open Folder when connecting from an empty VS Code window.
+- Guide unconfigured folders into Detect Runtime Settings and identify workspace folders clearly.
+
 # 0.19.0 — Native runtime character sets
 
 - Choose automatic detection, ANSI or Unicode for each workspace without adding default settings to source projects.

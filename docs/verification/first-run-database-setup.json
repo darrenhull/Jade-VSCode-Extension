@@ -1,0 +1,13 @@
+{
+  "issue": 45,
+  "version": "0.18.1",
+  "red": {"initialCases":5,"initialFailures":4,"neutralRuntimeSuccessMessageFailedBeforeChange":true},
+  "green": {"focusedCases":14,"javascriptPassed":969,"powershellPassed":18,"explicitOptInSkipped":43,"failed":0},
+  "actualPrivateVsCodeHost": ["empty-window-create-or-open-folder", "unconfigured-source-folder-runtime-setup", "detected-installation-and-explicit-browse"],
+  "screenshots": ["docs/screenshots/first-run/empty.png", "docs/screenshots/first-run/unconfigured.png", "docs/screenshots/first-run/installation.png"],
+  "packagedVsix": {"nativePinAndAllHashesVerified":true,"noNodeOnPath":true,"databaseFreeDiscovery":true},
+  "nativeDatabaseOperations": false,
+  "userSettingsChanged": false,
+  "installedExtensionChanged": false,
+  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true
+}

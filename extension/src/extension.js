@@ -28,9 +28,9 @@ function expand(value, folder, resource=jadeSourceUri(vscode)) {
     .replaceAll('${file}', resource?.fsPath || '');
 }
 
-async function detectSettings() {
+async function detectSettings(selectedResource) {
   if (process.platform !== 'win32') throw new Error('This native proof currently supports Windows x64.');
-  const resource = jadeSourceUri(vscode) || vscode.workspace.workspaceFolders?.[0]?.uri;
+  const resource = selectedResource || jadeSourceUri(vscode) || vscode.workspace.workspaceFolders?.[0]?.uri;
   const folder = resource ? vscode.workspace.getWorkspaceFolder(resource) : undefined;
   if (!folder) throw new Error('Open a workspace folder before detecting Jade settings.');
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
@@ -41,9 +41,15 @@ async function detectSettings() {
   }
   const valid = [...candidates].filter(candidate => fs.existsSync(path.join(candidate, 'bin', 'jom.dll')));
   let installPath;
-  if (valid.length === 1) installPath = valid[0];
-  else if (valid.length > 1) installPath = await vscode.window.showQuickPick(valid, { title: 'Select Jade installation' });
-  else installPath = (await vscode.window.showOpenDialog({ title: 'Select Jade installation directory', canSelectFolders: true, canSelectFiles: false, canSelectMany: false }))?.[0]?.fsPath;
+  if (valid.length) {
+    const selected = await vscode.window.showQuickPick([
+      ...valid.map(directory => ({ label: directory, description: 'Detected Jade installation', directory })),
+      { label: 'Browse to another installation folder…', browse: true },
+    ], { title: 'Choose Jade installation folder', placeHolder: 'Select or browse to the installation folder containing bin/jom.dll, separate from your source folder.' });
+    if (!selected) return;
+    if (!selected.browse) installPath = selected.directory;
+    else installPath = (await vscode.window.showOpenDialog({ title: 'Select Jade installation folder (contains bin/jom.dll)', canSelectFolders: true, canSelectFiles: false, canSelectMany: false }))?.[0]?.fsPath;
+  } else installPath = (await vscode.window.showOpenDialog({ title: 'Select Jade installation folder (contains bin/jom.dll)', canSelectFolders: true, canSelectFiles: false, canSelectMany: false }))?.[0]?.fsPath;
   if (!installPath) return;
   const detected = inspectInstall(installPath);
   if (!detected.databasePath) {
@@ -63,7 +69,7 @@ async function detectSettings() {
   if (!selection) return;
   const values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
   for (const [key, value] of Object.entries(values)) await settings.update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
-  await vscode.window.showInformationMessage('Jade runtime settings saved. Open a CLS file and press Shift+F5 to publish; its schema is read from the file.');
+  await vscode.window.showInformationMessage('Jade runtime settings saved. You can now connect to Database Objects.');
   return values;
 }
 
@@ -124,7 +130,7 @@ function activate(context) {
     const folder=selectedFolder||(document?.uri&&vscode.workspace.getWorkspaceFolder(document.uri))||vscode.workspace.workspaceFolders?.[0];
     if(!folder)throw Error('Open a workspace folder and configure its Jade connection.');
     const settings=Object.fromEntries(Object.entries(defaults(document?.uri||folder.uri)).map(([key,value])=>[key,expand(value,folder,document?.uri||folder.uri)]));
-    const installPath=settings.installPath||process.env.JADE_INSTALL;if(!installPath)throw Error('Set jadeNative.installPath or use Detect Runtime Settings.');
+    const installPath=settings.installPath||process.env.JADE_INSTALL;if(!installPath)throw Object.assign(Error('Set jadeNative.installPath or use Detect Runtime Settings.'),{code:'JADE_RUNTIME_NOT_CONFIGURED'});
     return {...settings,installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
@@ -399,7 +405,7 @@ function activate(context) {
       if(!fs.existsSync(location.root))throw new Error('Compile or run tests first to create the working database.');
       await vscode.commands.executeCommand('revealFileInOS',vscode.Uri.file(location.databasePath));
     }),
-    vscode.commands.registerCommand('jadeNative.discover', () => detectSettings().catch(error => vscode.window.showErrorMessage(error.message))),
+    vscode.commands.registerCommand('jadeNative.discover', resource => detectSettings(resource).catch(error => vscode.window.showErrorMessage(error.message))),
     vscode.commands.registerCommand('jadeNative.checkFile', () => vscode.commands.executeCommand('jadeNative.compileClass'))
   );
   return {classView,objectExplorer,testing,nativeTests,workspaces};
