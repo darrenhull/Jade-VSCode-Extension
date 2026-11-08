@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-11-08T01:09:41.593Z",
+  "verifiedAt": "2026-11-08T01:29:11.613Z",
   "pullRequest": 32,
-  "baseHead": "68c4ea5aded4f7879eda97a71b012235d0b45e9f",
+  "baseHead": "191f0ea53ad61b79a03bfba88f33848c7ecb5f41",
   "findings": [
     {
       "comment": 4504392027,
@@ -10,16 +10,22 @@
     {
       "comment": 4504392029,
       "regressions": "Split lifecycle regressions failed before fix; all30controller tests pass."
+    },
+    {
+      "comment": 4504475802,
+      "regressions": "Multi-class split origin, independent restore slots, migration, group renumbering, ambiguity and native focus regressions failed before the additional fix; all 37 controller tests pass."
     }
   ],
   "fullSuite": {
-    "javascriptPassed": 789,
+    "javascriptRegressionSuitePassed": true,
+    "controllerPassed": 37,
+    "objectExplorerFocusedPassed": 45,
     "powerShellPassed": 18,
     "explicitSkips": 42
   },
   "artifact": {
     "name": "jade-native-runner-cpp-preview-0.17.2.vsix",
-    "sha256": "80793c08cd9124cb60a6b1631d86b49a2154967a127a358e528b93eacf9e73e7"
+    "sha256": "1830d88adfc52574516861dff38d32ba48a0ba8060a5e616c679fb79589c2698"
   },
   "nativeUI": {
     "nativeDatabaseOpened": false,
@@ -41,10 +47,15 @@
         }
       ],
       "actualPropertyEditSaved": true,
+      "screenshot": "docs/screenshots/class-workspace/class-workspace-native-splits.png",
+      "multiClassSource": true,
+      "bothSplitSlotsPersisted": true,
+      "bothNativeSplitsReloaded": true,
+      "bothReloadedSplitsFlushed": true,
       "closedSplitPreservesSibling": true,
       "originalSourceAfterClose": true,
       "survivingClassReused": true,
-      "screenshot": "docs/screenshots/class-workspace/class-workspace-native-splits.png"
+      "reloadedScreenshot": "docs/screenshots/class-workspace/class-workspace-native-multiclass-splits-restored.png"
     },
     "nativeWindowReload": true,
     "delayedCursorDoubleBack": true,

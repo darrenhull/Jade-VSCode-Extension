@@ -15,16 +15,17 @@ async function run(context){
  const restored=Boolean(phase);
  if(!restored)fs.writeFileSync(file,'schemaDefinition\r\nMovePets subschemaOf RootSchema partialDefinition;\r\ntypeHeaders\r\nFish subclassOf Object transient;\r\nBird subclassOf Object transient;\r\ntypeDefinitions\r\nFish completeDefinition ( )\r\nBird completeDefinition ( )\r\ntypeSources\r\n');
  const controller=registerClassWorkspaces(vscode,context,{viewType:'jade.testClassWorkspace',model:{resolveClass:async row=>{
-  const name=row.name||row.owner;if(!['Fish','Bird','SplitFish'].includes(name))throw Error('Unknown private move-proof class.');
-  return{name,schema:'MovePets',projectId,file:(name==='SplitFish'?splitUri:uri).toString(),qualifiedName:'MovePets::'+name};
+  const name=row.name||row.owner;if(!['Fish','Bird','SplitFish','SplitBird'].includes(name))throw Error('Unknown private move-proof class.');
+  return{name,schema:'MovePets',projectId,file:(name.startsWith('Split')?splitUri:uri).toString(),qualifiedName:'MovePets::'+name};
  }},onOriginal:async row=>{const document=await vscode.workspace.openTextDocument(vscode.Uri.parse(row.file));await vscode.window.showTextDocument(document,{preview:false});return{uri:document.uri.toString()};},shell:{attach(session){sessions.push(session);if(session.row.name==='SplitFish'){const view=splitShell.attach(session),flush=view.flushPendingEdits;session.proofViewId=view.viewId;return{...view,flushPendingEdits:async()=>{splitFlushes.push({panel:session.panel,active:session.panel.active,focusedGroup:vscode.window.tabGroups.activeTabGroup.viewColumn});return flush();}};}session.panel.webview.html='<!doctype html><html><body><h1>'+session.row.name+'</h1><p>Native moved class restore proof</p></body></html>';return{dispose(){},state:()=>({}),setOrigin(){}};},dispose(){splitShell.dispose();}}});
  async function wait(predicate,label,details){for(let attempt=0;attempt<200;attempt++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,40));}throw Error('Timed out: '+label+(details?' '+JSON.stringify(details()):''));}
  const savedClass=name=>Object.values(context.workspaceState.get(STATE)||{}).find(value=>value.row.name===name&&value.row.file===uri.toString());
  async function verifyNativeSplits(){
-  fs.writeFileSync(splitFile,'schemaDefinition\r\nMovePets subschemaOf RootSchema partialDefinition;\r\ntypeHeaders\r\nSplitFish subclassOf Object transient;\r\ntypeDefinitions\r\nSplitFish completeDefinition\r\n(\r\nattributeDefinitions\r\nname: String[50];\r\n)\r\ntypeSources\r\n');
+  if(phase?.phase!=='split-reload'){
+  fs.writeFileSync(splitFile,'schemaDefinition\r\nMovePets subschemaOf RootSchema partialDefinition;\r\ntypeHeaders\r\nSplitFish subclassOf Object transient;\r\nSplitBird subclassOf Object transient;\r\ntypeDefinitions\r\nSplitFish completeDefinition\r\n(\r\nattributeDefinitions\r\nname: String[50];\r\n)\r\nSplitBird completeDefinition ( )\r\ntypeSources\r\n');
   await vscode.commands.executeCommand('vscode.setEditorLayout',{orientation:0,groups:[{},{}]});
   await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
-  await controller.open({name:'SplitFish',schema:'MovePets',file:splitUri.toString()},{selectedId:'split-name'});
+  await controller.open({name:'SplitFish',schema:'MovePets',file:splitUri.toString()},{selectedId:'split-name',origin:{scope:'workspace',kind:'catalogue',filter:{query:'split-fish',offset:20},scrollTop:11}});
   await wait(()=>sessions.some(session=>session.row.name==='SplitFish'),'first actual split proof editor');
   const first=sessions.find(session=>session.row.name==='SplitFish');
   await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{
@@ -53,16 +54,39 @@ async function run(context){
   assert.ok(first.document.getText().includes('name: String[51];'),'Actual focused property edit reaches original source before source operations');await first.document.save();
   const screenshot=path.join(process.env.JADE_CLASS_WORKSPACE_SCREENSHOTS,'class-workspace-native-splits.png');
   await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{await browser.screenshot(screenshot);},{predicate:'document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(second.proofViewId)});
+
+   const slots=Object.values(context.workspaceState.get(STATE)||{}).filter(value=>value.row.file===splitUri.toString()&&value.row.name==='SplitFish');
+   assert.deepEqual(slots.map(value=>value.column).sort(),[first.panel.viewColumn,second.panel.viewColumn].sort(),'Each multi-class split has a separate persisted native column');
+   await context.workspaceState.update(STATE,context.workspaceState.get(STATE));
+   fs.writeFileSync(phaseFile,JSON.stringify({phase:'split-reload',splitColumns:[first.panel.viewColumn,second.panel.viewColumn],splitEvidence:{nativeSplitCommand:true,sharedOriginalDocument:true,sourcePreflightBothPanels:true,unfocusedOriginalGroupFlushed:true,nativeFocusEvidence:splitActivity,actualPropertyEditSaved:true,screenshot}}));
+   void vscode.commands.executeCommand('workbench.action.reloadWindow');return await new Promise(()=>{});
+  }
+  await wait(()=>sessions.filter(value=>value.row.name==='SplitFish').length===2,'both same-class multi-class-source native splits restored');
+  const [first,second]=sessions.filter(value=>value.row.name==='SplitFish').sort((left,right)=>left.panel.viewColumn-right.panel.viewColumn);
+  assert.equal(sessions.some(value=>value.row.name==='SplitBird'),false,'A split never changes to its sibling class from the same file');
+  assert.deepEqual([first.panel.viewColumn,second.panel.viewColumn],phase.splitColumns.slice().sort());assert.strictEqual(first.document,second.document);
+  assert.equal(first.origin.filter.query,'split-fish');assert.equal(second.origin.filter.query,'split-fish');
+  const splitTabs=()=>vscode.window.tabGroups.all.flatMap(group=>group.tabs.filter(tab=>tab.input instanceof vscode.TabInputCustom&&tab.input.viewType==='jade.testClassWorkspace'&&tab.input.uri.toString()===splitUri.toString()));
+  await wait(()=>splitTabs().length===2,'both restored native split tabs');
+  for(const session of [first,second])await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{
+   await browser.wait('document.getElementById("workspace").getAttribute("aria-busy")==="false"','restored split class snapshot');
+   await browser.evaluate('document.querySelector("[data-member-id=split-name]").click()');await browser.wait('document.querySelector(".cm-content")?.getAttribute("contenteditable")==="true"','restored split property editor');
+  },{predicate:'document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(session.proofViewId)});
+  second.panel.reveal(second.panel.viewColumn);await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');await wait(()=>vscode.window.tabGroups.activeTabGroup.viewColumn===second.panel.viewColumn,'restored second split focused before close');
+  splitFlushes.length=0;assert.equal(await controller.prepareActiveSource(splitUri),true);assert.deepEqual(splitFlushes.map(value=>value.panel),[first.panel,second.panel]);
+  const reloadedScreenshot=path.join(process.env.JADE_CLASS_WORKSPACE_SCREENSHOTS,'class-workspace-native-multiclass-splits-restored.png');
+  await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{await browser.screenshot(reloadedScreenshot);},{predicate:'document.getElementById("workspace")?.dataset.viewId==='+JSON.stringify(second.proofViewId)});
   await vscode.commands.executeCommand('workbench.action.closeActiveEditor');await wait(()=>second.isClosed()&&splitTabs().length===1,'second split is natively closed');
   splitFlushes.length=0;assert.equal(await controller.prepareActiveSource(splitUri),true);assert.deepEqual(splitFlushes.map(value=>value.panel),[first.panel]);
   const original=await controller.openOriginal();assert.equal(original.uri,splitUri.toString());assert.equal(vscode.window.activeTextEditor?.document.uri.toString(),splitUri.toString(),'Surviving split still opens its actual original source editor');
   assert.equal((await controller.open({name:'SplitFish',schema:'MovePets',file:splitUri.toString()})).reused,true);assert.equal(sessions.filter(session=>session.row.name==='SplitFish').length,2);
   await vscode.commands.executeCommand('workbench.action.closeActiveEditor');await wait(()=>first.isClosed()&&splitTabs().length===0,'owned final split is closed');
-  return{nativeSplitCommand:true,sharedOriginalDocument:true,sourcePreflightBothPanels:true,unfocusedOriginalGroupFlushed:true,nativeFocusEvidence:splitActivity,actualPropertyEditSaved:true,closedSplitPreservesSibling:true,originalSourceAfterClose:true,survivingClassReused:true,screenshot};
+  return{...phase.splitEvidence,multiClassSource:true,bothSplitSlotsPersisted:true,bothNativeSplitsReloaded:true,bothReloadedSplitsFlushed:true,closedSplitPreservesSibling:true,originalSourceAfterClose:true,survivingClassReused:true,reloadedScreenshot};
  }
 
+
  try{
-  if(!restored){
+  if(!restored||phase.phase==='split-reload'){
    const splitEvidence=await verifyNativeSplits();
    await vscode.commands.executeCommand('vscode.setEditorLayout',{orientation:0,groups:[{},{},{}]});
    // Keep the original group present when its class tab moves. Otherwise Code's
