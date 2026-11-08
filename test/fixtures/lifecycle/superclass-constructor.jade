@@ -1,0 +1,9 @@
+vars
+    cow : DerivedLifecycleCow;
+begin
+    create cow transient;
+    write cow.moo();
+    write cow.getConstruction();
+epilog
+    delete cow;
+end;

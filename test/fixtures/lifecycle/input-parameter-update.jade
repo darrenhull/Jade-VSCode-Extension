@@ -1,0 +1,14 @@
+vars
+    cow : LifecycleCow;
+    operations : LifecycleOperations;
+begin
+    create cow transient;
+    create operations transient;
+    operations.renameInput(cow, "Daisy");
+    write cow.moo();
+    operations.replaceReference(cow);
+    write cow.moo();
+epilog
+    delete cow;
+    delete operations;
+end;

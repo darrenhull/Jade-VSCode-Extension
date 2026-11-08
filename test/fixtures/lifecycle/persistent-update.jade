@@ -1,0 +1,14 @@
+vars
+    cow : LifecycleCow;
+begin
+    beginTransaction;
+    create cow persistent;
+    cow.setName("Stored");
+    write cow.moo();
+    delete cow;
+    commitTransaction;
+epilog
+    if process.isInTransactionState then
+        abortTransaction;
+    endif;
+end;

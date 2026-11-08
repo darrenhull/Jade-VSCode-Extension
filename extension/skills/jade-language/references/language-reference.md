@@ -151,3 +151,110 @@ endif;
 This assumes `x` and `y` are declared in the surrounding method. Source property declarations belong in their native sections, for example `species : String[30];` under `attributeDefinitions`. Reference declarations belong under `referenceDefinitions`. Keep extracted native metadata when editing an existing declaration.
 
 [Language notation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_notation.htm) · [write instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/write_instruction.htm)
+
+## Object creation, initialisation and updating methods
+
+A class variable holds a reference, initially null. Create the instance before invoking it: use native `create`, not `new`. The examples below use the accompanying `LifecycleCow` fixture, whose `moo()` returns String, so its result is written. For a project Cow, resolve its actual signature first.
+
+### Create before invoking
+
+The class allows process-local transient instances. Its automatic constructor sets the initial name. `epilog` deletes the owned instance on normal or exception exit; it does not protect against fatal process termination. Deleting a null reference is harmless.
+
+<!-- lifecycle:create-before-use -->
+```jade
+vars
+    cow : LifecycleCow;
+begin
+    create cow transient;
+    write cow.moo();
+    cow.setName("Daisy");
+    write cow.moo();
+epilog
+    delete cow;
+end;
+```
+
+### Supply constructor parameters
+
+Use the extended create expression when a constructor requires arguments. Do not invent `create cow("Bessie") transient;`. The class below defines `create(pName : String) updating;`.
+
+<!-- lifecycle:parameterized-constructor -->
+```jade
+vars
+    cow : NamedLifecycleCow;
+begin
+    cow := create NamedLifecycleCow("Bessie") transient;
+    write cow.moo();
+    write cow.getConstruction();
+epilog
+    delete cow;
+end;
+```
+
+### Update an input object without changing the caller receiver
+
+The helper signature is `renameInput(pCow : LifecycleCow input; pName : String);`. It calls `pCow.setName(pName)` without updating its own self. `replaceReference(pCow : LifecycleCow io);` can replace the caller reference; the fixture deletes the owned previous transient first.
+
+<!-- lifecycle:input-parameter-update -->
+```jade
+vars
+    cow : LifecycleCow;
+    operations : LifecycleOperations;
+begin
+    create cow transient;
+    create operations transient;
+    operations.renameInput(cow, "Daisy");
+    write cow.moo();
+    operations.replaceReference(cow);
+    write cow.moo();
+epilog
+    delete cow;
+    delete operations;
+end;
+```
+
+### Keep persistent changes inside a transaction
+
+The class permits persistent instances and has a database map. `updating` on its setter does not start a transaction. This example deletes its persistent fixture before committing; the epilog aborts any transaction still owned by this script.
+
+<!-- lifecycle:persistent-update -->
+```jade
+vars
+    cow : LifecycleCow;
+begin
+    beginTransaction;
+    create cow persistent;
+    cow.setName("Stored");
+    write cow.moo();
+    delete cow;
+    commitTransaction;
+epilog
+    if process.isInTransactionState then
+        abortTransaction;
+    endif;
+end;
+```
+
+### Define the native constructor and setter
+
+```jade
+create() updating;
+begin
+    self.name := "calf";
+end;
+```
+
+```jade
+setName(pName : String) updating;
+begin
+    self.name := pName;
+end;
+```
+
+A `create` constructor runs automatically during native creation. A normal domain method named `initialiseName`, `init` or `initialise` is called explicitly unless the application has defined a framework/event contract. Application and Global classes have framework lifecycle methods; do not apply domain-object constructor rules blindly to those classes.
+
+Parameterless superclass constructors run automatically before derived constructors. A parameterised superclass constructor requires the documented signature forwarding form, for example `create() ::super("Bessie") updating;`, not a guessed C# `base` invocation. The native fixture verifies base → named → derived initialisation. Check `inheritCreate` and parameter rules before generating other constructor arrangements; Jade does not offer arbitrary constructor overloads.
+
+When changing a CLS method signature or flags, keep its `jadeMethodDefinitions` declaration and `jadeMethodSources` signature consistent. Preserve its identity number and unrelated source; do not append a duplicate body.
+
+[Native create instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/create_instruction.htm) · [Constructors and destructors](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/userguide/ch4methodfeaturedef/using_constructors_and_destructors.htm) · [Updating option](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/updating_option.htm) · [Delete](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/delete_instruction.htm)

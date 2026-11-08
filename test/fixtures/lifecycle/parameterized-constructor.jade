@@ -1,0 +1,9 @@
+vars
+    cow : NamedLifecycleCow;
+begin
+    cow := create NamedLifecycleCow("Bessie") transient;
+    write cow.moo();
+    write cow.getConstruction();
+epilog
+    delete cow;
+end;
