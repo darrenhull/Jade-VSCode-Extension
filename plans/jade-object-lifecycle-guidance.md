@@ -11,7 +11,7 @@ Issue: https://github.com/darrenhull/Jade-VSCode-Extension/issues/42
 
 ## Evidence
 
-Red: all 3 lifecycle guidance/delivery tests failed on the original bundle (missing examples and transaction distinction). Green: the same 3 tests pass after the guide changes, including actual managed project installation. Native fixture build and positive/negative execution verification remain in progress; this PR stays Draft until that evidence and packaging checks are complete.
+Initial checkpoint (before native verification): all 3 lifecycle guidance/delivery tests failed on the original bundle (missing examples and transaction distinction). Green: the same 3 tests pass after the guide changes, including actual managed project installation. Native fixture build and positive/negative execution verification remain in progress; this PR stays Draft until that evidence and packaging checks are complete.
 
 
 Native Jade 25.0.2.19 proof (2026-11-08): all four class fixtures compiled in an owned Working clone. Creation/setter output was Moo: calf then Moo: Daisy; parameterised constructor Moo: Bessie/base,named; superclass forwarding base,named,derived; input/io mutations Daisy then calf; explicit ordinary initialiser calf then Explicit then true after deletion; persistent transaction Stored. Deliberate errors were native 6027 (new), runtime 1090 (null invocation), 6451 (constructor arguments), runtime 1048 (persistent create outside transaction), 6097 (missing updating) and 6094 (constant parameter mutation). Native schema loader summarized the last two method diagnostics as loader exit 8510; original diagnostics were retained. Restoring valid sources compiled successfully after each failure. Source was never published.
@@ -23,3 +23,8 @@ The 0.17.9 guidance preview was packaged and installed successfully. Its three c
 
 
 Codex identified an encoding regression in the existing Filter Instances ellipsis. Restored the original UTF-8 manifest bytes with only its version changed; a new title regression fails against the reviewed head and passes after the fix. All four focused checks pass. Corrected 0.17.9 VSIX SHA-256: 9a3fc983f1d53be133729bc0f1bd6566a174f33d869af805c5cd759ac712916c.
+
+
+Final encoding correction covers the full review thread: native Filter Instances ellipsis, original language-reference separators and constructor-order arrows. The original reference prefix is restored byte-for-byte after newline normalization; changed UTF-8 text was audited. New guide regression first failed (4 pass, 1 fail), then all 5 focused checks passed. Final corrected installed VSIX SHA-256: 509a4d793800638d35110766115eb142174d1fb17174d2a4cc106d399aa98a80. Earlier hashes above describe superseded verification iterations.
+
+Final full regression after all encoding fixes: 973 core tests and 18 workflow tests passed (991 total), zero failures.

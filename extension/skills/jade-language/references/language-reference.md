@@ -34,7 +34,7 @@ end;
 
 Bare local Decimal causes native error 7699. Method parameter and return declarations have their own rules: do not mechanically add a storage descriptor everywhere a Decimal type appears. Decimal assignment rounds to the destination scale; preserve required precision and check native overflow/rounding behaviour.
 
-[Decimal type](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/encycloprim/decimal_type/decimal_type.htm) Â· [Parameters](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/parameters.htm) Â· [Broader syntax rules](syntax-reference.md)
+[Decimal type](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/encycloprim/decimal_type/decimal_type.htm) · [Parameters](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/parameters.htm) · [Broader syntax rules](syntax-reference.md)
 
 ## Workspace body versus method
 
@@ -64,7 +64,7 @@ end;
 
 Method parameters use semicolons between declarations; call arguments use commas. A complete CLS also needs the corresponding native method declaration and owner/source sections. A method body alone is not a complete import file.
 
-[Language syntax](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_syntax.htm) Â· [Language notation and parameters](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_notation.htm)
+[Language syntax](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_syntax.htm) · [Language notation and parameters](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_notation.htm)
 
 ## Strings and interpolation-style messages
 
@@ -85,7 +85,7 @@ end;
 
 This gives the effect often requested as string interpolation. Parenthesize arithmetic before conversion: `(x + y).String`. Do not generate `$"{name}"`, JavaScript template literals or Python f-strings as native Jade syntax. The documented String method catalogue does not supply `String::format`; application-defined helpers must be checked in source.
 
-[String concatenation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/string_concatenation_operator.htm) Â· [Primitive conversions](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/type_casts.htm) Â· [Literals](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/literals.htm)
+[String concatenation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/string_concatenation_operator.htm) · [Primitive conversions](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/type_casts.htm) · [Literals](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/literals.htm)
 
 ### Convert Real and Integer values to text
 
@@ -124,7 +124,7 @@ timeText := clock.format("HH:mm:ss");
 
 These are Date/Time methods, not String formatting. Their picture tokens and locale behavior differ: check the exact type's table, especially `MM` for a month and `mm` for minutes in these pictures. Declare the destination String variables and initialize the inputs in the surrounding code.
 
-[Date.format](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/date_type/format.htm) Â· [Time.format](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/time_type/format.htm)
+[Date.format](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/date_type/format.htm) · [Time.format](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/encycloprim/time_type/format.htm)
 
 ### Reuse localized parameterized messages
 
@@ -150,7 +150,7 @@ endif;
 
 This assumes `x` and `y` are declared in the surrounding method. Source property declarations belong in their native sections, for example `species : String[30];` under `attributeDefinitions`. Reference declarations belong under `referenceDefinitions`. Keep extracted native metadata when editing an existing declaration.
 
-[Language notation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_notation.htm) Â· [write instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/write_instruction.htm)
+[Language notation](https://secure.jadeworld.com/developer-centre/JADE2025/OnlineDocumentation/content/resources/devref/ch1languageref/jade_language_notation.htm) · [write instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/write_instruction.htm)
 
 ## Object creation, initialisation and updating methods
 
@@ -253,8 +253,8 @@ end;
 
 A `create` constructor runs automatically during native creation. A normal domain method named `initialiseName`, `init` or `initialise` is called explicitly unless the application has defined a framework/event contract. Application and Global classes have framework lifecycle methods; do not apply domain-object constructor rules blindly to those classes.
 
-Parameterless superclass constructors run automatically before derived constructors. A parameterised superclass constructor requires the documented signature forwarding form, for example `create() ::super("Bessie") updating;`, not a guessed C# `base` invocation. The native fixture verifies base â†’ named â†’ derived initialisation. Check `inheritCreate` and parameter rules before generating other constructor arrangements; Jade does not offer arbitrary constructor overloads.
+Parameterless superclass constructors run automatically before derived constructors. A parameterised superclass constructor requires the documented signature forwarding form, for example `create() ::super("Bessie") updating;`, not a guessed C# `base` invocation. The native fixture verifies base → named → derived initialisation. Check `inheritCreate` and parameter rules before generating other constructor arrangements; Jade does not offer arbitrary constructor overloads.
 
 When changing a CLS method signature or flags, keep its `jadeMethodDefinitions` declaration and `jadeMethodSources` signature consistent. Preserve its identity number and unrelated source; do not append a duplicate body.
 
-[Native create instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/create_instruction.htm) Â· [Constructors and destructors](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/userguide/ch4methodfeaturedef/using_constructors_and_destructors.htm) Â· [Updating option](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/updating_option.htm) Â· [Delete](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/delete_instruction.htm)
+[Native create instruction](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/create_instruction.htm) · [Constructors and destructors](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/userguide/ch4methodfeaturedef/using_constructors_and_destructors.htm) · [Updating option](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/updating_option.htm) · [Delete](https://secure.jadeworld.com/developer-centre/Jade2025/OnlineDocumentation/content/resources/devref/ch1languageref/delete_instruction.htm)

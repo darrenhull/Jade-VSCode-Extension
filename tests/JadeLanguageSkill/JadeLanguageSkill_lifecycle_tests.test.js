@@ -30,3 +30,10 @@ test('guidance packaging preserves the native instance filter command title',()=
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'extension/package.json'),'utf8'));
  assert.equal(manifest.contributes.commands.find(command=>command.command==='jadeNative.filterObjectInstances').title,'Jade: Filter Instances\u2026');
 });
+
+test('lifecycle reference preserves original UTF-8 separators and constructor order',()=>{
+ const text=guide('references/language-reference.md');
+ assert.ok(text.includes(') \u00b7 ['));
+ assert.ok(text.includes('base \u2192 named \u2192 derived'));
+ for(const bad of ['\u00c2\u00b7','\u00e2\u2020\u2019','\u00c3'])assert.ok(!text.includes(bad),'Unexpected encoding corruption '+bad);
+});
