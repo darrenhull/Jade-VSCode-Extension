@@ -8,8 +8,8 @@
     "progressNotifications": 0
   },
   "green": {
-    "focusedCases": 14,
-    "javascriptPassed": 969,
+    "focusedCases": 15,
+    "javascriptPassed": 970,
     "powershellPassed": 18,
     "explicitOptInSkipped": 43,
     "failed": 0,
@@ -49,6 +49,7 @@
   "reviewRegressions": {
     "pendingWorkingToSourceBrowse": true,
     "cancelPendingUsernamePrompt": true,
-    "cancelPendingPasswordPrompt": true
+    "cancelPendingPasswordPrompt": true,
+    "cancelPendingWorkspacePicker": true
   }
 }

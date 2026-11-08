@@ -69,6 +69,7 @@ function registerObjectExplorer(vscode, context, services) {
               await vscode.window.showQuickPick(
                 folders.map((folder) => ({ label: folder.name, folder })),
                 { title: "Choose Jade database settings" },
+                connectionOperation?.cancellation.token,
               )
             )?.folder);
       if (!folder)
