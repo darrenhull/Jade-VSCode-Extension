@@ -96,7 +96,7 @@
       },
       {
         "command": "jadeNative.filterObjectInstances",
-        "title": "Jade: Filter InstancesÃ¢â‚¬Â¦",
+        "title": "Jade: Filter Instances…",
         "icon": "$(filter)"
       },
       {

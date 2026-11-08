@@ -20,3 +20,6 @@ Default regression: 971 tests plus 18 workflow tests passed, zero failures.
 
 
 The 0.17.9 guidance preview was packaged and installed successfully. Its three changed attached guides match the installed extension byte-for-byte; all eight pinned native runtime files and original CLI 0.4.3 manifest were verified. VSIX SHA-256: 613b9eecd0be3358f46a03d276568b0cda1dc5197f0cf01cc4c965ca9ccab3e0. CLI manifest SHA-256: e4f5f57a1de0aa893cd6588a0eb41f7217905c58306f3f1098da298fb5de13a9. No forced reload occurred. Existing managed project guidance will update through its normal installer on reload, preserving dirty/custom files; the host jade-development skill was updated in place without replacing unrelated metadata/content. The private broker exited and owned Working databases, backup, definition copies and broker state were deleted; compact proof receipts remain outside the repository.
+
+
+Codex identified an encoding regression in the existing Filter Instances ellipsis. Restored the original UTF-8 manifest bytes with only its version changed; a new title regression fails against the reviewed head and passes after the fix. All four focused checks pass. Corrected 0.17.9 VSIX SHA-256: 9a3fc983f1d53be133729bc0f1bd6566a174f33d869af805c5cd759ac712916c.

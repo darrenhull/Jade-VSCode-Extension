@@ -25,3 +25,8 @@ test('actual project skill installation delivers the create-before-use and updat
  assert.equal(example(installed,'create-before-use'),fs.readFileSync(path.join(root,'test/fixtures/lifecycle/create-before-use.jade'),'utf8'));
  assert.match(installed,/setName\(pName[^\n]*updating/);
 });
+
+test('guidance packaging preserves the native instance filter command title',()=>{
+ const manifest=JSON.parse(fs.readFileSync(path.join(root,'extension/package.json'),'utf8'));
+ assert.equal(manifest.contributes.commands.find(command=>command.command==='jadeNative.filterObjectInstances').title,'Jade: Filter Instances\u2026');
+});
