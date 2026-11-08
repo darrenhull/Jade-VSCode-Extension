@@ -83,7 +83,7 @@ These rules are not exhaustive. Review the complete change and its affected call
 
 ## Automated PR comments
 
-Post automated PR comments through GitHub Actions or an authorized GitHub App so they use the bot identity. Include attribution that Codex prepared the comment on behalf of @darrenhull. The user-authenticated GitHub connector posts as the user; do not use it for future automated comments or imply that it is a bot. If a bot-backed path is unavailable, report that limitation instead of impersonating a bot.
+Prefer GitHub Actions or an authorized GitHub App for bot-authored PR comments. The user also authorizes agents to comment using the user-authenticated account when appropriate. Every agent-authored comment must explicitly state "Prepared by Codex on behalf of @darrenhull". Never claim a user-authenticated comment is a bot, impersonate another reviewer or approve a PR on the owner's behalf.
 
 ## Required issue link
 
