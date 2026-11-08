@@ -1,3 +1,10 @@
+# 0.18.0 — Shared native connections
+
+- Open Working automatically and keep its native connection available across Object Explorer, compilation and tests.
+- Switch to Scratch Pad or debugging without manually disconnecting inspection; native handoff preserves output and debugger ownership.
+- Disconnect the selected database while keeping the other target available, with clear protection for other active clients.
+- Discard stale inspection handles after native reconnection and reopen inspection when you refresh.
+
 # 0.17.9 — Native lifecycle guidance
 
 - Guide Copilot to create objects before invoking methods, using native constructors and explicit lifetimes.

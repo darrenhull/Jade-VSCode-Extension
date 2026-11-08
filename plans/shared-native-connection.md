@@ -23,7 +23,8 @@ Structural loads, Scratch Pad and debugging use automatic native handoff followe
 - [x] Verify private VS Code debugger regression and inspection handoff: preserve a paused debugger, stack/frame locals, object expansion, cycles, native collections and subsequent lazy inspection reopening.
 - [x] Commit this plan, source, grouped tests and editable/rendered architecture together. Capture actual changed UI in an owned private host.
 - [ ] Replace the approved 0.4.3 dependency with a verified official shared-connection CLI release after its approval. The tested candidate is not an official pin.
-- [ ] Complete final 0.18.0 version/release notes, official-bundle packaging and current-head checks/review. Only then request owner approval and protected squash merge.
+- [x] Prepare coordinated 0.18.0 version and user-facing feature-only release notes; verify the existing release-notes contract red then green.
+- [ ] Complete official-bundle packaging and current-head checks/review. Only then request owner approval and protected squash merge.
 
 ## Verification
 
