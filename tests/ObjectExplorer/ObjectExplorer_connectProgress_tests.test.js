@@ -37,3 +37,7 @@ test('the existing database view replaces disconnected/Connect controls with pen
  const backup=gate();const s=setup({resolveInspectionTarget:async config=>{await backup.promise;return config;}});
  try{const pending=s.commands.get('jadeNative.connectObjects')();await turn();const controls=await s.controller.provider.getChildren();assert.ok(controls.some(row=>row.name==='Cancel connection'));assert.ok(controls.every(row=>row.command!=='jadeNative.connectObjects'));assert.doesNotMatch(s.controller.view.message,/Disconnected/);assert.match(s.statuses[0].text,/Connecting/);backup.finish();await pending;assert.match(s.statuses[0].text,/Read-only/);}finally{backup.finish();await s.cleanup();}
 });
+test('closing the extension during pending preparation does not update disposed database controls',async()=>{
+ const backup=gate();const s=setup({resolveInspectionTarget:async config=>{await backup.promise;return config;}});
+ try{const pending=s.commands.get('jadeNative.connectObjects')();await turn();s.disposeExtension();Object.defineProperty(s.statuses[0],'text',{set(){throw Error('Status bar is disposed.');}});Object.defineProperty(s.controller.view,'description',{set(){throw Error('Tree view is disposed.');}});backup.finish();await pending;assert.deepEqual(s.errors,[]);assert.equal(s.clients.length,0);}finally{backup.finish();await s.cleanup();}
+});

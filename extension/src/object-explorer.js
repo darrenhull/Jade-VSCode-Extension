@@ -91,7 +91,7 @@ function registerObjectExplorer(vscode, context, services) {
         { ...config, ...(operation ? { signal: operation.controller.signal } : {}) },
         selection,
         text => {
-          output.append(text);
+          if (!disposed) output.append(text);
           operation?.report(text);
         },
       );
@@ -116,8 +116,8 @@ function registerObjectExplorer(vscode, context, services) {
         client = services.createTransport
           ? services.createTransport(options)
           : new CliInspectionTransport(services.client, options);
-        client.on('output', text => { output.append(text); operation?.report(text); });
-        client.on('failure', error => output.appendLine(error.message));
+        client.on('output', text => { if (!disposed) output.append(text); operation?.report(text); });
+        client.on('failure', error => { if (!disposed) output.appendLine(error.message); });
         client.once('close', () => {
           if (lockOwner === owner) {
             lockOwner = undefined;
@@ -135,6 +135,7 @@ function registerObjectExplorer(vscode, context, services) {
     },
   });
   function refreshDescription() {
+    if (disposed) return;
     const state = connectionOperation ? (connectionOperation.cancelling ? 'Cancelling' : 'Connecting') : 'Read-only';
     if (status) status.text = (connectionOperation ? "$(loading~spin)" : "$(database)") + " Jade Inspect: " + (session.target === "working" ? "Working" : "Source") + " · " + state;
     if (!view) return;
@@ -319,7 +320,7 @@ function registerObjectExplorer(vscode, context, services) {
         cancellable: true,
       }, async (progress, cancellation) => {
         operation.report = text => {
-          if (connectionOperation !== operation || operation.controller.signal.aborted) return;
+          if (disposed || connectionOperation !== operation || operation.controller.signal.aborted) return;
           const message = String(text).split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1);
           if (message) {
             operation.message = message.slice(0, 200);
@@ -329,7 +330,7 @@ function registerObjectExplorer(vscode, context, services) {
           }
         };
         const subscription = cancellation.onCancellationRequested(() => {
-          void cancelConnection().catch(error => output.appendLine(error.message));
+          void cancelConnection().catch(error => { if (!disposed) output.appendLine(error.message); });
         });
         try {
           if (operation.controller.signal.aborted) return { cancelled: true };
@@ -339,7 +340,7 @@ function registerObjectExplorer(vscode, context, services) {
           return await connectOnce();
         } catch (error) {
           if (!operation.controller.signal.aborted) throw error;
-          output.appendLine('Inspection cancelled after the native operation finished: ' + error.message);
+          if (!disposed) output.appendLine('Inspection cancelled after the native operation finished: ' + error.message);
           return { cancelled: true };
         } finally { subscription.dispose(); }
       });

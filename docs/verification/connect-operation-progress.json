@@ -1,13 +1,49 @@
 {
   "issue": 47,
   "version": "0.18.2",
-  "red": {"rapidConnectClicks":3,"nativePreparations":1,"catalogueLoads":3,"progressNotifications":0},
-  "green": {"focusedCases":10,"javascriptPassed":965,"powershellPassed":18,"explicitOptInSkipped":43,"failed":0,"rapidConnectNativePreparations":1,"rapidConnectCatalogueLoads":1},
-  "cancellation": {"targetsOwnedRequestOnly":true,"waitsForOriginalNativePromise":true,"noReplacementUntilCompletion":true,"noForcedProcessTermination":true},
-  "actualPrivateVsCodeHost": {"passed":true,"preparation":"gated fake native target resolver","rapidConnectClicks":3,"nativePreparations":1,"allJoinedResultsCancelled":true,"assertedPendingUntilSafeBoundary":true},
-  "screenshots": ["docs/screenshots/connect-progress/backup.png","docs/screenshots/connect-progress/restore.png","docs/screenshots/connect-progress/cancelling.png"],
-  "packagedVsix": {"nativePinAndAllHashesVerified":true,"noNodeOnPath":true,"databaseFreeDiscovery":true},
+  "red": {
+    "rapidConnectClicks": 3,
+    "nativePreparations": 1,
+    "catalogueLoads": 3,
+    "progressNotifications": 0
+  },
+  "green": {
+    "focusedCases": 11,
+    "javascriptPassed": 966,
+    "powershellPassed": 18,
+    "explicitOptInSkipped": 43,
+    "failed": 0,
+    "rapidConnectNativePreparations": 1,
+    "rapidConnectCatalogueLoads": 1
+  },
+  "cancellation": {
+    "targetsOwnedRequestOnly": true,
+    "waitsForOriginalNativePromise": true,
+    "noReplacementUntilCompletion": true,
+    "noForcedProcessTermination": true
+  },
+  "actualPrivateVsCodeHost": {
+    "passed": true,
+    "preparation": "gated fake native target resolver",
+    "rapidConnectClicks": 3,
+    "nativePreparations": 1,
+    "allJoinedResultsCancelled": true,
+    "assertedPendingUntilSafeBoundary": true
+  },
+  "screenshots": [
+    "docs/screenshots/connect-progress/backup.png",
+    "docs/screenshots/connect-progress/restore.png",
+    "docs/screenshots/connect-progress/cancelling.png"
+  ],
+  "packagedVsix": {
+    "nativePinAndAllHashesVerified": true,
+    "noNodeOnPath": true,
+    "databaseFreeDiscovery": true
+  },
   "nativeBackupOrDatabaseProofClaimed": false,
   "userSettingsOrInstalledExtensionChanged": false,
-  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true
+  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
+  "disposal": {
+    "pendingCompletionDoesNotUpdateDisposedControls": true
+  }
 }
