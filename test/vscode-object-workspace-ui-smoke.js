@@ -13,7 +13,7 @@ async function run() {
   const context = { extensionPath: path.resolve(__dirname, ".."), globalStorageUri: vscode.Uri.file(path.resolve(workspace, "../inspection-private")), subscriptions };
   const config = { installPath: "C:/NotOpened", databasePath: path.resolve(workspace, "../fixture-source"), iniPath: path.resolve(workspace, "../fixture.ini"), server: "singleUser", schema: "Pets", workspaceRoots: [workspace] };
   const requests = [], transports = [];
-  let holdNextRelease=false,finishCursorRelease;
+  let holdNextRelease=false,finishCursorRelease,failNextCollection=false;
   const host = { ...vscode, window: Object.assign(Object.create(vscode.window), {
     createTreeView: (_name, options) => vscode.window.createTreeView("jade.testInspectionInstances", options),
     showQuickPick: async choices => choices.find(choice => choice.target === "source"),
@@ -49,6 +49,7 @@ async function run() {
           ] };
         }
         if (command === "collection") {
+          if(failNextCollection){failNextCollection=false;throw Error("Initial collection unavailable");}
           const start = args.cursor ? Number(args.cursor.split(":")[1]) : 0;
           const count = Math.min(args.limit, 75 - start);
           return { items: Array.from({ length: Math.max(0, count) }, (_, index) => ({ key: "Tank " + (start + index + 1), index: start + index + 1, type: "Fish", oid: index % 2 ? "9050.1" : "9050.2" })), hasMore: start + count < 75, cursor: start + count < 75 ? "page:" + (start + count) : undefined };
@@ -156,6 +157,20 @@ async function run() {
       finishCursorRelease();await new Promise(resolve=>setTimeout(resolve,100));
       assert.equal(await browser.evaluate('document.getElementById("identity").textContent.includes("9050.1")&&document.getElementById("history").value==="0"'),true,'late cursor release must not restore the superseded object');
       await browser.screenshot(path.join(captures,"object-history-latest-navigation.png"));
+      failNextCollection=true;
+      await browser.evaluate('document.querySelector("#properties .reference").click()');
+      await browser.wait('document.getElementById("state").textContent.includes("Initial collection unavailable")',"failed collection retains native diagnostic");
+      await browser.evaluate('document.getElementById("first").click()');
+      await browser.wait('document.getElementById("entries").children.length>0&&!document.getElementById("state").textContent.includes("Collection read failed")',"First retry replaces failed collection snapshot");
+      await browser.evaluate('document.querySelector("#entries .reference").click()');
+      await browser.wait('document.getElementById("title").textContent==="Fish"',"leave successful retry");
+      await browser.evaluate('document.getElementById("back").click()');
+      await browser.wait('document.getElementById("title").textContent==="FishByName"',"restore successful collection retry");
+      assert.equal(await browser.evaluate('document.getElementById("state").textContent.includes("Collection read failed")'),false,"Back must not revive the initial collection error");
+      assert.equal(await browser.evaluate('document.getElementById("entries").children.length>0'),true);
+      await browser.screenshot(path.join(captures,"collection-retry-history.png"));
+      await browser.evaluate('document.getElementById("back").click()');
+      await browser.wait('document.getElementById("identity").textContent.includes("9050.1")',"return to original snapshot after retry proof");
       for (const width of [760, 480, 360]) {
         await browser.viewport(width);
         assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'), true, "no overflow at " + width);
@@ -203,7 +218,7 @@ async function run() {
       assert.equal(await browser.evaluate('document.getElementById("copyOid").disabled'), false);
       await browser.evaluate('document.getElementById("state").scrollIntoView({block:"start"})');
       await browser.screenshot(path.join(captures, "object-stale-360.png"));
-      return { objectScreenshot, collectionScreenshot, instances:true, instancesPageBound:100,instanceNextAndReturnFirst:true, snapshotValues: true, lazyKeyboardReference: true, collectionPages: [25, 50], pageOnlyFilter: true, pin: true, snapshotHistory: true, delayedCursorDoubleBack:true, internalCollectionScroll:true, themes:["light","dark","high-contrast"],zoomPercent:200, contrast, responsive: [760, 480, 360], staleRetained: true, transport: "deterministic-read-only-ui-fixture", nativeDatabaseOpened: false };
+      return { objectScreenshot, collectionScreenshot, instances:true, instancesPageBound:100,instanceNextAndReturnFirst:true, snapshotValues: true, lazyKeyboardReference: true, collectionPages: [25, 50], pageOnlyFilter: true, pin: true, snapshotHistory: true, delayedCursorDoubleBack:true,collectionRetryHistory:true, internalCollectionScroll:true, themes:["light","dark","high-contrast"],zoomPercent:200, contrast, responsive: [760, 480, 360], staleRetained: true, transport: "deterministic-read-only-ui-fixture", nativeDatabaseOpened: false };
     }, { predicate: 'Boolean(document.getElementById("identity")?.textContent.includes("9050.1") && document.getElementById("properties"))' });
     assert.ok(requests.every(request => ["catalog", "instances", "object", "collection", "release"].includes(request.command)));
     assert.ok(requests.filter(request=>request.command==="instances").every(request=>request.args.limit===100));

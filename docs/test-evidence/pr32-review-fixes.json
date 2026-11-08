@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-11-08T01:29:11.613Z",
+  "verifiedAt": "2026-11-08T07:59:31.365Z",
   "pullRequest": 32,
-  "baseHead": "191f0ea53ad61b79a03bfba88f33848c7ecb5f41",
+  "baseHead": "35875841598aa1e49e21df1792084a32dfae4682",
   "findings": [
     {
       "comment": 4504392027,
@@ -14,18 +14,32 @@
     {
       "comment": 4504475802,
       "regressions": "Multi-class split origin, independent restore slots, migration, group renumbering, ambiguity and native focus regressions failed before the additional fix; all 37 controller tests pass."
+    },
+    {
+      "comment": 4505425216,
+      "regressions": "Three no-argument palette regressions failed before fix. Native palette cancel/retry selects the exact schema/project source without creating an extra tab."
+    },
+    {
+      "comment": 4505425222,
+      "regressions": "Three retained retry diagnostic regressions failed before fix; superseded replies remain isolated. Native failed-read -> First retry -> navigate away -> Back retains success."
+    },
+    {
+      "review": 5817046409,
+      "regressions": "Reviewed multi-class splitting uses native complete-file contents, preserves source metadata/BOM/EOL and rejects unsupported, dirty/stale/colliding inputs. Concurrent edit and resource-ordering regressions were red before safeguards. Actual native Undo/Redo, Save All and LF under CRLF preference passed."
     }
   ],
   "fullSuite": {
     "javascriptRegressionSuitePassed": true,
-    "controllerPassed": 37,
-    "objectExplorerFocusedPassed": 45,
+    "javascriptPassed": 821,
+    "controllerPassed": 39,
+    "objectExplorerFocusedPassed": 49,
     "powerShellPassed": 18,
     "explicitSkips": 42
   },
   "artifact": {
     "name": "jade-native-runner-cpp-preview-0.17.2.vsix",
-    "sha256": "1830d88adfc52574516861dff38d32ba48a0ba8060a5e616c679fb79589c2698"
+    "sha256": "70b1b15bfcfd7cf868dc974f698faf63f6ee21fea8ec04ff3dbbec8db1865ed9",
+    "entries": 141
   },
   "nativeUI": {
     "nativeDatabaseOpened": false,
@@ -59,7 +73,36 @@
     },
     "nativeWindowReload": true,
     "delayedCursorDoubleBack": true,
-    "objectHistoryScreenshot": "docs/screenshots/object-workspace/object-history-latest-navigation.png"
+    "objectHistoryScreenshot": "docs/screenshots/object-workspace/object-history-latest-navigation.png",
+    "commandPalette": {
+      "actualPaletteInvokedNoArguments": true,
+      "existingClassSelector": true,
+      "cancelCreatesNoTab": true,
+      "selectionOpensExactSource": true,
+      "rowArgumentReusesClass": true,
+      "sourceBytesUnchanged": true
+    },
+    "collectionRetryHistory": true,
+    "collectionRetryScreenshot": "docs/screenshots/object-workspace/collection-retry-history.png",
+    "classFileSplit": {
+      "passed": true,
+      "nativeDatabaseOpened": false,
+      "actualNativeOffer": true,
+      "keepCombinedUnchanged": true,
+      "reviewedDestinations": true,
+      "nativeWorkspaceEdit": true,
+      "nativeUndoRestoresAll": true,
+      "nativeRedo": true,
+      "lfPreservedAgainstCrlfPreference": true,
+      "createFileContents": true,
+      "completeSiblingBytesCreated": true,
+      "originalNotAutoSaved": true,
+      "saveAllProducesOneClassPerFile": true,
+      "screenshots": [
+        "docs/screenshots/class-workspace/class-source-split-offer.png",
+        "docs/screenshots/class-workspace/class-source-split-review.png"
+      ]
+    }
   },
   "portable": {
     "nativeDistributionAndRuntimeHashes": true,
@@ -69,6 +112,7 @@
   },
   "cleanup": {
     "ownedHostProcessesExited": true,
-    "ownedStagesRemoved": true
+    "ownedStagesRemoved": true,
+    "verifiedOwnedStageCount": 4
   }
 }

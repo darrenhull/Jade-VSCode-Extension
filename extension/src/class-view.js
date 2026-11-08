@@ -424,7 +424,7 @@ function registerClassView(vscode, context, language, options={}) {
       },
     ),
     previewController,
-    vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>previewController.open(row,{origin:treeOrigin(row)})),
+    vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>row?previewController.open(row,{origin:treeOrigin(row)}):vscode.commands.executeCommand('jadeNative.findSourceClass')),
     vscode.commands.registerCommand(
       "jadeNative.showClassMember",
       async (row) => {

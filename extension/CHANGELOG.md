@@ -3,6 +3,7 @@
 - Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.
 - Edit local methods, properties and references in the class workspace with the original source document's save and undo history, completion and compiler diagnostics.
 - Save the current file with a visible Save action and unsaved/saving/saved feedback.
+- Review a local multi-class file split into separate class files, preserving supported native metadata and Undo without overwriting existing files.
 - Keep editing scoped to the current file and recover rejected method edits after reopening the workspace.
 - Browse instances through an explicit Source or Working choice, retaining class and project identity.
 - Filter the current instance page with the same autocomplete and grid controls as class search.

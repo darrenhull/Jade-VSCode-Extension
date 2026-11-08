@@ -996,12 +996,19 @@ function registerObjectExplorer(vscode, context, services) {
                     return;
                   }
                   record.page = page;
-                  Object.assign(record.history.current(), { page, limit: record.limit });
                   record.cursor = page.cursor;
                   record.readAt = new Date().toISOString();
-                  Object.assign(record.history.current(), { readAt: record.readAt });
+                  Object.assign(record.history.current(), {
+                    page,
+                    limit: record.limit,
+                    readAt: record.readAt,
+                    error: undefined,
+                  });
                 } catch (error) {
-                  if (record.revision === revision && generation === session.generation) record.error = diagnostic(error);
+                  if (record.revision === revision && generation === session.generation) {
+                    record.error = diagnostic(error);
+                    Object.assign(record.history.current(), { error: record.error });
+                  }
                 } finally {
                   if (record.pendingAction === token) {
                     record.pendingAction = undefined;

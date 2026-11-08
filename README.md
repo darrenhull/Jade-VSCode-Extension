@@ -24,11 +24,13 @@ GitHub releases require manual VSIX installation. A new CLI release opens a revi
 | Debug | Experimental gutter breakpoints, stepping, native caller stacks, selected-frame locals, object expansion and paged collections on compatible runtimes. |
 | Format | Document/selection indentation for native declarations and complete method bodies, preserving tokens, literals and line endings. |
 | Scratch Pad | Run native Workspace statements in Working, see output and compare the two most recent runs. F5 is for builds; Scratch Pad has its own Run action. |
-| Class workspaces | Schema-qualified search, grouped current-file members and method editing backed by the original document, with native undo/save. |
+| Class workspaces | Schema-qualified search, grouped current-file members and editing backed by the original document, with native undo/save. Multi-class files offer a reviewed split into individual class files. |
 | Data browsing | Read-only Source/Working inspection, native object IDs, lazy reference traversal, history, pinned views and collection paging. |
 | Source designer | Create schemas, classes, member/external dictionaries, ordered object arrays and unique object sets. Review source before saving. |
 | Collection rules | Known inherited keys and lifetime permissions, supported key-size checks, Binary comparison, population/block sizing and reviewed existing-file class mappings. Unknown metadata stays explicit. |
 | Publication | Review the destination and changed files, then explicitly confirm publication to Source. |
+
+Opening a multi-class source offers **Review split** or **Keep combined**. The reviewed split keeps the selected class in the original file and creates sibling class files as one native, undoable edit; save all changes before compiling. It accepts saved UTF-8 complete-class extracts with supported class mappings. Partial declarations, other schema-level sections, unsupported encodings and destination conflicts are refused without overwriting files.
 
 See the [user guide](extension/README.md), [collection coverage and limits](docs/COLLECTION-COVERAGE.md) and [changelog](extension/CHANGELOG.md).
 

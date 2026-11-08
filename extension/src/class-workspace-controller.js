@@ -2,6 +2,7 @@
 const {ClassWorkspaceEditorProvider}=require('./class-workspace-editor-provider');
 const {classIdentity}=require('./class-workspace');
 const {MethodDraftRecovery,sourceMemberKind}=require('./method-draft-recovery');
+const {ClassSourceSplitOffer}=require('./class-source-split-offer');
 const STATE='jade.classWorkspaceContexts.v1';
 const validColumn=column=>Number.isInteger(column)&&column>=1&&column<=9;
 const contextSlot=value=>JSON.stringify([classIdentity(value.row),value.column]);
@@ -13,8 +14,9 @@ function safeContext(value){
   if(origin&&['tree','quickpick','catalogue'].includes(value.origin.kind))origin.kind=value.origin.kind;
   return {row,column:Number.isInteger(value.column)&&value.column>=1&&value.column<=9?value.column:undefined,origin};
 }
-function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType='jade.classWorkspace'}) {
+function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType='jade.classWorkspace',sourceSplitOffer}) {
   const views=new Map(),pending=new Map();
+  const splitOffer=sourceSplitOffer||(vscode.workspace?.openTextDocument&&vscode.workspace?.fs?.readFile?new ClassSourceSplitOffer(vscode):undefined);
   const recovery=new MethodDraftRecovery(context.workspaceState);
   let contexts=Object.fromEntries(Object.values(context.workspaceState?.get(STATE)||{}).slice(-50).map(safeContext).filter(Boolean).map(value=>[contextSlot(value),value]));
   let disposed=false,opening=Promise.resolve(),lastActivePanel;
@@ -157,6 +159,8 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
         existing=classView(key);
       }
     }
+    await splitOffer?.consider(vscode.Uri.parse(identity.file),identity.name);
+    if(disposed)throw Error('Class workspace is closed.');
     const other=[...views.values()].some(value=>value.row.file===identity.file);
     const column=other?vscode.ViewColumn.Beside:vscode.ViewColumn.Active;
     pending.set(identity.file,{row:identity,origin,selectedId});
