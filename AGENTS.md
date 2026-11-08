@@ -77,6 +77,8 @@ These rules are not exhaustive. Review the complete change and its affected call
 - Check performance evidence and ensure ordinary navigation, single-file operations and paged lookups do not unexpectedly trigger expensive project-wide work.
 - Check release/update automation for unreviewed publication, unverified downloads, stale integrity and silently skipped failures.
 
+- Verify the current head and all published review threads before reporting review readiness. If the user reports new comments that the connector does not show, bypass stale connector review data with a fresh authenticated GitHub API read, including pagination and review timestamps. Never print or persist credentials.
+
 - Successful reviewed main builds publish new consumer versions automatically. Preserve immutable published releases, protected owner approval, single full PR validation and patch-version updates for native dependency PRs. Do not add duplicate feature-push builds or explicit PR workflow dispatch.
 
 ## Automated PR comments

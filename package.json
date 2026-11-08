@@ -1,6 +1,6 @@
 {
   "name": "jade-vscode-extension-workspace",
-  "version": "0.17.4",
+  "version": "0.17.6",
   "private": true,
   "description": "Standalone build and test workspace for Jade Native Runner VS Code extension",
   "engines": {

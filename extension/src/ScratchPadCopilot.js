@@ -1,7 +1,7 @@
 'use strict';
 /** Opens VS Code's own inline editing UI for one existing Scratch Pad cell. */
 class ScratchPadCopilot {
-  constructor(vscode,{guidance=[],markdownGuidance=[],contextFor}={}){this.vscode=vscode;this.guidance=[...guidance];this.markdownGuidance=[...markdownGuidance];this.contextFor=contextFor;}
+  constructor(vscode,{guidance=[],markdownGuidance=[],prepareMarkdown,contextFor}={}){this.vscode=vscode;this.guidance=[...guidance];this.markdownGuidance=[...markdownGuidance];this.prepareMarkdown=prepareMarkdown;this.contextFor=contextFor;}
   fix(cell,failure){if(!failure)return Promise.reject(Error('Rerun the Scratch Pad to capture its current error before choosing Fix with Copilot.'));return this.edit(cell,{failure});}
   failureMessage(cell,failure){
     if(!failure||failure.sourceUri!==cell.document.uri.toString()||failure.sourceVersion!==cell.document.version||failure.sourceText!==cell.document.getText()||failure.schema!==cell.notebook.metadata?.schema)throw Error('The Scratch Pad, schema or its error context changed. Rerun it before choosing Fix with Copilot.');
@@ -26,6 +26,12 @@ class ScratchPadCopilot {
     if(failure)this.failureMessage(cell,failure);
     const commands=await vscode.commands.getCommands(true);
     if(!commands.includes('inlineChat.start')){await vscode.window.showInformationMessage('Copilot inline editing is unavailable. Enable GitHub Copilot Chat and sign in, then choose Edit with Copilot again.');return {opened:false};}
+    if(cell.kind===vscode.NotebookCellKind.Markup){
+      if(typeof this.prepareMarkdown!=='function')throw Error('Native Markdown editing setup is unavailable. Reload Jade Tools and try again.');
+      const before={text:cell.document.getText(),version:cell.document.version,index:cell.index,editor:vscode.window.activeTextEditor,notebookEditor:vscode.window.activeNotebookEditor};
+      if(await this.prepareMarkdown()!==true)return {opened:false};
+      if(notebook.isClosed||cell.document.isClosed||cell.index!==before.index||notebook.cellAt(before.index)!==cell||cell.document.version!==before.version||cell.document.getText()!==before.text||vscode.window.activeTextEditor!==before.editor||vscode.window.activeNotebookEditor!==before.notebookEditor)throw Error('The Scratch Pad cell or focus changed while preparing native Markdown editing. Select it and try Edit with Copilot again.');
+    }
     const target=cell.document.uri.toString();
     await vscode.window.showNotebookDocument(notebook,{preserveFocus:false,selections:[new vscode.NotebookRange(cell.index,cell.index+1)]});
     // This public native command enters the selected notebook cell's editor.

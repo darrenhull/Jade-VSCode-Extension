@@ -55,6 +55,8 @@ async function main(){
  if(alternating)fs.copyFileSync(path.join(base,'inspector/application-probe.ddx'),path.join(extension,'test/application-probe.ddx'));
  if(pull&&fs.existsSync(workspace)&&fs.readdirSync(workspace).length)throw Error('Pull verification requires an empty folder: '+workspace);
  fs.mkdirSync(workspace,{recursive:true});
+ if(classWorkspaceUi&&process.env.JADE_SCRATCH_PAD_MERMAID_PROOF==='1'){fs.mkdirSync(path.join(workspace,'.vscode'),{recursive:true});fs.writeFileSync(path.join(workspace,'.vscode/settings.json'),JSON.stringify({'inlineChat.notebookAgent':true}));}
+
  if(debug)fs.writeFileSync(path.join(workspace,'VsCodeDebugProbe.cls'),fs.readFileSync(path.join(base,'test/fixtures/DebugDemo.cls'),'utf8').replaceAll('DebugDemo','VsCodeDebugProbe'));
  for(const name of (creation||objectWorkspaceUi||nativeOids||incremental||workspaces||formatting||cliIntegration||alternating||perf||project||pull||debug||collections||classes||objects||impact||testDebug?[]:['schemas/SJetSchema/types/Fish.cls','schemas/SJetTestSchema/types/BaseUnitTest.cls','schemas/SJetTestSchema/types/FishTest.cls'])){
   const to=path.join(workspace,name);fs.mkdirSync(path.dirname(to),{recursive:true});fs.writeFileSync(to,fs.readFileSync(path.join(repository,'test/fixtures/workspace',name),'utf8').replaceAll('BaseUnitTest','HostFreshBaseUnitTest').replaceAll('FishTest','HostFreshFishTest'));

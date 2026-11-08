@@ -1,0 +1,21 @@
+{
+  "extensionVersion": "0.17.4",
+  "nativeIntent": "inline/notebookEditor",
+  "nativeTools": [
+    "edit_notebook_file"
+  ],
+  "nativeRouteConfirmed": true,
+  "initialCellCount": 1,
+  "currentCellCount": 1,
+  "sourceSha256": "b5893dfa8092df083eee4858d5376a6655908f890a2b4f0a217bfdcefd074f1d",
+  "completeMarkdownPreserved": true,
+  "nativeMermaidPreviewObserved": true,
+  "rendererLabels": [
+    "Source",
+    "Tests",
+    "Working"
+  ],
+  "sourceDatabaseOpened": false,
+  "globalSettingsChanged": false,
+  "note": "Fresh owned window with the native setting enabled before activation; supersedes the earlier unconfirmed legacy-session comparison."
+}

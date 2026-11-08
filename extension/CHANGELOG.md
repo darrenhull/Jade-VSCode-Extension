@@ -1,7 +1,7 @@
-# 0.17.4 — Copilot edits for Scratch Pad
+# 0.17.6 — Copilot edits for Scratch Pad
 
 - Edit any line in an existing code cell without appending duplicate bodies, including when only a word was selected.
-- Edit Markdown and Mermaid source with the visible Edit with Copilot action.
+- Edit Markdown and Mermaid source through VS Code's native notebook editor, with an explicit workspace-only setup action.
 - Fix native cell errors with complete cell and diagnostic context attached to a short request.
 - Supply expanded Jade syntax guidance, covering the official primitive inventory, descriptors, conversions and language syntax references.
 

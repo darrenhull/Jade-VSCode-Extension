@@ -38,12 +38,22 @@ For a new live case: capture the intended cell before further UI changes, obtain
 
 After Undo restored the rejected cell, a real Copilot request explicitly required one outer Markdown response fence and inner tilde Mermaid fences. The accepted existing cell retained its heading, prose and diagram; the native preview rendered Source → Tests → Working and the notebook still had 12 cells. The original truncation remains recorded as a failed attempt. The final extension supplies this compatibility guidance as a read-only Mermaid skill attachment; its default-prompt round trip remains a separate check from this explicit-prompt proof.
 
-## Remaining native Markdown limitation
+## Legacy native Markdown limitation (superseded by the native-agent gate)
 
 Two further installed-0.17.4 requests with the Mermaid guidance attached still failed: one retained only prose, and a short natural request retained only the inner flowchart body. The immutable receipts preserve both failures. This means the attachment is a useful instruction, not a proven reliable workaround for the native response decoder.
 
-A comparison with the experimental notebook-agent flag in the disposable workspace accepted complete tilde-fenced Markdown, but the native log still identified the legacy inline/edit route. It therefore does not prove the new handler fixed the problem. The setting was removed afterward; no user/global settings were changed. The normal Markdown diagram editing acceptance criterion remains open, and PR #37 must remain Draft. Code editing, the primitive audit and PR #32 are independent of this limitation.
+A comparison with the experimental notebook-agent flag in the disposable workspace accepted complete tilde-fenced Markdown, but the native log still identified the legacy inline/edit route. It therefore does not prove the new handler fixed the problem. The setting was removed afterward; no user/global settings were changed. That result established a required native capability gate rather than a reliable prompt workaround; the completed native-agent path is recorded below. Code editing, the primitive audit and PR #32 are independent of this limitation.
 
 ## Packaged checks and cleanup
 
 Preview 0.17.4 passed the exact packaged Notebook UI check (five Jade guide URIs, current native error context, separate Mermaid attachment, actual tilde-fence rendering) and portable CLI smoke without Node on PATH. These tests do not claim an authenticated model request. The real model round trips above are separate evidence. The completed native test session was disconnected, both owned test windows were closed, and the disposable 142 MB Working database and workspace test folder were removed. Compact source/response receipts remain available locally.
+
+## Final native-agent workflow verification: 0.17.6
+
+The installed build now refuses the legacy Markdown path. Its explicit workspace-only setup uses a native modal: Cancel preserved the exact three-cell notebook and disabled setting; a second Edit opened a fresh dialog; Enable and Reload wrote only the workspace setting and restored all three cells after restart. The native handler then used notebook editing tools instead of the legacy code-block decoder.
+
+An ordinary Markdown edit retained the complete heading, prose, original backtick Mermaid fence and requested Source → Tests → Working diagram. Both neighboring cells remained byte-identical. Code Edit started from an end caret with five real Jade reference attachments; the accepted single body executed natively and printed Hello from Jade 3. A controlled Integer.asString error produced 6026. Fix started with only counter selected, supplied the short native request plus read-only full context, changed only the conversion to .String, preserved the Markdown cells and reran successfully in 2.88 seconds. An independent exact-source native replay passed in 3.343 seconds with the same output.
+
+[Structured final workflow evidence](test-evidence/native-copilot-0.17.6.json) records source hashes, scope and real execution results. The original failed attempts remain preserved above. [Packaged verification](test-evidence/packaged-0.17.6-verification.json) separately proves the exact VSIX controls, attachments, rendering and no-Node portable runtime; that automated UI test does not impersonate a model response. Both owned default-profile test windows and the disposable Working databases were closed/disconnected and removed after recording compact evidence. The user's unsaved workspace window was left open.
+
+PR #37 remains Draft pending the user-requested sequence: merge PR #32 first, then rebase #37 onto approved main, review its comments and validate the final combined head.

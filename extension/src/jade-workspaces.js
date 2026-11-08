@@ -6,6 +6,7 @@ const {WorkspaceDiagnostics}=require('./WorkspaceDiagnostics');
 const {WorkspaceContext}=require('./WorkspaceContext');
 const {ScratchPadMarkdown}=require('./ScratchPadMarkdown');
 const {ScratchPadFailures}=require('./ScratchPadFailures');
+const {NotebookCopilotSetup}=require('./NotebookCopilotSetup');
 const notebookType='jade-workspace';
 
 async function runSequential(cells,execute) {
@@ -165,7 +166,8 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   const copilotContext=new (require('./ScratchPadCopilotContext').ScratchPadCopilotContext)(vscode);context.subscriptions.push(copilotContext);
   const copilotGuidance=context.extensionUri&&vscode.Uri?.joinPath?['SKILL.md','references/language-reference.md','references/syntax-reference.md','references/primitive-types.md','references/language-syntax.md'].map(relative=>vscode.Uri.joinPath(context.extensionUri,'skills','jade-language',...relative.split('/'))):[];
   const copilotMarkdownGuidance=context.extensionUri&&vscode.Uri?.joinPath?[vscode.Uri.joinPath(context.extensionUri,'skills','mermaid','SKILL.md')]:[];
-  const makeCopilot=()=>new (require('./ScratchPadCopilot').ScratchPadCopilot)(vscode,{guidance:copilotGuidance,markdownGuidance:copilotMarkdownGuidance,contextFor:text=>copilotContext.create(text)});
+  const notebookCopilotSetup=new NotebookCopilotSetup(vscode);
+  const makeCopilot=()=>new (require('./ScratchPadCopilot').ScratchPadCopilot)(vscode,{guidance:copilotGuidance,markdownGuidance:copilotMarkdownGuidance,prepareMarkdown:()=>notebookCopilotSetup.ensure(),contextFor:text=>copilotContext.create(text)});
   function selectedCell(value){const cell=value?.cell||value;if(cell?.document)return cell;const editor=vscode.window.activeNotebookEditor;return editor?.notebook.cellAt(editor.selections?.[0]?.start??0);}
   async function fixWithCopilot(cell){
     const failure=cell?.document&&failures.get(cell.document,cell.notebook?.metadata?.schema);

@@ -30,7 +30,9 @@ Use the user's requested output format. Keep Mermaid source editable; export SVG
 
 Preserve the entire existing cell: its headings, prose and all diagrams. Edit the existing cell in place, make the requested changes and do not create another cell. Never omit a diagram when rewriting surrounding text. Review the diff before accepting; use Undo if any content was dropped.
 
-For VS Code notebook inline editing, the native response decoder treats triple backticks as the outer edit boundary. To keep a nested diagram intact, wrap the complete replacement response in one outer triple-backtick `markdown` block and use tilde fences (`~~~mermaid` and `~~~`) for every inner Mermaid diagram. Tilde fences are valid Markdown and render as Mermaid in the native notebook preview. A nested triple-backtick diagram can prematurely end the applied replacement and lose the rest of the cell. Existing diagram contents and behavior must be preserved when changing their fence delimiters. This compatibility rule applies to notebook inline editing, not ordinary Markdown files or standalone `.mmd` source.
+Jade Tools uses VS Code's native notebook editing agent for Markdown edits. Apply changes to the existing selected cell through the native notebook edit tool. Preserve existing headings, prose and complete diagram blocks; both backtick and tilde fences are valid. Do not wrap the entire cell in an extra Markdown fence or replace the cell with only the diagram body. Do not execute code or create additional cells unless the user explicitly requests that action.
+
+The legacy inline editor can truncate nested fenced Markdown. Enable the supported native notebook editing option for this workspace and reload before editing through that path. Never work around it by deleting surrounding text or altering other cells.
 
 ## Official references
 
