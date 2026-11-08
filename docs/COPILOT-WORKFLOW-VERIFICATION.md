@@ -36,7 +36,7 @@ For a new live case: capture the intended cell before further UI changes, obtain
 
 ## Native Markdown recovery
 
-After Undo restored the rejected cell, a real Copilot request explicitly required one outer Markdown response fence and inner tilde Mermaid fences. The accepted existing cell retained its heading, prose and diagram; the native preview rendered Source → Tests → Working and the notebook still had 12 cells. The original truncation remains recorded as a failed attempt. The final extension supplies this compatibility guidance as a read-only Mermaid skill attachment; its default-prompt round trip remains a separate check from this explicit-prompt proof.
+After Undo restored the rejected cell, a real Copilot request explicitly required one outer Markdown response fence and inner tilde Mermaid fences. The accepted existing cell retained its heading, prose and diagram; the native preview rendered Source → Tests → Working and the notebook still had 12 cells. The original truncation remains recorded as a failed attempt. That then-current 0.17.4-era experiment supplied a Mermaid guidance attachment; the failures below show that it did not provide a reliable decoder workaround. The final native notebook-agent implementation instead preserves standard backtick and tilde fences without requiring an outer response wrapper.
 
 ## Legacy native Markdown limitation (superseded by the native-agent gate)
 
@@ -56,4 +56,4 @@ An ordinary Markdown edit retained the complete heading, prose, original backtic
 
 [Structured final workflow evidence](test-evidence/native-copilot-0.17.6.json) records source hashes, scope and real execution results. The original failed attempts remain preserved above. [Packaged verification](test-evidence/packaged-0.17.6-verification.json) separately proves the exact VSIX controls, attachments, rendering and no-Node portable runtime; that automated UI test does not impersonate a model response. Both owned default-profile test windows and the disposable Working databases were closed/disconnected and removed after recording compact evidence. The user's unsaved workspace window was left open.
 
-PR #37 remains Draft pending the user-requested sequence: merge PR #32 first, then rebase #37 onto approved main, review its comments and validate the final combined head.
+PR #32 merged before this work was rebased onto approved main. The combined preview is 0.17.7 and preserves the merged class/object fixes. Combined regression, package and UI verification are in progress; the authenticated 0.17.6 results above remain historical evidence with their original hashes and version labels.

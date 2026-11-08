@@ -1,4 +1,4 @@
-# 0.17.6 — Copilot edits for Scratch Pad
+# 0.17.7 — Copilot edits for Scratch Pad
 
 - Edit any line in an existing code cell without appending duplicate bodies, including when only a word was selected.
 - Edit Markdown and Mermaid source through VS Code's native notebook editor, with an explicit workspace-only setup action.
