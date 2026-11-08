@@ -1,17 +1,22 @@
-# 0.17.8 — Automatic structural loading
+# 0.17.9 — Native lifecycle guidance
+
+- Guide Copilot to create objects before invoking methods, using native constructors and explicit lifetimes.
+- Explain updating setters, object parameter usage and persistent transactions with native-verified examples.
+
+# 0.17.8 â€” Automatic structural loading
 
 - Compile supported property and class-structure changes in Working without manually disconnecting or resetting the database.
 - Let native Jade perform required reorganisation and reconnect Working after a successful structural load.
 - Keep the retained fast path for method-body-only edits, with original native errors preserved on failed loads.
 
-# 0.17.7 — Copilot edits for Scratch Pad
+# 0.17.7 â€” Copilot edits for Scratch Pad
 
 - Edit any line in an existing code cell without appending duplicate bodies, including when only a word was selected.
 - Edit Markdown and Mermaid source through VS Code's native notebook editor, with an explicit workspace-only setup action.
 - Fix native cell errors with complete cell and diagnostic context attached to a short request.
 - Supply expanded Jade syntax guidance, covering the official primitive inventory, descriptors, conversions and language syntax references.
 
-# 0.17.2 — Class and object workspaces
+# 0.17.2 â€” Class and object workspaces
 
 - Open a class from search or Object Explorer to browse grouped members, filter inherited members and focus on one method or declaration.
 - Edit local methods, properties and references in the class workspace with the original source document's save and undo history, completion and compiler diagnostics.
@@ -26,7 +31,7 @@
 - Switch Scratch Pad notes between Markdown source and a labelled preview action, and insert Mermaid diagrams using VS Code's renderer.
 - Edit an existing Scratch Pad cell with Copilot, or prepare a fix request with the whole cell, current native error and Jade guidance.
 
-# 0.16.0 — Collection families and native rules
+# 0.16.0 â€” Collection families and native rules
 
 - Create ordered object arrays and unique object sets alongside keyed dictionaries.
 - Review inherited keys, known property attributes and class/subclass lifetime permissions, with unknown metadata clearly identified.
@@ -34,7 +39,7 @@
 - Choose expected population or entries per block, with verified source bounds and clear native runtime sizing guidance.
 - Select an existing database file and review both the new class and its schema mapping before saving. Dirty files and stale reviews block the write.
 
-# 0.15.0 — Create schemas, classes and collections
+# 0.15.0 â€” Create schemas, classes and collections
 
 - Create a schema, ordinary class or keyed dictionary from one designer under Jade Tools.
 - Search schema-qualified superclasses and member classes, choose ordered dictionary keys and adjust supported advanced settings.
@@ -42,18 +47,18 @@
 - Review a plain-language definition and the exact native source before explicitly saving new files.
 - Keep compilation and publication as separate actions; existing schema and collection commands remain available.
 
-# 0.14.3 — Native object IDs
+# 0.14.3 â€” Native object IDs
 
 - See Jade's own object identifiers when browsing database objects, references and collections.
 - Copy an ID from Jade and use it to inspect the same object in VS Code.
 
-# 0.14.2 — Build changed workspace files with F5
+# 0.14.2 â€” Build changed workspace files with F5
 
 - Press F5 from a Jade source file to build new and changed files across its workspace, including classes you have not opened.
 - Save native source buffers before building and skip loading when nothing changed.
 - Keep **Jade: Compile Current File** for a focused check. Publishing remains a separate action.
 
-# 0.14.0 — Scratch Pad
+# 0.14.0 â€” Scratch Pad
 
 - Try Jade code from Scratch Pad under Tools without publishing a class.
 - Choose a schema, run saved or unsaved code, and see output and errors beside the code.
@@ -61,18 +66,18 @@
 - Compare the code and output from your two most recent runs.
 - Use Jade code completion while writing an experiment.
 
-# 0.13.3 — Jade Tools and complete CLS indentation
+# 0.13.3 â€” Jade Tools and complete CLS indentation
 
 - Format class and property declarations, collection keys, database mappings, package sections and method source structure using your editor's tabs/spaces settings.
 - Format complete method bodies, including switch cases, multiline conditions and read-transaction blocks. Preserve literal text, Jade tokens and native metadata values.
 - Correct selected declaration lines without changing neighboring lines, and keep Format Document idempotent and undoable.
 - Present the extension as Jade Tools, with concise setup steps, supported features and commands in its Details page.
 
-# 0.13.2 — Extension update maintenance
+# 0.13.2 â€” Extension update maintenance
 
 - Improve reliability checks when packaging and updating the extension.
 
-# 0.13.0 — Jade method formatting and inline diagnostics companion
+# 0.13.0 â€” Jade method formatting and inline diagnostics companion
 
 - Add Format Document and Format Selection for complete Jade method bodies, using editor tabs/spaces while preserving native declarations, metadata and literal contents.
 - Keep unsupported or incomplete control structures unchanged; selection edits stay inside complete selected lines.
@@ -80,25 +85,25 @@
 - Document GitHub VSIX installation and manual updates.
 - Verify formatting through native before/after compilation/tests and the actual VS Code document/range/undo workflow.
 
-# 0.12.1 — Independent release updates
+# 0.12.1 â€” Independent release updates
 
 - Bundle the official native CLI 0.3.0.
 - Own the extension's release and update automation locally; check official CLI releases every five minutes and open reviewed dependency updates.
 - Skip unchanged ZIP downloads after verifying the local runtime; repair corrupt payloads and patch-bump the consumer only for a new dependency.
 
-# 0.12.0 — Native C++ CLI
+# 0.12.0 â€” Native C++ CLI
 
 - Replace the JavaScript CLI backend with the standalone native C++ CLI and helpers, without a separate end-user Node.js installation.
 - Preserve the existing editor, testing, inspection, publishing and debugger workflows through thin native CLI adapters.
 
-# 0.11.1 — CI and release automation candidate
+# 0.11.1 â€” CI and release automation candidate
 
 - Build, test and package the VSIX in GitHub Actions; publish matching version tags only after the commit reaches the approved default branch.
 - Reuse shared CLI workflows for verified dependency update pull requests and release ancestry checks.
 - Pin CLI 0.1.1, including shared portable packaging and release validation support.
 - Include editable draw.io and exported SVG architecture diagrams.
 
-# 0.11.0 — Packaged Jade CLI
+# 0.11.0 â€” Packaged Jade CLI
 
 - Separate the VS Code product into an independent Git workspace with standalone build and packaging tools.
 - Route native operations through the versioned Jade CLI backend while preserving the editor UI and native Jade semantics.
