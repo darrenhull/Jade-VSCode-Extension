@@ -15,13 +15,29 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   const views=new Map(),pending=new Map();
   const recovery=new MethodDraftRecovery(context.workspaceState);
   let contexts=Object.fromEntries(Object.values(context.workspaceState?.get(STATE)||{}).slice(-50).map(safeContext).filter(Boolean).map(value=>[classIdentity(value.row),value]));
-  let disposed=false,opening=Promise.resolve(),lastActiveKey;
+  let disposed=false,opening=Promise.resolve(),lastActivePanel;
+  function classView(key){
+    const matching=[...views.values()].filter(value=>value.key===key);
+    return matching.find(value=>value.panel===lastActivePanel)||matching.at(-1);
+  }
   function remember(row,column,origin){
     const key=classIdentity(row);
     const value=safeContext({row,column,origin});if(!value)return;
     delete contexts[key];contexts[key]=value;
     contexts=Object.fromEntries(Object.entries(contexts).slice(-50));
     void Promise.resolve(context.workspaceState?.update(STATE,contexts)).catch(()=>{});
+  }
+  function retirePanel(panel){
+    const value=views.get(panel);if(!value)return;
+    views.delete(panel);
+    if(lastActivePanel===panel)lastActivePanel=[...views.keys()].at(-1);
+    // Closing one split must retain the surviving class's restore context.
+    // Controller unload preserves slots for native window restoration.
+    if(!disposed){
+      const survivor=classView(value.key);
+      if(survivor)remember(survivor.row,survivor.panel.viewColumn,survivor.origin);
+      else{delete contexts[value.key];void Promise.resolve(context.workspaceState?.update(STATE,contexts)).catch(()=>{});}
+    }
   }
   const provider=new ClassWorkspaceEditorProvider(vscode,async session=>{
     const uri=session.document.uri.toString(),request=pending.get(uri);
@@ -85,30 +101,25 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
       },
     };
     const view=shell.attach({...session,row,origin:state.origin,selectedId:state.selectedId,services:{...session.services,editorScriptUri,draftRecovery}});
-    views.set(key,{panel:session.panel,view,row,binding:session.binding,origin:state.origin});
-    lastActiveKey=key;
+    views.set(session.panel,{key,panel:session.panel,view,row,binding:session.binding,origin:state.origin});
+    lastActivePanel=session.panel;
     const active=session.panel.onDidChangeViewState?.(event=>{
-      const current=views.get(key),panel=event.webviewPanel;
+      const current=views.get(session.panel),panel=event.webviewPanel;
       if(!current||current.panel!==session.panel||panel!==session.panel)return;
-      if(panel.active)lastActiveKey=key;
+      if(panel.active)lastActivePanel=panel;
       const column=panel.viewColumn;
       if(Number.isInteger(column)&&column>=1&&column<=9&&contexts[key]?.column!==column)remember(current.row,column,current.origin);
     });
-    const closed=session.panel.onDidDispose(()=>{
-      if(views.get(key)?.panel!==session.panel)return;
-      views.delete(key);
-      // A real tab close retires only its restore slot. Controller shutdown
-      // preserves live slots for VS Code's native window reload restoration.
-      if(!disposed){delete contexts[key];void Promise.resolve(context.workspaceState?.update(STATE,contexts)).catch(()=>{});}
-    });
+    const closed=session.panel.onDidDispose(()=>retirePanel(session.panel));
     return {dispose(){active?.dispose();closed.dispose();view.dispose();if(reservedIdentity)void recovery.release(reservedIdentity).catch(()=>{});}};
   });
   const registration=vscode.window.registerCustomEditorProvider(viewType,provider,{supportsMultipleEditorsPerDocument:true,webviewOptions:{retainContextWhenHidden:true}});
   async function openResolved(row,{origin,selectedId}={}){
     if(disposed)throw Error('Class workspace is closed.');
-    const identity=await model.resolveClass(row),key=classIdentity(identity),existing=views.get(key);
+    const identity=await model.resolveClass(row),key=classIdentity(identity);
+    let existing=classView(key);
     origin??=existing?.origin;
-    if(existing){
+    while(existing){
       try{
         if(origin){existing.origin=origin;existing.view.setOrigin(origin);remember(identity,existing.panel.viewColumn,origin);}
         existing.panel.reveal(existing.panel.viewColumn);
@@ -118,8 +129,9 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
         if(!/webview is disposed/i.test(error?.message||''))throw error;
         // Native disposal may precede delivery of onDidDispose. The explicit
         // navigation request opens a fresh view, never revives the old panel.
-        if(views.get(key)===existing)views.delete(key);
+        retirePanel(existing.panel);
         existing.view.dispose();
+        existing=classView(key);
       }
     }
     const other=[...views.values()].some(value=>value.row.file===identity.file);
@@ -127,7 +139,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     pending.set(identity.file,{row:identity,origin,selectedId});
     try{await vscode.commands.executeCommand('vscode.openWith',vscode.Uri.parse(identity.file),viewType,{preview:false,viewColumn:column});}
     catch(error){pending.delete(identity.file);throw error;}
-    const created=views.get(key);if(selectedId&&created)await created.view.select(selectedId);
+    const created=classView(key);if(selectedId&&created)await created.view.select(selectedId);
     return {opened:true,reused:false,uri:identity.file};
   }
   function open(row,options){
@@ -139,20 +151,20 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();
     for(const [key,value] of views){
       if(value.row.file!==uri.toString()&&!(project&&value.row.projectId===project))continue;
-      if(value.view.isClosed?.()){if(views.get(key)===value)views.delete(key);continue;}
+      if(value.view.isClosed?.()){retirePanel(key);continue;}
       try{
         if((value.panel.active||value.binding?.snapshot?.())&&await value.view.flushPendingEdits?.()===false)return false;
       }catch(error){
         if(value.view.isClosed?.()!==true&&!/webview is disposed/i.test(error?.message||''))throw error;
         // A native close can precede the extension-host disposal event. Its
         // stale canvas must not prevent flushing the remaining live sources.
-        if(views.get(key)===value)views.delete(key);
+        retirePanel(key);
         value.view.dispose();
       }
     }
     return true;
   }
-  const controller={open,prepareActiveSource,async openOriginal(){const selected=[...views.values()].find(value=>value.panel.active)||views.get(lastActiveKey)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
+  const controller={open,prepareActiveSource,async openOriginal(){const selected=[...views.values()].find(value=>value.panel.active)||views.get(lastActivePanel)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
   context.subscriptions.push(controller);
   return controller;
 }

@@ -13,6 +13,7 @@ async function run() {
   const context = { extensionPath: path.resolve(__dirname, ".."), globalStorageUri: vscode.Uri.file(path.resolve(workspace, "../inspection-private")), subscriptions };
   const config = { installPath: "C:/NotOpened", databasePath: path.resolve(workspace, "../fixture-source"), iniPath: path.resolve(workspace, "../fixture.ini"), server: "singleUser", schema: "Pets", workspaceRoots: [workspace] };
   const requests = [], transports = [];
+  let holdNextRelease=false,finishCursorRelease;
   const host = { ...vscode, window: Object.assign(Object.create(vscode.window), {
     createTreeView: (_name, options) => vscode.window.createTreeView("jade.testInspectionInstances", options),
     showQuickPick: async choices => choices.find(choice => choice.target === "source"),
@@ -31,6 +32,7 @@ async function run() {
       transport.closed = new Promise(resolve => { transport.stop = () => { transport.emit("close", 0); resolve(); return transport.closed; }; });
       transport.request = async (command, args) => {
         requests.push({ command, args });
+        if(command==="release"&&holdNextRelease){holdNextRelease=false;await new Promise(resolve=>{finishCursorRelease=resolve;});}
         if (command === "catalog") return { schemas: [{ name: "Pets", oid: "9050.0", classes: [{ name: "Fish", schema: "Pets", oid: "9050.0" }] }] };
         if (command === "instances") {
           const offset = args.cursor ? 100 : 0;
@@ -139,6 +141,21 @@ async function run() {
       await browser.wait('document.getElementById("title").textContent==="Fish"', "retained history snapshot");
       assert.equal(await browser.evaluate('document.getElementById("properties-filter").value'), "children");
       await browser.evaluate('document.getElementById("properties-filter").value="";document.getElementById("properties-filter").dispatchEvent(new Event("input"))');
+      await vscode.commands.executeCommand("jadeNative.inspectObject","9050.2");
+      await browser.wait('document.getElementById("identity").textContent.includes("9050.2")',"second object before cursor ownership race");
+      await browser.evaluate('document.querySelector("#properties .reference").click()');
+      await browser.wait('document.getElementById("title").textContent==="FishByName"',"collection before cursor race");
+      await browser.evaluate('document.getElementById("page-size").value="25";document.getElementById("page-size").dispatchEvent(new Event("change"))');
+      await browser.wait('document.getElementById("page-status").textContent.includes("1–25")&&!document.getElementById("next").disabled',"live collection cursor before double Back");
+      holdNextRelease=true;
+      await browser.evaluate('document.getElementById("back").click()');
+      for(let attempt=0;attempt<100&&!finishCursorRelease;attempt++)await new Promise(resolve=>setTimeout(resolve,20));
+      assert.equal(typeof finishCursorRelease,'function','first Back must await the held native cursor release');
+      await browser.evaluate('document.getElementById("back").click()');
+      await browser.wait('document.getElementById("identity").textContent.includes("9050.1")&&document.getElementById("history").value==="0"',"newer Back reaches original object");
+      finishCursorRelease();await new Promise(resolve=>setTimeout(resolve,100));
+      assert.equal(await browser.evaluate('document.getElementById("identity").textContent.includes("9050.1")&&document.getElementById("history").value==="0"'),true,'late cursor release must not restore the superseded object');
+      await browser.screenshot(path.join(captures,"object-history-latest-navigation.png"));
       for (const width of [760, 480, 360]) {
         await browser.viewport(width);
         assert.equal(await browser.evaluate('document.documentElement.scrollWidth<=window.innerWidth'), true, "no overflow at " + width);
@@ -186,7 +203,7 @@ async function run() {
       assert.equal(await browser.evaluate('document.getElementById("copyOid").disabled'), false);
       await browser.evaluate('document.getElementById("state").scrollIntoView({block:"start"})');
       await browser.screenshot(path.join(captures, "object-stale-360.png"));
-      return { objectScreenshot, collectionScreenshot, instances:true, instancesPageBound:100,instanceNextAndReturnFirst:true, snapshotValues: true, lazyKeyboardReference: true, collectionPages: [25, 50], pageOnlyFilter: true, pin: true, snapshotHistory: true, internalCollectionScroll:true, themes:["light","dark","high-contrast"],zoomPercent:200, contrast, responsive: [760, 480, 360], staleRetained: true, transport: "deterministic-read-only-ui-fixture", nativeDatabaseOpened: false };
+      return { objectScreenshot, collectionScreenshot, instances:true, instancesPageBound:100,instanceNextAndReturnFirst:true, snapshotValues: true, lazyKeyboardReference: true, collectionPages: [25, 50], pageOnlyFilter: true, pin: true, snapshotHistory: true, delayedCursorDoubleBack:true, internalCollectionScroll:true, themes:["light","dark","high-contrast"],zoomPercent:200, contrast, responsive: [760, 480, 360], staleRetained: true, transport: "deterministic-read-only-ui-fixture", nativeDatabaseOpened: false };
     }, { predicate: 'Boolean(document.getElementById("identity")?.textContent.includes("9050.1") && document.getElementById("properties"))' });
     assert.ok(requests.every(request => ["catalog", "instances", "object", "collection", "release"].includes(request.command)));
     assert.ok(requests.filter(request=>request.command==="instances").every(request=>request.args.limit===100));

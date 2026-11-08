@@ -1069,9 +1069,11 @@ function registerObjectExplorer(vscode, context, services) {
   }
   async function restoreSnapshot(record, snapshot) {
     if (!snapshot) return;
-    record.revision = (record.revision || 0) + 1;
+    const revision = (record.revision || 0) + 1;
+    record.revision = revision;
     record.readTicket = {};
     await releaseCursor(record);
+    if (record.disposed || record.revision !== revision) return;
     Object.assign(record, snapshot, { pendingAction: undefined });
     record.panel.title = record.object.className + " · " + record.object.oid;
     // Native cursors were released on navigation. Restart explicitly with First.
