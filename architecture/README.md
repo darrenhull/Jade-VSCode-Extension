@@ -11,7 +11,7 @@ The diagram describes the shipped extension and its optional MCP integration. Th
 | --- | --- |
 | VS Code extension | JavaScript presentation, editor integration, Testing, debugger UI, source creation and explicit publication review. The CLI is bundled in the VSIX. |
 | Native C++ CLI and broker | Configuration, workspace/dependency selection, job ownership, cancellation and warm native sessions. Matching CLI builds can share the per-user broker. Compatible Working operations reuse its native node. |
-| Our C++ helpers | Typed native compile, test and Scratch Pad execution share the Working node with a separate native read-only inspection context. Source inspection stays separate. Structural loads reconnect; debugging takes an exclusive lease. Vendor tools also perform native database/schema operations. |
+| Our C++ helpers | Typed native compile and test execution share the Working node with a separate native read-only inspection context. Scratch Pad hands off to the supported non-GUI Jade client for reliable write output. Source inspection stays separate. Structural loads reconnect; debugging takes an exclusive lease. Vendor tools also perform native database/schema operations. |
 | Installed Jade runtime | Compiler, Object Manager, database utilities and runtime semantics. Vendor DLLs and databases are not shipped by these repositories. |
 | Workspace files and Git | Application source and user-reviewed commits. Build/test consume saved source; previews and Scratch Pad have explicitly described unsaved-buffer behaviour. |
 | Private storage | System metadata cache, broker state and Working databases outside the source checkout. The metadata cache does not replace an executable database. |
