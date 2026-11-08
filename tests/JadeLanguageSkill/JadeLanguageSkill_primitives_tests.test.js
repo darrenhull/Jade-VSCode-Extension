@@ -11,7 +11,7 @@ test('primitive guide and native declaration fixture cover every primitive in th
 });
 test('actual native audit covers the fixture inventory and distinguishes compile rejection from runtime overflow',()=>{
  const root=path.resolve(__dirname,'../..'),audit=JSON.parse(fs.readFileSync(path.join(root,'docs/test-evidence/primitive-audit.json'),'utf8'));assert.deepEqual(audit.primitiveTypes,types);assert.equal(audit.records.length,9);
- for(const record of audit.records){const text=fs.readFileSync(path.join(root,record.fixture),'utf8').replace(/\r\n/g,'\n');assert.equal(crypto.createHash('sha256').update(text).digest('hex'),record.sourceSha256,'Re-run native verification when its fixture changes.');}
+ for(const record of audit.records){const bytes=fs.readFileSync(path.join(root,record.fixture));assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),record.sourceSha256,'Re-run native verification when its fixture changes.');}
  const get=name=>audit.records.find(record=>record.fixture.endsWith('/'+name+'.jade'));
  for(const name of ['jade-primitive-matrix','jade-primitive-defaults','jade-current-clock-conversions','jade-byte-boundaries']){assert.equal(get(name).passed,true);assert.equal(get(name).compiled,true);assert.equal(get(name).executed,true);}
  assert.match(get('jade-primitive-matrix').output,/Integer64=2147483648/);assert.equal(get('jade-byte-boundaries').output,'0\n255\n');assert.match(get('jade-current-clock-conversions').output,/Byte=255/);
@@ -19,3 +19,5 @@ test('actual native audit covers the fixture inventory and distinguishes compile
  assert.equal(get('jade-application-actual-date').code,6026);
  for(const name of ['jade-byte-overflow-positive','jade-byte-overflow-negative']){assert.equal(get(name).code,4011);assert.equal(get(name).compiled,true);assert.equal(get(name).executed,true);assert.equal(get(name).output,'');assert.equal(get(name).runtimeError,4011);}
 });
+
+test('every native audit fixture retains exact verified bytes across Git checkout',()=>{const root=path.resolve(__dirname,'../..'),audit=JSON.parse(fs.readFileSync(path.join(root,'docs/test-evidence/primitive-audit.json'),'utf8')),{execFileSync}=require('node:child_process');const fixtures=audit.records.map(record=>record.fixture),attributes=execFileSync('git',['check-attr','text','--',...fixtures],{cwd:root,encoding:'utf8'}).trim().split(/\r?\n/);assert.deepEqual(attributes,fixtures.map(fixture=>fixture+': text: unset'),'Native receipts hash the exact compiled bytes; Git must not normalize them.');});

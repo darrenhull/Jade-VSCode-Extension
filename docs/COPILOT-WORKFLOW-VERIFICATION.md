@@ -8,7 +8,7 @@ The operator used the installed extension 0.17.3 in the real VS Code Copilot UI,
 
 | Existing cell | Real interaction | Observed validation result |
 | --- | --- | --- |
-| 2 | Asked Copilot to tidy messy code while preserving behavior | Native UI and exact saved-byte replay compiled and executed successfully; `Sum: 7`; replay 2,884 ms |
+| 2 | Asked Copilot from an end caret to tidy messy code while preserving behavior | Native UI and exact saved-byte replay compiled and executed successfully; `Sum: 7`; replay 2,884 ms |
 | 6 | Selected part of `firstFloat`, then chose Fix for three duplicated bodies and invalid `asString` conversions | Accepted one complete body with native `.String`; compiled and executed successfully; `Totals: 1.53`; independent replay 2,793 ms |
 | 8 | Asked ordinary Edit to add Real, Integer, Decimal, Boolean, Character and Byte examples, then used Fix on its actual native failure | First accepted generation failed with 6072 at an unconverted Byte assignment. Copilot Fix changed only that line to `byteValue := 7.Byte;`. Native UI and exact saved-byte replay then passed; output included `Primitive values: 1.5, 3` and `Additional values: 12.50, true, J, 7`; replay 2,831 ms |
 | 10 | Chose Fix from the end caret with the default short prompt after a native Decimal descriptor failure | Copilot changed only `amount : Decimal;` to `amount : Decimal[12,2];`. Native UI and exact saved-byte replay passed; `Amount: 12.50`; replay 2,789 ms |
@@ -22,7 +22,7 @@ The standalone Byte guidance fixture was also compiled and executed with the nat
 
 The actual failed Markdown response is retained verbatim in `test/fixtures/copilot-live-markdown-missing-mermaid.md`, with its source hash in the portable receipt. `MarkdownCopilotWorkflow` rejects it for missing the complete Mermaid fence. The validator checks content retention; successful native Mermaid rendering remains separate required evidence. Markdown source is not submitted to the Jade compiler.
 
-The additional ordinary end-caret Edit and the final attachment-only Markdown round trip remain pending; an explicit compatibility-prompt recovery passed as recorded below. This table does not imply that every generated suggestion compiles or satisfies its content requirements.
+The end-caret cleanup Edit is covered by cell 2. The final attachment-only Markdown round trip failed as recorded below; an explicit compatibility-prompt recovery passed. This table does not imply that every generated suggestion compiles or satisfies its content requirements.
 
 ## Repeatable regression tests
 
@@ -37,3 +37,13 @@ For a new live case: capture the intended cell before further UI changes, obtain
 ## Native Markdown recovery
 
 After Undo restored the rejected cell, a real Copilot request explicitly required one outer Markdown response fence and inner tilde Mermaid fences. The accepted existing cell retained its heading, prose and diagram; the native preview rendered Source → Tests → Working and the notebook still had 12 cells. The original truncation remains recorded as a failed attempt. The final extension supplies this compatibility guidance as a read-only Mermaid skill attachment; its default-prompt round trip remains a separate check from this explicit-prompt proof.
+
+## Remaining native Markdown limitation
+
+Two further installed-0.17.4 requests with the Mermaid guidance attached still failed: one retained only prose, and a short natural request retained only the inner flowchart body. The immutable receipts preserve both failures. This means the attachment is a useful instruction, not a proven reliable workaround for the native response decoder.
+
+A comparison with the experimental notebook-agent flag in the disposable workspace accepted complete tilde-fenced Markdown, but the native log still identified the legacy inline/edit route. It therefore does not prove the new handler fixed the problem. The setting was removed afterward; no user/global settings were changed. The normal Markdown diagram editing acceptance criterion remains open, and PR #37 must remain Draft. Code editing, the primitive audit and PR #32 are independent of this limitation.
+
+## Packaged checks and cleanup
+
+Preview 0.17.4 passed the exact packaged Notebook UI check (five Jade guide URIs, current native error context, separate Mermaid attachment, actual tilde-fence rendering) and portable CLI smoke without Node on PATH. These tests do not claim an authenticated model request. The real model round trips above are separate evidence. The completed native test session was disconnected, both owned test windows were closed, and the disposable 142 MB Working database and workspace test folder were removed. Compact source/response receipts remain available locally.

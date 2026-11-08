@@ -113,5 +113,27 @@
     ],
     "fenceStyle": "tilde",
     "initialFailurePreserved": true
+  },
+  "markdownAttachmentOnlyFailure": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "1bf5f96da42c7b8ff6322caf6a3429d7c303dc4b251893d72022058c5a7fad09",
+    "currentCellCount": 12,
+    "nativeMermaidSkillAttachmentObserved": true,
+    "userRequestIncludedPreserveFence": true,
+    "result": "Content failed: native accepted replacement omitted the diagram; attached guidance alone did not ensure nested-fence compatibility."
+  },
+  "markdownShortPromptFailure": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "1ea66da011660d57a2195ca26c5f48151653c5d76daddf71cd9cbd04adbdceec",
+    "currentCellCount": 12,
+    "result": "Native inline accepted only the inner flowchart body, dropping Markdown prose and fences."
+  },
+  "markdownNotebookSettingComparison": {
+    "extensionVersion": "0.17.4",
+    "sourceSha256": "e1cf7ea9d28620caad70615e607517877acc3ff0dffdcfc16d06cd9487f94e6a",
+    "currentCellCount": 12,
+    "ownedWorkspaceSettingRequested": true,
+    "nativeAgentRoutingConfirmed": false,
+    "result": "Complete heading/prose/tilde Mermaid source accepted; routing not established, so not a proven general fix."
   }
 }

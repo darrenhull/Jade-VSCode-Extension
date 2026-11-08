@@ -1,0 +1,13 @@
+# Authenticated evidence is hashed as exact accepted source bytes.
+/test/fixtures/copilot-live-markdown-missing-mermaid.md -text
+
+# Sources compiled in the recorded native primitive audit.
+/test/fixtures/jade-primitive-matrix.jade -text
+/test/fixtures/jade-byte-hex-unconverted.jade -text
+/test/fixtures/jade-application-actual-date.jade -text
+/test/fixtures/jade-application-time-unconverted.jade -text
+/test/fixtures/jade-current-clock-conversions.jade -text
+/test/fixtures/jade-primitive-defaults.jade -text
+/test/fixtures/jade-byte-boundaries.jade -text
+/test/fixtures/jade-byte-overflow-positive.jade -text
+/test/fixtures/jade-byte-overflow-negative.jade -text
