@@ -146,7 +146,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sourceContext,
     pullSource,
     config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
-    inspectionTarget: async (config,selection) => { if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,selection,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
+    inspectionTarget: async (config,selection) => { if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     disconnectTarget: async (config,target) => { targetDisconnections.push({config,target}); },
     isBusy: () => busy,

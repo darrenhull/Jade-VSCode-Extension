@@ -1,58 +1,62 @@
-# Reuse the native connection across IDE tools
+# Share native connections across IDE tools
 
 Issue: https://github.com/darrenhull/Jade-VSCode-Extension/issues/34
+Draft implementation: https://github.com/darrenhull/Jade-VSCode-Extension/pull/44
 
-## Outcome
+## Outcome and boundaries
 
-Open the requested project's native connection when it is needed and reuse it while healthy. Object Explorer, compilation, tests and Scratch Pad must not require manual disconnection simply because the user changes tools. Source and Working remain distinct targets. This change adds no connection dashboard, scheduler, queue UI or connection setting.
+Open a configured target when needed and reuse its healthy native connection. The user should not disconnect Object Explorer manually before compilation, tests, Scratch Pad or debugging. Source and Working remain separate. No connection dashboard, scheduler, queue UI or normal-workflow setting is added.
 
-## Native boundary
+The existing C++ CLI broker owns lifecycle, FIFO ordering, cancellation and native reconnection. The extension presents those operations through its existing `CliWorkingSession`; it does not implement a second connection manager. Compilation, tests and native read-only inspection can share one Working node using separate thread-affine application contexts. Source inspection retains its own native read-only node.
 
-The existing C++ CLI broker owns native connections, request ordering, cancellation and actual reconnection. The extension already owns one CliWorkingSession; inspection currently bypasses its operation service through an exclusive helper lease. Route inspection through the existing `inspect.*` service namespace instead, using the original project configuration and explicit target. Do not send an already-resolved Working configuration as Source configuration, and do not implement a second connection manager in JavaScript.
+Structural loads, Scratch Pad and debugging use automatic native handoff followed by lazy reopening. Scratch Pad keeps the supported non-GUI Jade client so `write` output is delivered reliably. It does not claim uninterrupted physical-node reuse. Native FileCapture on a retained Object Manager node did not flush until node finalization; public documentation provides no supported force-flush or output-binding API. No private replacement or source rewriting was introduced.
 
-Native implementation and disposable proof are prerequisites: read-only inspection must retain its native read-only guard while sharing a compatible Working node with execution. Native connection identity/epochs must reject stale cursors after structural reconnection. The first existing inspect.catalog request confirms actual native read-only readiness and returns an additive opaque connectionEpoch. Reuse that initial catalogue once for an exact matching UI request; later catalogue requests go to native code. Do not infer a database connection merely from the CLI stdio process. The native proof remains a prerequisite; no unsupported command is shipped as a placeholder.
+## Implementation checklist
 
-## Implementation sequence
+- [x] Write failing ownership/adapter tests before product changes. An idle inspector incorrectly claimed global operation ownership, and Scratch preparation disconnected two healthy native contexts.
+- [x] Replace the exclusive inspection helper lease with a thin adapter over existing `inspect.*` operations. Send original project configuration plus explicit Source/Working target, not an already-derived Working configuration.
+- [x] Use the first `inspect.catalog` response to confirm actual native read-only readiness, native OID format and opaque connection epoch. Reuse that catalogue once for an identical UI request; subsequent reads are native requests.
+- [x] Remove automatic disconnects from normal compile, test and Scratch preparation. Preserve explicit native handoff for publication, external utilities, reset and debugger ownership.
+- [x] Preserve target-qualified navigation, native cursor ownership, cancellation, shutdown and settings/project-file changes. Reject stale epoch replies without replaying old object IDs.
+- [x] Distinguish explicit physical Disconnect from logical cancel/disposal. `inspect.close` with `args.disconnect:true` releases only the selected idle target. The backend refuses to terminate another consumer and cleans only the caller's context. It does not create a missing Working database merely to disconnect it.
+- [x] Verify real native A -> B -> A execution, method-body reuse, structural reconnection, independent Scratch output and Source/Working separation in a disposable fixture.
+- [x] Verify private VS Code debugger regression and inspection handoff: preserve a paused debugger, stack/frame locals, object expansion, cycles, native collections and subsequent lazy inspection reopening.
+- [x] Commit this plan, source, grouped tests and editable/rendered architecture together. Capture actual changed UI in an owned private host.
+- [ ] Replace the approved 0.4.3 dependency with a verified official shared-connection CLI release after its approval. The tested candidate is not an official pin.
+- [ ] Complete final 0.18.0 version/release notes, official-bundle packaging and current-head checks/review. Only then request owner approval and protected squash merge.
 
-1. Write red-first adapter and ownership regressions. Prove that an idle inspector does not claim the extension's active-operation flag and that switching ordinary tools does not call global disconnect.
-2. Replace the inspector helper lease with a thin transport over the shared CliWorkingSession. Reuse native target/configuration identity, native OID capability and explicit read-only confirmation; preserve errors, source locations and request cancellation.
-3. Remove automatic inspection/native disconnect hooks from normal compile, test and Scratch Pad preparation. Retain exclusive handoff for external native utilities, publication, reset and the debugger helper lease. A paused debugger must never be silently terminated.
-4. Preserve database selection, schema/project identity, history snapshots, cursor release and close/dispose behavior. Configuration changes must not reuse another target's connection or accept stale replies.
-5. Verify actual native cross-tool reuse and A -> B -> A tests against disposable Working data. Tests execute every time; successful input/session reuse is not cached test results. Verify structural close/reopen using CLI #13, read-only Source inspection and debugger handoff.
-6. Commit this plan with code and grouped tests, and bundle only a verified compatible native CLI. Keep the PR Draft while implementation or required native proof is incomplete. Mark Ready to trigger Codex once verified, resolve all current-head findings, then request owner approval behind protected checks.
+## Verification
 
-## Verification ledger
+Red-first regressions cover lazy-open deduplication, idle ownership, own-request cancellation, stale native epochs, old target replies, config changes, explicit Disconnect versus cancel/dispose, and shutdown when the shared service closes first. The complete run after rebasing onto approved main passed **952 JavaScript tests and 18 PowerShell contracts**, with **43 explicit optional skips** and zero failures. The final official-bundle update will be checked separately. Default tests explicitly skip the opt-in licensed native fixture.
 
-Red-first regressions run before product edits: the connected idle Object Explorer claimed global execution ownership (true instead of false), and Scratch Pad preparation disconnected the inspector and retained native helper (two releases instead of zero). Both tests failed for the intended behavior. Native mixed-role shared-node proof has now passed in the native owner: a shared node supports read-only and writable thread-affine application processes with the read-only transaction guard intact. Eight thin service-transport tests pass for actual catalogue readiness, original-config/target identity, native capabilities, per-session close, own-request cancellation, stale replies and epoch changes. The adapter is now wired into product activation; compile, tests and Scratch Pad no longer disconnect ordinary inspection or the shared native service. Exclusive utilities, publication, reset and debugger handoff retain explicit release. The first full integration regression run passed934 JavaScript and18 PowerShell tests, with42 explicitly optional skips. Further red-first regressions now cover first-use deduplication, stale native epochs, pending old-target results and settings/project configuration changes.
+The reusable `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the coherent candidate in 44.88 seconds. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI`, and a private `JADE_TOOLS_STATE_DIRECTORY` within a disposable `jade-cli-integration-seed-*` fixture. The fixture supplies SharedConnectionPet and SharedConnectionTestsA/B. Every edited source file is restored and only the fixture broker is shut down; Source is never published.
 
-Native connection epochs are returned by every inspection operation. Later requests carry the known epoch as a precondition. A staleConnection reply invalidates old history/cursors and rejects the pending stale operation without replaying its object ID into a replacement connection. Refresh retrieves current data. Logical close cancels only its own requests and leaves healthy shared native ownership to the broker.
-
-Delivery remains blocked on the verified compatible native CLI candidate and real mixed-tool, structural and debugger runtime proof. The installed official0.17.8 release is a separate approved CLI0.4.3 consumer update; this feature has not been installed or claimed complete. Record actual packaged behavior, screenshots and timing boundaries before review handoff.
-
-Latest rebased integration verification: **946 JavaScript tests passed**, **18 PowerShell contracts passed**, **42 explicit optional skips**, zero failures. The latest run includes target-specific explicit disconnect coverage. The suite verifies the approved0.4.3 bundle while the shared-connection native candidate remains a separate delivery prerequisite. Focused red-first tests also proved automatic Refresh opening and safe extension shutdown when its shared CLI service is already disposed. No user window was reloaded or closed.
-
-The updated architecture SVG was maintained with the Draw.io XML fallback because the installed desktop exporter returned without producing output. Its embedded XML exactly round-trips to the editable source. An isolated headless Edge render was visually inspected; owned render/export profiles were removed after use. This diagram evidence is separate from the actual extension/native runtime proof still required.
-
-
-Native output compatibility finding: the retained Object Manager node does not flush Interpreter FileCapture output until node finalization. Public documentation provides no supported force-flush or interpreter output callback, and ReadWriteStdio applies specifically to jadclient startup. Scratch Pad therefore retains its supported non-GUI native-client path with automatic connection handoff and later lazy reopen. This is not same-physical-node reuse for Scratch Pad. Do not claim otherwise in runtime proof, review evidence or release notes. The user does not need to disconnect inspection manually; native code owns the transition. Compilation, tests and native read-only inspection remain the mixed-role reuse target.
-
-
-Explicit disconnect is distinct from cancel/dispose: the existing inspect.close accepts args.disconnect:true to release only the selected physical target. An idle target can still be disconnected after its logical reader closed, without preparing or opening a missing Working database. The native backend refuses to close another consumer's active target, releasing only the caller's logical context before reporting that refusal. The extension also rejects explicit disconnect while its own compile/test/debug operation is active. No global disconnect is used by this Object Explorer action. Ninety-six focused inspection/target/history/transport regressions pass, including red-first coverage of this distinction.
-
-
-## Actual native adapter proof
-
-The explicitly opt-in `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the coherent native candidate in44.88seconds. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI` and a dedicated `JADE_TOOLS_STATE_DIRECTORY` inside a disposable `jade-cli-integration-seed-*` fixture. Default tests skip it explicitly. The fixture supplies SharedConnectionPet plus SharedConnectionTestsA/B nativeValue methods in configured schemas. It restores every edited source file and shuts down only its private broker; it never publishes Source or installs the candidate.
-
-| Observed operation | End-to-end | Native phase evidence |
+| Observed operation | End-to-end | Native evidence |
 | --- | --- | --- |
-| Source / prepared Working reader startup |834ms /760ms | Separate native read-only identities |
-| Test A → B → A |1261ms /1185ms /1180ms | Native execution1159ms /1089ms /1092ms; each selected one test, completed and passed; same native epoch |
-| Method-only build |430ms | Native load342.8ms; reconnect0ms; same epoch |
-| Independent Scratch runs |5134ms /5011ms | Distinct returned output tokens; supported handoff and lazy reopen each time |
-| Structural change |11416ms | Native latest-schema reorganisation8850.6ms; reconnect517.6ms; changed epoch |
-| Working target disconnect |Succeeded | Source retained the same native epoch |
+| Source / prepared Working startup | 834 / 760 ms | Separate native read-only identities |
+| Test A -> B -> A | 1261 / 1185 / 1180 ms | Native runs 1159 / 1089 / 1092 ms; each selects one test, completes and passes; same epoch |
+| Method-only build | 430 ms | Native load 342.8 ms, reconnect 0 ms; same epoch |
+| Independent Scratch runs | 5134 / 5011 ms | Distinct output tokens; automatic handoff and lazy reopen |
+| Structural change | 11416 ms | Reorganisation/load 8850.6 ms; reconnect 517.6 ms; changed epoch |
+| Working disconnect | Succeeded | Source retains its native epoch |
 
-These startup figures use an already prepared disposable Working base; they are not cold-backup timings. Initial class loading and structural setup were measured separately from warm test reuse. The test verifies actual per-method results and output rather than accepting a cached success flag. Candidate executable SHA256 was `a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487`; manifest SHA256 `a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0`. This is an unreleased candidate receipt, not the official0.4.3 distribution.
+Startup figures use an already prepared fixture, not a cold backup. Initial structural setup is separate from warm test reuse. Test reports contain real per-method outcomes and native log evidence, rather than cached execution results.
 
-Actual VS Code host/debugger ownership verification and a release-pinned native bundle remain delivery gates. No global preview installation or feature-complete claim follows from this adapter proof alone.
+Tested candidate receipts:
+
+- Executable SHA256: `a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487`.
+- Manifest SHA256: `a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0`.
+
+These identify an unreleased candidate, not the official 0.4.3 distribution. The candidate was staged only in owned private VS Code profiles. The user's installed extension and windows were not replaced, closed or reloaded by this proof.
+
+## UI and debugger evidence
+
+The existing private debugger host passed breakpoint/F9 registration, stepping, string results, native stack, selected-frame locals, object expansion, cycles and native collection keys. The `--shared-connection` host additionally passes inspection-before-debug handoff, refusal to replace a paused debugger, and lazy inspection after debugging. It owns its profile, broker and cleanup. The corrected target-status host rerun also passed. Sanitized receipts are committed in `docs/verification/shared-native-connection.json`.
+
+Visual inspection found a real target-status defect: the CLI's typed configuration does not include a UI-only `selection` field. A failing regression reproduced the connected view's incorrect settings prompt; the fix derives that presentation field from the original selected target. Corrected screenshots are stored under `docs/screenshots/shared-connection/`.
+
+The architecture Draw.io and SVG remain editable and synchronized. The installed Draw.io exporter returned without writing output, so the skill's XML/vector fallback was used. Embedded XML round-trips to the source and an isolated Edge render was visually verified. Owned render profiles were removed afterward.
+
+## Delivery status
+
+Actual adapter and private debugger/mixed-role proofs are complete. Final delivery waits for the approved official native bundle, final consumer packaging/checks and automated review. PR #44 remains Draft and owner review/auto-merge are withheld until those gates clear. A successful private candidate proof does not imply that the globally installed extension includes this feature.

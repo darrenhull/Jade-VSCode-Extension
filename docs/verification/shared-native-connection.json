@@ -1,0 +1,70 @@
+{
+  "kind": "private prerelease candidate verification",
+  "candidateExecutableSha256": "a59cc61e6792614469b144b98c677b71ca03e185c195b416d43b3f6ad113b487",
+  "candidateManifestSha256": "a40efe74dc14c11a79134729e9f28ee89a054f1c96711ef89abaebfcebc289b0",
+  "nativeAdapter": {
+    "passed": true,
+    "durationMilliseconds": 44879.9215,
+    "sourceStartupMilliseconds": 834,
+    "preparedWorkingStartupMilliseconds": 760,
+    "testsAbaMilliseconds": [
+      1261,
+      1185,
+      1180
+    ],
+    "nativeTestsAbaMilliseconds": [
+      1159,
+      1089,
+      1092
+    ],
+    "methodBuildMilliseconds": 430,
+    "methodLoadMilliseconds": 342.7818,
+    "methodReconnectMilliseconds": 0,
+    "scratchMilliseconds": [
+      5134,
+      5011
+    ],
+    "structuralBuildMilliseconds": 11416,
+    "structuralLoadMilliseconds": 8850.61,
+    "structuralReconnectMilliseconds": 517.5561,
+    "targetedDisconnectPreservedSource": true
+  },
+  "privateVsCodeHost": {
+    "sharedInspectionDebugHandoff": true,
+    "pausedDebuggerProtected": true,
+    "lazyInspectionAfterDebug": true,
+    "callerSourcePositions": true,
+    "nativeCollectionsAndKeys": true,
+    "fullNativeStack": true,
+    "selectedCallerLocals": true,
+    "expandableObjects": true,
+    "cyclicReferences": true,
+    "passed": true,
+    "version": "0.17.9",
+    "breakpoint": true,
+    "editorBreakpointToggle": true,
+    "stepOver": true,
+    "locals": [
+      0,
+      40,
+      42
+    ],
+    "stringInspectionAndReturn": true,
+    "sourceLinesCorrect": true,
+    "noPython": true
+  },
+  "defaultTests": {
+    "javascriptPassed": 952,
+    "powershellPassed": 18,
+    "explicitOptionalSkipped": 43,
+    "failed": 0
+  },
+  "screenshots": [
+    "../screenshots/shared-connection/inspection-before-debug.png",
+    "../screenshots/shared-connection/inspection-after-debug.png"
+  ],
+  "delivery": {
+    "globalCandidateInstalled": false,
+    "officialSharedConnectionCliPinPending": true
+  }
+}

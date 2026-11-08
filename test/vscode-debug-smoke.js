@@ -40,7 +40,7 @@ async function run() {
     const extension = vscode.extensions.getExtension(
       "jade-local-tools.jade-native-runner-cpp-preview",
     );
-    await extension.activate();
+    const api = await extension.activate();
     const settings = vscode.workspace.getConfiguration(
       "jadeNative",
       vscode.workspace.workspaceFolders[0].uri,
@@ -65,6 +65,25 @@ async function run() {
     const file = path.join(root, "VsCodeDebugProbe.cls"),
       doc = await vscode.workspace.openTextDocument(file);
     await vscode.window.showTextDocument(doc);
+    const sharedProof = process.env.JADE_SHARED_CONNECTION_PROOF === '1';
+    async function connectInspectionAndCapture(name) {
+      await vscode.commands.executeCommand('jadeNative.connectObjects');
+      assert.ok(api.objectExplorer.session.client, 'Inspection opens its native reader without manual handoff');
+      await api.objectExplorer.session.client.ready;
+      await vscode.commands.executeCommand('jadeNative.objects.focus');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      const client = await require('./creation-ui-capture.cjs').connectPrivateDebugger(Number(process.env.JADE_SHARED_CONNECTION_DEBUG_PORT));
+      try {
+        const targets = await client.request('Target.getTargets');
+        const page = targets.targetInfos.find(target => target.type === 'page' && target.url.startsWith('vscode-file://'));
+        assert.ok(page, 'Private Code renderer must be found');
+        const attached = await client.request('Target.attachToTarget', {targetId:page.targetId,flatten:true});
+        const image = await client.request('Page.captureScreenshot', {format:'png',captureBeyondViewport:false}, attached.sessionId);
+        const directory = process.env.JADE_SHARED_CONNECTION_SCREENSHOTS;
+        fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,name+'.png'),Buffer.from(image.data,'base64'));
+      } finally {client.close();}
+    }
+    if (sharedProof) await connectInspectionAndCapture('inspection-before-debug');
     const lines = doc.getText().split("\n"),
       returnLine = lines.findIndex((l) => l.includes("return answer;")),
       firstLine = lines.findIndex((l) => l.includes("answer := 40;")),
@@ -122,6 +141,12 @@ async function run() {
     await wait((m) => m.event === "stopped");
     const session = vscode.debug.activeDebugSession;
     assert.ok(session);
+    if (sharedProof) {
+      assert.equal(api.objectExplorer.session.client, undefined, 'Debug launch releases its inspection lease automatically');
+      await assert.rejects(api.objectExplorer.session.connect(), /operation|wait/i);
+      assert.equal(vscode.debug.activeDebugSession, session, 'An inspection attempt must not terminate a paused debugger');
+    }
+
     let stack = await session.customRequest("stackTrace", { threadId: 1 });
     assert.equal(
       stack.stackFrames[0].line,
@@ -362,10 +387,18 @@ async function run() {
         messages.filter((x) => x.event === "terminated").length >
           terminatedCount,
     );
+    if (sharedProof) {
+      await stopSession(stackSession);
+      await connectInspectionAndCapture('inspection-after-debug');
+      await api.objectExplorer.releaseForOperation();
+    }
     fs.writeFileSync(
       report,
       JSON.stringify(
         {
+          sharedInspectionDebugHandoff: sharedProof,
+          pausedDebuggerProtected: sharedProof,
+          lazyInspectionAfterDebug: sharedProof,
           callerSourcePositions: true,
           nativeCollectionsAndKeys: true,
           fullNativeStack: true,

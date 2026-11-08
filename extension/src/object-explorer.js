@@ -94,7 +94,7 @@ function registerObjectExplorer(vscode, context, services) {
       try {
         if (generation !== session.generation || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
         currentConfig = config;
-        currentTarget = target;
+        currentTarget = { ...target, selection };
         refreshDescription();
         const authentication = credentials;
         credentials = undefined;
