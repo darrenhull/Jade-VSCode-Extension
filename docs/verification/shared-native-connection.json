@@ -28,6 +28,7 @@
     "targetedDisconnectPreservedSource": true
   },
   "privateVsCodeHost": {
+    "firstRefreshAfterNativeReconnect": true,
     "sharedInspectionDebugHandoff": true,
     "pausedDebuggerProtected": true,
     "lazyInspectionAfterDebug": true,
@@ -52,7 +53,7 @@
     "noPython": true
   },
   "defaultTests": {
-    "javascriptPassed": 952,
+    "javascriptPassed": 955,
     "powershellPassed": 18,
     "explicitOptionalSkipped": 43,
     "failed": 0
@@ -83,8 +84,16 @@
   "extensionArtifact": {
     "version": "0.18.0",
     "file": "jade-native-runner-cpp-preview-0.18.0.vsix",
-    "sha256": "2d733b7d7abeb5781e20875a9cc4ba23b72bc5c1a105824dd5e58f0ebd193b55",
+    "sha256": "a608bd26b7a2664d287d20c23fb265ac7ab46dd55985553d485cdd83fae6b0ae",
     "portableNoNodeNoDatabaseSmoke": true,
     "actualPackagedVsCodeHost": true
+  },
+  "reviewRegression": {
+    "commentId": 4506982499,
+    "catalogueEpochRetryLimit": 1,
+    "oldObjectAndCursorRequestsNeverReplayed": true,
+    "changedTargetNotFollowed": true,
+    "continuousReplacementBounded": true,
+    "actualPackagedSingleRefreshAfterNativeReconnect": true
   }
 }

@@ -29,7 +29,7 @@ Structural loads, Scratch Pad and debugging use automatic native handoff followe
 
 ## Verification
 
-Red-first regressions cover lazy-open deduplication, idle ownership, own-request cancellation, stale native epochs, old target replies, config changes, explicit Disconnect versus cancel/dispose, and shutdown when the shared service closes first. The complete run after rebasing onto approved main passed **952 JavaScript tests and 18 PowerShell contracts**, with **43 explicit optional skips** and zero failures. The same complete suite passed with the final official 0.5.0 bundle. Default tests explicitly skip the opt-in licensed native fixture.
+Red-first regressions cover lazy-open deduplication, idle ownership, own-request cancellation, stale native epochs, old target replies, config changes, explicit Disconnect versus cancel/dispose, and shutdown when the shared service closes first. The complete run after rebasing onto approved main passed **955 JavaScript tests and 18 PowerShell contracts**, with **43 explicit optional skips** and zero failures. The same complete suite passed with the final official 0.5.0 bundle. Default tests explicitly skip the opt-in licensed native fixture.
 
 The reusable `tests/CliInspectionTransport/CliInspectionTransport_native_tests.test.js` passed against the final official CLI 0.5.0 in 62.79 seconds on a fresh disposable Working database. It requires `JADE_SHARED_ADAPTER_FIXTURE`, `JADE_SHARED_ADAPTER_CLI`, and a private `JADE_TOOLS_STATE_DIRECTORY` within a disposable `jade-cli-integration-seed-*` fixture. The fixture supplies SharedConnectionPet and SharedConnectionTestsA/B. Every edited source file is restored and only the fixture broker is shut down; Source is never published.
 
@@ -64,3 +64,12 @@ The architecture Draw.io and SVG remain editable and synchronized. The installed
 ## Delivery status
 
 Implementation, official native pin, default tests, portable VSIX smoke, actual native adapter and packaged private debugger/UI proofs are complete. Push verified work, finish repository automation, then mark PR #44 Ready to trigger automated review. Resolve all current-head findings before requesting owner approval or protected auto-merge. Live checks and approval are tracked in PR #44; this plan does not claim that a global installation or release has occurred.
+
+
+## Review regression: one Refresh after native reconnection
+
+Codex comment 4506982499 identified that an epoch change could invalidate a catalogue load and require a second Refresh when no instance cursors were cached. Two failing regressions reproduced the missing reload and unbounded-replacement expectations before the fix; the database-switch guard was also verified.
+
+The transport now marks only the native stale-connection response with a typed inspection epoch error. The UI reloads the catalogue once when the original client and target still match. A newer catalogue request is reused, and repeated epoch changes stop after the bounded retry. Object IDs and cursor requests are never replayed, and changing the database prevents the old request from following the new target.
+
+All 955 JavaScript tests and 18 PowerShell contracts pass with 43 explicit optional skips. The rebuilt official 0.5.0-backed VSIX passes portable pin/hash/no-Node checks. Its actual private VS Code host deliberately closes the native Working connection while retaining the logical inspector, then asserts that one Refresh both observes a new epoch and repopulates schemas. Full paused-debug ownership, stack, variables, object/collection expansion and inspection reopening also pass. Owned host/broker processes stopped and the native owner removed the disposable seed and assembly roots.

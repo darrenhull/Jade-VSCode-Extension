@@ -70,6 +70,13 @@ async function run() {
       await vscode.commands.executeCommand('jadeNative.connectObjects');
       assert.ok(api.objectExplorer.session.client, 'Inspection opens its native reader without manual handoff');
       await api.objectExplorer.session.client.ready;
+      if (name === 'inspection-before-debug') {
+        const previousEpoch = api.objectExplorer.session.client.connectionEpoch;
+        await api.nativeTests.release();
+        await vscode.commands.executeCommand('jadeNative.refreshObjects');
+        assert.notEqual(api.objectExplorer.session.client.connectionEpoch, previousEpoch, 'The native connection must actually be replaced');
+        assert.ok((await api.objectExplorer.provider.getChildren()).some(row => row.kind === 'schema'), 'One Refresh must repopulate the catalogue after native reconnection');
+      }
       await vscode.commands.executeCommand('jadeNative.objects.focus');
       await new Promise(resolve => setTimeout(resolve, 400));
       const client = await require('./creation-ui-capture.cjs').connectPrivateDebugger(Number(process.env.JADE_SHARED_CONNECTION_DEBUG_PORT));
@@ -396,6 +403,7 @@ async function run() {
       report,
       JSON.stringify(
         {
+          firstRefreshAfterNativeReconnect: sharedProof,
           sharedInspectionDebugHandoff: sharedProof,
           pausedDebuggerProtected: sharedProof,
           lazyInspectionAfterDebug: sharedProof,

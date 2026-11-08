@@ -193,8 +193,9 @@ function registerObjectExplorer(vscode, context, services) {
     await releaseNativeCursor(previous?.cursor);
     for(const record of instanceCatalogues.values()) if(record.generation===session.generation && record.oid===oid) void record.controller.update().catch(()=>{});
   }
-  function loadCatalog() {
-    const generation = session.generation,
+  function loadCatalog(reloadEpoch = true) {
+    const client = session.client, target = session.target,
+      generation = session.generation,
       version = ++catalogVersion;
     const request = session
       .request("catalog", { includeSystem: showSystem })
@@ -219,6 +220,10 @@ function registerObjectExplorer(vscode, context, services) {
           return data;
         },
         (error) => {
+          if (error.code === 'JADE_INSPECTION_EPOCH_CHANGED' && client === session.client && target === session.target && !disposed) {
+            if (catalogRequest && catalogRequest !== request) return catalogRequest;
+            if (reloadEpoch) return loadCatalog(false);
+          }
           if (version !== catalogVersion && generation === session.generation)
             return catalogRequest;
           throw error;

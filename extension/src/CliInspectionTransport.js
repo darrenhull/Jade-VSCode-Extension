@@ -63,7 +63,7 @@ class CliInspectionTransport extends EventEmitter {
         this.initialCatalog=undefined;
         this.emit('epoch',{previous,current:body.connectionEpoch});
       }
-      if(body.staleConnection===true)throw Error('The native connection changed. Refresh the database view before inspecting this object again.');
+      if(body.staleConnection===true)throw Object.assign(Error('The native connection changed. Refresh the database view before inspecting this object again.'),{code:'JADE_INSPECTION_EPOCH_CHANGED'});
       return body;
     } finally {this.pending.delete(request.id);}
   }
