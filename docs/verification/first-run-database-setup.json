@@ -16,11 +16,11 @@
     "currentIntegrationFailuresBeforeFix": 5
   },
   "green": {
-    "withCurrentProgressAndCharacterSetCases": 60,
+    "withCurrentProgressAndCharacterSetCases": 80,
     "failed": 0,
-    "firstRunAndWizardCases": 21,
+    "firstRunAndWizardCases": 41,
     "powershellPassed": 18,
-    "javascriptPassed": 1017,
+    "javascriptPassed": 1037,
     "explicitOptInSkipped": 43
   },
   "actualPrivateVsCodeHost": [
@@ -35,7 +35,7 @@
   ],
   "screenshotsRecapturedOnCurrentImplementation": true,
   "packagedVsix": {
-    "sha256": "2aa3bfd1f89d63a6faf65729eab226fdd8849899f7196f6f0de78314590aba91",
+    "sha256": "9e4111cd01bbee3f8982192e1fef2b8c553ede52291f9eca76d48f4515d38695",
     "databaseFreeDiscovery": true,
     "officialNativePinAndAllHashesVerified": true,
     "nativeCliVersion": "0.6.0",
@@ -47,12 +47,24 @@
   "userSettingsChanged": false,
   "installedExtensionChanged": false,
   "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
-  "independentReadOnlyAudit": "Both current integration defects independently confirmed; updated guards and workspace scoping re-reviewed with no further concrete omission.",
+  "independentReadOnlyAudit": "Final read-only audit at f89e6e2 found no further concrete setup lifecycle or scope hole after all wizard/callsite boundaries were checked.",
   "preNativePromptCancellation": {
     "nativeCancellationUnchanged": true,
     "cancellationListenerRemoved": true,
     "settlesWithoutDismissal": true,
     "lateResponseCannotAffectNextConnect": true,
     "visibleControlsUnchangedAfterLifecycleFix": true
+  },
+  "fullWizardCancellation": {
+    "installationBrowseDatabaseIniAndModeWaitsCovered": true,
+    "openFolderCommandWaitCancellable": true,
+    "terminalNotificationsNonBlocking": true,
+    "removedOrRemappedScopeDoesNotReceiveWrites": true,
+    "partialSaveFailureRetainsCountAndCause": true,
+    "startedCommitAwaitedBeforeSettlement": true,
+    "noPreSaveWritesAfterCancellation": true,
+    "targetSelectorRespectsSetupDismissal": true,
+    "standaloneWithoutTokenCompatible": true,
+    "tokenForwardedThroughActualDiscoverCommand": true
   }
 }
