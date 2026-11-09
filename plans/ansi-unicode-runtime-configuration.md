@@ -1,7 +1,7 @@
 # ANSI and Unicode runtime configuration
 
 Issue: [#49](https://github.com/darrenhull/Jade-VSCode-Extension/issues/49)
-Native dependency: Jade CLI #25, coherent compatible native package required before release readiness.
+Native dependency: Jade CLI #25 / PR #26, now merged and officially released as 0.6.0. The exact verified official distribution is pinned in this change.
 
 ## Scope
 
@@ -16,7 +16,7 @@ Add a resource-scoped `jadeNative.characterSet` enum (`auto`, `ansi`, `unicode`)
 5. Run full default regressions, exact distribution verification and portable packaged checks. Capture the actual Settings UI in a private VS Code host. Use native owner's disposable ANSI/Unicode evidence; never open vendor/source databases from extension-only tests.
 6. Commit code, plan, tests and evidence in one linked Draft PR. Move Ready only when compatible bundle, current-head checks, UI evidence and native capability claims are verified; address review comments until owner review is the only remaining gate.
 
-## Initial evidence and remaining gate
+## Initial red/green evidence (historical)
 
 Four initial tests failed against approved main: missing setting metadata and missing characterSet in actual activation's workspace configurations. All 26 focused configuration/transport cases now pass, including explicit scope inspection, default omission, legacy cache/debug-session request forwarding and native mismatch-error preservation. The activation fixture uses the real configuration resolver with fake filesystem checks; explicit empty, null and numeric choices remain intact for native rejection. Actual private VS Code Settings UI displays auto without writing workspace settings or starting a native broker. The full default suite passes 996 JavaScript tests and 18 PowerShell checks (43 explicit native opt-in skips). Packaging correctly rejects the old 0.5.0 bundle because the feature now requires CLI 0.6.0; this is a deliberate release gate until verified compatible native bytes are adopted. No database or installed user extension is touched. Actual Settings UI and private packaged native integration are now verified below. Production adoption still requires the reviewed official CLI release; mock transport tests alone are not native execution evidence.
 
@@ -35,3 +35,11 @@ Remaining delivery gates are the reviewed official CLI release and exact officia
 
 Candidate 187b6fb adds bounded native log-line framing and restores the preexisting StringUtf8 early size guard before SDK dereference. The valid-value getter is unchanged. Every final manifest asset and the rebuilt private VSIX passed verification and portable no-Node/no-database smoke. The sanitized receipt explicitly retains the earlier connected candidate hashes rather than attributing its native/UI proof to these later bounded changes. Native-owner regressions cover the review fixes; no additional database connection was made. Production adoption still awaits the approved official release.
 
+
+## Official distribution adopted
+
+Rebased onto approved extension 0.18.3 (main c1d3014), preserving the backup and diagnostics fixes. The official CLI 0.6.0 tag points to reviewed main 4220e8c. The existing safe updater verified the trusted archive/checksum source, bounded extraction, version, exact manifest and every runtime asset. GitHub archive/executable digests match. The production pin and full official runtime are committed together; no development runtime is included.
+
+Against those official bytes, the final default suite passed 996 JavaScript and 18 PowerShell checks, with 43 explicit native opt-in skips. The actual 0.19.0 VSIX passed portable discovery outside the checkout without Node on PATH or any database connection. The earlier actual native/editor proof remains attributed to its exact candidate hashes; no new connected test is claimed for this official artifact verification. See docs/verification/runtime-character-set-official.json. The installed user environment remains unchanged.
+
+All implementation, configuration tests, UI evidence and official package gates are complete. Current-head CI/automated review and protected owner approval remain the delivery gates. Historical pending-candidate notes above describe the sequence, not the current production pin.

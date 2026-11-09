@@ -1,6 +1,6 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.5.2 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.6.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
@@ -68,7 +68,7 @@ The CLI prepares visible saved schema source in the private Working database bef
 
 The JSONL operation is `workspace.run`, with `config`, exact `sourceText`, an optional `source` URI label, and optional zero-based `lineOffset`/`columnOffset` for a selected source snapshot. The result preserves native compiler codes and UTF-16 positions/lengths in `report.diagnostics`, with one-based source line/column, plus `report.output`, execution state and Working identity. Clients must inspect `passed` and diagnostics: a handled Jade compiler error can accompany a native process exit code of zero. Cancellation/timeout stop the owned process; partial redirected output can remain buffered until exit.
 
-Workspace input is limited to 64 KiB of UTF-8 text; result output is bounded to 256 KiB and indicates truncation. Standard input is closed: a Jade `read` receives EOF/default input instead of asking the user, so code containing `read` may still complete with an empty/default value. The verified `jadclient` runtime emits redirected output using the Windows ANSI code page, which the CLI decodes before returning UTF-8 JSON. `outputEncoding` identifies that code page. Jade can replace characters unavailable in that encoding, so this path does not promise lossless Unicode console output. The source snapshot and native diagnostic positions remain Unicode.
+Workspace input is limited to 64 KiB of UTF-8 text; result output is bounded to 256 KiB and indicates truncation. Standard input is closed: a Jade `read` receives EOF/default input instead of asking the user, so code containing `read` may still complete with an empty/default value. The verified `jadclient` runtime emits redirected output using the Windows ANSI code page, which the CLI decodes before returning UTF-8 JSON. `outputEncoding` identifies that code page. Jade can replace characters unavailable in that encoding, so this path does not promise lossless Unicode console output. Source snapshots retain their original encoding; diagnostics preserve the source locations supplied by native Jade.
 
 Structural load errors also use Jade's per-load compiler log. An unambiguous source line is mapped back to its original local file. If a generated line cannot be identified uniquely, the diagnostic retains the actual generated file and native location rather than guessing a user source line.
 
@@ -89,6 +89,14 @@ jade-cli test .\FishTest.cls .\HampsterTests.cls
 ```
 
 The installation path lives in your private `%LOCALAPPDATA%/JadeTools/connections.json`, outside the repository. The CLI infers the Source database as `<installPath>/system`, its INI as `<databasePath>/jade.ini`, the workspace root as the folder containing `jade.json`, and private Working storage as `%LOCALAPPDATA%/JadeTools/projects`. Working identities include workspace roots, so separate projects keep separate Working databases. Initialization writes configuration only; it does not connect, extract, compile or publish source.
+
+Native helper selection defaults to `"characterSet": "auto"`. The CLI detects whether the configured installation uses ANSI or Unicode and selects the matching packaged helper before opening a native session. An optional `characterSet` preference can be stored in the project configuration or a private connection profile; a project preference overrides the profile. The accepted values are exactly `auto`, `ansi` and `unicode`. A conflicting preference fails with the requested and detected modes; it does not convert a database or substitute vendor DLLs.
+
+```json
+{ "connection": "demo", "characterSet": "ansi" }
+```
+
+Normally omit this preference and leave detection automatic. Runtime selection does not establish support for every debugger ABI; debugging still requires a verified matching native profile.
 
 A missing `jade.json` is initialized automatically by `build`, `test` or `workspace run`. With one saved connection it is selected automatically. With several, use `--profile demo`; an interactive terminal can choose from a list. With no saved connection, use `--install`, set `JADE_INSTALL` (or `JADE_HOME`), or enter the installation folder when prompted. Piped input, JSONL services and CI never prompt: ambiguous or missing setup returns a clear configuration error. An explicitly named missing `--config` file is an error, rather than an implicit new project.
 
@@ -210,6 +218,21 @@ Bot PR creation runs separately from the full build. Squash auto-merge waits for
 
 [Edit the diagram in draw.io](docs/architecture.drawio). The SVG is the rendered companion to the editable source.
 
-### Native character ABI and error text
 
-Connected helpers require a 64-bit Unicode Jade runtime. Before passing native string parameters, they use Jade’s SDK character conversion to reject ANSI or unknown character width clearly. Native error resources are decoded through the same vendor conversion; resource/conversion failures retain the original Jade error code with a safe message fallback. This does not add ANSI runtime support or diagnose a database-lock error from its encoding alone.
+## Native runtime character sets
+
+`characterSet` is optional: `auto` selects the ANSI or Unicode helper using Jade's native Character conversion API before opening a database. Set `ansi` or `unicode` to require that ABI; native Working build/test and inspection reject an explicit mismatch before dispatch and preserve an already healthy shared connection. It does not convert a database or replace vendor DLLs. JSON/source editing stays UTF-8; the shared C++ boundary uses the SDK's `Character` type and Windows code-page conversion for ANSI strings. Unsupported/unrepresentable parameter text fails instead of being silently replaced.
+
+Native error resources are decoded through Jade's SDK conversion. Resource/conversion failures retain the original Jade error code with a safe message fallback; character encoding alone does not diagnose a database-lock error.
+
+| Capability | ANSI | Unicode |
+| --- | --- | --- |
+| Working native compilation, structural load/reorganisation and tests | SDK-typed helper | SDK-typed helper |
+| Read-only database metadata/object inspection | SDK-typed helper with native read-only sign-on | SDK-typed helper with native read-only sign-on |
+| Scratch Pad execution | Matching installed `jadclient` | Matching installed `jadclient` |
+| Debugging | Explicitly unavailable until a native ANSI debugger ABI profile is verified | Existing verified debugger ABI profiles |
+| Retired offline compiler/type-cache helper | Explicitly unavailable | Existing supported private ABI profile |
+
+The distribution contains ABI-neutral inspection/test/debug entry points plus ANSI/Unicode typed variants. Vendor Jade DLLs are required from the configured installation and are not redistributed. Native `StringUtf8` values use the SDK UTF-8 reference getter directly, preserving Chinese, emoji and other Unicode characters even in ANSI databases. Ordinary ANSI `String` text uses the Windows active code page; CP1252 was exercised against the isolated local Jade 25.0.1.24 demo clone, with fake conversion coverage for DBCS CP932. This does not claim connected coverage of every code page or vendor hotfix. Loader method errors retain the native method and line; when native output provides no column, the existing line-only diagnostic uses column 1 rather than inventing an offset.
+
+Retired cache/index commands are unavailable on ANSI. Their raw helper lease can release this CLI's idle shared sessions before its stdin request is validated; no cache is created, and the next supported operation reconnects automatically. This legacy path does not have the early mismatch-preservation guarantee of native Working operations.

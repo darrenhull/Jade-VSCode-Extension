@@ -1,0 +1,30 @@
+{
+  "status": "verified-official-production-pin",
+  "cliVersion": "0.6.0",
+  "extensionVersion": "0.19.0",
+  "officialTag": "v0.6.0",
+  "officialTagCommit": "4220e8cda57581ad332bb53d7130e451bcbecaa4",
+  "cliArchiveSha256": "0bcef430fd4fa75875a6fb83efb4c5e67b41078c78cea1ac65cf94c678e2beef",
+  "cliExecutableSha256": "f9c3e53af7383c20b479157bdcbdffdd455459c8baa1abbd02271114cd0fd6fe",
+  "nativeManifestSha256": "77093cc44098c0e94b3da8dae700d83636521aba049c647e5d916971b9007ca9",
+  "vsixSha256": "e2bd2879a65dc9524098dfa84a66d0d8f6734a2235c43551ba133527652a5e83",
+  "officialGithubArchiveAndExeDigestsMatch": true,
+  "allManifestAssetsVerified": true,
+  "defaultTests": {
+    "javascriptPassed": 996,
+    "powerShellPassed": 18,
+    "failed": 0,
+    "nativeOptInSkipped": 43
+  },
+  "portableVsixOutsideCheckout": true,
+  "nodeOnPathRequired": false,
+  "databaseOpenedForOfficialArtifactCheck": false,
+  "nativeConnectedProofProvenance": "runtime-character-set-native-candidate.json retains the actual earlier connected candidate hashes; final review fixes were native log framing and restoration of an existing early size guard.",
+  "actualSettingsScreenshot": "docs/screenshots/runtime-character-set/setting.png",
+  "installedEnvironmentChanged": false,
+  "remainingGates": [
+    "current-head CI",
+    "current-head automated review",
+    "owner approval"
+  ]
+}
