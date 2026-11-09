@@ -35,3 +35,8 @@ Three additional integration cases were first reproduced as failures: cancelling
 
 The final 0.19.1 implementation passes 17 first-run/wizard cases and 56 cases when combined with current connection-progress and character-set regressions. The full default suite passes 1013 JavaScript and 18 PowerShell checks, with 43 explicit native opt-in skips. The packaged VSIX matches the official CLI 0.6.0 manifest and every runtime asset and passes portable discovery without Node on PATH or a database connection. All three actual private VS Code setup states were recaptured and visually inspected against the current implementation, including its retained connection progress. Owned private hosts/profiles and temporary package extraction were cleaned. The independent read-only audit found no further concrete acceptance-criteria omission after the cancellation/scope fixes. User settings, installed extensions, brokers and databases remain untouched. Current-head CI and fresh automated review precede the protected owner-approval handoff.
 
+
+## Pre-native guidance cancellation
+
+Two bounded regressions proved Connect cancellation remained pending until the informational setup prompt was dismissed. A small presentation helper now races only these pre-native information prompts with the existing operation AbortSignal and always removes its listener. Cancelled/old prompt responses cannot execute actions or affect a subsequent Connect; two additional repeated-operation cases prove that isolation. No native backup cancellation or connection ownership behavior changed. All 60 focused cases pass; the full suite/package are rechecked on this final helper before Ready.
+

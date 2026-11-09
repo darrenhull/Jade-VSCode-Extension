@@ -75,3 +75,24 @@ test('an outside CLS selects a real workspace before missing-runtime setup',asyn
  const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>{if(name==='jadeNative.discover')resource=args[0];return execute(name,...args);};
  try{await s.commands.get('jadeNative.connectObjects')();assert.equal(picker?.options.title,'Choose Jade workspace folder');assert.equal(s.configCalls[0].folder,folders[1]);assert.equal(s.configCalls[0].doc,undefined);assert.equal(resource,folders[1].uri);assert.deepEqual(s.errors,[]);assert.equal(s.clients.length,0);}finally{await s.cleanup();}
 });
+
+for(const mode of ['empty','unconfigured'])test('Connect cancellation settles pending '+mode+' guidance without waiting for dismissal',async()=>{
+ const s=setup(mode==='unconfigured'?{configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})}:{});
+ s.vscode.window.activeTextEditor=undefined;if(mode==='empty')s.vscode.workspace.workspaceFolders=[];
+ let choose,settled=false,pending;s.vscode.window.showInformationMessage=()=>new Promise(resolve=>choose=resolve);
+ try{pending=s.commands.get('jadeNative.connectObjects')().then(result=>{settled=true;return result;});await new Promise(resolve=>setImmediate(resolve));s.progressOperations[0].cancel();await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,true);assert.deepEqual(await pending,{cancelled:true});assert.equal(s.contexts.get('jadeNative.connectingObjects'),false);assert.equal(s.clients.length,0);assert.deepEqual(s.errors,[]);
+ }finally{choose?.();await pending;await s.cleanup();}
+});
+
+for(const mode of ['empty','unconfigured'])test('a late cancelled '+mode+' prompt cannot affect the next Connect',async()=>{
+ const s=setup(mode==='unconfigured'?{configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})}:{});
+ s.vscode.window.activeTextEditor=undefined;if(mode==='empty')s.vscode.workspace.workspaceFolders=[];
+ const choices=[],executed=[];s.vscode.window.showInformationMessage=()=>new Promise(resolve=>choices.push(resolve));
+ const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>{executed.push(name);return execute(name,...args);};
+ let first,second,secondSettled=false;
+ try{first=s.commands.get('jadeNative.connectObjects')();await new Promise(resolve=>setImmediate(resolve));s.progressOperations[0].cancel();await first;
+ second=s.commands.get('jadeNative.connectObjects')().then(result=>{secondSettled=true;return result;});await new Promise(resolve=>setImmediate(resolve));
+ choices[0](mode==='empty'?'Create or Open Folder':'Detect Runtime Settings');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(secondSettled,false);assert.equal(s.contexts.get('jadeNative.connectingObjects'),true);assert.ok(!executed.includes('workbench.action.files.openFolder'));assert.ok(!executed.includes('jadeNative.discover'));s.progressOperations[1].cancel();await second;assert.deepEqual(s.errors,[]);
+ }finally{for(const choose of choices)choose();await Promise.allSettled([first,second]);await s.cleanup();}
+});
