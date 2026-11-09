@@ -20,3 +20,8 @@ Connect treated workspace folders as database-setting profiles. In an empty VS C
 Red: four of five initial regressions failed against approved 0.18.0, demonstrating the empty picker, misleading label and cancellation errors. Green: 14 focused first-run/wizard cases; full default suite passes 969 JavaScript tests and 18 PowerShell checks (43 explicit opt-in skips). Private VS Code hosts verify the actual empty-window guidance, unconfigured-folder guidance and detected-installation/Browse picker; screenshots are checked in under docs/screenshots/first-run. The packaged VSIX passes exact native receipt/hash checks and portable discovery without Node or a database connection. Owned host profiles and smoke artifacts are removed after verification.
 
 No connection manager, new configuration format, database operation or profile system is introduced.
+
+## Rebase onto approved 0.19.0
+
+Resolved the PR against approved main 92afb836, retaining the official CLI 0.6.0 distribution, characterSet/default-precedence support and the current single-flight connection/progress/cancellation path. The workspace picker keeps its active cancellation token while gaining clear labels and folder paths. The shared Object Explorer fixture retains its native target progress callback and preserves typed configuration failures. Release version is 0.19.1; no downgrade to the original 0.18.1 proposal. Setup UI wording is unchanged. Focused first-run, wizard, connection-progress and character-set regressions pass 53/53; full suite and refreshed private UI/package verification follow before Ready. Installed environment remains untouched.
+
