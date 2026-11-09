@@ -1,13 +1,49 @@
 {
   "issue": 45,
-  "version": "0.18.1",
-  "red": {"initialCases":5,"initialFailures":4,"neutralRuntimeSuccessMessageFailedBeforeChange":true},
-  "green": {"focusedCases":14,"javascriptPassed":969,"powershellPassed":18,"explicitOptInSkipped":43,"failed":0},
-  "actualPrivateVsCodeHost": ["empty-window-create-or-open-folder", "unconfigured-source-folder-runtime-setup", "detected-installation-and-explicit-browse"],
-  "screenshots": ["docs/screenshots/first-run/empty.png", "docs/screenshots/first-run/unconfigured.png", "docs/screenshots/first-run/installation.png"],
-  "packagedVsix": {"nativePinAndAllHashesVerified":true,"noNodeOnPath":true,"databaseFreeDiscovery":true},
+  "version": "0.19.1",
+  "approvedBase": "92afb836b0928eec2ee87a0be1e0dcb39cb5843a",
+  "red": {
+    "currentIntegrationCases": [
+      "cancelled empty-window setup ignores late Create/Open action",
+      "cancelled unconfigured setup ignores late Detect action",
+      "outside-workspace CLS selects an explicit workspace folder"
+    ],
+    "neutralRuntimeSuccessMessageFailedBeforeChange": true,
+    "originalInitialCases": 5,
+    "originalInitialFailures": 4,
+    "currentIntegrationFailuresBeforeFix": 3
+  },
+  "green": {
+    "withCurrentProgressAndCharacterSetCases": 56,
+    "failed": 0,
+    "firstRunAndWizardCases": 17,
+    "powershellPassed": 18,
+    "javascriptPassed": 1013,
+    "explicitOptInSkipped": 43
+  },
+  "actualPrivateVsCodeHost": [
+    "empty-window-create-or-open-folder",
+    "unconfigured-source-folder-runtime-setup",
+    "detected-installation-and-explicit-browse"
+  ],
+  "screenshots": [
+    "docs/screenshots/first-run/empty.png",
+    "docs/screenshots/first-run/unconfigured.png",
+    "docs/screenshots/first-run/installation.png"
+  ],
+  "screenshotsRecapturedOnCurrentImplementation": true,
+  "packagedVsix": {
+    "sha256": "840c1a9e869826af73fd81e94dc048a966e8b971f54946100b820845e2151152",
+    "databaseFreeDiscovery": true,
+    "officialNativePinAndAllHashesVerified": true,
+    "nativeCliVersion": "0.6.0",
+    "noNodeOnPath": true
+  },
+  "preservesCurrentCharacterSetConfiguration": true,
+  "preservesSingleFlightProgressCancellation": true,
   "nativeDatabaseOperations": false,
   "userSettingsChanged": false,
   "installedExtensionChanged": false,
-  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true
+  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
+  "independentReadOnlyAudit": "Both current integration defects independently confirmed; updated guards and workspace scoping re-reviewed with no further concrete omission."
 }
