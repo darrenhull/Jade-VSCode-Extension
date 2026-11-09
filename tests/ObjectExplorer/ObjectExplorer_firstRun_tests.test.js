@@ -96,3 +96,22 @@ for(const mode of ['empty','unconfigured'])test('a late cancelled '+mode+' promp
  assert.equal(secondSettled,false);assert.equal(s.contexts.get('jadeNative.connectingObjects'),true);assert.ok(!executed.includes('workbench.action.files.openFolder'));assert.ok(!executed.includes('jadeNative.discover'));s.progressOperations[1].cancel();await second;assert.deepEqual(s.errors,[]);
  }finally{for(const choose of choices)choose();await Promise.allSettled([first,second]);await s.cleanup();}
 });
+
+test('Connect forwards cancellation into the selected runtime wizard',async()=>{
+ const s=setup({configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})});s.vscode.window.activeTextEditor=undefined;s.vscode.window.showInformationMessage=async()=> 'Detect Runtime Settings';let token,finish,settled=false,pending;
+ s.commands.set('jadeNative.discover',async(_resource,value)=>{token=value;return new Promise(resolve=>{finish=resolve;token?.onCancellationRequested(resolve);});});
+ try{pending=s.commands.get('jadeNative.connectObjects')().then(value=>{settled=true;return value;});await new Promise(resolve=>setImmediate(resolve));assert.ok(token,'Runtime wizard must receive the active Connect cancellation token');s.progressOperations[0].cancel();await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,true);await pending;assert.equal(s.contexts.get('jadeNative.connectingObjects'),false);assert.deepEqual(s.errors,[]);
+ }finally{s.progressOperations[0]?.cancel();finish?.();await pending;await s.cleanup();}
+});
+
+test('Connect cancellation releases a pending Open Folder command',async()=>{
+ const s=setup();s.vscode.workspace.workspaceFolders=[];s.vscode.window.activeTextEditor=undefined;s.vscode.window.showInformationMessage=async()=> 'Create or Open Folder';let finish,settled=false,pending;
+ const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>name==='workbench.action.files.openFolder'?new Promise(resolve=>finish=resolve):execute(name,...args);
+ try{pending=s.commands.get('jadeNative.connectObjects')().then(value=>{settled=true;return value;});await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof finish,'function');s.progressOperations[0].cancel();await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,true);await pending;assert.equal(s.contexts.get('jadeNative.connectingObjects'),false);assert.equal(s.clients.length,0);assert.deepEqual(s.errors,[]);}finally{s.progressOperations[0]?.cancel();finish?.();await pending;await s.cleanup();}
+});
+
+for(const mode of ['empty','unconfigured'])test('database selection respects dismissed '+mode+' setup',async()=>{
+ const s=setup(mode==='unconfigured'?{configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})}:{});s.vscode.window.activeTextEditor=undefined;if(mode==='empty')s.vscode.workspace.workspaceFolders=[];
+ let picks=0;s.vscode.window.showInformationMessage=async()=>undefined;s.vscode.window.showQuickPick=async()=>{picks++;};
+ try{await s.commands.get('jadeNative.selectInspectionDatabase')();assert.equal(picks,0);assert.equal(s.clients.length,0);assert.deepEqual(s.errors,[]);}finally{await s.cleanup();}
+});

@@ -55,13 +55,13 @@ function registerObjectExplorer(vscode, context, services) {
       value,
     );
   };
-  async function setupInformation(message, ...actions) {
+  async function setupStep(show) {
     const operation = connectionOperation, signal = operation?.controller.signal;
     const cancelled = () => Error("Inspection connection cancelled.");
     if (disposed || signal?.aborted) throw cancelled();
     let onAbort;
     try {
-      const prompt = vscode.window.showInformationMessage(message, ...actions);
+      const prompt = show();
       const selected = signal
         ? await Promise.race([prompt, new Promise((_, reject) => {
             onAbort = () => reject(cancelled());
@@ -75,6 +75,7 @@ function registerObjectExplorer(vscode, context, services) {
       if (onAbort) signal.removeEventListener("abort", onAbort);
     }
   }
+  const setupInformation = (message, ...actions) => setupStep(() => vscode.window.showInformationMessage(message, ...actions));
   async function configuration() {
     if (inspectionScope) return configured(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
     const folders = vscode.workspace.workspaceFolders || [];
@@ -84,7 +85,7 @@ function registerObjectExplorer(vscode, context, services) {
         "Create or Open Folder",
       );
       if (selected === "Create or Open Folder")
-        await vscode.commands.executeCommand("workbench.action.files.openFolder");
+        await setupStep(() => vscode.commands.executeCommand("workbench.action.files.openFolder"));
       throw Error("Inspection connection cancelled.");
     }
     let doc = vscode.window.activeTextEditor?.document;
@@ -117,7 +118,7 @@ function registerObjectExplorer(vscode, context, services) {
         "Detect Runtime Settings",
       );
       if (selected === "Detect Runtime Settings")
-        await vscode.commands.executeCommand("jadeNative.discover", folder?.uri);
+        await vscode.commands.executeCommand("jadeNative.discover", folder?.uri, connectionOperation?.cancellation.token);
       throw Error("Inspection connection cancelled.");
     }
   }
@@ -1228,7 +1229,7 @@ function registerObjectExplorer(vscode, context, services) {
         let config;
         try {
           config = await configuration();
-        } catch {}
+        } catch (error) { if (/cancelled/i.test(error.message)) return { cancelled: true }; }
         if (!ownsTransition()) return { cancelled: true };
         const choice = await vscode.window.showQuickPick(
           [
