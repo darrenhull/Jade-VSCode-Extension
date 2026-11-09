@@ -17,15 +17,17 @@
     "defaultPrecedenceFailure": 1,
     "legacyForwardingFailures": 3,
     "minimumCompatibleCliGateFailedBeforeChange": true,
-    "debugSessionForwardingFailures": 3
+    "debugSessionForwardingFailures": 3,
+    "explicitInvalidEmptyValueFailure": 1
   },
   "configurationAndFakeTransport": {
-    "focusedPassed": 23,
-    "defaultJavaScriptPassed": 993,
+    "focusedPassed": 26,
+    "defaultJavaScriptPassed": 996,
     "powershellPassed": 18,
     "explicitNativeOptInSkipped": 43,
     "failed": 0,
-    "nativeDatabaseOpened": false
+    "nativeDatabaseOpened": false,
+    "actualResolverWithFakeFilesystemChecks": true
   },
   "actualPrivateSettingsUi": {
     "passed": true,

@@ -108,6 +108,8 @@ function activate(context) {
     const workspaceRoots = [folder?.uri.fsPath || path.dirname(document.uri.fsPath)];
     const config = resolveConfig({ ...settings, schema, program: document.uri.fsPath, workspaceRoots, classFile: true, sourceProperties: true,
       offline: false, run: false });
+    // Preserve explicit choices for CLI validation, including invalid empty values.
+    if (Object.hasOwn(settings, 'characterSet')) config.characterSet = settings.characterSet;
     const directory = settings.cacheDirectory ? path.resolve(folder?.uri.fsPath || path.dirname(document.uri.fsPath), settings.cacheDirectory)
       : path.join(context.globalStorageUri.fsPath, 'native');
     config.storagePath = directory;
