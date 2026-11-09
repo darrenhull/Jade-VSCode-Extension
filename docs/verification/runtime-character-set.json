@@ -1,0 +1,56 @@
+{
+  "issue": 49,
+  "version": "0.19.0",
+  "nativeContract": {
+    "field": "characterSet",
+    "values": [
+      "auto",
+      "ansi",
+      "unicode"
+    ],
+    "manifestDefault": "auto",
+    "manifestOnlyDefaultOmitted": true,
+    "explicitVsCodePreferencePreserved": true
+  },
+  "testsFirst": {
+    "initialConfigurationFailures": 4,
+    "defaultPrecedenceFailure": 1,
+    "legacyForwardingFailures": 3,
+    "minimumCompatibleCliGateFailedBeforeChange": true,
+    "debugSessionForwardingFailures": 3,
+    "explicitInvalidEmptyValueFailure": 1
+  },
+  "configurationAndFakeTransport": {
+    "focusedPassed": 26,
+    "defaultJavaScriptPassed": 996,
+    "powershellPassed": 18,
+    "explicitNativeOptInSkipped": 43,
+    "failed": 0,
+    "nativeDatabaseOpened": false,
+    "actualResolverWithFakeFilesystemChecks": true
+  },
+  "actualPrivateSettingsUi": {
+    "passed": true,
+    "screenshot": "docs/screenshots/runtime-character-set/setting.png",
+    "defaultDisplayed": "auto",
+    "workspaceSettingsWritten": false,
+    "nativeBrokerStarted": false,
+    "ownedHostCleaned": true
+  },
+  "releaseGate": {
+    "minimumCliVersion": "0.6.0",
+    "compatibleNativeDistributionPending": true,
+    "oldBundlePackagingCorrectlyRejected": "bundled 0.5.0",
+    "installedUserExtensionChanged": false,
+    "ansiExecutionClaimedFromFakeTests": false
+  },
+  "unsupportedUntilNativeProof": [
+    "ANSI debugging",
+    "retired legacy offline compiler/cache ABI"
+  ],
+  "debugSession": {
+    "explicitSelectionForwarded": true,
+    "omittedSelectionDoesNotOverrideWorkingDto": true,
+    "ansiExecutionClaimed": false
+  }
+}

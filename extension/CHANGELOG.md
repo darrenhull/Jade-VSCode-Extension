@@ -1,8 +1,14 @@
+# 0.19.0 — Native runtime character sets
+
+- Choose automatic detection, ANSI or Unicode for each workspace without adding default settings to source projects.
+- Preserve native project preferences and report explicit runtime character-set mismatches clearly.
+
 # 0.18.3 — Reliable preparation and readable native errors
 
 - Reuse a verified completed backup after a failed restore or cancellation, avoiding another Source backup.
 - Recover interrupted private Working preparation safely and show the read/write paths and reused snapshot time.
 - Keep native error text readable and reject incompatible ANSI runtimes clearly before opening a database. ANSI runtime support is a separate upcoming update.
+
 # 0.18.2 — Visible database connection progress
 
 - Show backup, restore and connection progress while opening Database Objects.

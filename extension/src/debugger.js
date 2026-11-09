@@ -221,6 +221,7 @@ function registerDebugger(vscode, context, services) {
               file,
               JSON.stringify({
                 ...working,
+                ...(config.characterSet === undefined ? {} : { characterSet: config.characterSet }),
                 workingWrites: true,
                 sourceDatabasePath: config.databasePath,
                 launchMode: this.applicationMode ? "application" : "method",

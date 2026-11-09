@@ -10,10 +10,14 @@ const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
 const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
+const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
-  return Object.fromEntries(keys.map(key => [key, settings.get(key)]));
+  const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));
+  const characterSet = settings.inspect?.('characterSet');
+  if (!['globalValue', 'workspaceValue', 'workspaceFolderValue', 'globalLanguageValue', 'workspaceLanguageValue', 'workspaceFolderLanguageValue'].some(scope => characterSet?.[scope] !== undefined))
+    delete values.characterSet;
+  return values;
 }
 
 function expand(value, folder, resource=jadeSourceUri(vscode)) {
@@ -104,6 +108,8 @@ function activate(context) {
     const workspaceRoots = [folder?.uri.fsPath || path.dirname(document.uri.fsPath)];
     const config = resolveConfig({ ...settings, schema, program: document.uri.fsPath, workspaceRoots, classFile: true, sourceProperties: true,
       offline: false, run: false });
+    // Preserve explicit choices for CLI validation, including invalid empty values.
+    if (Object.hasOwn(settings, 'characterSet')) config.characterSet = settings.characterSet;
     const directory = settings.cacheDirectory ? path.resolve(folder?.uri.fsPath || path.dirname(document.uri.fsPath), settings.cacheDirectory)
       : path.join(context.globalStorageUri.fsPath, 'native');
     config.storagePath = directory;

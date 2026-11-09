@@ -19,6 +19,7 @@ function startCpp(config,operation,onOutput=()=>{},onReport=()=>{},dependencies=
   const id=randomUUID();
   const request={protocolVersion:1,id,operation,events:true,installPath:config.installPath,storagePath:config.storagePath,
     workspaceRoots:config.workspaceRoots,source:config.program,schema:config.schema};
+  if(config.characterSet!==undefined)request.characterSet=config.characterSet;
   if(config.systemSnapshotPath)request.snapshot=config.systemSnapshotPath;
   if(operation==='cache.refresh')Object.assign(request,{databasePath:config.databasePath,iniPath:config.iniPath,server:config.server});
   if(config.methods)request.methods=Array.isArray(config.methods)?config.methods:[config.methods];
