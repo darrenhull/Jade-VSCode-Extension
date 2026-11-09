@@ -1,0 +1,70 @@
+{
+  "issue": 45,
+  "version": "0.19.1",
+  "approvedBase": "92afb836b0928eec2ee87a0be1e0dcb39cb5843a",
+  "red": {
+    "currentIntegrationCases": [
+      "cancelled empty-window setup ignores late Create/Open action",
+      "cancelled unconfigured setup ignores late Detect action",
+      "outside-workspace CLS selects an explicit workspace folder",
+      "empty guidance cancellation settles without dismissal",
+      "unconfigured guidance cancellation settles without dismissal"
+    ],
+    "neutralRuntimeSuccessMessageFailedBeforeChange": true,
+    "originalInitialCases": 5,
+    "originalInitialFailures": 4,
+    "currentIntegrationFailuresBeforeFix": 5
+  },
+  "green": {
+    "withCurrentProgressAndCharacterSetCases": 80,
+    "failed": 0,
+    "firstRunAndWizardCases": 41,
+    "powershellPassed": 18,
+    "javascriptPassed": 1037,
+    "explicitOptInSkipped": 43
+  },
+  "actualPrivateVsCodeHost": [
+    "empty-window-create-or-open-folder",
+    "unconfigured-source-folder-runtime-setup",
+    "detected-installation-and-explicit-browse"
+  ],
+  "screenshots": [
+    "docs/screenshots/first-run/empty.png",
+    "docs/screenshots/first-run/unconfigured.png",
+    "docs/screenshots/first-run/installation.png"
+  ],
+  "screenshotsRecapturedOnCurrentImplementation": true,
+  "packagedVsix": {
+    "sha256": "9e4111cd01bbee3f8982192e1fef2b8c553ede52291f9eca76d48f4515d38695",
+    "databaseFreeDiscovery": true,
+    "officialNativePinAndAllHashesVerified": true,
+    "nativeCliVersion": "0.6.0",
+    "noNodeOnPath": true
+  },
+  "preservesCurrentCharacterSetConfiguration": true,
+  "preservesSingleFlightProgressCancellation": true,
+  "nativeDatabaseOperations": false,
+  "userSettingsChanged": false,
+  "installedExtensionChanged": false,
+  "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
+  "independentReadOnlyAudit": "Final read-only audit at f89e6e2 found no further concrete setup lifecycle or scope hole after all wizard/callsite boundaries were checked.",
+  "preNativePromptCancellation": {
+    "nativeCancellationUnchanged": true,
+    "cancellationListenerRemoved": true,
+    "settlesWithoutDismissal": true,
+    "lateResponseCannotAffectNextConnect": true,
+    "visibleControlsUnchangedAfterLifecycleFix": true
+  },
+  "fullWizardCancellation": {
+    "installationBrowseDatabaseIniAndModeWaitsCovered": true,
+    "openFolderCommandWaitCancellable": true,
+    "terminalNotificationsNonBlocking": true,
+    "removedOrRemappedScopeDoesNotReceiveWrites": true,
+    "partialSaveFailureRetainsCountAndCause": true,
+    "startedCommitAwaitedBeforeSettlement": true,
+    "noPreSaveWritesAfterCancellation": true,
+    "targetSelectorRespectsSetupDismissal": true,
+    "standaloneWithoutTokenCompatible": true,
+    "tokenForwardedThroughActualDiscoverCommand": true
+  }
+}

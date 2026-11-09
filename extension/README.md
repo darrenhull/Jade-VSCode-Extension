@@ -9,9 +9,10 @@ A compatible **Windows Jade runtime** is required. The **Jade IDE is not require
 ## Get started
 
 1. Install the `.vsix` from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest) using **Extensions: Install from VSIX…**. Reload VS Code when prompted.
-2. Open your Jade source folder. In Settings, set **Jade Native: Install Path** to your Jade installation, or run **Jade: Detect Runtime Settings** from the Command Palette.
-3. Configure your Source database connection. Use **Jade: Extract All Sources** to pull source into a folder inside your workspace, or open an existing source checkout.
-4. Open a class file and press **F5** to compile. Use **Testing** or **Run Local Test** above a test to run it.
+2. Create a new folder for your Jade source, or use **File: Open Folder** to open an existing source folder. It can be empty before your first pull.
+3. Run **Jade: Detect Runtime Settings**. Choose a detected installation or **Browse to another installation folder…** and select the installation root containing `bin/jom.dll`, for example `C:\Jade2025`. This is separate from your source folder. Then select the Source database, INI and server mode when prompted. Settings belong to that workspace folder; Connect identifies folders by name and path in a multi-folder workspace.
+4. Use **Jade: Extract All Sources** to pull source inside your workspace, or work with your existing native files.
+5. Open a class file and press **F5** to compile. Use **Testing** or **Run Local Test** above a test to run it.
 
 GitHub VSIX updates are installed manually. Installing a newer VSIX updates the same extension; there is no need to uninstall it first.
 

@@ -8,9 +8,10 @@ The extension includes a verified native C++ CLI and our native helpers. VS Code
 
 1. Download the VSIX from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest).
 2. Run **Extensions: Install from VSIX...** and select it. Reload VS Code after an update; installing the same extension ID replaces the installed version.
-3. Open your source checkout. Set **Jade Native: Install Path**, then configure the Source database or run **Jade: Detect Runtime Settings**.
-4. Pull missing source with **Jade: Extract All Sources**, or work with your existing native files.
-5. Use **F5** to build, **Testing** to run tests, and the separate publish controls when you intend to update Source.
+3. Create a new folder for your source, or use **File: Open Folder** to open an existing source checkout. The folder can be empty before your first source pull.
+4. Run **Jade: Detect Runtime Settings**. Choose a detected installation or **Browse to another installation folder…**. Select the Jade installation root containing `bin/jom.dll`, for example `C:\Jade2025`; this is separate from your source folder. Then select the Source database, INI and server mode when prompted. Settings belong to the selected workspace folder; Connect identifies folders by name and path in a multi-folder workspace.
+5. Pull missing source with **Jade: Extract All Sources**, or work with your existing native files.
+6. Use **F5** to build, **Testing** to run tests, and the separate publish controls when you intend to update Source.
 
 GitHub releases require manual VSIX installation. A new CLI release opens a reviewed dependency update; it does not silently update an installed extension. Error Lens is an optional install-alongside companion for inline diagnostics.
 

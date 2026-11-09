@@ -55,30 +55,72 @@ function registerObjectExplorer(vscode, context, services) {
       value,
     );
   };
+  async function setupStep(show) {
+    const operation = connectionOperation, signal = operation?.controller.signal;
+    const cancelled = () => Error("Inspection connection cancelled.");
+    if (disposed || signal?.aborted) throw cancelled();
+    let onAbort;
+    try {
+      const prompt = show();
+      const selected = signal
+        ? await Promise.race([prompt, new Promise((_, reject) => {
+            onAbort = () => reject(cancelled());
+            signal.addEventListener("abort", onAbort, { once: true });
+            if (signal.aborted) onAbort();
+          })])
+        : await prompt;
+      if (disposed || signal?.aborted || connectionOperation !== operation) throw cancelled();
+      return selected;
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
+  }
+  const setupInformation = (message, ...actions) => setupStep(() => vscode.window.showInformationMessage(message, ...actions));
   async function configuration() {
-    if (inspectionScope) return services.config(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
+    if (inspectionScope) return configured(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
+    const folders = vscode.workspace.workspaceFolders || [];
+    if (!folders.length) {
+      const selected = await setupInformation(
+        "Create a new folder or open an existing folder for your Jade source. Then run Jade: Detect Runtime Settings and browse to your Jade installation folder.",
+        "Create or Open Folder",
+      );
+      if (selected === "Create or Open Folder")
+        await setupStep(() => vscode.commands.executeCommand("workbench.action.files.openFolder"));
+      throw Error("Inspection connection cancelled.");
+    }
     let doc = vscode.window.activeTextEditor?.document;
-    if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath)) {
-      const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri),
-        folders = vscode.workspace.workspaceFolders || [];
+    if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath) || !vscode.workspace.getWorkspaceFolder(doc.uri)) {
+      const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri);
       const folder =
         active ||
         (folders.length === 1
           ? folders[0]
           : (
               await vscode.window.showQuickPick(
-                folders.map((folder) => ({ label: folder.name, folder })),
-                { title: "Choose Jade database settings" },
+                folders.map((folder) => ({ label: folder.name, description: folder.uri.fsPath, folder })),
+                { title: "Choose Jade workspace folder" },
                 connectionOperation?.cancellation.token,
               )
             )?.folder);
       if (!folder)
-        throw Error(
-          "Open a workspace and configure its Jade database settings first.",
-        );
-      return services.config(undefined, folder);
+        throw Error("Inspection connection cancelled.");
+      return configured(undefined, folder);
     }
-    return services.config(doc);
+    return configured(doc, vscode.workspace.getWorkspaceFolder(doc.uri));
+  }
+  async function configured(document, folder) {
+    try {
+      return await services.config(document, folder);
+    } catch (error) {
+      if (error.code !== "JADE_RUNTIME_NOT_CONFIGURED") throw error;
+      const selected = await setupInformation(
+        "Browse to your Jade installation folder to set up this source workspace. The installation folder contains bin/jom.dll; it is separate from your source folder.",
+        "Detect Runtime Settings",
+      );
+      if (selected === "Detect Runtime Settings")
+        await vscode.commands.executeCommand("jadeNative.discover", folder?.uri, connectionOperation?.cancellation.token);
+      throw Error("Inspection connection cancelled.");
+    }
   }
   const session = new InspectionSession({
     connect: async (selection) => {
@@ -1187,7 +1229,7 @@ function registerObjectExplorer(vscode, context, services) {
         let config;
         try {
           config = await configuration();
-        } catch {}
+        } catch (error) { if (/cancelled/i.test(error.message)) return { cancelled: true }; }
         if (!ownsTransition()) return { cancelled: true };
         const choice = await vscode.window.showQuickPick(
           [
