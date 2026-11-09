@@ -1,0 +1,43 @@
+{
+  "status": "verified-private-refreshed-candidate",
+  "officialRelease": false,
+  "cliSourceHead": "2da70cf",
+  "cliExecutableSha256": "ef843e0235c2a8d4797722f39ce44434cd9c19202bb92ca30bc09f33ddfb6f67",
+  "nativeManifestSha256": "69521e604db8ac7dca3b019a227fb9c2efdb49eae17a1b82d26ef306d12ec71a",
+  "cliArchiveSha256": "64baab9d6450464e33060107b4d9932a3e00a6dca97972097a02b465c67730ce",
+  "privateVsixSha256": "78f754a94fc62a45a50effbaa680a4d9777a86c47a47f34e2193c5b72a2a7995",
+  "allManifestAssetsVerified": true,
+  "portableNoNodeNoDatabaseSmoke": true,
+  "defaultTests": {
+    "powerShellPassed": 18,
+    "javascriptPassed": 996,
+    "nativeOptInSkipped": 43,
+    "failed": 0
+  },
+  "actualPackagedClient": {
+    "nativeType": "StringUtf8",
+    "characterSet": "ansi",
+    "noSourceWrites": true,
+    "value": "中 🐟",
+    "property": "unicodeText",
+    "readOnlySourceInspection": true
+  },
+  "earlierFullUiAndBothModeProof": "runtime-character-set-native-preliminary.json",
+  "nativeOwnerRefreshedProof": {
+    "warmMismatchAndNativeDiagnosticRetry": true,
+    "regularCafeAndStringUtf8": true,
+    "ansiAndUnicode": true
+  },
+  "cleanup": {
+    "allFixtureLeasesReturned": true,
+    "nativeOwnerConfirmedFixturesRemoved": true,
+    "nativePIDs": [],
+    "globalCandidateInstalled": false,
+    "activeJobs": [],
+    "clientAndBrokerStopped": true
+  },
+  "remainingGates": [
+    "reviewed official CLI release pin",
+    "official distribution consumer checks and review"
+  ]
+}
