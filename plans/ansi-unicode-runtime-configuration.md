@@ -30,3 +30,8 @@ The final native candidate at source 2da70cf fixes the ANSI StringUtf8 getter. E
 
 Remaining delivery gates are the reviewed official CLI release and exact official distribution adoption, followed by consumer CI and automated review. Development bytes remain excluded from Git and have not been installed globally. The PR stays Draft until the production pin satisfies its CLI 0.6.0 minimum.
 
+
+## Final native review fix verification
+
+Candidate 187b6fb adds bounded native log-line framing and restores the preexisting StringUtf8 early size guard before SDK dereference. The valid-value getter is unchanged. Every final manifest asset and the rebuilt private VSIX passed verification and portable no-Node/no-database smoke. The sanitized receipt explicitly retains the earlier connected candidate hashes rather than attributing its native/UI proof to these later bounded changes. Native-owner regressions cover the review fixes; no additional database connection was made. Production adoption still awaits the approved official release.
+

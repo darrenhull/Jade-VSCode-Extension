@@ -1,11 +1,11 @@
 {
   "status": "verified-private-refreshed-candidate",
   "officialRelease": false,
-  "cliSourceHead": "2da70cf",
-  "cliExecutableSha256": "ef843e0235c2a8d4797722f39ce44434cd9c19202bb92ca30bc09f33ddfb6f67",
-  "nativeManifestSha256": "69521e604db8ac7dca3b019a227fb9c2efdb49eae17a1b82d26ef306d12ec71a",
-  "cliArchiveSha256": "64baab9d6450464e33060107b4d9932a3e00a6dca97972097a02b465c67730ce",
-  "privateVsixSha256": "78f754a94fc62a45a50effbaa680a4d9777a86c47a47f34e2193c5b72a2a7995",
+  "cliSourceHead": "187b6fb",
+  "cliExecutableSha256": "33864676592ef5c8bba4d15fb8478c2a04d836c99e65ff6ebdee8fec709ffd2f",
+  "nativeManifestSha256": "1d2f9d46de506be19ffb730f343d948eadbcf711bc56223076eab075db82fc5f",
+  "cliArchiveSha256": "d8d9f84183e15ed5657b7307df58f39211f0db5b941844d21b77ec4e751cd149",
+  "privateVsixSha256": "aa9e885bf8abed30c9a1ce69c4f8876ee5a2ee362a67e0f83a67eb7783c58402",
   "allManifestAssetsVerified": true,
   "portableNoNodeNoDatabaseSmoke": true,
   "defaultTests": {
@@ -13,15 +13,6 @@
     "javascriptPassed": 996,
     "nativeOptInSkipped": 43,
     "failed": 0
-  },
-  "actualPackagedClient": {
-    "nativeType": "StringUtf8",
-    "characterSet": "ansi",
-    "noSourceWrites": true,
-    "value": "中 🐟",
-    "property": "unicodeText",
-    "readOnlySourceInspection": true,
-    "sourceDatabaseScope": "owned disposable proof clone; never the installed user Source database"
   },
   "earlierFullUiAndBothModeProof": "runtime-character-set-native-preliminary.json",
   "nativeOwnerRefreshedProof": {
@@ -40,5 +31,30 @@
   "remainingGates": [
     "reviewed official CLI release pin",
     "official distribution consumer checks and review"
-  ]
+  ],
+  "connectedProofCandidate": {
+    "cliSourceHead": "2da70cf",
+    "cliExecutableSha256": "ef843e0235c2a8d4797722f39ce44434cd9c19202bb92ca30bc09f33ddfb6f67",
+    "nativeManifestSha256": "69521e604db8ac7dca3b019a227fb9c2efdb49eae17a1b82d26ef306d12ec71a",
+    "privateVsixSha256": "78f754a94fc62a45a50effbaa680a4d9777a86c47a47f34e2193c5b72a2a7995",
+    "actualPackagedAnsiStringUtf8Read": {
+      "nativeType": "StringUtf8",
+      "characterSet": "ansi",
+      "noSourceWrites": true,
+      "value": "中 🐟",
+      "property": "unicodeText",
+      "readOnlySourceInspection": true,
+      "sourceDatabaseScope": "owned disposable proof clone; never the installed user Source database"
+    }
+  },
+  "finalBuildChanges": [
+    "bounded native log framing preserves complete encoded lines",
+    "preexisting early StringUtf8 size guard restored before dereference; valid getter unchanged"
+  ],
+  "finalBuildVerification": {
+    "newDatabaseConnection": false,
+    "everyManifestAsset": true,
+    "connectedProofProvenance": "Earlier candidate actual connected proof retained explicitly; final bounded log/size guard changes verified by native owner regressions.",
+    "portablePrivateVsix": true
+  }
 }
