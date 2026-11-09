@@ -1,12 +1,14 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.5.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.5.2 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
 ## Native connection reuse
 
 The first inspection or build opens its native target when needed. Working inspection shares the retained compiler/test node through a separate thread-affine application signed on with native `DB_READ_ONLY`; the update application remains separate. Source inspection shares its own read-only node. A first Working inspection can prepare the ordinary private backup/restore copy automatically; it never publishes local files to Source. Cancellation during its Source backup is observed after that backup completes and before private restore; configured native timeouts still apply.
+
+Working preparation starts a fresh private backup when no verified snapshot is available. A completed native-verified backup survives restore failure or cancellation; the next attempt validates it with native checksums and resumes that captured snapshot without backing up Source again. Progress shows its capture time: this resumes the same snapshot rather than claiming the latest Source data. Each restore uses a fresh owned directory, and completed restores can recover an interrupted promotion without repeating backup or restore. Protected checkpoints bind the Windows user, Source, configuration and owned directories; incomplete or unverified attempts use fresh staging, while a recorded completed snapshot that fails integrity checks is preserved with a clear error and no silent rebackup. Earlier backups are preserved; authenticated owned staging is cleaned only after Working is safely ready. A temporary deletion lock produces a cleanup warning without invalidating a successfully restored Working database. Unsafe linked/overlapping destinations, changed unmanaged Working INIs and pre-existing unowned restore files are refused instead of overwritten. Progress reports the Source read path, backup write path and Working restore path. Application/security settings and unknown custom INI paths remain unchanged; Working isolation is not an operating-system sandbox.
 
 Method-only builds, test switches and repeated inspection reuse a healthy compatible Working node. Structural loads close it for the native loader/reorganisation path and reopen it automatically. Scratch Pad still uses its native `jadclient` handoff, then the next compatible operation reconnects lazily. Debugging keeps its existing exclusive helper ownership; a paused debugger is not stopped to run another tool.
 
@@ -207,3 +209,7 @@ Bot PR creation runs separately from the full build. Squash auto-merge waits for
 ![Architecture](docs/architecture.drawio.svg)
 
 [Edit the diagram in draw.io](docs/architecture.drawio). The SVG is the rendered companion to the editable source.
+
+### Native character ABI and error text
+
+Connected helpers require a 64-bit Unicode Jade runtime. Before passing native string parameters, they use Jade’s SDK character conversion to reject ANSI or unknown character width clearly. Native error resources are decoded through the same vendor conversion; resource/conversion failures retain the original Jade error code with a safe message fallback. This does not add ANSI runtime support or diagnose a database-lock error from its encoding alone.

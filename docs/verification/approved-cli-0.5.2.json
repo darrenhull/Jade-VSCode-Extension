@@ -1,0 +1,23 @@
+{
+  "cliVersion": "0.5.2",
+  "extensionVersion": "0.18.3",
+  "officialTag": "v0.5.2",
+  "officialTagCommit": "2533aac143462fc8fe951b07bd88b58cbe366eb5",
+  "cliArchiveSha256": "1db8e97e3d51667bf234a5db2b53fce2e439015c0f364901e7a1d2565a505b1b",
+  "cliExecutableSha256": "62b94cd28bd5960abe6bb293d9e2713051d1ff78281e9c55d0953af6aea4229e",
+  "nativeManifestSha256": "79dab4db0ef4eb33180164b98be94e49a152cc6a08fc41db8c7ea78f8f58a2b6",
+  "vsixSha256": "0b7dcbe053cc13dc110012efb2a37a332ffdec40ec1541764428fa4ba4f6d5b4",
+  "officialGithubArchiveAndExeDigestsMatch": true,
+  "allManifestAssetsVerified": true,
+  "defaultTests": {
+    "nativeOptInSkipped": 43,
+    "failed": 0,
+    "powerShellPassed": 18,
+    "javascriptPassed": 970
+  },
+  "portableVsixOutsideCheckout": true,
+  "nodeOnPathRequired": false,
+  "databaseOpened": false,
+  "localInstallPerformed": false,
+  "uiChanged": false
+}
