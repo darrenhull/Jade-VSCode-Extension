@@ -63,12 +63,13 @@ function registerObjectExplorer(vscode, context, services) {
         "Create a new folder or open an existing folder for your Jade source. Then run Jade: Detect Runtime Settings and browse to your Jade installation folder.",
         "Create or Open Folder",
       );
+      if (disposed || connectionOperation?.controller.signal.aborted) throw Error("Inspection connection cancelled.");
       if (selected === "Create or Open Folder")
         await vscode.commands.executeCommand("workbench.action.files.openFolder");
       throw Error("Inspection connection cancelled.");
     }
     let doc = vscode.window.activeTextEditor?.document;
-    if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath)) {
+    if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath) || !vscode.workspace.getWorkspaceFolder(doc.uri)) {
       const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri);
       const folder =
         active ||
@@ -92,10 +93,12 @@ function registerObjectExplorer(vscode, context, services) {
       return await services.config(document, folder);
     } catch (error) {
       if (error.code !== "JADE_RUNTIME_NOT_CONFIGURED") throw error;
+      if (disposed || connectionOperation?.controller.signal.aborted) throw Error("Inspection connection cancelled.");
       const selected = await vscode.window.showInformationMessage(
         "Browse to your Jade installation folder to set up this source workspace. The installation folder contains bin/jom.dll; it is separate from your source folder.",
         "Detect Runtime Settings",
       );
+      if (disposed || connectionOperation?.controller.signal.aborted) throw Error("Inspection connection cancelled.");
       if (selected === "Detect Runtime Settings")
         await vscode.commands.executeCommand("jadeNative.discover", folder?.uri);
       throw Error("Inspection connection cancelled.");

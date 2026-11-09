@@ -25,3 +25,8 @@ No connection manager, new configuration format, database operation or profile s
 
 Resolved the PR against approved main 92afb836, retaining the official CLI 0.6.0 distribution, characterSet/default-precedence support and the current single-flight connection/progress/cancellation path. The workspace picker keeps its active cancellation token while gaining clear labels and folder paths. The shared Object Explorer fixture retains its native target progress callback and preserves typed configuration failures. Release version is 0.19.1; no downgrade to the original 0.18.1 proposal. Setup UI wording is unchanged. Focused first-run, wizard, connection-progress and character-set regressions pass 53/53; full suite and refreshed private UI/package verification follow before Ready. Installed environment remains untouched.
 
+
+## Current lifecycle and resource-scope regressions
+
+Three additional integration cases were first reproduced as failures: cancelling Connect while either setup information prompt is pending must not execute its later Create/Open Folder or Detect Runtime action, and an active CLS outside all workspace folders must not bypass workspace selection or pass an undefined folder to runtime setup. Minimal cancellation/disposal guards and the existing workspace-folder picker now preserve both constraints. All 56 focused first-run/wizard, Connect-progress and character-set cases pass. No new UI or connection abstraction was added.
+

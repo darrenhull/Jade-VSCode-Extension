@@ -52,3 +52,26 @@ test("dismissing missing-runtime setup never invokes the wizard or connects",asy
  s.vscode.window.showInformationMessage=async()=>undefined;const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>{assert.notEqual(name,"jadeNative.discover");return execute(name,...args);};
  try{await s.commands.get("jadeNative.connectObjects")();assert.equal(s.clients.length,0);assert.deepEqual(s.errors,[]);}finally{await s.cleanup();}
 });
+
+for(const mode of ['empty','unconfigured'])test('cancelled Connect ignores a later '+mode+' setup action',async()=>{
+ const s=setup(mode==='unconfigured'?{configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})}:{});
+ s.vscode.window.activeTextEditor=undefined;if(mode==='empty')s.vscode.workspace.workspaceFolders=[];
+ let choose;const prompt=new Promise(resolve=>choose=resolve),executed=[];
+ s.vscode.window.showInformationMessage=async()=>prompt;
+ const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>{executed.push(name);return execute(name,...args);};
+ let pending;
+ try{pending=s.commands.get('jadeNative.connectObjects')();await new Promise(resolve=>setImmediate(resolve));s.progressOperations[0].cancel();choose(mode==='empty'?'Create or Open Folder':'Detect Runtime Settings');await pending;
+ assert.ok(!executed.includes('workbench.action.files.openFolder'));assert.ok(!executed.includes('jadeNative.discover'));assert.equal(s.clients.length,0);assert.deepEqual(s.errors,[]);
+ }finally{choose();await pending;await s.cleanup();}
+});
+
+test('an outside CLS selects a real workspace before missing-runtime setup',async()=>{
+ const s=setup({configError:Object.assign(Error('Runtime not configured'),{code:'JADE_RUNTIME_NOT_CONFIGURED'})});
+ const folders=['one','two'].map(name=>({name:'Sources',uri:{scheme:'file',fsPath:path.join(s.root,name)}}));
+ s.vscode.workspace.workspaceFolders=folders;s.vscode.workspace.getWorkspaceFolder=uri=>folders.find(folder=>uri.fsPath.startsWith(folder.uri.fsPath));
+ s.vscode.window.activeTextEditor={document:{uri:{scheme:'file',fsPath:'C:/outside/Unrelated.cls'}}};
+ let picker,resource;s.vscode.window.showQuickPick=async(items,options)=>{picker={items,options};return items[1];};
+ s.vscode.window.showInformationMessage=async()=> 'Detect Runtime Settings';
+ const execute=s.vscode.commands.executeCommand;s.vscode.commands.executeCommand=async(name,...args)=>{if(name==='jadeNative.discover')resource=args[0];return execute(name,...args);};
+ try{await s.commands.get('jadeNative.connectObjects')();assert.equal(picker?.options.title,'Choose Jade workspace folder');assert.equal(s.configCalls[0].folder,folders[1]);assert.equal(s.configCalls[0].doc,undefined);assert.equal(resource,folders[1].uri);assert.deepEqual(s.errors,[]);assert.equal(s.clients.length,0);}finally{await s.cleanup();}
+});
