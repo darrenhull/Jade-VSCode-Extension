@@ -1,0 +1,97 @@
+{
+  "status": "preliminary-private-candidate",
+  "officialRelease": false,
+  "cliSourceHead": "64e5dcdbf3873184efd2f4207b13889cb6470dd6",
+  "cliExecutableSha256": "3ee7899e6f82a9c3ed9c72b6e377b7092670cf1289665309e3ee3adb43cd40b1",
+  "nativeManifestSha256": "251af921947dc5e542296bf301bb2e84324f6f1e35669f9a240bef3ff489f293",
+  "packagedVsixSha256": "88decb35fafaf4d0eb328fab835a3da949870daf0d50346f6a6316cbc19c36ca",
+  "verifiedAllManifestAssets": true,
+  "portableNoNodeNoDatabaseSmoke": true,
+  "modes": [
+    {
+      "mode": "ansi",
+      "build": [
+        {
+          "passed": true,
+          "ms": 12506
+        }
+      ],
+      "tests": [
+        {
+          "method": "firstTest",
+          "executed": true
+        },
+        {
+          "method": "secondTest",
+          "executed": true
+        },
+        {
+          "method": "firstTest",
+          "executed": true
+        }
+      ],
+      "readOnlyCatalogue": true,
+      "warmMismatchPreservedEpoch": true,
+      "scratch": [
+        "Extension ansi café"
+      ]
+    },
+    {
+      "mode": "unicode",
+      "build": [
+        {
+          "passed": true,
+          "ms": 14828
+        }
+      ],
+      "tests": [
+        {
+          "method": "firstTest",
+          "executed": true
+        },
+        {
+          "method": "secondTest",
+          "executed": true
+        },
+        {
+          "method": "firstTest",
+          "executed": true
+        }
+      ],
+      "readOnlyCatalogue": true,
+      "warmMismatchPreservedEpoch": true,
+      "scratch": [
+        "Extension unicode café"
+      ]
+    }
+  ],
+  "actualPrivateVsCodeAnsi": {
+    "passed": true,
+    "compilePassed": true,
+    "testingPassed": true,
+    "scratchOutput": "Private VS Code ANSI café\n",
+    "readOnlyInspection": true,
+    "packetModesPreserved": true,
+    "commands": [
+      "build",
+      "test",
+      "workspace.run",
+      "inspect.target",
+      "inspect.catalog",
+      "inspect.instances"
+    ]
+  },
+  "cleanup": {
+    "sdkBrokerJobsAndNativePidsEmpty": true,
+    "privateCodeHostStoppedAndStageRemoved": true,
+    "temporaryWorkspaceSettingsRemoved": true,
+    "ownedWorkingCopiesRemoved": true,
+    "ansiAndUnicodeSeedLeasesReturnedToNativeOwner": true,
+    "originalSourceDatabaseOpened": false
+  },
+  "remainingGates": [
+    "refreshed StringUtf8-fidelity candidate verification",
+    "reviewed official CLI release pin",
+    "final consumer CI and review"
+  ]
+}
