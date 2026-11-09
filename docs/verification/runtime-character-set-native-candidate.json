@@ -20,7 +20,8 @@
     "noSourceWrites": true,
     "value": "中 🐟",
     "property": "unicodeText",
-    "readOnlySourceInspection": true
+    "readOnlySourceInspection": true,
+    "sourceDatabaseScope": "owned disposable proof clone; never the installed user Source database"
   },
   "earlierFullUiAndBothModeProof": "runtime-character-set-native-preliminary.json",
   "nativeOwnerRefreshedProof": {
