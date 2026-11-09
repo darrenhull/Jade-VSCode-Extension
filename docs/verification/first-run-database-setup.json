@@ -6,19 +6,21 @@
     "currentIntegrationCases": [
       "cancelled empty-window setup ignores late Create/Open action",
       "cancelled unconfigured setup ignores late Detect action",
-      "outside-workspace CLS selects an explicit workspace folder"
+      "outside-workspace CLS selects an explicit workspace folder",
+      "empty guidance cancellation settles without dismissal",
+      "unconfigured guidance cancellation settles without dismissal"
     ],
     "neutralRuntimeSuccessMessageFailedBeforeChange": true,
     "originalInitialCases": 5,
     "originalInitialFailures": 4,
-    "currentIntegrationFailuresBeforeFix": 3
+    "currentIntegrationFailuresBeforeFix": 5
   },
   "green": {
-    "withCurrentProgressAndCharacterSetCases": 56,
+    "withCurrentProgressAndCharacterSetCases": 60,
     "failed": 0,
-    "firstRunAndWizardCases": 17,
+    "firstRunAndWizardCases": 21,
     "powershellPassed": 18,
-    "javascriptPassed": 1013,
+    "javascriptPassed": 1017,
     "explicitOptInSkipped": 43
   },
   "actualPrivateVsCodeHost": [
@@ -33,7 +35,7 @@
   ],
   "screenshotsRecapturedOnCurrentImplementation": true,
   "packagedVsix": {
-    "sha256": "840c1a9e869826af73fd81e94dc048a966e8b971f54946100b820845e2151152",
+    "sha256": "2aa3bfd1f89d63a6faf65729eab226fdd8849899f7196f6f0de78314590aba91",
     "databaseFreeDiscovery": true,
     "officialNativePinAndAllHashesVerified": true,
     "nativeCliVersion": "0.6.0",
@@ -45,5 +47,12 @@
   "userSettingsChanged": false,
   "installedExtensionChanged": false,
   "ownedPrivateHostsAndTemporaryArtifactsCleaned": true,
-  "independentReadOnlyAudit": "Both current integration defects independently confirmed; updated guards and workspace scoping re-reviewed with no further concrete omission."
+  "independentReadOnlyAudit": "Both current integration defects independently confirmed; updated guards and workspace scoping re-reviewed with no further concrete omission.",
+  "preNativePromptCancellation": {
+    "nativeCancellationUnchanged": true,
+    "cancellationListenerRemoved": true,
+    "settlesWithoutDismissal": true,
+    "lateResponseCannotAffectNextConnect": true,
+    "visibleControlsUnchangedAfterLifecycleFix": true
+  }
 }

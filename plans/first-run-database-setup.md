@@ -40,3 +40,8 @@ The final 0.19.1 implementation passes 17 first-run/wizard cases and 56 cases wh
 
 Two bounded regressions proved Connect cancellation remained pending until the informational setup prompt was dismissed. A small presentation helper now races only these pre-native information prompts with the existing operation AbortSignal and always removes its listener. Cancelled/old prompt responses cannot execute actions or affect a subsequent Connect; two additional repeated-operation cases prove that isolation. No native backup cancellation or connection ownership behavior changed. All 60 focused cases pass; the full suite/package are rechecked on this final helper before Ready.
 
+
+## Delivery verification after prompt cancellation fix
+
+Final totals are 21 first-run/wizard cases, 60 focused cases with existing connection-progress/character-set coverage, and a full default pass of 1017 JavaScript plus 18 PowerShell checks (43 explicit native opt-in skips). The rebuilt final 0.19.1 VSIX again matches the official CLI 0.6.0 pin and passes portable no-Node/no-database smoke. The three freshly captured UI states remain visually unchanged by the subsequent cancellation-listener lifecycle fix, so their actual screenshots remain applicable. Five current-integration defects have explicit RED-to-GREEN evidence; repeated late responses are covered separately. The checked-in receipt has the final VSIX hash and counts. No user environment changes were made.
+
