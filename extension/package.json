@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.18.3",
+  "version": "0.19.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -628,6 +628,13 @@
           "scope": "resource",
           "description": "Jade database directory containing _control.dat."
         },
+        "jadeNative.characterSet": {
+          "type": "string",
+          "enum": ["auto", "ansi", "unicode"],
+          "default": "auto",
+          "scope": "resource",
+          "description": "Native runtime character set. Auto detects your Jade installation. Explicit ANSI or Unicode must match the installed runtime; the native CLI validates this before opening it."
+        },
         "jadeNative.iniPath": {
           "type": "string",
           "default": "",
@@ -793,6 +800,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.5.0"
+    "minimumCliVersion": "0.6.0"
   }
 }

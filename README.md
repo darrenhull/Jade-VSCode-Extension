@@ -77,6 +77,10 @@ Selecting an existing database file reviews the new class and its authoritative 
 
 ## Runtime troubleshooting
 
+**Jade Native: Character Set** defaults to `auto`. With no explicit VS Code override, the CLI preserves any character-set preference in the native project/connection configuration, then detects the installed runtime when no preference is set. You can explicitly choose `auto`, `ansi` or `unicode` for a workspace folder; an explicit choice is passed unchanged to the native CLI, which rejects a mismatch before opening the runtime. No default setting is written into source projects.
+
+ANSI runtime support requires a compatible bundled native CLI. ANSI debugging and the retired legacy offline compiler/cache ABI remain unsupported until a matching native profile is verified; selecting ANSI does not make those operations available.
+
 The extension opens native connections when needed and coordinates Object Explorer, compilation, tests and Scratch Pad through the existing CLI broker. Compatible inspection, compilation and test operations reuse the Working node. Inspection runs in a native read-only context; Source uses its own read-only connection. Opening Object Explorer first prepares a missing private Working database automatically.
 
 Connect shows native backup, restore and connection progress in a notification and the database view. Repeated Connect commands join the same attempt. Cancel requests cancellation of that attempt and keeps it visible until the current native step finishes safely; a Source backup may need to finish before cancellation takes effect. A failed attempt retains its native error and permits a deliberate retry.

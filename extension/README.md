@@ -4,6 +4,8 @@ Edit, build, test and explore Jade applications in Visual Studio Code. Work with
 
 A compatible **Windows Jade runtime** is required. The **Jade IDE is not required**. The extension includes its command-line tools; you do not need to install Node.js, Python or a separate CLI.
 
+**Jade Native: Character Set** normally stays on `auto`. The native CLI respects a project/connection preference when VS Code has no explicit override, then detects the installed runtime. Optional workspace overrides are `auto`, `ansi` and `unicode`; explicit mismatches fail before runtime sign-on. ANSI debugging and the retired legacy compiler/cache ABI remain unsupported unless a matching native profile is verified.
+
 ## Get started
 
 1. Install the `.vsix` from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest) using **Extensions: Install from VSIX…**. Reload VS Code when prompted.
