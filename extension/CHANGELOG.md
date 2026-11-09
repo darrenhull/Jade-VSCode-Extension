@@ -1,3 +1,8 @@
+# 0.18.3 — Reliable preparation and readable native errors
+
+- Reuse a verified completed backup after a failed restore or cancellation, avoiding another Source backup.
+- Recover interrupted private Working preparation safely and show the read/write paths and reused snapshot time.
+- Keep native error text readable and reject incompatible ANSI runtimes clearly before opening a database. ANSI runtime support is a separate upcoming update.
 # 0.18.2 — Visible database connection progress
 
 - Show backup, restore and connection progress while opening Database Objects.
@@ -205,3 +210,4 @@
 - Report incomplete checks accurately, including method counts.
 
 Verified against the installed Jade 25.0.02 DLL build. See README for runtime limits.
+
