@@ -10,7 +10,7 @@ const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
 const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
+const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));

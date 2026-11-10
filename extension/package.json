@@ -608,6 +608,14 @@
           "scope": "resource",
           "description": "Working source folder relative to the current workspace. Both src and /src mean <workspace>/src. Sources are written directly here, without timestamped directories. Use . for the workspace root. You can also change it using Jade: Change Extraction Folder."
         },
+        "jadeNative.extractionTimeoutSeconds": {
+          "type": "integer",
+          "default": 3600,
+          "minimum": 1,
+          "maximum": 86400,
+          "scope": "resource",
+          "description": "Timeout in seconds for Extract All Sources. Defaults to one hour; increase for large schemas. Cancel stops extraction without applying partial source files."
+        },
         "jadeNative.testTimeoutSeconds": {
           "type": "integer",
           "default": 120,

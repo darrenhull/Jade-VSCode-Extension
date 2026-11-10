@@ -196,6 +196,10 @@ function registerSidebar(vscode, context, options) {
             );
             return { ...result, destination };
           }
+          if (result.timedOut)
+            throw new Error(
+              "Jade extraction timed out. Increase jadeNative.extractionTimeoutSeconds for large schemas. Working source was not changed. See Jade Extract output.",
+            );
           if (!result.success)
             throw new Error(
               `Jade extraction failed (exit ${result.code}). See Jade Extract output.`,

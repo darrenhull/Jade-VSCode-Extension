@@ -38,7 +38,7 @@ function resolveExtractConfig(settings) {
   const server = settings.server || "singleUser";
   if (!["singleUser", "multiUser"].includes(server))
     throw new Error("Invalid Jade server mode.");
-  return { executable, databasePath, iniPath, server };
+  return { executable, databasePath, iniPath, server, extractionTimeoutSeconds: settings.extractionTimeoutSeconds ?? 3600 };
 }
 
 function extractArguments(config, destination) {
@@ -130,6 +130,9 @@ function startExtract(
   output = () => {},
   spawnProcess = require('./cli-gateway').spawnUtility,
 ) {
+  const timeoutSeconds = config.extractionTimeoutSeconds ?? 3600;
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 86400)
+    throw new Error("jadeNative.extractionTimeoutSeconds must be an integer from 1 to 86400.");
   // mkdir is deliberately exclusive: never refresh over someone's edited files.
   fs.mkdirSync(destination);
   const log = fs.openSync(path.join(destination, "extract.log"), "wx");
@@ -148,7 +151,7 @@ function startExtract(
       child = spawnProcess(
         config.executable,
         extractArguments(config, destination),
-        { windowsHide: true, shell: false },
+        { windowsHide: true, shell: false, timeoutMilliseconds: timeoutSeconds * 1000 },
       );
     } catch (error) {
       fs.closeSync(log);
@@ -169,8 +172,10 @@ function startExtract(
         reject(launchError);
         return;
       }
-      if (cancelled || code !== 0) {
-        resolve({ success: false, cancelled, code, signal, destination });
+      const timedOut = child.timedOut === true;
+      cancelled = cancelled || child.cancelled === true;
+      if (cancelled || timedOut || code !== 0) {
+        resolve({ success: false, cancelled, timedOut, code, signal, destination });
         return;
       }
       try {
