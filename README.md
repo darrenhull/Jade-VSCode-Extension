@@ -119,3 +119,7 @@ Pull requests target **main** and require owner approval and passing checks. CI 
 CLI release polling opens Draft dependency-update PRs with verified packages and a consumer version update. Implementation, integrity, CI and review findings must be complete before requesting owner review. GitHub's five-minute scheduling is best-effort, not a five-minute delivery guarantee; delayed or dropped runs can postpone detection. The workflow's Actions history distinguishes automatic schedule runs from explicit workflow_dispatch recovery runs. Extension, CLI and MCP are independently versioned products.
 
 Jade Tools is independent third-party tooling and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
+
+### Large-schema extraction
+
+Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Timeout and cancellation do not apply partial sources to the working folder. Timeout failures identify the setting in the error message.
