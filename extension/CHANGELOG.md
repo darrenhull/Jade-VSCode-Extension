@@ -1,3 +1,8 @@
+# 0.19.2 — Configurable extraction timeout
+
+- Allow large-schema extraction to run for up to one hour by default, configurable with `jadeNative.extractionTimeoutSeconds`.
+- Distinguish extraction timeouts from cancellation and preserve cancellation handling.
+
 # 0.19.1 — First-run connection setup
 
 - Offer Open Folder when connecting from an empty VS Code window.
