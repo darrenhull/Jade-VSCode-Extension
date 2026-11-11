@@ -159,6 +159,7 @@ function registerSidebar(vscode, context, options) {
               const observed = createPullProgress(progress, {
                 directory: staging,
                 watchRoot: temporary,
+                log: (line) => output.appendLine(line),
               });
               let operation;
               const subscription = token.onCancellationRequested(() =>
@@ -169,6 +170,8 @@ function registerSidebar(vscode, context, options) {
                   return { result: { success: false, cancelled: true } };
                 operation = startExtract(config, staging, (text) =>
                   output.append(text),
+                  undefined,
+                  (event) => observed.phase(event),
                 );
                 const result = await operation.completion;
                 if (!result.success) return { result };
@@ -255,33 +258,44 @@ function registerSidebar(vscode, context, options) {
             replaceConflicts = choice === "Replace Listed Files";
           }
           checkDirtyEditors();
-          const applied = applySourceUpdate(plan, replaceConflicts, {
-            writeManifest: false,
-          });
-          fs.mkdirSync(baselineDirectory, { recursive: true });
-          fs.writeFileSync(
-            baselineFile,
-            JSON.stringify(plan.manifest, null, 2) + "\n",
+          const applied = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: "Updating Jade sources", cancellable: false },
+            async (progress) => {
+              const observed = createPullProgress(progress, {
+                initialPhase: "Applying source changes",
+                log: (line) => output.appendLine(line),
+              });
+              try {
+                // Let the notification paint before the existing synchronous apply.
+                await require("node:timers/promises").setImmediate();
+                checkDirtyEditors();
+                const applied = applySourceUpdate(plan, replaceConflicts, {
+                  writeManifest: false,
+                });
+                fs.mkdirSync(baselineDirectory, { recursive: true });
+                fs.writeFileSync(
+                  baselineFile,
+                  JSON.stringify(plan.manifest, null, 2) + "\n",
+                );
+                if (
+                  legacyBytes &&
+                  fs.existsSync(legacyManifest) &&
+                  fs.readFileSync(legacyManifest).equals(legacyBytes)
+                ) {
+                  const legacy = JSON.parse(
+                    legacyBytes.toString("utf8").replace(/^\uFEFF/, ""),
+                  );
+                  if (legacy.database && Array.isArray(legacy.files) && legacy.extractor)
+                    fs.unlinkSync(legacyManifest);
+                }
+                observed.phase("Refreshing tests and class views");
+                // Native bulk pulls may coalesce filesystem watcher events.
+                await vscode.commands.executeCommand("jadeNative.refreshTests");
+                await vscode.commands.executeCommand("jadeNative.refreshClassView");
+                return applied;
+              } finally { observed.dispose(); }
+            },
           );
-          if (
-            legacyBytes &&
-            fs.existsSync(legacyManifest) &&
-            fs.readFileSync(legacyManifest).equals(legacyBytes)
-          ) {
-            const legacy = JSON.parse(
-              legacyBytes.toString("utf8").replace(/^\uFEFF/, ""),
-            );
-            if (
-              legacy.database &&
-              Array.isArray(legacy.files) &&
-              legacy.extractor
-            )
-              fs.unlinkSync(legacyManifest);
-          }
-          // A native bulk pull can overflow/coalesce filesystem watcher events.
-          // Rescan completed source explicitly instead of relying on those events.
-          await vscode.commands.executeCommand("jadeNative.refreshTests");
-          await vscode.commands.executeCommand("jadeNative.refreshClassView");
           for (const legacy of plan.retainedLegacy || [])
             output.appendLine(
               `Kept locally edited legacy export: ${legacy.path}. Preserve or move those edits before deleting it; local compile/navigation ignores full SCM copies.`,

@@ -98,6 +98,12 @@ The optional [Jade Local MCP server](https://github.com/darrenhull/Jade-Local-MC
 
 After updating, reload all VS Code windows and reconnect other clients. If an older native CLI still owns the broker, finish its active work and use its **status** and **shutdown** commands before starting the new build. Use graceful CLI shutdown rather than terminating unrelated processes or deleting database files.
 
+## Source-pull progress
+
+**Extract All Sources** shows native extraction, file discovery and hashing, source organization, comparison, application and editor refresh as separate stages. **Jade Extract** output records elapsed stage durations. The native-stage class count only observes files written so far; it is not a completion percentage. Hashing uses the actual discovered file total. Native observation scans stop once the extractor exits.
+
+This progress reporting does not make a pull incremental: the current batch route still exports all source. Local-conflict review and unsaved-editor protection remain in effect.
+
 ## Useful commands
 
 Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the available commands, including:

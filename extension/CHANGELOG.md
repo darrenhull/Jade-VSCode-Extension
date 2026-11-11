@@ -1,3 +1,8 @@
+# 0.19.3 - Clear source-pull progress
+
+- Show discovery, actual file hashing, organization, comparison, source updates and editor refresh separately from native extraction.
+- Record elapsed stage durations in Jade Extract output and stop native file-count scans after the extractor exits.
+
 # 0.19.2 — Configurable extraction timeout
 
 - Allow large-schema extraction to run for up to one hour by default, configurable with `jadeNative.extractionTimeoutSeconds`.

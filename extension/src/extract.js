@@ -55,7 +55,7 @@ function extractArguments(config, destination) {
   ];
 }
 
-async function snapshot(destination, config, isCancelled = () => false) {
+async function snapshot(destination, config, isCancelled = () => false, notify = () => {}) {
   const files = [],
     paths = [];
   function check() {
@@ -76,7 +76,11 @@ async function snapshot(destination, config, isCancelled = () => false) {
       }
     }
   }
+  notify({ phase: "Discovering extracted files" });
   await visit(destination);
+  let completed = 0, hashedBytes = 0;
+  const reportHash = () => notify({ phase: "Hashing extracted files", completed, total: paths.length, bytes: hashedBytes });
+  reportHash();
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(8, paths.length) }, async () => {
@@ -88,6 +92,9 @@ async function snapshot(destination, config, isCancelled = () => false) {
           bytes: bytes.length,
           sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
         });
+        completed++;
+        hashedBytes += bytes.length;
+        reportHash();
       }
     }),
   );
@@ -129,7 +136,11 @@ function startExtract(
   destination,
   output = () => {},
   spawnProcess = require('./cli-gateway').spawnUtility,
+  onProgress = () => {},
 ) {
+  // Progress observers are presentation only and must never replace a native
+  // error, cancellation or successful extraction result.
+  const report = (event) => { try { onProgress(event); } catch {} };
   const timeoutSeconds = config.extractionTimeoutSeconds ?? 3600;
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 86400)
     throw new Error("jadeNative.extractionTimeoutSeconds must be an integer from 1 to 86400.");
@@ -183,7 +194,7 @@ function startExtract(
           success: true,
           code,
           destination,
-          ...(await snapshot(destination, config, () => cancelled)),
+          ...(await snapshot(destination, config, () => cancelled, report)),
         });
       } catch (error) {
         if (cancelled)
