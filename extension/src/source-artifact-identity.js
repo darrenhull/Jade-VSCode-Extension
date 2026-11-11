@@ -1,8 +1,8 @@
 "use strict";
-// Logical identity for unsaved class/interface views, independent of file layout.
+// Logical identity for unsaved local type views, independent of file layout.
 function sourceArtifactIdentity(artifact) {
   return artifact &&
-    ["class", "interface"].includes(artifact.kind) &&
+    ["class", "interface", "primitive"].includes(artifact.kind) &&
     typeof artifact.schema === "string" &&
     typeof artifact.name === "string"
     ? JSON.stringify([

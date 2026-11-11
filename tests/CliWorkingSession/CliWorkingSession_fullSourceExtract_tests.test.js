@@ -222,3 +222,46 @@ test("full schema DDX uses a separately permitted native aggregate resource even
   assert.equal((await op.completion).passed, true);
   f.session.dispose();
 });
+
+test("full native primitive override keeps its exact permit and outcome identity", async () => {
+  const f = fixture(),
+    op = f.session.startSourceExtraction(
+      {},
+      { destination: "C:/empty", scope: "all" },
+      { onPermit: () => true },
+    ),
+    id = begin(f);
+  f.emit({
+    id,
+    event: "source.stage",
+    stage: "inventory",
+    completedFiles: 0,
+    totalFiles: 1,
+  });
+  const item = {
+    path: "schemas/Pets/types/String.cls",
+    artifact: { schema: "Pets", name: "String", kind: "primitive", component: "source" },
+  };
+  f.emit({
+    id,
+    event: "source.permitRequired",
+    lease: "owned",
+    ticket: "resources",
+    expiresInMs: 30000,
+    ...item,
+  });
+  const permit = f.packets.at(-1);
+  assert.equal(permit.allow, true);
+  f.emit({ id: permit.id, event: "result", result: { passed: true, code: 0 } });
+  f.emit({
+    id,
+    event: "source.file",
+    outcome: "added",
+    sha256: hash,
+    bytes: 1234,
+    ...item,
+  });
+  end(f, id);
+  assert.equal((await op.completion).passed, true);
+  f.session.dispose();
+});

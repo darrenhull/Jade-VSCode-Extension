@@ -1,6 +1,6 @@
 "use strict";
 const { sourceTargetPath, relativeIdentity } = require("./source-pull-path");
-const kinds = new Set(["class", "interface", "schema"]),
+const kinds = new Set(["class", "interface", "primitive", "schema"]),
   components = new Set([
     "source",
     "schema-resources",

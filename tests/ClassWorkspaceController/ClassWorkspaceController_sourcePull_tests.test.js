@@ -33,3 +33,12 @@ test("artifact draft metadata is project-bound and synchronous before persistenc
 test("a newer unsubmitted draft cannot be cleared by an older in-flight acknowledgement",async()=>{
  const f=fixture();try{await f.controller.open({name:"Fish"});const recovery=f.views.get("Fish").services.draftRecovery;await recovery.save({owner:"Fish",member:"getName",kind:"method",version:1,text:"first"});f.snapshot.text="first";f.snapshot.version=2;const acknowledgement=recovery.acknowledge();const next=recovery.save({owner:"Fish",member:"getName",kind:"method",version:2,text:"second"});await acknowledgement;assert.equal(f.controller.hasPendingArtifact({schema:"Pets",name:"Fish",kind:"class"},"file:///project"),true);await next;}finally{f.controller.dispose();}
 });
+
+test("registered class view protects a primitive override by native identity", async () => {
+ const f=fixture();try {
+  f.snapshot.owner="String"; await f.controller.open({name:"String"});
+  const saved=f.views.get("String").services.draftRecovery.save({owner:"String",member:"getName",kind:"method",version:1,text:"edited"});
+  assert.equal(f.controller.hasPendingArtifact({schema:"Pets",name:"String",kind:"primitive",component:"source"},"file:///project"),true);
+  await saved;
+ } finally {f.controller.dispose();}
+});

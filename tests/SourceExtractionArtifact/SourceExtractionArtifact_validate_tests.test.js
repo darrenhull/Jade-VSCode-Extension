@@ -77,3 +77,23 @@ test("full extraction accepts only the canonical native schema resource aggregat
     /resource|layout/i,
   );
 });
+
+test("native primitive overrides require their named source identity", () => {
+  assert.doesNotThrow(() =>
+    sourceArtifact(root, "schemas/CardSchema/types/String.cls", {
+      schema: "CardSchema",
+      name: "String",
+      kind: "primitive",
+      component: "source",
+    }),
+  );
+  assert.throws(
+    () =>
+      sourceArtifact(root, "schemas/CardSchema/types/String.cls", {
+        schema: "CardSchema",
+        kind: "primitive",
+        component: "source",
+      }),
+    /metadata/i,
+  );
+});
