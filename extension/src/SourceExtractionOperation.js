@@ -41,11 +41,10 @@ class SourceExtractionOperation {
     if (
       !path.isAbsolute(destination) ||
       !Array.isArray(selection) ||
-      !selection.length ||
-      selection.length > 30000
+      !selection.length
     )
       throw Error(
-        "Choose a destination and 1 to 30,000 class/interface sources.",
+        "Choose a destination and at least one class/interface source.",
       );
     if (typeof callbacks.onPermit !== "function")
       throw Error(

@@ -1,3 +1,9 @@
+# 0.20.0 - Pull a selected class from Source
+
+- Pull the current native class/interface source directly from a saved CLS file or Object Explorer without exporting every class.
+- Retain local changes, unchanged timestamps and unsaved class-view edits, with clear conflict guidance.
+- Show native extraction stages and partial/uncertain results, while refreshing editor indexes once after the operation.
+
 # 0.19.3 - Clear source-pull progress
 
 - Show discovery, actual file hashing, organization, comparison, source updates and editor refresh separately from native extraction.

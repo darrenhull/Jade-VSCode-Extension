@@ -48,3 +48,9 @@ test("a granted file already promoted when cancellation arrives remains an hones
  f.emit({id,event:"source.file",path:selection[0].path,outcome:"added",sha256:sha,bytes:12});finish(f,id,"cancelled");
  const result=await op.completion;assert.equal(result.status,"cancelled");assert.equal(result.completedFiles,1);assert.equal(result.counts.added,1);assert.equal(result.indeterminate,undefined);f.session.dispose();
 });
+
+test("selection metadata can exceed 30k without an artificial adapter count ceiling",async()=>{
+ const f=fixture(),many=Array.from({length:30001},(_,i)=>({schema:"Pets",name:"C"+i,kind:"class",path:"types/C"+i+".cls"}));
+ const op=f.session.startSourceExtraction({}, {destination:"C:/workspace",selection:many},{onPermit:()=>false});const id=f.requests[0].id;assert.equal(f.requests[0].selection.length,30001);op.stop();
+ f.emit({id,event:"result",result:{passed:false,code:130,status:"cancelled",scope:"classes",version:"current",authoritative:false,partial:false,counts:{},completedFiles:0}});assert.equal((await op.completion).status,"cancelled");f.session.dispose();
+});

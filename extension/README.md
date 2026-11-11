@@ -104,12 +104,19 @@ After updating, reload all VS Code windows and reconnect other clients. If an ol
 
 This progress reporting does not make a pull incremental: the current batch route still exports all source. Local-conflict review and unsaved-editor protection remain in effect.
 
+## Pull a selected class
+
+Use **Jade: Pull Selected Class from Source (Streaming)** from a saved single-class/interface CLS editor or an Object Explorer class context menu. It pulls the current Source version with native comparison, without a full schema export. Unsaved edits are protected; conflicts are retained with guidance and unchanged files keep their timestamps.
+
+The output shows native stages and file outcomes. Cancellation/failure can leave an already-applied prefix; an unconfirmed native completion is reported as uncertain. This class-only action does not extract complete schema resources, detect deletions or replace **Extract All Sources**.
+
 ## Useful commands
 
 Open the Command Palette with `Ctrl+Shift+P` and type **Jade** to find the available commands, including:
 
 - **Jade: Detect Runtime Settings**
 - **Jade: Extract All Sources**
+- **Jade: Pull Selected Class from Source (Streaming)**
 - **Jade: Create Keyed Collection**
 - **Jade: Create Schema, Class or Collection**
 - **Jade: Create Schema**
