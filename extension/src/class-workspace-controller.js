@@ -18,6 +18,16 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   const views=new Map(),pending=new Map();
   const splitOffer=sourceSplitOffer||(vscode.workspace?.openTextDocument&&vscode.workspace?.fs?.readFile?new ClassSourceSplitOffer(vscode):undefined);
   const recovery=new MethodDraftRecovery(context.workspaceState);
+  const pendingDraftViews=new Map(),pendingDraftCounts=new Map(),pendingDraftListeners=new Set();
+  const uriKey=uri=>uri.toString().toLowerCase();
+  const hasPendingSource=uri=>(pendingDraftCounts.get(uriKey(uri))||0)>0||recovery.hasDraftForUri(uri.toString());
+  function setDraftPending(entry,pending){
+    const file=entry.row.file,key=uriKey(file),was=pendingDraftViews.has(entry.panel);
+    if(pending===was)return;
+    if(pending){pendingDraftViews.set(entry.panel,file);pendingDraftCounts.set(key,(pendingDraftCounts.get(key)||0)+1);}
+    else{pendingDraftViews.delete(entry.panel);const count=(pendingDraftCounts.get(key)||1)-1;if(count)pendingDraftCounts.set(key,count);else pendingDraftCounts.delete(key);}
+    for(const listener of pendingDraftListeners)try{listener({uri:file,pending:hasPendingSource(file)});}catch{}
+  }
   let contexts=Object.fromEntries(Object.values(context.workspaceState?.get(STATE)||{}).slice(-50).map(safeContext).filter(Boolean).map(value=>[contextSlot(value),value]));
   let disposed=false,opening=Promise.resolve(),lastActivePanel;
   function focused(entry){
@@ -46,6 +56,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   function retirePanel(panel){
     const value=views.get(panel);if(!value)return;
     views.delete(panel);
+    if(pendingDraftViews.has(panel))void recovery.queue.then(()=>setDraftPending(value,false));
     if(lastActivePanel===panel)lastActivePanel=[...views.keys()].at(-1);
     // Each native split owns a restore slot. Closing one never retires another
     // split; controller unload keeps all slots for native window restoration.
@@ -98,7 +109,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
         try{await recovery.reserve(identity);reservedIdentity=identity;session.binding.readOnlyReason=sourceReadOnlyReason;return {...session.binding.snapshot(),maxCharacters:recovery.maxCharacters};}
         catch(error){session.binding.readOnlyReason=error.message;return {...session.binding.snapshot(),readOnly:true,reason:error.message};}
       },
-      save(draft){const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member||sourceMemberKind(draft?.kind)!==identity.kind)throw Error('The selected member changed before its recovery checkpoint.');return recovery.save(identity,draft);},
+      save(draft){setDraftPending(entry,true);const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member||sourceMemberKind(draft?.kind)!==identity.kind)throw Error('The selected member changed before its recovery checkpoint.');return recovery.save(identity,draft);},
       get(){const selected=session.binding.snapshot();displayedDraft=(selected&&recovery.get(draftIdentity()))||recovery.list(recoveryScope)[0];return displayedDraft;},
       acknowledge:()=>session.binding.snapshot()?recovery.acknowledge(draftIdentity(),session.binding.snapshot()):Promise.resolve(false),
       async discard(){
@@ -174,13 +185,14 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     opening=operation.catch(()=>{});
     return operation;
   }
-  async function prepareActiveSource(uri){
+  async function prepareActiveSource(uri,{onlySelectedFile=false}={}){
     const project=vscode.workspace?.getWorkspaceFolder?.(uri)?.uri.toString();
     for(const [key,value] of views){
-      if(value.row.file!==uri.toString()&&!(project&&value.row.projectId===project))continue;
+      if(value.row.file!==uri.toString()&&(onlySelectedFile||!(project&&value.row.projectId===project)))continue;
       if(value.view.isClosed?.()){retirePanel(key);continue;}
       try{
         if((value.panel.active||value.binding?.snapshot?.())&&await value.view.flushPendingEdits?.()===false)return false;
+        setDraftPending(value,false);
       }catch(error){
         if(value.view.isClosed?.()!==true&&!/webview is disposed/i.test(error?.message||''))throw error;
         // A native close can precede the extension-host disposal event. Its
@@ -194,7 +206,9 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   const focusEvents=[];
   if(vscode.window.tabGroups?.onDidChangeTabGroups)focusEvents.push(vscode.window.tabGroups.onDidChangeTabGroups(trackNativeFocus));
   if(vscode.window.tabGroups?.onDidChangeTabs)focusEvents.push(vscode.window.tabGroups.onDidChangeTabs(trackNativeFocus));
-  const controller={open,prepareActiveSource,async openOriginal(){const selected=[...views.values()].find(focused)||views.get(lastActivePanel)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;for(const event of focusEvents)event.dispose();registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();}};
+  const controller={open,prepareActiveSource,hasPendingSource,
+    onDidChangePendingSource(listener){pendingDraftListeners.add(listener);return{dispose:()=>pendingDraftListeners.delete(listener)};},
+    async prepareSourcePull(uri){if(await prepareActiveSource(uri,{onlySelectedFile:true})===false)return false;await recovery.queue;return !hasPendingSource(uri);},async openOriginal(){const selected=[...views.values()].find(focused)||views.get(lastActivePanel)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;for(const event of focusEvents)event.dispose();registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();pendingDraftListeners.clear();pendingDraftViews.clear();pendingDraftCounts.clear();}};
   context.subscriptions.push(controller);
   return controller;
 }

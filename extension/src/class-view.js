@@ -47,6 +47,7 @@ function registerClassView(vscode, context, language, options={}) {
     if (/\.(scm|sec|ddx)$/i.test(uri.fsPath)) resources = undefined;
     pendingFiles.add(uri.toString());
     clearTimeout(timer);
+    if(language.index.bulkUpdating)return;
     timer = setTimeout(() => {
       events.fire();
       if (catalogue.panel) void catalogue.refresh().catch(() => {});
@@ -332,6 +333,13 @@ function registerClassView(vscode, context, language, options={}) {
       return [];
     },
   };
+  async function refresh({rescan=true}={}){
+    resources=undefined;systemReadyProjects.clear();
+    if(rescan)await language.index.rescan();
+    if(catalogue.panel)await catalogue.refresh();
+    if(pendingFiles.size)await previewController.refresh([...pendingFiles]).catch(()=>{});
+    pendingFiles.clear();events.fire();
+  }
   const children = provider.getChildren.bind(provider);
   provider.getChildren = async (row) => {
     const result = await children(row);
@@ -491,13 +499,7 @@ function registerClassView(vscode, context, language, options={}) {
         return { opened: false };
       },
     ),
-    vscode.commands.registerCommand("jadeNative.refreshClassView", async () => {
-      resources = undefined;
-      systemReadyProjects.clear();
-      await language.index.rescan();
-      if (catalogue.panel) await catalogue.refresh();
-      events.fire();
-    }),
+    vscode.commands.registerCommand("jadeNative.refreshClassView", () => refresh()),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.uri.scheme !== "file") return;
       changed(event.document.uri);
@@ -543,6 +545,7 @@ function registerClassView(vscode, context, language, options={}) {
     previewController,
     browser,
     syncBrowser,
+    refresh,
     revealClass,
     catalogue,
   };

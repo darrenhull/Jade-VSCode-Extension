@@ -10,6 +10,8 @@ const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
 const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
+let activeNativeService;
+
 const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
@@ -121,6 +123,7 @@ function activate(context) {
   const compileOutput = vscode.window.createOutputChannel('Jade Compile');
   const testOutput = vscode.window.createOutputChannel('Jade Tests');
   const nativeTests = new CliWorkingSession({entry:path.join(context.extensionPath,'vendor','jade-tools-cli','jade-cli.exe')});
+  activeNativeService = nativeTests;
   const startWorking=(...args)=>nativeTests.startWorking(...args);
   require('./cli-gateway').configure(nativeTests);
   context.subscriptions.push(nativeTests,{dispose:()=>require('./cli-gateway').configure(undefined)});
@@ -208,6 +211,15 @@ function activate(context) {
   const debugTests=require('./test-debug').registerTestDebugging(vscode,context);
   const testing = require('./testing').registerTesting(vscode, context, (...args) =>
     vscode.commands.executeCommand('jadeNative.executeLocalTests', ...args), language.index,debugTests);
+  const sourcePull=require('./SourcePullController').registerSourcePull(vscode,context,{
+    service:nativeTests,index:language.index,testing,classView,beforeOperation,
+    prepareSource:uri=>classView.previewController.prepareSourcePull(uri),
+    pendingSources:{hasPending:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
+      onDidChange:listener=>classView.previewController.onDidChangePendingSource(event=>listener({path:vscode.Uri.parse(event.uri).fsPath,pending:event.pending}))},
+    isBusy:()=>publishing,
+    setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
+    settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
+  });
   require('./verify-tests').registerVerifyTests(vscode,context,{
     beforeOperation,
     testing,output:testOutput,isBusy:()=>publishing,
@@ -443,7 +455,8 @@ function activate(context) {
     vscode.commands.registerCommand('jadeNative.discover', detectSettingsCommand),
     vscode.commands.registerCommand('jadeNative.checkFile', () => vscode.commands.executeCommand('jadeNative.compileClass'))
   );
-  return {classView,objectExplorer,testing,nativeTests,workspaces};
+  return {classView,objectExplorer,testing,nativeTests,workspaces,sourcePull};
 }
 
-module.exports = { activate };
+function deactivate(){return activeNativeService?.dispose();}
+module.exports = { activate, deactivate };

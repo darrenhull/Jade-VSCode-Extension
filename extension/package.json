@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.19.3",
+  "version": "0.20.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -220,6 +220,12 @@
         "title": "Jade: Extract All Sources",
         "icon": "$(cloud-download)",
         "enablement": "!jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.pullSelectedClassFromSource",
+        "title": "Jade: Pull Selected Class from Source (Streaming)",
+        "icon": "$(cloud-download)",
+        "enablement": "!jadeNative.publishing && !inDebugMode"
       },
       {
         "command": "jadeNative.openLastExtraction",
@@ -446,6 +452,11 @@
           "command": "jadeNative.previewClassMember",
           "when": "view == jadeNative.classes && (viewItem == jadeSourceMember || viewItem == jadeSourceMethod)",
           "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.pullSelectedClassFromSource",
+          "when": "view == jadeNative.classes && viewItem == jadeSourceClass",
+          "group": "jadeSource@1"
         }
       ],
       "editor/title": [
@@ -557,6 +568,11 @@
           "command": "jadeNative.buildWorkspace",
           "when": "resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf",
           "group": "navigation"
+        },
+        {
+          "command": "jadeNative.pullSelectedClassFromSource",
+          "when": "resourceExtname == .cls",
+          "group": "jadeSource@1"
         }
       ],
       "notebook/cell/title": [
@@ -638,7 +654,11 @@
         },
         "jadeNative.characterSet": {
           "type": "string",
-          "enum": ["auto", "ansi", "unicode"],
+          "enum": [
+            "auto",
+            "ansi",
+            "unicode"
+          ],
           "default": "auto",
           "scope": "resource",
           "description": "Native runtime character set. Auto detects your Jade installation. Explicit ANSI or Unicode must match the installed runtime; the native CLI validates this before opening it."
@@ -808,6 +828,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.6.0"
+    "minimumCliVersion": "0.7.0"
   }
 }

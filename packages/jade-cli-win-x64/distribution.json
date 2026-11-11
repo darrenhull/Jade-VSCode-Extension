@@ -1,28 +1,41 @@
 {
-  "arch": "x64",
+  "packageVersion": "0.7.0",
   "characterSets": [
     "ansi",
     "unicode"
   ],
-  "formatVersion": 2,
-  "executableSha256": "f9c3e53af7383c20b479157bdcbdffdd455459c8baa1abbd02271114cd0fd6fe",
   "runtime": "native-cpp",
-  "packageVersion": "0.6.0",
-  "executable": "jade-cli.exe",
   "platform": "win32",
   "oidFormat": "jade-native",
+  "executableSha256": "950ef328ec0954f1abe9046b012a7618eeaf146ee20b9470425ff10760f03fd1",
+  "sourceExtraction": {
+    "protocol": 1,
+    "fullSchema": false,
+    "versions": [
+      "current"
+    ],
+    "scopes": [
+      "classes"
+    ]
+  },
   "runtimeFiles": {
     "native/jade-inspect-helper-ansi.exe": "7d8374e2bec1fd1e1a90c68a4de2131373129d21773a1a3b7b6b5f62ba7e382e",
+    "native/jade-inspect-helper.exe": "381928c680f5fd05d5c17bf5bba486f5baa52923a56a5e8b64ed7d0204568570",
     "native/jade-test-helper-unicode.exe": "7e41986854168c9581e053d7d49d40b933bb577b5382ddd943be26f69593d45e",
-    "native/jade-debug-helper-unicode.exe": "869aa7cb13f030e9e43c0a81963c327d8cdf7b13e6d6759ba35c5c3f30084f01",
-    "ThirdPartyNotices.txt": "ac1241ef6060a10dea5357a2f7c4452a77cc05d8d7d9c930d9c67eea5c74942f",
-    "native/debugger-abi.json": "73e1ff8ac2e417ed75b2170fbd365041b50f0c3d3f03cf00199851be3055f4f5",
-    "native/jade-test-helper.exe": "381928c680f5fd05d5c17bf5bba486f5baa52923a56a5e8b64ed7d0204568570",
     "native/jade-debug-helper.exe": "381928c680f5fd05d5c17bf5bba486f5baa52923a56a5e8b64ed7d0204568570",
-    "README.md": "56ac19ec3308fad219dde5543df563f5c855d8229022e109c50bc1bbd04ab4da",
-    "native/jade-inspect-helper-unicode.exe": "d6b5a52ee7e6060bad29f6da938306a1b204b1d8016bb3857e4232f40da4fee9",
+    "native/jade-source-helper-ansi.exe": "510790ecc84fb5b8dbd71e3ab8b058aed52a7c70b7b05609cac35685daa7e74d",
+    "ThirdPartyNotices.txt": "ac1241ef6060a10dea5357a2f7c4452a77cc05d8d7d9c930d9c67eea5c74942f",
+    "README.md": "9e69af6249df7a1a86a0ec6a1db5f3d4ae936c789c7e09b550a2df89907d5340",
+    "native/jade-source-helper-unicode.exe": "2c3143fbc2f9496d49fa3ba2b9b012f58da92f70865964ebeb727d3909148f16",
     "native/jade-native-helper.exe": "bc74c338b3ba68e51ff0da812c0aecf25e5eff707923534aca7bb70a25c93034",
+    "native/jade-inspect-helper-unicode.exe": "d6b5a52ee7e6060bad29f6da938306a1b204b1d8016bb3857e4232f40da4fee9",
+    "native/jade-debug-helper-unicode.exe": "869aa7cb13f030e9e43c0a81963c327d8cdf7b13e6d6759ba35c5c3f30084f01",
     "native/jade-test-helper-ansi.exe": "385f70cc9ebb05eede8c39ce1bf5228b1c933dc7ab50fb2a1902c1b6bc7dc4a4",
-    "native/jade-inspect-helper.exe": "381928c680f5fd05d5c17bf5bba486f5baa52923a56a5e8b64ed7d0204568570"
-  }
+    "native/jade-test-helper.exe": "381928c680f5fd05d5c17bf5bba486f5baa52923a56a5e8b64ed7d0204568570",
+    "native/debugger-abi.json": "73e1ff8ac2e417ed75b2170fbd365041b50f0c3d3f03cf00199851be3055f4f5",
+    "native/jade-source-helper.exe": "f6e5865a49bc512ee7c6ce804b075abd13a4e52d4778a2fa1bab545a66e3bb02"
+  },
+  "formatVersion": 2,
+  "arch": "x64",
+  "executable": "jade-cli.exe"
 }
