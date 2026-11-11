@@ -216,6 +216,7 @@ if (require.main === module)
       evidenceName: "source-pull-full-native-host.json",
       screenshotDirectory: "full-source-extraction",
       screenshotFile: "extract-all-sources.png",
+      timeoutMilliseconds: 240000,
     })
     .catch((error) => {
       console.error(error);

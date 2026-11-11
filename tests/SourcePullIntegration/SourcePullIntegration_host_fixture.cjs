@@ -197,6 +197,7 @@ async function main({
   evidenceName = "source-pull-native-host.json",
   screenshotDirectory = "native-source-pull",
   screenshotFile = "selected-class-pull.png",
+  timeoutMilliseconds = 120000,
 } = {}) {
   if (process.env.JADE_SOURCE_PULL_NATIVE !== "1")
     throw Error("Explicit JADE_SOURCE_PULL_NATIVE=1 required");
@@ -339,7 +340,7 @@ async function main({
         tail = (tail + v).slice(-6000);
       });
     try {
-      await artifacts.wait(child, { timeoutMilliseconds: 120000 });
+      await artifacts.wait(child, { timeoutMilliseconds });
     } catch (error) {
       throw Error(error.message + "\n" + tail);
     }
