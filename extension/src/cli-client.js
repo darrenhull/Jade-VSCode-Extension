@@ -91,7 +91,7 @@ class CliWorkingSession{
   options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
   return request.promise.finally(()=>options.signal?.removeEventListener('abort',abort));
  }
- sourceCapabilities(config){return this.resolveNative('doctor',config,'capabilities');}
+ sourceCapabilities(config,body={}){return this.resolveNative('doctor',config,'capabilities',body);}
  startSourceExtraction(config,selection,callbacks){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
   const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks);

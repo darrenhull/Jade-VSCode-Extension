@@ -130,6 +130,7 @@ function activate(context) {
   let publishing = false,objectExplorer;
   const beforeOperation=async()=>{await objectExplorer?.releaseForOperation();if(!publishing)await nativeTests.release();};
   require('./sidebar').registerSidebar(vscode, context, {
+    streamAllSources:folder=>sourcePull.runAll(folder),
     beforeOperation,
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },

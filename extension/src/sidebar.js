@@ -97,6 +97,7 @@ function registerSidebar(vscode, context, options) {
         let locked = false;
         let temporary;
         try {
+          if(options.streamAllSources){const folder=await workspaceFolder(resource);return folder?await options.streamAllSources(folder):undefined;}
           await options.beforeOperation?.();
           if (options.isBusy())
             throw new Error("A Jade operation is already running.");
