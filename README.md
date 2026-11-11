@@ -122,7 +122,7 @@ Jade Tools is independent third-party tooling and is not affiliated with or endo
 
 ### Large-schema extraction
 
-Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Timeout and cancellation do not apply partial sources to the working folder. Timeout failures identify the setting in the error message.
+Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Streaming extraction retains already-applied files after timeout or cancellation; its output reports the acknowledged prefix and any uncertainty. Timeout failures identify the setting in the error message.
 
 ### Pull one selected class from Source
 
@@ -131,3 +131,13 @@ Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 sec
 An unchanged file keeps its timestamp. Local edits and conflicts are retained; a verified saved remote receipt can supply the prior baseline. No baseline is invented from the current local bytes. The output distinguishes files written, unchanged, kept locally and conflicted, with native stage timings. Cancellation or failure may leave already-applied files in place; a lost native completion is reported as uncertain and the selected source scope is refreshed.
 
 This selected-class route does not extract complete schema resources or detect deletions, and does not replace **Extract All Sources**. It requires the native streaming CLI capability; an older bundle reports the missing capability instead of silently running a batch export.
+
+### Extract complete Source into a new project
+
+Open your source folder, configure its Source runtime settings, then run **Jade: Extract All Sources**. You do not need a current CLS or class selection. The full streaming capability must be present in the bundled native CLI; a selected-only bundle reports the missing capability before creating source files.
+
+Jade/CLI discover and serialize the current user schemas directly into the configured extraction folder, including native schema headers, sections, class/interface sources and one complete `schemaResources.ddx` per schema. Each file is checked and promoted individually. Preparation, native inventory and acknowledged file progress are visible from the first click; repeated clicks while preparation is waiting do not start another pull. Index/test/class refreshes are grouped at the end.
+
+Saved local edits, conflicts, dirty source editors and unsubmitted class-view drafts remain protected. An unchanged file keeps its timestamp. Cancellation or failure can leave already-applied files in place, and unconfirmed native outcomes are reported as uncertain. A complete native inventory does not authorize deletion: workspace files missing from the export are retained. This path does not build a second complete raw/organized/staging source tree.
+
+Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. Whole-schema aggregate resources are not automatically attached to a single-class publish; unsupported resource publication is refused.

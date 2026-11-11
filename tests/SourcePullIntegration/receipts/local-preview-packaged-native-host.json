@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "nativeJadeExecuted": true,
+  "registeredCommand": "jadeNative.extractAllSources",
+  "initialSourceFiles": 0,
+  "scope": "all",
+  "layout": "schema-ddx",
+  "version": "current",
+  "privateCandidate": true,
+  "packagedVsix": true,
+  "distributionSha256": "9ce307029ac7eaa23b275c24c91f65702a5608fbbd8c71f0e369b20fa57ff444",
+  "cliSha256": "ffd5f1c8b091251a7e77f1feb4f8b151d05856627c93b0876313972912414ff7",
+  "expectedFiles": 306,
+  "goldenInventoryMatched": true,
+  "unchangedFiles": 306,
+  "unchangedMtimes": true,
+  "associatedUntitledVeto": {
+    "rejected": 1,
+    "added": 305,
+    "retained": true
+  },
+  "artifact": "C:/Git/Jade-VScode/artifacts/jade-tools-0.21.0-local-preview-ffd5f1c8.vsix",
+  "vsixSha256": "b9eb34926e5c8bb6f028b2c5fbbe5ef61363e594df4cad66e8e5d39003f9f973",
+  "officialRelease": false,
+  "installedInUserEnvironment": false,
+  "nativeApprovedCommit": "13eac23d9a5d6ec11b5486fce2671b5290a9e08e",
+  "portableVsixSmokePassed": true,
+  "portableSmokeNoNodeOnPath": true,
+  "runtimeHashesVerified": 15,
+  "goldenReceiptSha256": "c1fb4488e40bf8998dbbbfc4fcf29c48155bf0a35d6f8e37bb99353e4ce53a34",
+  "limits": "306 native files across three schemas; not a 30k native benchmark. Local build from approved CLI source, not an official release archive."
+}

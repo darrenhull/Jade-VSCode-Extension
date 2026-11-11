@@ -130,6 +130,7 @@ function activate(context) {
   let publishing = false,objectExplorer;
   const beforeOperation=async()=>{await objectExplorer?.releaseForOperation();if(!publishing)await nativeTests.release();};
   require('./sidebar').registerSidebar(vscode, context, {
+    streamAllSources:folder=>sourcePull.runAll(folder),
     beforeOperation,
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
@@ -213,9 +214,11 @@ function activate(context) {
     vscode.commands.executeCommand('jadeNative.executeLocalTests', ...args), language.index,debugTests);
   const sourcePull=require('./SourcePullController').registerSourcePull(vscode,context,{
     service:nativeTests,index:language.index,testing,classView,beforeOperation,
+    refreshUnknownScope:destination=>require('./source-index-scope').queueSourceIndexScope(vscode,language.index,destination),
     prepareSource:uri=>classView.previewController.prepareSourcePull(uri),
     pendingSources:{hasPending:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
-      onDidChange:listener=>classView.previewController.onDidChangePendingSource(event=>listener({path:vscode.Uri.parse(event.uri).fsPath,pending:event.pending}))},
+      hasPendingArtifact:(artifact,projectId)=>classView.previewController.hasPendingArtifact(artifact,projectId),
+      onDidChange:listener=>classView.previewController.onDidChangePendingSource(event=>listener({path:vscode.Uri.parse(event.uri).fsPath,pending:event.pending,artifact:event.artifact,projectId:event.projectId}))},
     isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))

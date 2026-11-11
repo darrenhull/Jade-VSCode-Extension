@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "nativeJadeExecuted": true,
+  "registeredCommand": "jadeNative.extractAllSources",
+  "initialSourceFiles": 0,
+  "scope": "all",
+  "layout": "schema-ddx",
+  "version": "current",
+  "privateCandidate": false,
+  "packagedVsix": true,
+  "distributionSha256": "1a3bb291dfe939e19178b5786666b05adea630831d59edb877a2e1d40c919091",
+  "cliSha256": "10063a794f43b9b66704560e72bc6121ed1061ad12069c157a868b831a2ee9fb",
+  "expectedFiles": 306,
+  "goldenInventoryMatched": true,
+  "unchangedFiles": 306,
+  "unchangedMtimes": true,
+  "associatedUntitledVeto": {
+    "rejected": 1,
+    "added": 305,
+    "retained": true
+  },
+  "officialCliRelease": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.8.0",
+  "officialArchiveSha256": "a14ce1b3bab993aa1fb3f2e1a124fd4c1b0e965ef6a94aa2f045b836e79a8a06",
+  "vsixSha256": "5982f6de9053513de0c4e2b8c4d799995e2e4609024add1f0e86b48870043a6f",
+  "extensionVersion": "0.21.0",
+  "minimumCliVersion": "0.8.0",
+  "runtimeHashesVerified": 15,
+  "portableVsixSmokePassed": true,
+  "bundleRegressionTestsPassed": 47,
+  "goldenReceiptSha256": "c1fb4488e40bf8998dbbbfc4fcf29c48155bf0a35d6f8e37bb99353e4ce53a34",
+  "installedInUserEnvironment": false,
+  "limits": "306 files across three schemas, not a 30,000-file native performance benchmark. Production VSIX verified locally; extension release still requires PR review/merge."
+}

@@ -1,6 +1,7 @@
 "use strict";
 const path = require("node:path");
 const { selectedSourcePaths } = require("./source-pull-path");
+const { sourceArtifact } = require("./source-extraction-artifact");
 const outcomes = new Set([
   "added",
   "updated",
@@ -32,21 +33,46 @@ class SourceExtractionOperation {
   constructor(
     session,
     config,
-    { destination, selection, baselineReceipt, version = "current" },
+    {
+      destination,
+      selection,
+      baselineReceipt,
+      cwd,
+      scope = "classes",
+      schemas,
+      version = "current",
+    },
     callbacks = {},
   ) {
     if (version !== "current")
       throw Error(
         "Streaming extraction currently supports the current source version only.",
       );
+    const full = scope !== "classes";
     if (
+      !["classes", "schemas", "all"].includes(scope) ||
       !path.isAbsolute(destination) ||
-      !Array.isArray(selection) ||
-      !selection.length
+      (full &&
+        (selection !== undefined ||
+          (scope === "all" && schemas !== undefined))) ||
+      (!full && (!Array.isArray(selection) || !selection.length)) ||
+      (scope === "schemas" &&
+        (!Array.isArray(schemas) ||
+          !schemas.length ||
+          schemas.some((value) => typeof value !== "string" || !value)))
     )
       throw Error(
-        "Choose a destination and at least one class/interface source.",
+        "Choose a destination and a valid native class, schema or all-schemas scope.",
       );
+    this.scope = scope;
+    this.full = full;
+    this.destination = destination;
+    this.schemas =
+      scope === "schemas"
+        ? new Set(schemas.map((value) => value.toLowerCase()))
+        : undefined;
+    this.seenFiles = new Set();
+    this.inventoryKnown = !full;
     if (typeof callbacks.onPermit !== "function")
       throw Error(
         "Native extraction requires an editor promotion-permission handler.",
@@ -54,7 +80,7 @@ class SourceExtractionOperation {
     this.session = session;
     this.callbacks = callbacks;
     this.remaining = new Set();
-    for (const item of selection) {
+    for (const item of selection || []) {
       if (
         !item ||
         !["class", "interface"].includes(item.kind) ||
@@ -68,9 +94,11 @@ class SourceExtractionOperation {
         );
       this.remaining.add(key(item.path));
     }
-    this.allowed = new Set(selectedSourcePaths(selection).map(key));
-    this.total = this.allowed.size;
-    this.expectedTotal = selection.length;
+    this.allowed = full
+      ? undefined
+      : new Set(selectedSourcePaths(selection).map(key));
+    this.total = full ? Infinity : this.allowed.size;
+    this.expectedTotal = full ? 0 : selection.length;
     this.started = false;
     this.stopped = false;
     this.observedFiles = 0;
@@ -81,7 +109,8 @@ class SourceExtractionOperation {
       {
         config,
         destination,
-        selection,
+        ...(cwd ? { cwd } : {}),
+        ...(full ? { scope, ...(schemas ? { schemas } : {}) } : { selection }),
         version,
         promotion: "client",
         ...(baselineReceipt ? { baselineReceipt } : {}),
@@ -96,7 +125,7 @@ class SourceExtractionOperation {
         passed: false,
         code: 2,
         status: "failed",
-        scope: "classes",
+        scope: this.scope,
         version: "current",
         authoritative: false,
         partial: this.started,
@@ -154,7 +183,7 @@ class SourceExtractionOperation {
         if (
           this.started ||
           !token(packet.lease) ||
-          packet.scope !== "classes" ||
+          packet.scope !== this.scope ||
           packet.authoritative !== false
         )
           throw Error("Invalid native extraction ownership or scope.");
@@ -172,6 +201,7 @@ class SourceExtractionOperation {
           packet.totalFiles > this.total
         )
           throw Error("Invalid native extraction progress.");
+        if (packet.stage === "inventory") this.inventoryKnown = true;
         this.expectedTotal = Math.max(this.expectedTotal, packet.totalFiles);
         this.notify("onStage", packet);
       } else if (packet.event === "source.permitRequired") {
@@ -183,12 +213,22 @@ class SourceExtractionOperation {
           !validTicket ||
           this.seenTickets.has(ticketKey) ||
           this.pendingPermit ||
-          !this.allowed.has(key(packet.path)) ||
+          !(this.full
+            ? !this.seenFiles.has(key(packet.path))
+            : this.allowed.has(key(packet.path))) ||
           !integer(packet.expiresInMs) ||
           packet.expiresInMs < 1 ||
           packet.expiresInMs > 30000
         )
           throw Error("Invalid, stale or foreign native promotion permit.");
+        const artifactKey = this.full
+          ? sourceArtifact(
+              this.destination,
+              packet.path,
+              packet.artifact,
+              this.schemas,
+            )
+          : undefined;
         this.seenTickets.add(ticketKey);
         let allow = false;
         if (!this.stopped) {
@@ -206,7 +246,7 @@ class SourceExtractionOperation {
           }
         }
         allow = allow && !this.stopped;
-        this.pendingPermit = { path: key(packet.path), allow };
+        this.pendingPermit = { path: key(packet.path), allow, artifactKey };
         this.send(
           "source.permit",
           { lease: this.lease, ticket: packet.ticket, allow },
@@ -216,13 +256,27 @@ class SourceExtractionOperation {
         const fileKey = key(packet.path);
         if (
           !this.started ||
-          !this.allowed.has(fileKey) ||
+          !(this.full
+            ? !this.seenFiles.has(fileKey)
+            : this.allowed.has(fileKey)) ||
           !outcomes.has(packet.outcome) ||
           !/^[a-fA-F0-9]{64}$/.test(packet.sha256 || "") ||
           !integer(packet.bytes)
         )
           throw Error("Invalid native source-file outcome.");
-        if (this.pendingPermit && this.pendingPermit.path !== fileKey)
+        const artifactKey = this.full
+          ? sourceArtifact(
+              this.destination,
+              packet.path,
+              packet.artifact,
+              this.schemas,
+            )
+          : undefined;
+        if (
+          this.pendingPermit &&
+          (this.pendingPermit.path !== fileKey ||
+            this.pendingPermit.artifactKey !== artifactKey)
+        )
           throw Error(
             "Native file completion does not match its pending permission.",
           );
@@ -234,7 +288,8 @@ class SourceExtractionOperation {
             "Native source was promoted without this client's permission.",
           );
         this.remaining.delete(fileKey);
-        this.allowed.delete(fileKey);
+        this.allowed?.delete(fileKey);
+        this.seenFiles.add(fileKey);
         this.pendingPermit = undefined;
         this.observedFiles++;
         this.observedCounts[packet.outcome] =
@@ -252,9 +307,15 @@ class SourceExtractionOperation {
       typeof result.passed !== "boolean" ||
       !Number.isInteger(result.code) ||
       !["completed", "cancelled", "failed"].includes(result.status) ||
-      result.scope !== "classes" ||
+      result.scope !== this.scope ||
       result.version !== "current" ||
-      result.authoritative !== false ||
+      (this.full
+        ? typeof result.authoritative !== "boolean" ||
+          result.authoritative !==
+            (result.passed &&
+              result.code === 0 &&
+              result.status === "completed")
+        : result.authoritative !== false) ||
       typeof result.partial !== "boolean" ||
       !integer(result.completedFiles) ||
       !result.counts ||
@@ -273,7 +334,8 @@ class SourceExtractionOperation {
           (result.counts[outcome] || 0) !== (this.observedCounts[outcome] || 0),
       ) ||
       (result.passed &&
-        (this.remaining.size > 0 ||
+        (!this.inventoryKnown ||
+          this.remaining.size > 0 ||
           this.pendingPermit ||
           this.observedFiles !== this.expectedTotal))
     )
@@ -293,14 +355,23 @@ class SourceExtractionOperation {
       passed: false,
       code: nativeResult?.passed === false ? nativeResult.code : 2,
       status: "failed",
-      scope: "classes",
+      scope: this.scope,
       version: "current",
       authoritative: false,
       partial: this.started,
       indeterminate: this.started,
       counts: this.observedCounts,
       completedFiles: this.observedFiles,
-      report: { error: nativeResult?.report?.error || message },
+      report: {
+        error: nativeResult?.report?.error || message,
+        ...Object.fromEntries(
+          ["reason", "schema", "path"]
+            .filter(
+              (field) => typeof nativeResult?.report?.[field] === "string",
+            )
+            .map((field) => [field, nativeResult.report[field]]),
+        ),
+      },
       clientError: message,
     };
   }

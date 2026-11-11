@@ -4,6 +4,7 @@ const {SourceIndex}=require('./workspace-index');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
+const {isIndexableSourcePath}=require('./source-index-scope');
 const {registerFormatting}=require('./jade-formatter');
 const {parseSource}=require('./source_symbols');
 
@@ -11,7 +12,7 @@ function registerLanguageTools(vscode,context){
   const selector=[{language:'jade-nz',scheme:'file',pattern:'**/*.{cls,jade}'},{language:'jade-nz',scheme:'untitled'},{language:'jade-nz',scheme:'vscode-notebook-cell'}];
   registerFormatting(vscode,context,selector);
   const output=vscode.window.createOutputChannel('Jade Language Tools');let lastError,lastCache,lastProject;
-  const supported=uri=>uri.scheme==='untitled'||/\.(cls|jade)$/i.test(uri.fsPath||'')||/[/\\]schemaDefinitions\.sec$/i.test(uri.fsPath||'');
+  const supported=uri=>uri.scheme==='untitled'||isIndexableSourcePath(uri.fsPath);
   const accepted=uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace);
   const index=new SourceIndex({
     list:async()=> (await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git}/**')).filter(accepted).map(uri=>uri.toString()),

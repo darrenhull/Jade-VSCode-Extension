@@ -1,5 +1,8 @@
 "use strict";
 const path = require("node:path");
+const fs = require("node:fs");
+const { isIndexableSourcePath } = require("./source-index-scope");
+const { resolveSourcePullProject } = require("./source-pull-project");
 const { SourcePullEditorGuard } = require("./SourcePullEditorGuard");
 const { resolveSourcePullSelection } = require("./source-pull-selection");
 const { readSelectedBaselineReceipt } = require("./source-baseline-receipt");
@@ -13,7 +16,7 @@ const stageLabels = {
   closing: "Closing Source",
 };
 
-/** VS Code presentation and editor permissions for the native class-only route. */
+/** VS Code presentation and editor permissions for native source scopes. */
 class SourcePullController {
   constructor(vscode, context, services) {
     this.vscode = vscode;
@@ -22,9 +25,57 @@ class SourcePullController {
     this.output = vscode.window.createOutputChannel("Jade Source Pull");
     this.active = new Set();
     this.disposed = false;
+    this.idle = Promise.resolve();
   }
 
-  async run(resource) {
+  runAll(folder) {
+    return this.runFull(folder, "all");
+  }
+  runSchemas(folder, schemas) {
+    return this.runFull(folder, "schemas", schemas);
+  }
+  runFull(folder, scope, schemas) {
+    return this.vscode.window.withProgress(
+      {
+        location: this.vscode.ProgressLocation.Notification,
+        title:
+          scope === "all"
+            ? "Extracting all Source schemas"
+            : "Refreshing selected Source schemas",
+        cancellable: true,
+      },
+      (progress, token) =>
+        this.run(folder, {
+          scope,
+          schemas,
+          preparationProgress: progress,
+          preparationToken: token,
+        }),
+    );
+  }
+
+  async run(
+    resource,
+    { scope = "classes", schemas, preparationProgress, preparationToken } = {},
+  ) {
+    const full = scope !== "classes";
+    let refreshAll = false,
+      ownsRun = false,
+      finishRun;
+    const preparing = (message) => {
+      try {
+        preparationProgress?.report({ message });
+      } catch {}
+    };
+    const cancelledBeforeStart = () =>
+      preparationToken?.isCancellationRequested || this.disposed;
+    const labels = full
+      ? {
+          ...stageLabels,
+          inventory: "Discovering complete Source inventory",
+          "native-write": "Writing native Source files",
+        }
+      : stageLabels;
     const { vscode, services, output } = this;
     const log = (text) => {
       try {
@@ -41,40 +92,71 @@ class SourcePullController {
     let expectedFiles = 0;
     try {
       if (this.disposed) throw Error("Source pull is closed.");
+      if (this.running)
+        throw Error("A Source extraction is already preparing or running.");
+      this.running = true;
+      ownsRun = true;
+      this.idle = new Promise((resolve) => {
+        finishRun = resolve;
+      });
+      preparing("Checking native Source extraction support…");
       if (services.isBusy())
         throw Error(
-          "Wait for the current Jade operation before pulling class sources.",
+          "Wait for the current Jade operation before extracting Source files.",
         );
-      resolved = await (services.resolve || resolveSourcePullSelection)(
-        vscode,
-        resource,
-        services.settings,
-        { prepareSource: services.prepareSource },
-      );
+      resolved = await (
+        full
+          ? services.resolveProject || resolveSourcePullProject
+          : services.resolve || resolveSourcePullSelection
+      )(vscode, resource, services.settings, {
+        prepareSource: services.prepareSource,
+      });
       const { folder, config, destination, selection } = resolved;
-      expectedFiles = selection.length;
-      const capabilities = await services.service.sourceCapabilities(config);
+      expectedFiles = full ? undefined : selection.length;
+      const capabilities = await services.service.sourceCapabilities(
+        config,
+        full ? { cwd: resolved.cwd } : undefined,
+      );
       const capability = capabilities?.sourceExtraction;
       if (
         capability?.protocol !== 1 ||
-        !capability.scopes?.includes("classes") ||
+        !capability.scopes?.includes(scope) ||
+        (full &&
+          (capability.fullSchema !== true ||
+            capability.available !== true ||
+            capability.layout !== "schema-ddx")) ||
         capability.requiresPromotionPermit !== true ||
         !capability.versions?.includes("current")
       )
         throw Error(
-          "The bundled Jade CLI does not support safe native streaming extraction. Update Jade Tools; no batch fallback was run.",
+          "The bundled Jade CLI does not support this native streaming scope (complete schemas require full-schema support). Update Jade Tools; no batch fallback was run.",
         );
       let baselineReceipt, baselineWarning;
       try {
-        baselineReceipt = readSelectedBaselineReceipt({
-          storageDirectory: this.context.globalStorageUri.fsPath,
-          destination,
-          sourceDatabasePath: config.databasePath,
-          selection,
-        });
+        if (!full)
+          baselineReceipt = readSelectedBaselineReceipt({
+            storageDirectory: this.context.globalStorageUri.fsPath,
+            destination,
+            sourceDatabasePath: config.databasePath,
+            selection,
+          });
       } catch (error) {
         baselineWarning = error.message;
       }
+      if (cancelledBeforeStart())
+        return {
+          passed: false,
+          code: 130,
+          status: "cancelled",
+          scope,
+          version: "current",
+          authoritative: false,
+          partial: false,
+          counts: {},
+          completedFiles: 0,
+        };
+      if (full) fs.mkdirSync(destination, { recursive: true });
+      preparing("Finishing the previous Jade operation…");
       await services.beforeOperation();
       if (services.isBusy())
         throw Error(
@@ -82,14 +164,23 @@ class SourcePullController {
         );
       await services.setBusy(true);
       locked = true;
+      preparing("Preparing source editor indexes…");
       release = await services.index.pauseDiskUpdates();
       output.clear();
       output.show(true);
       log(
-        "Pulling selected class/interface sources from Source (current version).",
+        full
+          ? scope === "all"
+            ? "Extracting all user schema sources from Source (current version)."
+            : "Refreshing Source schemas: " +
+              schemas.join(", ") +
+              " (current version)."
+          : "Pulling selected class/interface sources from Source (current version).",
       );
       log(
-        "Class-only scope: complete schema resources and deletion detection are not included.",
+        full
+          ? "Complete schema source scope; native per-file updates retain local edits. Missing files are never deleted."
+          : "Class-only scope: complete schema resources and deletion detection are not included.",
       );
       log(
         "Source: " +
@@ -113,18 +204,39 @@ class SourcePullController {
       guard = new SourcePullEditorGuard({
         workspace: vscode.workspace,
         destination,
-        pendingSources: services.pendingSources,
-        selectedPaths: selectedSourcePaths(selection),
+        pendingSources: services.pendingSources && {
+          hasPending: (file) => services.pendingSources.hasPending?.(file),
+          hasPendingArtifact: (artifact) =>
+            services.pendingSources.hasPendingArtifact?.(
+              artifact,
+              folder.uri.toString(),
+            ),
+          onDidChange: (listener) =>
+            services.pendingSources.onDidChange((event) => {
+              if (
+                !event.projectId ||
+                event.projectId.toLowerCase() ===
+                  folder.uri.toString().toLowerCase()
+              )
+                listener(event);
+            }),
+        },
+        selectedPaths: full ? [] : selectedSourcePaths(selection),
         onInvalidated: (reason) => {
           log(reason);
           cancelledEarly = true;
           operation?.stop();
         },
       });
-      result = await vscode.window.withProgress(
+      const withNativeProgress = preparationProgress
+        ? async (_options, task) => task(preparationProgress, preparationToken)
+        : vscode.window.withProgress.bind(vscode.window);
+      result = await withNativeProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: "Pulling class sources from Source",
+          title: full
+            ? "Extracting all Source schemas"
+            : "Pulling class sources from Source",
           cancellable: true,
         },
         async (progress, token) => {
@@ -143,12 +255,17 @@ class SourcePullController {
             try {
               progress.report({
                 message:
-                  stageLabels[stage] +
+                  labels[stage] +
                   " · " +
                   completed.toLocaleString() +
-                  "/" +
-                  expectedFiles.toLocaleString() +
-                  " selected files processed · " +
+                  (expectedFiles === undefined
+                    ? " files processed"
+                    : "/" +
+                      expectedFiles.toLocaleString() +
+                      (full
+                        ? " native files processed"
+                        : " selected files processed")) +
+                  " · " +
                   elapsedLabel(now() - start) +
                   " elapsed",
               });
@@ -192,7 +309,7 @@ class SourcePullController {
                 passed: false,
                 code: 130,
                 status: "cancelled",
-                scope: "classes",
+                scope,
                 version: "current",
                 authoritative: false,
                 partial: false,
@@ -201,26 +318,40 @@ class SourcePullController {
               };
             operation = services.service.startSourceExtraction(
               config,
-              { destination, selection, baselineReceipt, version: "current" },
+              {
+                destination,
+                ...(full
+                  ? {
+                      scope,
+                      ...(schemas ? { schemas } : {}),
+                      cwd: resolved.cwd,
+                    }
+                  : { selection, baselineReceipt }),
+                version: "current",
+              },
               {
                 onOutput: (text) => output.append(text),
                 onStarted: () => report(false),
                 onStage: (event) => {
                   completed = event.completedFiles;
-                  expectedFiles = event.totalFiles;
+                  if (!full || event.stage !== "opening")
+                    expectedFiles = event.totalFiles;
                   stageChanged(event.stage);
                 },
                 onPermit: (event) =>
                   !cancelledEarly &&
                   !token.isCancellationRequested &&
-                  guard.approve(event.path),
+                  guard.approve(event.path, event.artifact),
                 onFile: (event) => {
                   guard.complete(event.path);
                   if (event.outcome === "conflict" && !firstConflict)
                     firstConflict = event.path;
                   observedFiles++;
                   completed = Math.max(completed, observedFiles);
-                  if (["added", "updated"].includes(event.outcome))
+                  if (
+                    ["added", "updated"].includes(event.outcome) &&
+                    isIndexableSourcePath(event.path)
+                  )
                     refreshPaths.add(event.path);
                   if (
                     ["conflict", "rejected", "keptLocal"].includes(
@@ -243,8 +374,13 @@ class SourcePullController {
               native.indeterminate ||
               native.report?.outcomesUncertain
             )
-              for (const relative of selectedSourcePaths(selection))
+              for (const relative of full ? [] : selectedSourcePaths(selection))
                 refreshPaths.add(relative);
+            if (
+              full &&
+              (native.indeterminate || native.report?.outcomesUncertain)
+            )
+              refreshAll = true;
             completed = native.completedFiles;
             report(true);
             return native;
@@ -258,7 +394,7 @@ class SourcePullController {
             );
             for (const [name, milliseconds] of durations)
               log(
-                stageLabels[name] +
+                labels[name] +
                   ": " +
                   Math.round(milliseconds) +
                   " ms (client event timing)",
@@ -279,8 +415,10 @@ class SourcePullController {
           " · " +
           result.completedFiles +
           "/" +
-          expectedFiles +
-          " selected files processed · " +
+          (expectedFiles ?? "unknown") +
+          (full
+            ? " native files processed · "
+            : " selected files processed · ") +
           written +
           " written · " +
           (counts.conflict || 0) +
@@ -289,15 +427,61 @@ class SourcePullController {
           " rejected.",
       );
       if (result.report?.error) log(result.report.error);
+      if (result.clientError)
+        log("Source client validation: " + result.clientError);
       if (result.indeterminate || result.report?.outcomesUncertain)
         void vscode.window.showWarningMessage(
           "Source connection closed before confirmation. Some files may already have changed; the selected source scope will be refreshed. See Jade Source Pull.",
         );
-      else if (result.status === "cancelled")
+      else if (
+        !full &&
+        result.code === 2 &&
+        result.completedFiles === 0 &&
+        !result.partial &&
+        result.report?.reason === "schema-ddx-full-refresh-required" &&
+        selection.length === 1 &&
+        typeof result.report.schema === "string" &&
+        result.report.schema.toLowerCase() === selection[0].schema.toLowerCase()
+      ) {
+        const idle = this.idle,
+          schema = result.report.schema;
+        void vscode.window
+          .showWarningMessage(
+            "This Form uses the schema resource aggregate. Refresh its whole schema Source instead of adding an individual Form DDX.",
+            "Refresh Schema Source",
+            "Show Source Pull Log",
+          )
+          .then(async (choice) => {
+            if (choice === "Show Source Pull Log") output.show(true);
+            else if (choice === "Refresh Schema Source") {
+              await idle;
+              if (!this.disposed) return this.runSchemas(folder, [schema]);
+            }
+          })
+          .catch((error) =>
+            log("Could not refresh schema Source: " + error.message),
+          );
+      } else if (
+        full &&
+        result.code === 2 &&
+        result.completedFiles === 0 &&
+        !result.partial &&
+        result.report?.reason === "schema-ddx-individual-migration-required"
+      ) {
+        void vscode.window
+          .showWarningMessage(
+            "This source folder contains individual Form DDX files. A reviewed migration to schema resource aggregates is required before a full refresh; no source files were changed.",
+            "Show Source Pull Log",
+          )
+          .then((choice) => {
+            if (choice === "Show Source Pull Log") output.show(true);
+          })
+          .catch((error) => log(error.message));
+      } else if (result.status === "cancelled")
         void vscode.window.showInformationMessage(
           "Source pull cancelled after " +
             result.completedFiles +
-            " selected file(s). Already-applied files are retained.",
+            " file(s). Already-applied files are retained.",
         );
       else if (counts.conflict || counts.rejected)
         void vscode.window
@@ -333,7 +517,9 @@ class SourcePullController {
         );
       else
         void vscode.window.showInformationMessage(
-          "Selected class sources pulled: " +
+          (full
+            ? "Source extraction complete: "
+            : "Selected class sources pulled: ") +
             written +
             " written, " +
             (counts.unchanged || 0) +
@@ -341,16 +527,23 @@ class SourcePullController {
             (counts.keptLocal || 0) +
             " local edits kept.",
         );
-      return result;
+      return full ? { ...result, destination } : result;
     } catch (error) {
       if (operation) {
         operation.stop();
         const native = await operation.completion;
         if (!native.indeterminate) guard?.nativeClosed();
-        for (const relative of selectedSourcePaths(resolved.selection))
+        for (const relative of full
+          ? []
+          : selectedSourcePaths(resolved.selection))
           refreshPaths.add(relative);
+        if (full) refreshAll = true;
         log("Source pull presentation failed: " + error.message);
-        return { ...native, clientError: error.message };
+        return {
+          ...native,
+          ...(full ? { destination: resolved.destination } : {}),
+          clientError: error.message,
+        };
       }
       log("Source pull failed: " + error.message);
       void vscode.window.showErrorMessage(error.message);
@@ -358,7 +551,7 @@ class SourcePullController {
         passed: false,
         code: 2,
         status: "failed",
-        scope: "classes",
+        scope,
         authoritative: false,
         partial: operation?.started === true,
         indeterminate: operation?.started === true,
@@ -369,22 +562,54 @@ class SourcePullController {
       // indeterminate; refresh its selected scope conservatively, without a retry.
       guard?.dispose();
       if (release) {
+        const clock = services.now || (() => performance.now()),
+          refreshStart = clock();
+        const reportRefresh = () =>
+          preparing(
+            "Refreshing source indexes and editor views · " +
+              elapsedLabel(clock() - refreshStart) +
+              " elapsed",
+          );
+        reportRefresh();
+        const refreshTimer = preparationProgress
+          ? setInterval(reportRefresh, 1000)
+          : undefined;
+        refreshTimer?.unref?.();
         try {
-          for (const relative of refreshPaths) {
-            const uri = vscode.Uri.file(
-              sourceTargetPath(resolved.destination, relative),
-            );
-            if (vscode.workspace.getWorkspaceFolder(uri))
-              services.index.schedule(uri.toString());
+          try {
+            for (const relative of refreshPaths) {
+              if (!isIndexableSourcePath(relative)) continue;
+              const uri = vscode.Uri.file(
+                sourceTargetPath(resolved.destination, relative),
+              );
+              if (vscode.workspace.getWorkspaceFolder(uri))
+                services.index.schedule(uri.toString());
+            }
+            if (refreshAll) {
+              if (services.refreshUnknownScope)
+                await services.refreshUnknownScope(resolved.destination);
+              else await services.index.rescan();
+            }
+          } finally {
+            await release();
           }
-          await release();
           await services.testing.discover(false);
           await services.classView.refresh({ rescan: false });
         } catch (error) {
           log("Source indexing refresh failed: " + error.message);
+        } finally {
+          clearInterval(refreshTimer);
+          log("Editor refresh: " + Math.round(clock() - refreshStart) + " ms");
         }
       }
-      if (locked) await services.setBusy(false);
+      try {
+        if (locked) await services.setBusy(false);
+      } finally {
+        if (ownsRun) {
+          this.running = false;
+          finishRun?.();
+        }
+      }
     }
   }
 

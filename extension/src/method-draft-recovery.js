@@ -1,4 +1,5 @@
 'use strict';
+const {projectArtifactIdentity}=require('./source-artifact-identity');
 const STORAGE_KEY='jade.methodDraftRecovery.v1';
 function sourceMemberKind(kind){if(kind===undefined||kind==='method'||kind==='typeMethod')return 'method';if(kind==='property'||kind==='reference')return kind;throw new Error('Invalid source member kind.');}
 /** Bounded safety checkpoints only. Saving and undo always belong to TextDocument. */
@@ -18,6 +19,10 @@ class MethodDraftRecovery {
   serial(action){const next=this.queue.then(action);this.queue=next.catch(()=>{});return next;}
   get(identity){const value=this.records.get(this.key(identity));return value&&!value.pristine?structuredClone(value):undefined;}
   hasDraftForUri(uri){const key=String(uri).toLowerCase();for(const record of this.records.values())if(!record.pristine&&record.identity.uri.toLowerCase()===key)return true;return false;}
+  hasDraftForArtifact(projectId,artifact){
+    if(this.artifactRecords?.deref()!==this.records){this.artifactRecords=new WeakRef(this.records);this.artifactIndex=new Set();for(const record of this.records.values())if(!record.pristine){const key=projectArtifactIdentity(record.identity.projectId,{schema:record.identity.schema,name:record.identity.owner,kind:'class'});if(key)this.artifactIndex.add(key);}}
+    const key=projectArtifactIdentity(projectId,artifact);return !!key&&this.artifactIndex.has(key);
+  }
   isUnresolved(identity){return this.unresolved.has(this.key(identity));}
   protectUnapplied(identity,snapshot){return this.serial(async()=>{
     const key=this.key(identity),record=this.records.get(key);

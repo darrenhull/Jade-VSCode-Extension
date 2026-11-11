@@ -1,5 +1,6 @@
 "use strict";
 const path = require("node:path");
+const { sourceArtifactIdentity } = require("./source-artifact-identity");
 const { sourceTargetPath } = require("./source-pull-path");
 
 /** Editor-only protection for one native file candidate at a time. */
@@ -17,6 +18,7 @@ class SourcePullEditorGuard {
     this.pendingSources = pendingSources;
     this.documents = new Map();
     this.active = undefined;
+    this.activeArtifact = undefined;
     this.invalidated = false;
     this.disposed = false;
     this.subscriptions = [];
@@ -30,7 +32,9 @@ class SourcePullEditorGuard {
           if (
             event.pending &&
             (path.resolve(event.path).toLowerCase() === this.active ||
-              this.scope.has(path.resolve(event.path).toLowerCase()))
+              this.scope.has(path.resolve(event.path).toLowerCase()) ||
+              (this.activeArtifact &&
+                sourceArtifactIdentity(event.artifact) === this.activeArtifact))
           )
             this.invalidate(
               "An approved source target has an unsubmitted class-view draft.",
@@ -44,14 +48,19 @@ class SourcePullEditorGuard {
       ),
       workspace.onDidCloseTextDocument((document) => {
         const key = this.documentKey(document);
-        if (key && this.documents.get(key) === document)
-          this.documents.delete(key);
+        const documents = key && this.documents.get(key);
+        if (documents) {
+          documents.delete(document);
+          if (!documents.size) this.documents.delete(key);
+        }
       }),
     );
   }
 
   documentKey(document) {
-    return document?.uri?.scheme === "file" &&
+    return (document?.uri?.scheme === "file" ||
+      (document?.uri?.scheme === "untitled" &&
+        path.isAbsolute(document.uri.fsPath || ""))) &&
       typeof document.uri.fsPath === "string"
       ? path.resolve(document.uri.fsPath).toLowerCase()
       : undefined;
@@ -61,7 +70,9 @@ class SourcePullEditorGuard {
     if (this.disposed) return;
     const key = this.documentKey(document);
     if (!key) return;
-    this.documents.set(key, document);
+    let documents = this.documents.get(key);
+    if (!documents) this.documents.set(key, (documents = new Set()));
+    documents.add(document);
     // Native disk reloads can emit clean changes. Only unsaved buffer changes
     // invalidate a granted permit; the CLI independently rechecks saved bytes.
     if ((key === this.active || this.scope.has(key)) && document.isDirty)
@@ -78,7 +89,14 @@ class SourcePullEditorGuard {
     this.onInvalidated(reason);
   }
 
-  approve(relative) {
+  isDirty(key) {
+    const documents = this.documents.get(key);
+    if (documents)
+      for (const document of documents) if (document.isDirty) return true;
+    return false;
+  }
+
+  approve(relative, artifact) {
     if (this.disposed || this.invalidated) return false;
     const key = this.targetKey(relative);
     if (this.active) {
@@ -88,11 +106,13 @@ class SourcePullEditorGuard {
     // Keep live TextDocument references; this is a current-state check with no
     // all-editor rescan or source-text copy for each of 30,000 incoming files.
     if (
-      this.documents.get(key)?.isDirty ||
-      this.pendingSources?.hasPending(key)
+      this.isDirty(key) ||
+      this.pendingSources?.hasPending?.(key) ||
+      (artifact && this.pendingSources?.hasPendingArtifact?.(artifact))
     )
       return false;
     this.active = key;
+    this.activeArtifact = sourceArtifactIdentity(artifact);
     return true;
   }
 
@@ -105,10 +125,12 @@ class SourcePullEditorGuard {
       return;
     }
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 
   nativeClosed() {
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 
   dispose() {
@@ -121,6 +143,7 @@ class SourcePullEditorGuard {
     this.documents.clear();
     this.scope.clear();
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 }
 module.exports = { SourcePullEditorGuard };
