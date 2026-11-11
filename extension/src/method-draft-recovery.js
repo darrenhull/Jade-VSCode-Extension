@@ -20,7 +20,7 @@ class MethodDraftRecovery {
   get(identity){const value=this.records.get(this.key(identity));return value&&!value.pristine?structuredClone(value):undefined;}
   hasDraftForUri(uri){const key=String(uri).toLowerCase();for(const record of this.records.values())if(!record.pristine&&record.identity.uri.toLowerCase()===key)return true;return false;}
   hasDraftForArtifact(projectId,artifact){
-    if(this.artifactRecords!==this.records){this.artifactRecords=this.records;this.artifactIndex=new Set();for(const record of this.records.values())if(!record.pristine){const key=projectArtifactIdentity(record.identity.projectId,{schema:record.identity.schema,name:record.identity.owner,kind:'class'});if(key)this.artifactIndex.add(key);}}
+    if(this.artifactRecords?.deref()!==this.records){this.artifactRecords=new WeakRef(this.records);this.artifactIndex=new Set();for(const record of this.records.values())if(!record.pristine){const key=projectArtifactIdentity(record.identity.projectId,{schema:record.identity.schema,name:record.identity.owner,kind:'class'});if(key)this.artifactIndex.add(key);}}
     const key=projectArtifactIdentity(projectId,artifact);return !!key&&this.artifactIndex.has(key);
   }
   isUnresolved(identity){return this.unresolved.has(this.key(identity));}

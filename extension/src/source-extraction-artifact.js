@@ -20,7 +20,11 @@ function sourceArtifact(destination, relative, artifact, schemas) {
     !identifier(artifact.schema) ||
     !kinds.has(artifact.kind) ||
     !components.has(artifact.component) ||
-    (artifact.name !== undefined && !identifier(artifact.name)) ||
+    (artifact.name !== undefined &&
+      (typeof artifact.name !== "string" ||
+        !artifact.name.length ||
+        artifact.name.length > 256 ||
+        /[\x00-\x1f\x7f]/.test(artifact.name))) ||
     (artifact.kind !== "schema" && !identifier(artifact.name))
   )
     throw Error("Invalid native source artifact metadata.");
