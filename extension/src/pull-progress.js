@@ -19,12 +19,24 @@ function elapsedLabel(milliseconds) {
 }
 function createPullProgress(progress, options) {
   const {
-    directory, intervalMs = 3000, now = () => performance.now(),
-    watch = fs.watch, log = () => {}, initialPhase = "Native extraction",
+    directory,
+    intervalMs = 3000,
+    now = () => performance.now(),
+    watch = fs.watch,
+    log = () => {},
+    initialPhase = "Native extraction",
   } = options;
   const start = now();
-  let phaseStart = start, lastReport = -Infinity, phase = initialPhase;
-  let disposed = false, timer, watcher, refreshing, count = 0, dirty = true, counters;
+  let phaseStart = start,
+    lastReport = -Infinity,
+    phase = initialPhase;
+  let disposed = false,
+    timer,
+    watcher,
+    refreshing,
+    count = 0,
+    dirty = true,
+    counters;
   let observing = initialPhase === "Native extraction";
   const report = () => {
     if (disposed) return;
@@ -32,10 +44,24 @@ function createPullProgress(progress, options) {
     const detail = observing
       ? count.toLocaleString() + " class files observed · "
       : counters && Number.isInteger(counters.total)
-        ? counters.completed.toLocaleString() + "/" + counters.total.toLocaleString() + " files hashed · "
+        ? counters.completed.toLocaleString() +
+          "/" +
+          counters.total.toLocaleString() +
+          " files hashed · "
         : "";
     // Progress rendering must not replace the extraction outcome.
-    try { progress.report({ message: phase + " · " + detail + elapsedLabel(now() - phaseStart) + " stage · " + elapsedLabel(now() - start) + " elapsed" }); } catch {}
+    try {
+      progress.report({
+        message:
+          phase +
+          " · " +
+          detail +
+          elapsedLabel(now() - phaseStart) +
+          " stage · " +
+          elapsedLabel(now() - start) +
+          " elapsed",
+      });
+    } catch {}
   };
   async function scan() {
     let total = 0;
@@ -43,10 +69,15 @@ function createPullProgress(progress, options) {
     while (directories.length && !disposed && observing) {
       const current = directories.pop();
       let entries;
-      try { entries = await fs.promises.readdir(current, { withFileTypes: true }); }
-      catch (error) { if (error.code === "ENOENT") continue; throw error; }
+      try {
+        entries = await fs.promises.readdir(current, { withFileTypes: true });
+      } catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
       for (const entry of entries) {
-        if (entry.isDirectory()) directories.push(path.join(current, entry.name));
+        if (entry.isDirectory())
+          directories.push(path.join(current, entry.name));
         else if (entry.isFile() && /\.cls$/i.test(entry.name)) total++;
       }
     }
@@ -54,23 +85,50 @@ function createPullProgress(progress, options) {
   }
   function refresh() {
     if (disposed) return Promise.resolve();
-    if (!observing) { report(); return Promise.resolve(); }
+    if (!observing) {
+      report();
+      return Promise.resolve();
+    }
     if (refreshing) return refreshing;
-    if (watcher && !dirty) { report(); return Promise.resolve(); }
+    if (watcher && !dirty) {
+      report();
+      return Promise.resolve();
+    }
     dirty = false;
-    refreshing = scan().then(value => { if (observing) count = value; report(); }, () => report())
-      .finally(() => { refreshing = undefined; });
+    refreshing = scan()
+      .then(
+        (value) => {
+          if (observing) count = value;
+          report();
+        },
+        () => report(),
+      )
+      .finally(() => {
+        refreshing = undefined;
+      });
     return refreshing;
   }
   function schedule() {
     if (disposed) return;
-    timer = setTimeout(async () => { await refresh(); schedule(); }, intervalMs);
+    timer = setTimeout(async () => {
+      await refresh();
+      schedule();
+    }, intervalMs);
     timer.unref?.();
   }
   if (observing) {
     try {
-      watcher = watch(options.watchRoot || directory, { recursive: true }, () => { dirty = true; });
-      watcher.on?.("error", () => { watcher?.close(); watcher = undefined; });
+      watcher = watch(
+        options.watchRoot || directory,
+        { recursive: true },
+        () => {
+          dirty = true;
+        },
+      );
+      watcher.on?.("error", () => {
+        watcher?.close();
+        watcher = undefined;
+      });
     } catch {} // Observation still works where recursive watching is unavailable.
   }
   report();
@@ -78,7 +136,16 @@ function createPullProgress(progress, options) {
   schedule();
   const finishPhase = () => {
     const duration = Math.max(0, now() - phaseStart);
-    try { log(phase + ": " + elapsedLabel(duration) + " stage (" + Math.round(duration) + " ms)"); } catch {}
+    try {
+      log(
+        phase +
+          ": " +
+          elapsedLabel(duration) +
+          " stage (" +
+          Math.round(duration) +
+          " ms)",
+      );
+    } catch {}
   };
   return {
     refresh,
@@ -86,16 +153,33 @@ function createPullProgress(progress, options) {
       if (disposed) return;
       const next = typeof value === "string" ? value : value.phase;
       const changed = next !== phase;
-      if (changed) { finishPhase(); phase = next; phaseStart = now(); counters = undefined; }
+      if (changed) {
+        finishPhase();
+        phase = next;
+        phaseStart = now();
+        counters = undefined;
+      }
       if (phase !== "Native extraction" && observing) {
-        observing = false; watcher?.close(); watcher = undefined;
+        observing = false;
+        watcher?.close();
+        watcher = undefined;
       }
       if (typeof value === "object") counters = value;
-      if (changed || now() - lastReport >= 250 || counters?.completed === counters?.total && counters?.total !== undefined) report();
+      if (
+        changed ||
+        now() - lastReport >= 250 ||
+        (counters?.completed === counters?.total &&
+          counters?.total !== undefined)
+      )
+        report();
     },
     dispose() {
       if (disposed) return;
-      finishPhase(); disposed = true; clearTimeout(timer); watcher?.close(); watcher = undefined;
+      finishPhase();
+      disposed = true;
+      clearTimeout(timer);
+      watcher?.close();
+      watcher = undefined;
     },
   };
 }
