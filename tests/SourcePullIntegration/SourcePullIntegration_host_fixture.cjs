@@ -166,7 +166,7 @@ async function run() {
         nativeJadeExecuted: true,
         registeredCommand: true,
         privateCandidate: process.env.JADE_SOURCE_HOST_OFFICIAL !== "1",
-        packagedVsix: process.env.JADE_SOURCE_HOST_OFFICIAL === "1",
+        packagedVsix: process.env.JADE_SOURCE_HOST_VSIX === "1",
         distributionSha256: process.env.JADE_SOURCE_HOST_MANIFEST_SHA,
         cliSha256: process.env.JADE_SOURCE_HOST_SHA,
         scope: "classes",
@@ -241,11 +241,20 @@ async function main({
           stdio: "pipe",
         },
       );
+      const candidate = process.env.JADE_SOURCE_PULL_CANDIDATE_DISTRIBUTION;
       require("../../scripts/bundle-cli.cjs").bundleCli({
         source: path.join(extension, "vendor/jade-tools-cli"),
-        pinFile: path.join(root, "packages/jade-cli-pin.json"),
+        ...(candidate ? {} : {pinFile: path.join(root, "packages/jade-cli-pin.json")}),
         verifyOnly: true,
       });
+      if (candidate) {
+        assert.deepEqual(
+          fs.readFileSync(path.join(extension, "vendor/jade-tools-cli/distribution.json")),
+          fs.readFileSync(path.join(candidate, "distribution.json")),
+          "Local preview must preserve the exact explicitly verified candidate receipt",
+        );
+        require("../../scripts/bundle-cli.cjs").bundleCli({source: path.resolve(candidate), verifyOnly: true});
+      }
       assert.equal(
         crypto
           .createHash("sha256")
@@ -304,7 +313,8 @@ async function main({
       JADE_SOURCE_HOST_PORT: String(port),
       JADE_SOURCE_HOST_SHA: sha,
       JADE_SOURCE_HOST_MANIFEST_SHA: manifestSha,
-      JADE_SOURCE_HOST_OFFICIAL: vsix ? "1" : "0",
+      JADE_SOURCE_HOST_OFFICIAL: vsix && !process.env.JADE_SOURCE_PULL_CANDIDATE_DISTRIBUTION ? "1" : "0",
+      JADE_SOURCE_HOST_VSIX: vsix ? "1" : "0",
       JADE_SOURCE_HOST_SCREENSHOT: path.join(
         root,
         "docs/screenshots",

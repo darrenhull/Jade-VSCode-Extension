@@ -186,7 +186,7 @@ async function run() {
         layout: "schema-ddx",
         version: "current",
         privateCandidate: process.env.JADE_SOURCE_HOST_OFFICIAL !== "1",
-        packagedVsix: process.env.JADE_SOURCE_HOST_OFFICIAL === "1",
+        packagedVsix: process.env.JADE_SOURCE_HOST_VSIX === "1",
         distributionSha256: process.env.JADE_SOURCE_HOST_MANIFEST_SHA,
         cliSha256: process.env.JADE_SOURCE_HOST_SHA,
         expectedFiles: expected.files.length,
