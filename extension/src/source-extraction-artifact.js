@@ -3,7 +3,7 @@ const { sourceTargetPath, relativeIdentity } = require("./source-pull-path");
 const kinds = new Set(["class", "interface", "schema"]),
   components = new Set([
     "source",
-    "forms",
+    "schema-resources",
     "section",
     "application",
     "package",
@@ -44,6 +44,19 @@ function sourceArtifact(destination, relative, artifact, schemas) {
   )
     throw Error(
       "Native source artifact path is outside its schema resource layout.",
+    );
+  const resource = /\.ddx$/i.test(relative),
+    aggregate =
+      parts.length === 3 &&
+      parts[2] === "schemaresources.ddx" &&
+      artifact.kind === "schema" &&
+      artifact.component === "schema-resources";
+  if (
+    (resource && !aggregate) ||
+    (!resource && artifact.component === "schema-resources")
+  )
+    throw Error(
+      "Full extraction requires the canonical schema resource aggregate layout.",
     );
   return [
     artifact.schema.toLowerCase(),

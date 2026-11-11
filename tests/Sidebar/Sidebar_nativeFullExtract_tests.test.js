@@ -91,6 +91,7 @@ function fixture(t, { full = true, dirty = false } = {}) {
       sourceExtraction: {
         protocol: 1,
         fullSchema: full,
+        layout: full ? "schema-ddx" : undefined,
         scopes: full ? ["classes", "schemas", "all"] : ["classes"],
         versions: ["current"],
         requiresPromotionPermit: true,
@@ -103,7 +104,7 @@ function fixture(t, { full = true, dirty = false } = {}) {
       return {
         stop() {},
         completion: Promise.resolve().then(() => {
-          cb.onStarted({ scope: "all", authoritative: false });
+          cb.onStarted({ scope: input.scope, authoritative: false });
           cb.onStage({ stage: "inventory", completedFiles: 0, totalFiles: 2 });
           const counts = {};
           for (const [file, artifact] of [
@@ -141,7 +142,7 @@ function fixture(t, { full = true, dirty = false } = {}) {
             passed: !counts.rejected,
             code: counts.rejected ? 4 : 0,
             status: "completed",
-            scope: "all",
+            scope: input.scope,
             version: "current",
             authoritative: !counts.rejected,
             partial: !!counts.rejected,
@@ -184,6 +185,7 @@ function fixture(t, { full = true, dirty = false } = {}) {
     streamAllSources: (selected) => controller.runAll(selected),
   });
   return {
+    controller,
     token,
     services,
     workspace,
@@ -214,7 +216,7 @@ test("actual Extract All command fills an empty folder through native all scope 
     fs.existsSync(path.join(f.workspace, "schemas/Pets/types/Fish.cls")),
   );
   assert.equal(f.refresh.length, 2);
-  assert.equal(f.scheduled.size, 2);
+  assert.equal(f.scheduled.size, 1);
   assert.ok(f.reports.every((x) => !x.message.includes("0/0")));
 });
 test("selected-only CLI is refused before full extraction changes an empty folder", async (t) => {
@@ -389,4 +391,88 @@ test("cancelling preparation never starts native extraction and releases the loc
     (await f.commands.get("jadeNative.extractAllSources")(f.folder.uri)).passed,
     true,
   );
+});
+
+test("post-native index refresh is labelled separately instead of keeping a native stage visible", async (t) => {
+  const f = fixture(t);
+  let refreshMessage;
+  f.services.testing.discover = async () => {
+    refreshMessage = f.reports.at(-1).message;
+  };
+  const result = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(result.passed, true);
+  assert.match(refreshMessage, /Refreshing source indexes and editor views/);
+  assert.match(f.logs.join("\n"), /Editor refresh: .* ms/);
+});
+
+test("full schema capability without the qualified aggregate layout is refused before changes", async (t) => {
+  const f = fixture(t),
+    capabilities = f.services.service.sourceCapabilities;
+  f.services.service.sourceCapabilities = async (...args) => {
+    const result = await capabilities(...args);
+    delete result.sourceExtraction.layout;
+    return result;
+  };
+  const result = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(result.passed, false);
+  assert.equal(f.invocations(), 0);
+  assert.deepEqual(fs.readdirSync(f.workspace), []);
+});
+
+test("named schema refresh keeps the explicit schema list in the native DTO", async (t) => {
+  const f = fixture(t);
+  const result = await f.controller.runSchemas(f.folder, ["Pets"]);
+  assert.equal(result.passed, true, JSON.stringify(result));
+  assert.equal(f.input().input.scope, "schemas");
+  assert.deepEqual(f.input().input.schemas, ["Pets"]);
+  assert.equal(result.scope, "schemas");
+});
+
+test("legacy individual DDX refusal stays actionable and never starts migration or replacement", async (t) => {
+  const f = fixture(t);
+  f.services.service.startSourceExtraction = () => ({
+    stop() {},
+    completion: Promise.resolve({
+      passed: false,
+      code: 2,
+      status: "failed",
+      scope: "all",
+      version: "current",
+      authoritative: false,
+      partial: false,
+      counts: {},
+      completedFiles: 0,
+      report: {
+        reason: "schema-ddx-individual-migration-required",
+        schema: "Pets",
+        path: "schemas/Pets/types/Fish.ddx",
+        error: "Legacy individual Form resources require a reviewed migration",
+      },
+    }),
+  });
+  const value = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(value.code, 2);
+  assert.match(
+    f.logs.join("\n"),
+    /reviewed migration.*no source files were changed/i,
+  );
+  assert.deepEqual(fs.readdirSync(f.workspace), []);
+});
+
+test("Open Last Extraction points to the captured native destination after a streamed pull", async (t) => {
+  const f = fixture(t),
+    revealed = [];
+  f.controller.vscode.commands.executeCommand = async (name, uri) =>
+    revealed.push({ name, uri });
+  await f.commands.get("jadeNative.extractAllSources")(f.folder.uri);
+  await f.commands.get("jadeNative.openLastExtraction")();
+  assert.equal(revealed.length, 1);
+  assert.equal(revealed[0].name, "revealInExplorer");
+  assert.equal(revealed[0].uri.fsPath, f.workspace);
 });

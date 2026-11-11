@@ -97,7 +97,16 @@ function registerSidebar(vscode, context, options) {
         let locked = false;
         let temporary;
         try {
-          if(options.streamAllSources){const folder=await workspaceFolder(resource);return folder?await options.streamAllSources(folder):undefined;}
+          if(options.streamAllSources){
+            const folder=await workspaceFolder(resource);if(!folder)return;
+            const result=await options.streamAllSources(folder);
+            if(result?.destination&&(result.passed||result.partial)){
+              lastExtraction=result.destination;
+              try{await context.workspaceState?.update("jadeNative.lastExtraction",lastExtraction);}catch(error){try{output.appendLine("Could not save extraction location: "+error.message);}catch{}}
+              try{refresh();}catch{}
+            }
+            return result;
+          }
           await options.beforeOperation?.();
           if (options.isBusy())
             throw new Error("A Jade operation is already running.");

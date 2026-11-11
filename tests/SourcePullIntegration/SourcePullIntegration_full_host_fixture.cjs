@@ -6,9 +6,12 @@ const fs = require("node:fs"),
   assert = require("node:assert/strict");
 const base = require("./SourcePullIntegration_host_fixture.cjs"),
   { sourceTargetPath } = require("../../extension/src/source-pull-path");
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  digest = (file) =>
-    crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function digest(file) {
+  const hash = crypto.createHash("sha256");
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+  return hash.digest("hex");
+}
 function inventory(root) {
   const files = [];
   function visit(folder) {
@@ -40,6 +43,19 @@ async function run() {
       Array.isArray(expected.files) && expected.files.length > 0,
       "Native golden inventory must contain complete output hashes",
     );
+    const resources = expected.files.filter((item) =>
+      /\.ddx$/i.test(item.path),
+    );
+    assert.ok(
+      resources.length > 0,
+      "The native golden fixture must cover schema resource aggregates",
+    );
+    for (const item of resources)
+      assert.match(
+        item.path,
+        /^schemas\/[^/]+\/schemaResources\.ddx$/,
+        "Full scope must not emit individual Form DDX",
+      );
     const paths = new Set();
     for (const item of expected.files) {
       sourceTargetPath(workspace, item.path);
@@ -74,7 +90,7 @@ async function run() {
     for (const item of expected.files) {
       const target = sourceTargetPath(workspace, item.path);
       assert.equal(
-        digest(target),
+        await digest(target),
         item.sha256.toLowerCase(),
         "Native golden mismatch: " + item.path,
       );
@@ -167,6 +183,7 @@ async function run() {
         registeredCommand: "jadeNative.extractAllSources",
         initialSourceFiles: 0,
         scope: "all",
+        layout: "schema-ddx",
         version: "current",
         privateCandidate: process.env.JADE_SOURCE_HOST_OFFICIAL !== "1",
         packagedVsix: process.env.JADE_SOURCE_HOST_OFFICIAL === "1",

@@ -214,6 +214,7 @@ function activate(context) {
     vscode.commands.executeCommand('jadeNative.executeLocalTests', ...args), language.index,debugTests);
   const sourcePull=require('./SourcePullController').registerSourcePull(vscode,context,{
     service:nativeTests,index:language.index,testing,classView,beforeOperation,
+    refreshUnknownScope:destination=>require('./source-index-scope').queueSourceIndexScope(vscode,language.index,destination),
     prepareSource:uri=>classView.previewController.prepareSourcePull(uri),
     pendingSources:{hasPending:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
       hasPendingArtifact:(artifact,projectId)=>classView.previewController.hasPendingArtifact(artifact,projectId),

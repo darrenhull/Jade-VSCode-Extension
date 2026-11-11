@@ -48,3 +48,32 @@ test("class/interface artifacts require logical names for virtual draft protecti
     /metadata/i,
   );
 });
+
+test("full extraction accepts only the canonical native schema resource aggregate", () => {
+  assert.doesNotThrow(() =>
+    sourceArtifact(root, "schemas/Pets/schemaResources.ddx", {
+      schema: "Pets",
+      kind: "schema",
+      component: "schema-resources",
+    }),
+  );
+  assert.throws(
+    () =>
+      sourceArtifact(root, "schemas/Pets/types/Fish.ddx", {
+        schema: "Pets",
+        kind: "class",
+        name: "Fish",
+        component: "forms",
+      }),
+    /resource|metadata|layout/i,
+  );
+  assert.throws(
+    () =>
+      sourceArtifact(root, "schemas/Pets/other.ddx", {
+        schema: "Pets",
+        kind: "schema",
+        component: "schema-resources",
+      }),
+    /resource|layout/i,
+  );
+});

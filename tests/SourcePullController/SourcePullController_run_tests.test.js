@@ -232,7 +232,7 @@ test("late dirty edit cancels and partial failure still refreshes scope before u
   });
   const value = await f.controller.run();
   assert.equal(value.status, "cancelled");
-  assert.equal(f.scheduled.size, 2);
+  assert.equal(f.scheduled.size, 1);
   assert.equal(f.refreshes.length, 2);
   assert.equal(f.bulk(), false);
   assert.equal(f.busy(), false);
@@ -310,7 +310,7 @@ test("unacknowledged native completion refreshes scope and reports uncertainty i
   );
   const value = await f.controller.run();
   assert.equal(value.passed, false);
-  assert.equal(f.scheduled.size, 2);
+  assert.equal(f.scheduled.size, 1);
   assert.equal(f.refreshes.length, 2);
   assert.match(
     f.warnings.join("\n"),
@@ -349,6 +349,86 @@ test("native-discovered Form companion total is shown without class-count overfl
   const value = await f.controller.run();
   assert.equal(value.passed, true);
   assert.match(f.reports.at(-1).message, /2\/2 selected files/);
-  assert.equal(f.scheduled.size, 2);
+  assert.equal(f.scheduled.size, 1);
   assert.equal(f.refreshes.length, 2);
+});
+
+test("selected Form aggregate refusal offers named schema refresh only after current cleanup", async (t) => {
+  const f = fixture(t, async () =>
+    result({
+      passed: false,
+      code: 2,
+      status: "failed",
+      counts: {},
+      completedFiles: 0,
+      report: {
+        reason: "schema-ddx-full-refresh-required",
+        schema: "Pets",
+        path: "schemas/Pets/schemaResources.ddx",
+        error: "Refresh whole schema resources",
+      },
+    }),
+  );
+  f.resolved.selection[0].schema = "pets"; // Jade schema identity is case-insensitive.
+  let refreshed;
+  f.controller.vscode.window.showWarningMessage = async (
+    _message,
+    ...actions
+  ) => {
+    assert.ok(actions.includes("Refresh Schema Source"));
+    return "Refresh Schema Source";
+  };
+  f.controller.runSchemas = async (folder, schemas) => {
+    assert.equal(f.busy(), false);
+    assert.equal(f.bulk(), false);
+    refreshed = { folder, schemas };
+  };
+  const value = await f.controller.run();
+  assert.equal(value.code, 2);
+  await new Promise(setImmediate);
+  assert.deepEqual(refreshed.schemas, ["Pets"]);
+  assert.equal(refreshed.folder.uri.fsPath, f.root);
+});
+test("a mismatched reported schema cannot widen a selected source refresh action", async (t) => {
+  const f = fixture(t, async () =>
+    result({
+      passed: false,
+      code: 2,
+      status: "failed",
+      counts: {},
+      completedFiles: 0,
+      report: {
+        reason: "schema-ddx-full-refresh-required",
+        schema: "Other",
+        error: "Refresh other schema",
+      },
+    }),
+  );
+  let invoked = false;
+  f.controller.runSchemas = async () => {
+    invoked = true;
+  };
+  f.controller.vscode.window.showWarningMessage = async () =>
+    "Refresh Schema Source";
+  await f.controller.run();
+  await new Promise(setImmediate);
+  assert.equal(invoked, false);
+});
+
+test("native cancellation code is preserved while client validation explains why it stopped", async (t) => {
+  const f = fixture(t, async () =>
+    result({
+      passed: false,
+      code: 130,
+      status: "cancelled",
+      counts: {},
+      completedFiles: 0,
+      clientError:
+        "Native resource layout did not match the advertised protocol",
+    }),
+  );
+  const value = await f.controller.run();
+  assert.equal(value.code, 130);
+  assert.equal(value.status, "cancelled");
+  assert.match(f.logs.join("\n"), /Native resource layout did not match/);
 });

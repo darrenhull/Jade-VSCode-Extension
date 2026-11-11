@@ -106,7 +106,7 @@ This progress reporting does not make a pull incremental: the current batch rout
 
 ## Extract all source into a new folder
 
-Run **Jade: Extract All Sources** after opening a source folder and configuring the Source runtime. No existing CLS is required. A compatible bundled native CLI streams current schema headers, sections, class/interface sources and Form DDX into the extraction folder, one protected file at a time.
+Run **Jade: Extract All Sources** after opening a source folder and configuring the Source runtime. No existing CLS is required. A compatible bundled native CLI streams current schema headers, sections, class/interface sources and a complete schema resource DDX into the extraction folder, one protected file at a time.
 
 Progress begins during preparation and shows the native inventory and acknowledged file outcomes. Existing local changes and unsaved editors remain protected, including class-view drafts and path-associated untitled source files. Unchanged files keep their timestamps. Cancellation/failure can retain an applied prefix; missing files are never automatically deleted.
 
@@ -136,3 +136,5 @@ Debugger support requires a compatible runtime. GUI application hosting, arbitra
 [Source, architecture and development documentation](https://github.com/darrenhull/Jade-VSCode-Extension) · [Report an issue](https://github.com/darrenhull/Jade-VSCode-Extension/issues)
 
 Jade Tools is an independent third-party extension and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
+
+Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. Whole-schema aggregate resources are not automatically attached to a single-class publish; unsupported resource publication is refused.

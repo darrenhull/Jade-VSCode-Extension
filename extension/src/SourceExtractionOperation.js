@@ -362,7 +362,16 @@ class SourceExtractionOperation {
       indeterminate: this.started,
       counts: this.observedCounts,
       completedFiles: this.observedFiles,
-      report: { error: nativeResult?.report?.error || message },
+      report: {
+        error: nativeResult?.report?.error || message,
+        ...Object.fromEntries(
+          ["reason", "schema", "path"]
+            .filter(
+              (field) => typeof nativeResult?.report?.[field] === "string",
+            )
+            .map((field) => [field, nativeResult.report[field]]),
+        ),
+      },
       clientError: message,
     };
   }
