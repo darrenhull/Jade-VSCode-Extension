@@ -23,7 +23,8 @@ function activation(inspectionField='workspaceFolderValue',override){
 }
 test('character-set setting is optional, resource-scoped and defaults to automatic native detection',()=>{
  const setting=manifest.contributes.configuration.properties['jadeNative.characterSet'];assert.ok(setting);assert.deepEqual(setting.enum,['auto','ansi','unicode']);assert.equal(setting.default,'auto');assert.equal(setting.scope,'resource');
- assert.equal(manifest.jadeNative.minimumCliVersion,'0.6.0','Do not release the setting with a CLI that cannot safely select the native character ABI.');
+ const [major,minor]=manifest.jadeNative.minimumCliVersion.split('.').map(Number);assert.ok(major>0||major===0&&minor>=6,'Do not release the setting with a CLI older than the native character ABI support.');
+ require('../../scripts/NativeCompatibility.cjs').requireNativeVersion(path.join(root,'packages/jade-cli-win-x64'),manifest.jadeNative.minimumCliVersion);
 });
 for(const [index,expected] of ['ansi','unicode',undefined,'auto'].entries())test('actual activation resolves '+(expected||'omitted native default')+' for build, inspection, Scratch and debug configuration without writing settings',()=>{
  const host=activation(),folder=host.folders[index],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};

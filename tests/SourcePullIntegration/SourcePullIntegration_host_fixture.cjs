@@ -4,7 +4,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto"),
   assert = require("node:assert/strict"),
-  { spawn } = require("node:child_process");
+  { spawn, execFileSync } = require("node:child_process");
 const { HostTestArtifacts } = require("../../scripts/HostTestArtifacts.cjs");
 const {
   connectPrivateDebugger,
@@ -165,7 +165,9 @@ async function run() {
         passed: true,
         nativeJadeExecuted: true,
         registeredCommand: true,
-        privateCandidate: true,
+        privateCandidate: process.env.JADE_SOURCE_HOST_OFFICIAL !== "1",
+        packagedVsix: process.env.JADE_SOURCE_HOST_OFFICIAL === "1",
+        distributionSha256: process.env.JADE_SOURCE_HOST_MANIFEST_SHA,
         cliSha256: process.env.JADE_SOURCE_HOST_SHA,
         scope: "classes",
         version: "current",
@@ -216,17 +218,60 @@ async function main() {
   await artifacts.run(async (stage) => {
     const extension = path.join(stage, "extension"),
       workspace = path.join(stage, "workspace");
-    fs.cpSync(path.join(root, "extension"), extension, {
-      recursive: true,
-      filter: (source) =>
-        !source.includes(path.sep + "vendor" + path.sep + "jade-tools-cli"),
-    });
-    fs.mkdirSync(path.join(extension, "vendor"), { recursive: true });
-    fs.cpSync(
-      path.dirname(exe),
-      path.join(extension, "vendor/jade-tools-cli"),
-      { recursive: true },
-    );
+    const vsix = process.env.JADE_SOURCE_PULL_VSIX;
+    if (vsix) {
+      // Same bounded owned-VSIX staging policy as scripts/host-test.cjs.
+      const script = `$ErrorActionPreference='Stop';$zip=[IO.Compression.ZipFile]::OpenRead($env:JADE_SOURCE_PULL_VSIX);try{$total=0;if($zip.Entries.Count -gt 4096){throw 'VSIX entry limit exceeded'};foreach($entry in $zip.Entries){$total+=$entry.Length;if($total -gt 268435456){throw 'VSIX size limit exceeded'};if($entry.FullName -notmatch '^(extension/|extension.vsixmanifest$|\\[Content_Types\\]\\.xml$)' -or $entry.FullName.Contains('..') -or $entry.FullName.Contains('\\') -or (($entry.ExternalAttributes -shr 16) -band 61440) -eq 40960){throw 'Unsafe VSIX entry'}}}finally{$zip.Dispose()};[IO.Compression.ZipFile]::ExtractToDirectory($env:JADE_SOURCE_PULL_VSIX,$env:JADE_SOURCE_EXTRACT_STAGE)`;
+      execFileSync(
+        "pwsh",
+        ["-NoProfile", "-NonInteractive", "-Command", script],
+        {
+          env: {
+            ...process.env,
+            JADE_SOURCE_PULL_VSIX: path.resolve(vsix),
+            JADE_SOURCE_EXTRACT_STAGE: stage,
+          },
+          windowsHide: true,
+          stdio: "pipe",
+        },
+      );
+      require("../../scripts/bundle-cli.cjs").bundleCli({
+        source: path.join(extension, "vendor/jade-tools-cli"),
+        pinFile: path.join(root, "packages/jade-cli-pin.json"),
+        verifyOnly: true,
+      });
+      assert.equal(
+        crypto
+          .createHash("sha256")
+          .update(
+            fs.readFileSync(
+              path.join(extension, "vendor/jade-tools-cli/jade-cli.exe"),
+            ),
+          )
+          .digest("hex"),
+        sha,
+      );
+    } else {
+      fs.cpSync(path.join(root, "extension"), extension, {
+        recursive: true,
+        filter: (source) =>
+          !source.includes(path.sep + "vendor" + path.sep + "jade-tools-cli"),
+      });
+      fs.mkdirSync(path.join(extension, "vendor"), { recursive: true });
+      fs.cpSync(
+        path.dirname(exe),
+        path.join(extension, "vendor/jade-tools-cli"),
+        { recursive: true },
+      );
+    }
+    const manifestSha = crypto
+      .createHash("sha256")
+      .update(
+        fs.readFileSync(
+          path.join(extension, "vendor/jade-tools-cli/distribution.json"),
+        ),
+      )
+      .digest("hex");
     fs.mkdirSync(path.join(workspace, ".vscode"), { recursive: true });
     const settings = Object.fromEntries(
       ["installPath", "databasePath", "iniPath", "server", "characterSet"].map(
@@ -252,6 +297,8 @@ async function main() {
       JADE_SOURCE_HOST_STAGE: stage,
       JADE_SOURCE_HOST_PORT: String(port),
       JADE_SOURCE_HOST_SHA: sha,
+      JADE_SOURCE_HOST_MANIFEST_SHA: manifestSha,
+      JADE_SOURCE_HOST_OFFICIAL: vsix ? "1" : "0",
       JADE_SOURCE_HOST_SCREENSHOT: path.join(
         root,
         "docs/screenshots/native-source-pull/selected-class-pull.png",
@@ -294,7 +341,7 @@ async function main() {
     );
     assert.equal(report.passed, true, report.error);
     console.log(
-      "Actual registered source-pull command + private native CLI host passed.",
+      "Actual registered source-pull command in isolated native Code host passed.",
     );
   });
 }
