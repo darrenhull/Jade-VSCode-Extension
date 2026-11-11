@@ -1,6 +1,6 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.7.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.8.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
@@ -51,19 +51,49 @@ Structural schema compiler failures include native source diagnostics as well as
 
 The result reports `native_load_style`, `native_load_milliseconds` and `native_reconnect_milliseconds` when loading occurs. A failed native load or reconnect does not establish a successful input baseline or start dependent code; native commits can already exist after failure. Source publication remains a separate explicit operation. See [the checked-in implementation plan](https://github.com/darrenhull/Jade-CLI/blob/main/plans/automatic-structural-loading.md).
 
-## Pull a selected native class
+## Pull native source into a workspace
+
+Start in a new project folder, configure its Jade installation, then pull all user schemas from Source:
+
+```powershell
+mkdir C:\Git\JadeWorkspace
+cd C:\Git\JadeWorkspace
+jade-cli init --profile demo --install C:\Jade2025
+jade-cli source extract --all --json
+```
+
+To pull one named schema into the configured workspace instead:
+
+```powershell
+jade-cli source extract --schema ExampleSchema --json
+```
+
+Both commands select the native **current** schema version and read Source without publishing changes to it. Latest-version extraction is not supported. The destination is one existing configured workspace root; use `--workspace` when the project has several roots. `--all` cannot be combined with a named schema, class or output path.
+
+The full-source layout contains native CLS files and schema section files under `schemas/<schema>/`, with the schema header alongside that folder as `schemas/<schema>.scm`. Each schema has one complete native resource file at `schemas/<schema>/schemaResources.ddx`, covering its forms and other native schema resources. Full pulls do not also produce individual DDX sidecars. Build/test loading consumes the aggregate once. A destination containing older individual DDX files requires an explicit layout migration; extraction stops before writing rather than silently mixing both layouts.
+
+One read-only native batch session writes a complete file into a private candidate beside its destination, then hashes, compares and reconciles that file before continuing. Unchanged files retain their timestamps. Accepted remote baselines preserve local-only edits and local deletions; simultaneous local and remote changes remain conflicts, and an unmanaged differing file is not overwritten. IDE clients must grant each changed-file promotion after checking dirty editors. Terminal commands cannot inspect unsaved editor buffers.
+
+Files apply one at a time. Cancellation, failure or a later conflict can therefore leave earlier successful files applied; the result reports this partial outcome. Unpromoted candidates are discarded after native closure. Conflicts and rejected promotions return `result.code: 4` and `passed: false`; inspect the final result even when earlier files were added or updated. Files absent from the native inventory are not automatically deleted from the workspace. Each pull still exports the requested scope through Jade; unchanged-file comparison avoids workspace rewrites rather than claiming an incremental native export.
+
+A selected class can still be pulled to an explicit relative path:
 
 ```powershell
 jade-cli source extract --schema ExampleSchema --class Pet --output schemas/ExampleSchema/types/Pet.cls --json
 ```
 
-This pulls the explicitly selected class from Source into one configured workspace root. `--output` is required and stays relative to that root. It ignores a legacy selected `program`; the target file may be new. The native current schema version is selected. Latest-version and complete-schema extraction are not exposed by this route.
+This route requires `--output` within the chosen root and supports its existing native CLS/Form-sidecar contract. Application, external-component and custom-control sidecar cases fail clearly. A Form in a schema using `schemaResources.ddx` requires a full schema refresh rather than a second individual DDX file. Selected classes do not establish an authoritative schema inventory.
 
-One read-only native batch session writes each CLS and its supported Form DDX sidecar into one private candidate, then hashes, compares and reconciles it. Application, external-component and custom-control sidecar cases remain unsupported and fail clearly. Existing files use accepted per-file remote baselines: unchanged files retain their timestamps, local-only edits and deletions are kept, and conflicting changes remain untouched. An unmanaged differing file conflicts. There is no inferred deletion inventory or full-schema snapshot.
+### JSONL source clients
 
-`doctor.capabilities.sourceExtraction` advertises protocol1, classes scope, current version, `fullSchema:false` and required client promotion permits. JSONL clients send `source.extract` with `config`, an absolute existing `destination`, explicit `selection:[{schema,name,kind:"class"|"interface",path}]` and `promotion:"client"`. The typed `source.started`, `source.stage`, `source.permitRequired` and `source.file` events retain the extraction request id. Reply to each promotion ticket using `source.permit` with its lease, ticket and allow boolean; `source.cancel` uses the owning lease. Both controls bypass the native job queue. Before receiving a lease, use the existing cancel operationId. True terminal commands have no editor access; IDE clients must supply the connection-bound dirty-editor permit.
+In the qualified full-source package, `doctor.capabilities.sourceExtraction` reports protocol 1, scopes `classes`, `schemas` and `all`, versions `["current"]`, `fullSchema: true`, `layout: "schema-ddx"` and required client promotion permits. Check that capability before offering full extraction; older packages can advertise classes-only support.
 
-Cancellation, expired permits and owning-client disconnection deny unpromoted files and wait for native closure. The compact final result follows actual process exit and reports counts, appliedFiles, completedFiles, status, partial, scope and native stage timings. Conflicts and rejected promotions report result.code4 and passed:false; inspect the result even when some earlier files were applied. No source bodies are returned in events. See the [checked-in implementation plan](plans/selected-source-extraction.md) for the saved remote-receipt bridge and remaining full-extraction gates.
+JSONL clients send `source.extract` with `config`, an absolute existing `destination` and `promotion: "client"`. Use `scope: "all"` for all user schemas, or `scope: "schemas", schemas: ["ExampleSchema"]` for named schemas. Full scopes cannot be mixed with class selection. Selected-class requests retain explicit `selection: [{schema, name, kind: "class"|"interface", path}]`.
+
+The typed `source.started`, `source.stage`, `source.permitRequired` and `source.file` events retain the extraction request id. Reply to promotion tickets using `source.permit` with their lease, ticket and allow boolean; `source.cancel` uses the owning lease. Both controls bypass the native job queue. Before receiving a lease, use the existing cancel operationId. Expired permits and client disconnection deny unpromoted files and wait for native closure.
+
+The compact final result follows actual process exit and reports counts, appliedFiles, completedFiles, status, partial, scope and native stage timings. Only a successfully completed full pull without conflicts or rejected promotions reports `authoritative: true`. Failed, cancelled and selected-class pulls cannot establish that authority. Events contain file metadata rather than source bodies. See the checked-in [full-schema implementation plan](plans/full-schema-source-extraction.md) and [selected-source plan](plans/selected-source-extraction.md) for the protocol and baseline details.
+
 ## Jade Workspace execution
 
 `jade-cli workspace run scratch.jade --schema ExampleSchema` executes a signature-free native Jade Workspace, for example:
