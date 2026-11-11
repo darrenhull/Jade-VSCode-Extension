@@ -123,3 +123,11 @@ Jade Tools is independent third-party tooling and is not affiliated with or endo
 ### Large-schema extraction
 
 Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Timeout and cancellation do not apply partial sources to the working folder. Timeout failures identify the setting in the error message.
+
+### Pull one selected class from Source
+
+**Jade: Pull Selected Class from Source (Streaming)** is available from a saved, single-class/interface CLS editor or an Object Explorer class context menu when the bundled CLI advertises the streaming capability. It pulls the **current** Source version directly to that class file, with native comparison and one file candidate at a time. It does not run a full schema export. Multi-class files and unsaved editor/class-view changes are refused.
+
+An unchanged file keeps its timestamp. Local edits and conflicts are retained; a verified saved remote receipt can supply the prior baseline. No baseline is invented from the current local bytes. The output distinguishes files written, unchanged, kept locally and conflicted, with native stage timings. Cancellation or failure may leave already-applied files in place; a lost native completion is reported as uncertain and the selected source scope is refreshed.
+
+This selected-class route does not extract complete schema resources or detect deletions, and does not replace **Extract All Sources**. It requires the native streaming CLI capability; an older bundle reports the missing capability instead of silently running a batch export.
