@@ -1,3 +1,9 @@
+# 0.21.0 - Native full source extraction
+
+- Extract complete current schema sources into a new empty project without selecting a class first.
+- Stream native schema headers, sections, classes and Form definitions through individual editor protection checks.
+- Show inventory progress and honest partial results while coalescing editor refreshes.
+
 # 0.20.0 - Pull a selected class from Source
 
 - Pull the current native class/interface source directly from a saved CLS file or Object Explorer without exporting every class.

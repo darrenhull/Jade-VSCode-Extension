@@ -3,6 +3,7 @@ const {ClassWorkspaceEditorProvider}=require('./class-workspace-editor-provider'
 const {classIdentity}=require('./class-workspace');
 const {MethodDraftRecovery,sourceMemberKind}=require('./method-draft-recovery');
 const {ClassSourceSplitOffer}=require('./class-source-split-offer');
+const {projectArtifactIdentity}=require('./source-artifact-identity');
 const STATE='jade.classWorkspaceContexts.v1';
 const validColumn=column=>Number.isInteger(column)&&column>=1&&column<=9;
 const contextSlot=value=>JSON.stringify([classIdentity(value.row),value.column]);
@@ -18,7 +19,7 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   const views=new Map(),pending=new Map();
   const splitOffer=sourceSplitOffer||(vscode.workspace?.openTextDocument&&vscode.workspace?.fs?.readFile?new ClassSourceSplitOffer(vscode):undefined);
   const recovery=new MethodDraftRecovery(context.workspaceState);
-  const pendingDraftViews=new Map(),pendingDraftCounts=new Map(),pendingDraftListeners=new Set();
+  const pendingDraftViews=new Map(),pendingDraftCounts=new Map(),pendingDraftListeners=new Set(),pendingArtifactViews=new Map(),pendingArtifactCounts=new Map();
   const uriKey=uri=>uri.toString().toLowerCase();
   const hasPendingSource=uri=>(pendingDraftCounts.get(uriKey(uri))||0)>0||recovery.hasDraftForUri(uri.toString());
   function setDraftPending(entry,pending){
@@ -26,7 +27,10 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
     if(pending===was)return;
     if(pending){pendingDraftViews.set(entry.panel,file);pendingDraftCounts.set(key,(pendingDraftCounts.get(key)||0)+1);}
     else{pendingDraftViews.delete(entry.panel);const count=(pendingDraftCounts.get(key)||1)-1;if(count)pendingDraftCounts.set(key,count);else pendingDraftCounts.delete(key);}
-    for(const listener of pendingDraftListeners)try{listener({uri:file,pending:hasPendingSource(file)});}catch{}
+    const artifact={schema:entry.row.schema,name:entry.row.name,kind:'class'},artifactKey=pending?projectArtifactIdentity(entry.row.projectId,artifact):pendingArtifactViews.get(entry.panel);
+    if(pending&&artifactKey){pendingArtifactViews.set(entry.panel,artifactKey);pendingArtifactCounts.set(artifactKey,(pendingArtifactCounts.get(artifactKey)||0)+1);}
+    else if(artifactKey){pendingArtifactViews.delete(entry.panel);const count=(pendingArtifactCounts.get(artifactKey)||1)-1;if(count)pendingArtifactCounts.set(artifactKey,count);else pendingArtifactCounts.delete(artifactKey);}
+    for(const listener of pendingDraftListeners)try{listener({uri:file,pending:hasPendingSource(file),artifact,projectId:entry.row.projectId});}catch{}
   }
   let contexts=Object.fromEntries(Object.values(context.workspaceState?.get(STATE)||{}).slice(-50).map(safeContext).filter(Boolean).map(value=>[contextSlot(value),value]));
   let disposed=false,opening=Promise.resolve(),lastActivePanel;
@@ -109,9 +113,9 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
         try{await recovery.reserve(identity);reservedIdentity=identity;session.binding.readOnlyReason=sourceReadOnlyReason;return {...session.binding.snapshot(),maxCharacters:recovery.maxCharacters};}
         catch(error){session.binding.readOnlyReason=error.message;return {...session.binding.snapshot(),readOnly:true,reason:error.message};}
       },
-      save(draft){setDraftPending(entry,true);const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member||sourceMemberKind(draft?.kind)!==identity.kind)throw Error('The selected member changed before its recovery checkpoint.');return recovery.save(identity,draft);},
+      save(draft){entry.draftGeneration=(entry.draftGeneration||0)+1;setDraftPending(entry,true);const identity=draftIdentity();if(draft?.owner!==identity.owner||draft?.member!==identity.member||sourceMemberKind(draft?.kind)!==identity.kind)throw Error('The selected member changed before its recovery checkpoint.');return recovery.save(identity,draft);},
       get(){const selected=session.binding.snapshot();displayedDraft=(selected&&recovery.get(draftIdentity()))||recovery.list(recoveryScope)[0];return displayedDraft;},
-      acknowledge:()=>session.binding.snapshot()?recovery.acknowledge(draftIdentity(),session.binding.snapshot()):Promise.resolve(false),
+      async acknowledge(){const snapshot=session.binding.snapshot(),generation=entry.draftGeneration;if(!snapshot)return false;const accepted=await recovery.acknowledge(draftIdentity(),snapshot);if(accepted&&generation===entry.draftGeneration)setDraftPending(entry,false);return accepted;},
       async discard(){
         if(!displayedDraft)return;
         const identity=displayedDraft.identity;await recovery.discard(identity);
@@ -207,8 +211,9 @@ function registerClassWorkspaces(vscode,context,{model,shell,onOriginal,viewType
   if(vscode.window.tabGroups?.onDidChangeTabGroups)focusEvents.push(vscode.window.tabGroups.onDidChangeTabGroups(trackNativeFocus));
   if(vscode.window.tabGroups?.onDidChangeTabs)focusEvents.push(vscode.window.tabGroups.onDidChangeTabs(trackNativeFocus));
   const controller={open,prepareActiveSource,hasPendingSource,
+    hasPendingArtifact(artifact,projectId){const key=projectArtifactIdentity(projectId,artifact);return !!key&&(pendingArtifactCounts.get(key)||0)>0||recovery.hasDraftForArtifact(projectId,artifact);},
     onDidChangePendingSource(listener){pendingDraftListeners.add(listener);return{dispose:()=>pendingDraftListeners.delete(listener)};},
-    async prepareSourcePull(uri){if(await prepareActiveSource(uri,{onlySelectedFile:true})===false)return false;await recovery.queue;return !hasPendingSource(uri);},async openOriginal(){const selected=[...views.values()].find(focused)||views.get(lastActivePanel)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;for(const event of focusEvents)event.dispose();registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();pendingDraftListeners.clear();pendingDraftViews.clear();pendingDraftCounts.clear();}};
+    async prepareSourcePull(uri){if(await prepareActiveSource(uri,{onlySelectedFile:true})===false)return false;await recovery.queue;return !hasPendingSource(uri);},async openOriginal(){const selected=[...views.values()].find(focused)||views.get(lastActivePanel)||[...views.values()].at(-1);if(!selected)throw Error('Choose a class workspace before opening its original source.');if(!onOriginal)throw Error('Original source navigation is unavailable.');return onOriginal(selected.row,selected.view.state?.().selectedId);},refresh:()=>shell.refresh(),dispose(){if(disposed)return;disposed=true;for(const event of focusEvents)event.dispose();registration.dispose();provider.dispose();shell.dispose();views.clear();pending.clear();pendingDraftListeners.clear();pendingDraftViews.clear();pendingDraftCounts.clear();pendingArtifactViews.clear();pendingArtifactCounts.clear();}};
   context.subscriptions.push(controller);
   return controller;
 }

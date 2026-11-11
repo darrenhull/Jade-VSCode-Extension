@@ -15,7 +15,7 @@ const stageLabels = {
   closing: "Closing Source",
 };
 
-/** VS Code presentation and editor permissions for the native class-only route. */
+/** VS Code presentation and editor permissions for native source scopes. */
 class SourcePullController {
   constructor(vscode, context, services) {
     this.vscode = vscode;
@@ -27,12 +27,35 @@ class SourcePullController {
   }
 
   runAll(folder) {
-    return this.run(folder, { scope: "all" });
+    return this.vscode.window.withProgress(
+      {
+        location: this.vscode.ProgressLocation.Notification,
+        title: "Extracting all Source schemas",
+        cancellable: true,
+      },
+      (progress, token) =>
+        this.run(folder, {
+          scope: "all",
+          preparationProgress: progress,
+          preparationToken: token,
+        }),
+    );
   }
 
-  async run(resource, { scope = "classes" } = {}) {
+  async run(
+    resource,
+    { scope = "classes", preparationProgress, preparationToken } = {},
+  ) {
     const full = scope !== "classes";
-    let refreshAll = false;
+    let refreshAll = false,
+      ownsRun = false;
+    const preparing = (message) => {
+      try {
+        preparationProgress?.report({ message });
+      } catch {}
+    };
+    const cancelledBeforeStart = () =>
+      preparationToken?.isCancellationRequested || this.disposed;
     const labels = full
       ? {
           ...stageLabels,
@@ -56,9 +79,14 @@ class SourcePullController {
     let expectedFiles = 0;
     try {
       if (this.disposed) throw Error("Source pull is closed.");
+      if (this.running)
+        throw Error("A Source extraction is already preparing or running.");
+      this.running = true;
+      ownsRun = true;
+      preparing("Checking native Source extraction support…");
       if (services.isBusy())
         throw Error(
-          "Wait for the current Jade operation before pulling class sources.",
+          "Wait for the current Jade operation before extracting Source files.",
         );
       resolved = await (
         full
@@ -97,7 +125,20 @@ class SourcePullController {
       } catch (error) {
         baselineWarning = error.message;
       }
+      if (cancelledBeforeStart())
+        return {
+          passed: false,
+          code: 130,
+          status: "cancelled",
+          scope,
+          version: "current",
+          authoritative: false,
+          partial: false,
+          counts: {},
+          completedFiles: 0,
+        };
       if (full) fs.mkdirSync(destination, { recursive: true });
+      preparing("Finishing the previous Jade operation…");
       await services.beforeOperation();
       if (services.isBusy())
         throw Error(
@@ -105,6 +146,7 @@ class SourcePullController {
         );
       await services.setBusy(true);
       locked = true;
+      preparing("Preparing source editor indexes…");
       release = await services.index.pauseDiskUpdates();
       output.clear();
       output.show(true);
@@ -140,7 +182,23 @@ class SourcePullController {
       guard = new SourcePullEditorGuard({
         workspace: vscode.workspace,
         destination,
-        pendingSources: services.pendingSources,
+        pendingSources: services.pendingSources && {
+          hasPending: (file) => services.pendingSources.hasPending?.(file),
+          hasPendingArtifact: (artifact) =>
+            services.pendingSources.hasPendingArtifact?.(
+              artifact,
+              folder.uri.toString(),
+            ),
+          onDidChange: (listener) =>
+            services.pendingSources.onDidChange((event) => {
+              if (
+                !event.projectId ||
+                event.projectId.toLowerCase() ===
+                  folder.uri.toString().toLowerCase()
+              )
+                listener(event);
+            }),
+        },
         selectedPaths: full ? [] : selectedSourcePaths(selection),
         onInvalidated: (reason) => {
           log(reason);
@@ -148,7 +206,10 @@ class SourcePullController {
           operation?.stop();
         },
       });
-      result = await vscode.window.withProgress(
+      const withNativeProgress = preparationProgress
+        ? async (_options, task) => task(preparationProgress, preparationToken)
+        : vscode.window.withProgress.bind(vscode.window);
+      result = await withNativeProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: full
@@ -438,7 +499,11 @@ class SourcePullController {
           log("Source indexing refresh failed: " + error.message);
         }
       }
-      if (locked) await services.setBusy(false);
+      try {
+        if (locked) await services.setBusy(false);
+      } finally {
+        if (ownsRun) this.running = false;
+      }
     }
   }
 

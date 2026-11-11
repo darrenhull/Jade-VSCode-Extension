@@ -1,6 +1,6 @@
 # Stream complete Source extraction into an empty project
 
-Issue #63. This change extends the existing Extract All Sources command; it does not require a current class file. It builds on PR #62's typed service, per-file permissions and bulk index lease. Keep the work isolated on codex/agent/native-full-extract-extension; rebase the feature commits onto main after the prerequisite lands, retaining independent review and a real issue link.
+Issue #63. This change extends the existing Extract All Sources command; it does not require a current class file. It builds on PR #62's typed service, per-file permissions and bulk index lease. Work is isolated on codex/agent/native-full-extract-extension and rebased directly onto main after prerequisite PR #62 merged. Draft PR #64 links issue #63.
 
 ## Native contract and capability gate
 
@@ -23,3 +23,11 @@ Promote one completed candidate at a time. Cancellation/failure can retain a suc
 Write failing tests for the actual Extract All command in an empty folder, full-capability rejection before changes, typed all/schema requests, native resource events, artifact/dirty veto, partial/cancel/connection loss and valid empty inventory. Preserve selected-class regressions. Use synthetic 30k metadata to prove bounded UI/refresh work without calling it a native benchmark.
 
 When the complete native candidate is available, invoke the registered command with the actual packaged executable in an isolated Code host against an exclusively owned disposable database. Verify schema headers/sections/classes and Form DDX, repeated unchanged mtimes, local/unsaved edit protection and partial failures. Capture the running changed UI. Then consume the verified official full-schema CLI release, exact receipt/hashes, run all relevant tests and actual VSIX checks. No user Source changes, user installation or protected merge as part of implementation.
+
+## Checkpoint implementation
+
+The actual Extract All command delegates to the full native route with scope all and no CLS selection. Before any extraction folder is created, doctor must advertise fullSchema true/available true/current/all/permit support; the current official 0.7 bundle therefore refuses safely. Native artifact paths and schema identity are validated, and only the agreed SCM/SEC/CLS/DDX resource layout is allowed. A successful empty native inventory remains zero files without deleting anything.
+
+Failing-first tests now cover empty-folder command routing, class-only capability refusal, dirty schema header veto, all/schema transport and foreign-schema rejection. Synthetic 30k outcome tests coalesce notifications/logs and refresh once; a missing native outcome requests one terminal rescan. The registered class-view provider/recovery seam exposes synchronous project/schema/type pending metadata without copying draft source, including a backing filename different from the native output. Acknowledgement cannot clear a newer in-flight draft. Native full-scope qualification, actual native empty-folder Code host and official0.8 package gates remain outstanding; these fake-contract tests are not native extraction proof.
+
+Preparation now has one continuous cancellable notification from native capability checks through source indexing and extraction. A local controller guard refuses repeated clicks while preparation is waiting; cancelling before native startup creates no Source files and releases that guard. The existing selected command remains supported. Targeted registered-command tests prove these behaviors, and the pre-checkpoint full default suite passed 1105 tests with 44 explicit opt-in skips plus 18 PowerShell tests.

@@ -216,7 +216,8 @@ function activate(context) {
     service:nativeTests,index:language.index,testing,classView,beforeOperation,
     prepareSource:uri=>classView.previewController.prepareSourcePull(uri),
     pendingSources:{hasPending:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
-      onDidChange:listener=>classView.previewController.onDidChangePendingSource(event=>listener({path:vscode.Uri.parse(event.uri).fsPath,pending:event.pending}))},
+      hasPendingArtifact:(artifact,projectId)=>classView.previewController.hasPendingArtifact(artifact,projectId),
+      onDidChange:listener=>classView.previewController.onDidChangePendingSource(event=>listener({path:vscode.Uri.parse(event.uri).fsPath,pending:event.pending,artifact:event.artifact,projectId:event.projectId}))},
     isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))

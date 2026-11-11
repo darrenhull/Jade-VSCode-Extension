@@ -50,6 +50,17 @@ function fixture(t, { full = true, dirty = false } = {}) {
       events.on(event, cb);
       return { dispose: () => events.off(event, cb) };
     };
+  const token = {
+    isCancellationRequested: false,
+    onCancellationRequested: (cb) => {
+      events.on("cancel", cb);
+      return { dispose: () => events.off("cancel", cb) };
+    },
+    cancel() {
+      this.isCancellationRequested = true;
+      events.emit("cancel");
+    },
+  };
   const vscode = {
     workspace: ws,
     Uri: { file: uri },
@@ -72,13 +83,7 @@ function fixture(t, { full = true, dirty = false } = {}) {
       showWarningMessage: async (text) => logs.push(text),
       showInformationMessage: async (text) => logs.push(text),
       withProgress: async (_opts, cb) =>
-        cb(
-          { report: (value) => reports.push(value) },
-          {
-            isCancellationRequested: false,
-            onCancellationRequested: () => ({ dispose() {} }),
-          },
-        ),
+        cb({ report: (value) => reports.push(value) }, token),
     },
   };
   const service = {
@@ -179,6 +184,8 @@ function fixture(t, { full = true, dirty = false } = {}) {
     streamAllSources: (selected) => controller.runAll(selected),
   });
   return {
+    token,
+    services,
     workspace,
     folder,
     commands,
@@ -236,4 +243,150 @@ test("dirty schema header gets a per-file veto while other native files can proc
     fs.existsSync(path.join(f.workspace, "schemas/Pets/types/Fish.cls")),
   );
   assert.equal(f.refresh.length, 2);
+});
+
+test("30k native all-scope outcomes coalesce presentation and final refresh", async (t) => {
+  const f = fixture(t);
+  f.services.service.startSourceExtraction = (_config, input, cb) => ({
+    stop() {},
+    completion: Promise.resolve().then(() => {
+      assert.equal(input.scope, "all");
+      cb.onStarted({ scope: "all", authoritative: false });
+      cb.onStage({ stage: "inventory", completedFiles: 0, totalFiles: 30000 });
+      for (let i = 0; i < 30000; i++) {
+        const event = {
+          path: "schemas/Pets/types/C" + i + ".cls",
+          artifact: {
+            schema: "Pets",
+            kind: "class",
+            name: "C" + i,
+            component: "source",
+          },
+        };
+        assert.equal(cb.onPermit(event), true);
+        cb.onFile({
+          ...event,
+          sha256: "a".repeat(64),
+          bytes: 10,
+          outcome: "added",
+        });
+      }
+      assert.equal(f.refresh.length, 0);
+      return {
+        passed: true,
+        code: 0,
+        status: "completed",
+        scope: "all",
+        version: "current",
+        authoritative: true,
+        partial: false,
+        counts: { added: 30000 },
+        completedFiles: 30000,
+      };
+    }),
+  });
+  const result = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(result.passed, true);
+  assert.equal(f.scheduled.size, 30000);
+  assert.equal(f.refresh.length, 2);
+  assert.ok(f.reports.length < 12);
+  assert.ok(f.logs.length < 30);
+  assert.deepEqual(fs.readdirSync(f.workspace), []);
+});
+test("unknown full native outcomes request one final rescan even with no acknowledged file", async (t) => {
+  const f = fixture(t);
+  let rescans = 0;
+  f.services.index.rescan = async () => {
+    rescans++;
+  };
+  f.services.service.startSourceExtraction = (_config, _input, cb) => ({
+    stop() {},
+    completion: Promise.resolve().then(() => {
+      cb.onStarted({ scope: "all", authoritative: false });
+      return {
+        passed: false,
+        code: 2,
+        status: "failed",
+        scope: "all",
+        version: "current",
+        authoritative: false,
+        partial: true,
+        counts: {},
+        completedFiles: 0,
+        report: { error: "Native completion missing", outcomesUncertain: true },
+      };
+    }),
+  });
+  const result = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(result.passed, false);
+  assert.equal(rescans, 1);
+  assert.equal(f.refresh.length, 2);
+  assert.match(f.logs.join("\n"), /acknowledged|uncertain/);
+});
+
+test("Extract All shows preparation progress before waiting for native capabilities", async (t) => {
+  const f = fixture(t);
+  const capabilities = f.services.service.sourceCapabilities;
+  f.services.service.sourceCapabilities = async (...args) => {
+    assert.ok(
+      f.reports.some((value) => /Checking native/i.test(value.message)),
+      "Do not leave the first connection/pull invisible",
+    );
+    return capabilities(...args);
+  };
+  const result = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(result.passed, true, JSON.stringify(result));
+});
+
+test("a repeated Extract All click during preparation does not start a second native pull", async (t) => {
+  const f = fixture(t),
+    capabilities = f.services.service.sourceCapabilities;
+  let release,
+    doctors = 0;
+  const blocked = new Promise((resolve) => {
+    release = resolve;
+  });
+  f.services.service.sourceCapabilities = async (...args) => {
+    doctors++;
+    await blocked;
+    return capabilities(...args);
+  };
+  const first = f.commands.get("jadeNative.extractAllSources")(f.folder.uri);
+  await new Promise(setImmediate);
+  const repeated = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(repeated.passed, false);
+  assert.match(repeated.report.error, /already preparing|already running/);
+  assert.equal(doctors, 1);
+  release();
+  assert.equal((await first).passed, true);
+  assert.equal(f.invocations(), 1);
+});
+test("cancelling preparation never starts native extraction and releases the local operation guard", async (t) => {
+  const f = fixture(t),
+    capabilities = f.services.service.sourceCapabilities;
+  f.services.service.sourceCapabilities = async (...args) => {
+    f.token.cancel();
+    return capabilities(...args);
+  };
+  const value = await f.commands.get("jadeNative.extractAllSources")(
+    f.folder.uri,
+  );
+  assert.equal(value.status, "cancelled");
+  assert.equal(value.code, 130);
+  assert.equal(f.invocations(), 0);
+  assert.deepEqual(fs.readdirSync(f.workspace), []);
+  f.token.isCancellationRequested = false;
+  f.services.service.sourceCapabilities = capabilities;
+  assert.equal(
+    (await f.commands.get("jadeNative.extractAllSources")(f.folder.uri)).passed,
+    true,
+  );
 });

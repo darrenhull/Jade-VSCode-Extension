@@ -1,5 +1,6 @@
 "use strict";
 const path = require("node:path");
+const { sourceArtifactIdentity } = require("./source-artifact-identity");
 const { sourceTargetPath } = require("./source-pull-path");
 
 /** Editor-only protection for one native file candidate at a time. */
@@ -17,6 +18,7 @@ class SourcePullEditorGuard {
     this.pendingSources = pendingSources;
     this.documents = new Map();
     this.active = undefined;
+    this.activeArtifact = undefined;
     this.invalidated = false;
     this.disposed = false;
     this.subscriptions = [];
@@ -30,7 +32,9 @@ class SourcePullEditorGuard {
           if (
             event.pending &&
             (path.resolve(event.path).toLowerCase() === this.active ||
-              this.scope.has(path.resolve(event.path).toLowerCase()))
+              this.scope.has(path.resolve(event.path).toLowerCase()) ||
+              (this.activeArtifact &&
+                sourceArtifactIdentity(event.artifact) === this.activeArtifact))
           )
             this.invalidate(
               "An approved source target has an unsubmitted class-view draft.",
@@ -78,7 +82,7 @@ class SourcePullEditorGuard {
     this.onInvalidated(reason);
   }
 
-  approve(relative) {
+  approve(relative, artifact) {
     if (this.disposed || this.invalidated) return false;
     const key = this.targetKey(relative);
     if (this.active) {
@@ -89,10 +93,12 @@ class SourcePullEditorGuard {
     // all-editor rescan or source-text copy for each of 30,000 incoming files.
     if (
       this.documents.get(key)?.isDirty ||
-      this.pendingSources?.hasPending(key)
+      this.pendingSources?.hasPending?.(key) ||
+      (artifact && this.pendingSources?.hasPendingArtifact?.(artifact))
     )
       return false;
     this.active = key;
+    this.activeArtifact = sourceArtifactIdentity(artifact);
     return true;
   }
 
@@ -105,10 +111,12 @@ class SourcePullEditorGuard {
       return;
     }
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 
   nativeClosed() {
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 
   dispose() {
@@ -121,6 +129,7 @@ class SourcePullEditorGuard {
     this.documents.clear();
     this.scope.clear();
     this.active = undefined;
+    this.activeArtifact = undefined;
   }
 }
 module.exports = { SourcePullEditorGuard };
