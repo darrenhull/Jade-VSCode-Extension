@@ -192,7 +192,12 @@ async function run() {
     throw error;
   }
 }
-async function main() {
+async function main({
+  runModule = __filename,
+  evidenceName = "source-pull-native-host.json",
+  screenshotDirectory = "native-source-pull",
+  screenshotFile = "selected-class-pull.png",
+} = {}) {
   if (process.env.JADE_SOURCE_PULL_NATIVE !== "1")
     throw Error("Explicit JADE_SOURCE_PULL_NATIVE=1 required");
   const code = process.env.JADE_TEST_CODE,
@@ -213,7 +218,7 @@ async function main() {
       .digest("hex"),
     artifacts = new HostTestArtifacts({
       nativeSha256: sha,
-      evidencePath: path.join(root, "evidence/source-pull-native-host.json"),
+      evidencePath: path.join(root, "evidence", evidenceName),
     });
   await artifacts.run(async (stage) => {
     const extension = path.join(stage, "extension"),
@@ -286,7 +291,7 @@ async function main() {
     );
     fs.writeFileSync(
       path.join(stage, "runner.cjs"),
-      "exports.run=()=>require(" + JSON.stringify(__filename) + ").run();",
+      "exports.run=()=>require(" + JSON.stringify(runModule) + ").run();",
     );
     const server = require("node:net").createServer();
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -301,7 +306,9 @@ async function main() {
       JADE_SOURCE_HOST_OFFICIAL: vsix ? "1" : "0",
       JADE_SOURCE_HOST_SCREENSHOT: path.join(
         root,
-        "docs/screenshots/native-source-pull/selected-class-pull.png",
+        "docs/screenshots",
+        screenshotDirectory,
+        screenshotFile,
       ),
       JADE_HOST_OWNER: artifacts.nonce,
       JADE_TOOLS_STATE_DIRECTORY: path.join(stage, "broker"),
@@ -345,7 +352,7 @@ async function main() {
     );
   });
 }
-module.exports = { run, screenshot };
+module.exports = { run, screenshot, main };
 if (require.main === module)
   main().catch((error) => {
     console.error(error);

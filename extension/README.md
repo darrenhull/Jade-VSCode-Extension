@@ -104,6 +104,12 @@ After updating, reload all VS Code windows and reconnect other clients. If an ol
 
 This progress reporting does not make a pull incremental: the current batch route still exports all source. Local-conflict review and unsaved-editor protection remain in effect.
 
+## Extract all source into a new folder
+
+Run **Jade: Extract All Sources** after opening a source folder and configuring the Source runtime. No existing CLS is required. A compatible bundled native CLI streams current schema headers, sections, class/interface sources and Form DDX into the extraction folder, one protected file at a time.
+
+Progress begins during preparation and shows the native inventory and acknowledged file outcomes. Existing local changes and unsaved editors remain protected, including class-view drafts and path-associated untitled source files. Unchanged files keep their timestamps. Cancellation/failure can retain an applied prefix; missing files are never automatically deleted.
+
 ## Pull a selected class
 
 Use **Jade: Pull Selected Class from Source (Streaming)** from a saved single-class/interface CLS editor or an Object Explorer class context menu. It pulls the current Source version with native comparison, without a full schema export. Selected Forms include their same-stem DDX definition with a separate editor permission check. Unsaved edits are protected; conflicts are retained with guidance and unchanged files keep their timestamps.

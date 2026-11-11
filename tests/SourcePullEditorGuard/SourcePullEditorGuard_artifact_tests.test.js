@@ -50,3 +50,57 @@ test("native class identity protects a virtual draft at a different local filena
   guard.nativeClosed();
   guard.dispose();
 });
+
+test("an associated untitled source file vetoes its native target while plain Untitled remains unrelated", () => {
+  const root = path.join(os.tmpdir(), "untitled-source-guard"),
+    noop = () => ({ dispose() {} }),
+    workspace = {
+      textDocuments: [
+        {
+          uri: {
+            scheme: "untitled",
+            fsPath: path.join(root, "schemas/Pets.scm"),
+          },
+          isDirty: true,
+        },
+        { uri: { scheme: "untitled", fsPath: "Untitled-1" }, isDirty: true },
+      ],
+      onDidOpenTextDocument: noop,
+      onDidChangeTextDocument: noop,
+      onDidCloseTextDocument: noop,
+    };
+  const guard = new SourcePullEditorGuard({
+    workspace,
+    destination: root,
+    onInvalidated: () => assert.fail("No active permit existed"),
+  });
+  assert.equal(guard.approve("schemas/Pets.scm"), false);
+  assert.equal(guard.approve("schemas/Other.scm"), true);
+  guard.complete("schemas/Other.scm");
+  guard.dispose();
+});
+
+test("a clean file tab cannot hide an associated unsaved document for the same target", () => {
+  const root = path.join(os.tmpdir(), "shared-source-target"),
+    target = path.join(root, "schemas/Pets.scm"),
+    noop = () => ({ dispose() {} });
+  for (const reverse of [false, true]) {
+    const dirty = {
+        uri: { scheme: "untitled", fsPath: target },
+        isDirty: true,
+      },
+      clean = { uri: { scheme: "file", fsPath: target }, isDirty: false };
+    const guard = new SourcePullEditorGuard({
+      workspace: {
+        textDocuments: reverse ? [clean, dirty] : [dirty, clean],
+        onDidOpenTextDocument: noop,
+        onDidChangeTextDocument: noop,
+        onDidCloseTextDocument: noop,
+      },
+      destination: root,
+      onInvalidated: () => {},
+    });
+    assert.equal(guard.approve("schemas/Pets.scm"), false);
+    guard.dispose();
+  }
+});

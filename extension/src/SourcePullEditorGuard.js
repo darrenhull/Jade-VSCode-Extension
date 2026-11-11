@@ -48,14 +48,19 @@ class SourcePullEditorGuard {
       ),
       workspace.onDidCloseTextDocument((document) => {
         const key = this.documentKey(document);
-        if (key && this.documents.get(key) === document)
-          this.documents.delete(key);
+        const documents = key && this.documents.get(key);
+        if (documents) {
+          documents.delete(document);
+          if (!documents.size) this.documents.delete(key);
+        }
       }),
     );
   }
 
   documentKey(document) {
-    return document?.uri?.scheme === "file" &&
+    return (document?.uri?.scheme === "file" ||
+      (document?.uri?.scheme === "untitled" &&
+        path.isAbsolute(document.uri.fsPath || ""))) &&
       typeof document.uri.fsPath === "string"
       ? path.resolve(document.uri.fsPath).toLowerCase()
       : undefined;
@@ -65,7 +70,9 @@ class SourcePullEditorGuard {
     if (this.disposed) return;
     const key = this.documentKey(document);
     if (!key) return;
-    this.documents.set(key, document);
+    let documents = this.documents.get(key);
+    if (!documents) this.documents.set(key, (documents = new Set()));
+    documents.add(document);
     // Native disk reloads can emit clean changes. Only unsaved buffer changes
     // invalidate a granted permit; the CLI independently rechecks saved bytes.
     if ((key === this.active || this.scope.has(key)) && document.isDirty)
@@ -82,6 +89,13 @@ class SourcePullEditorGuard {
     this.onInvalidated(reason);
   }
 
+  isDirty(key) {
+    const documents = this.documents.get(key);
+    if (documents)
+      for (const document of documents) if (document.isDirty) return true;
+    return false;
+  }
+
   approve(relative, artifact) {
     if (this.disposed || this.invalidated) return false;
     const key = this.targetKey(relative);
@@ -92,7 +106,7 @@ class SourcePullEditorGuard {
     // Keep live TextDocument references; this is a current-state check with no
     // all-editor rescan or source-text copy for each of 30,000 incoming files.
     if (
-      this.documents.get(key)?.isDirty ||
+      this.isDirty(key) ||
       this.pendingSources?.hasPending?.(key) ||
       (artifact && this.pendingSources?.hasPendingArtifact?.(artifact))
     )
