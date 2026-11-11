@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "nativeJadeExecuted": true,
+  "registeredCommand": "jadeNative.extractAllSources",
+  "initialSourceFiles": 0,
+  "scope": "all",
+  "layout": "schema-ddx",
+  "version": "current",
+  "privateCandidate": true,
+  "packagedVsix": false,
+  "distributionSha256": "4876fed73fa3a2e498bec9c1a49535b71e06a373d8edffc151cdd71a2606ae41",
+  "cliSha256": "e647b848eea5eb690305167c5fc17fb1d619d12b6f63a0b44621c8c64cff5c57",
+  "expectedFiles": 306,
+  "goldenInventoryMatched": true,
+  "unchangedFiles": 306,
+  "unchangedMtimes": true,
+  "associatedUntitledVeto": {
+    "rejected": 1,
+    "added": 305,
+    "retained": true
+  },
+  "goldenReceiptSha256": "c1fb4488e40bf8998dbbbfc4fcf29c48155bf0a35d6f8e37bb99353e4ce53a34",
+  "goldenQualification": "Independent CURRENT native Every section projection; CardSchema DDX verified by strict root/text/recursive-child multiset with only native top-level order variation.",
+  "platform": "Windows x64, actual VS Code Extension Development Host, Jade 25 ANSI disposable fixture",
+  "limits": "306 files across three schemas; not a 30,000-file native performance benchmark; private candidate source-tree host, not official packaged VSIX."
+}
