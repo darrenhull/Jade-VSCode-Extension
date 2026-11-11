@@ -17,6 +17,7 @@ class MethodDraftRecovery {
   }
   serial(action){const next=this.queue.then(action);this.queue=next.catch(()=>{});return next;}
   get(identity){const value=this.records.get(this.key(identity));return value&&!value.pristine?structuredClone(value):undefined;}
+  hasDraftForUri(uri){const key=String(uri).toLowerCase();for(const record of this.records.values())if(!record.pristine&&record.identity.uri.toLowerCase()===key)return true;return false;}
   isUnresolved(identity){return this.unresolved.has(this.key(identity));}
   protectUnapplied(identity,snapshot){return this.serial(async()=>{
     const key=this.key(identity),record=this.records.get(key);

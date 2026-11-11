@@ -11,7 +11,7 @@ function cliInvocation(entry,args,options={}){
 }
 class CliWorkingSession{
  constructor({entry=path.join(__dirname,'../vendor/jade-tools-cli/jade-cli.exe'),spawn:spawnProcess=spawn}={}){
-  this.entry=entry;this.spawn=spawnProcess;this.nextId=0;this.pending=new Map();this.client=undefined;this.disposed=false;
+  this.entry=entry;this.spawn=spawnProcess;this.nextId=0;this.pending=new Map();this.client=undefined;this.disposed=false;this.activeSources=new Set();
  }
  connect(){
   if(this.disposed)throw Error('Jade CLI connection is disposed.');
@@ -33,6 +33,7 @@ class CliWorkingSession{
     let newline;
     while((newline=client.buffer.indexOf('\n'))>=0){const line=client.buffer.slice(0,newline).trim();client.buffer=client.buffer.slice(newline+1);if(!line)continue;const packet=JSON.parse(line),request=this.pending.get(packet.id);if(!request||request.client!==client)continue;
      if(packet.event==='output')request.output?.(packet.text||'');
+     else if(typeof packet.event==='string'&&packet.event.startsWith('source.'))request.events?.(packet);
      else if(packet.event==='result'){this.pending.delete(packet.id);request.resolve(packet.result);}
     }
    }catch(error){fail(Error('Invalid Jade CLI response: '+error.message));child.kill();}
@@ -40,13 +41,14 @@ class CliWorkingSession{
   child.once('close',(code,signal)=>fail(Error('Jade CLI closed before completing its request (exit '+code+(signal?', '+signal:'')+').'+(client.stderr?' '+client.stderr:''))));
   return client;
  }
- request(command,body={},output){
-  const client=this.connect(),id=++this.nextId;
+ request(command,body={},output,events,expectedClient){
+  if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
+  const client=expectedClient||this.connect(),id=++this.nextId;
   const promise=new Promise((resolve,reject)=>{
-   this.pending.set(id,{resolve,reject,output,client});
+   this.pending.set(id,{resolve,reject,output,events,client});
    try{client.child.stdin.write(JSON.stringify({id,command,...body})+'\n');}catch(error){this.pending.delete(id);reject(error);}
   });
-  return {id,promise};
+  return {id,promise,client};
  }
  startWorking(config,operation,onOutput=()=>{},onReport=()=>{}){
   let request,cancelled=false;
@@ -89,10 +91,25 @@ class CliWorkingSession{
   options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
   return request.promise.finally(()=>options.signal?.removeEventListener('abort',abort));
  }
+ sourceCapabilities(config){return this.resolveNative('doctor',config,'capabilities');}
+ startSourceExtraction(config,selection,callbacks){
+  const {SourceExtractionOperation}=require('./SourceExtractionOperation');
+  const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks);
+  this.activeSources.add(operation);
+  operation.completion.then(()=>this.activeSources.delete(operation),()=>this.activeSources.delete(operation));
+  return operation;
+ }
  dispose(){
+  if(this.disposed)return this.closing;
+  const client=this.client,active=[...this.activeSources];
+  // EOF is not a safe cancellation request. Send explicit owner-bound cancel,
+  // retain the original connection for replies, and await native close/result.
+  for(const operation of active)operation.stop();
   this.disposed=true;
-  const client=this.client;this.client=undefined;
-  if(client)client.child.kill();
+  const close=()=>{if(this.client===client)this.client=undefined;if(client)client.child.kill();};
+  if(active.length)this.closing=Promise.allSettled(active.map(operation=>operation.completion)).then(close);
+  else close();
+  return this.closing;
  }
 }
 module.exports={CliWorkingSession,configDto,cliInvocation};

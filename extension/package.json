@@ -222,6 +222,12 @@
         "enablement": "!jadeNative.publishing"
       },
       {
+        "command": "jadeNative.pullSelectedClassFromSource",
+        "title": "Jade: Pull Selected Class from Source (Streaming)",
+        "icon": "$(cloud-download)",
+        "enablement": "!jadeNative.publishing && !inDebugMode"
+      },
+      {
         "command": "jadeNative.openLastExtraction",
         "title": "Jade: Show Source Folder"
       },
@@ -446,6 +452,11 @@
           "command": "jadeNative.previewClassMember",
           "when": "view == jadeNative.classes && (viewItem == jadeSourceMember || viewItem == jadeSourceMethod)",
           "group": "navigation@2"
+        },
+        {
+          "command": "jadeNative.pullSelectedClassFromSource",
+          "when": "view == jadeNative.classes && viewItem == jadeSourceClass",
+          "group": "jadeSource@1"
         }
       ],
       "editor/title": [
@@ -557,6 +568,11 @@
           "command": "jadeNative.buildWorkspace",
           "when": "resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf",
           "group": "navigation"
+        },
+        {
+          "command": "jadeNative.pullSelectedClassFromSource",
+          "when": "resourceExtname == .cls",
+          "group": "jadeSource@1"
         }
       ],
       "notebook/cell/title": [
@@ -638,7 +654,11 @@
         },
         "jadeNative.characterSet": {
           "type": "string",
-          "enum": ["auto", "ansi", "unicode"],
+          "enum": [
+            "auto",
+            "ansi",
+            "unicode"
+          ],
           "default": "auto",
           "scope": "resource",
           "description": "Native runtime character set. Auto detects your Jade installation. Explicit ANSI or Unicode must match the installed runtime; the native CLI validates this before opening it."

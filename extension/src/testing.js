@@ -14,6 +14,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   let discovering;
   function update(document) {
     if (document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) return;
+    if (sourceIndex?.bulkUpdating && !document.isDirty) return;
     if (isNestedSnapshot(document.uri, vscode.workspace)) return;
     const entries = testLenses(document.getText());
     const text = document.getText();
@@ -75,6 +76,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
     try {
       if (!sourceIndex) return update(await vscode.workspace.openTextDocument(uri));
       sourceIndex.schedule(uri.toString());
+      if (sourceIndex.bulkUpdating) return;
       await sourceIndex.flush();
       const model = sourceIndex.project.models.get(uri.toString());
       if (model) updateModel(model);
@@ -83,7 +85,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   context.subscriptions.push(watcher,
     watcher.onDidCreate(changed),
     watcher.onDidChange(changed),
-    watcher.onDidDelete(uri => { controller.items.delete(uri.toString()); classes.delete(uri.toString()); }),
+    watcher.onDidDelete(uri => { if(sourceIndex?.bulkUpdating){sourceIndex.schedule(uri.toString());return;} controller.items.delete(uri.toString()); classes.delete(uri.toString()); }),
     vscode.workspace.onDidOpenTextDocument(update),
     vscode.workspace.onDidChangeTextDocument(event => update(event.document)));
   for (const document of vscode.workspace.textDocuments) update(document);
