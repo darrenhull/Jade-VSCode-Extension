@@ -1,6 +1,6 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.6.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.7.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
@@ -51,6 +51,19 @@ Structural schema compiler failures include native source diagnostics as well as
 
 The result reports `native_load_style`, `native_load_milliseconds` and `native_reconnect_milliseconds` when loading occurs. A failed native load or reconnect does not establish a successful input baseline or start dependent code; native commits can already exist after failure. Source publication remains a separate explicit operation. See [the checked-in implementation plan](https://github.com/darrenhull/Jade-CLI/blob/main/plans/automatic-structural-loading.md).
 
+## Pull a selected native class
+
+```powershell
+jade-cli source extract --schema ExampleSchema --class Pet --output schemas/ExampleSchema/types/Pet.cls --json
+```
+
+This pulls the explicitly selected class from Source into one configured workspace root. `--output` is required and stays relative to that root. It ignores a legacy selected `program`; the target file may be new. The native current schema version is selected. Latest-version and complete-schema extraction are not exposed by this route.
+
+One read-only native batch session writes each CLS and its supported Form DDX sidecar into one private candidate, then hashes, compares and reconciles it. Application, external-component and custom-control sidecar cases remain unsupported and fail clearly. Existing files use accepted per-file remote baselines: unchanged files retain their timestamps, local-only edits and deletions are kept, and conflicting changes remain untouched. An unmanaged differing file conflicts. There is no inferred deletion inventory or full-schema snapshot.
+
+`doctor.capabilities.sourceExtraction` advertises protocol1, classes scope, current version, `fullSchema:false` and required client promotion permits. JSONL clients send `source.extract` with `config`, an absolute existing `destination`, explicit `selection:[{schema,name,kind:"class"|"interface",path}]` and `promotion:"client"`. The typed `source.started`, `source.stage`, `source.permitRequired` and `source.file` events retain the extraction request id. Reply to each promotion ticket using `source.permit` with its lease, ticket and allow boolean; `source.cancel` uses the owning lease. Both controls bypass the native job queue. Before receiving a lease, use the existing cancel operationId. True terminal commands have no editor access; IDE clients must supply the connection-bound dirty-editor permit.
+
+Cancellation, expired permits and owning-client disconnection deny unpromoted files and wait for native closure. The compact final result follows actual process exit and reports counts, appliedFiles, completedFiles, status, partial, scope and native stage timings. Conflicts and rejected promotions report result.code4 and passed:false; inspect the result even when some earlier files were applied. No source bodies are returned in events. See the [checked-in implementation plan](plans/selected-source-extraction.md) for the saved remote-receipt bridge and remaining full-extraction gates.
 ## Jade Workspace execution
 
 `jade-cli workspace run scratch.jade --schema ExampleSchema` executes a signature-free native Jade Workspace, for example:
