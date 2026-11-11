@@ -1,5 +1,6 @@
 "use strict";
 const path = require("node:path");
+const { selectedSourcePaths } = require("./source-pull-path");
 const outcomes = new Set([
   "added",
   "updated",
@@ -67,7 +68,9 @@ class SourceExtractionOperation {
         );
       this.remaining.add(key(item.path));
     }
-    this.total = selection.length;
+    this.allowed = new Set(selectedSourcePaths(selection).map(key));
+    this.total = this.allowed.size;
+    this.expectedTotal = selection.length;
     this.started = false;
     this.stopped = false;
     this.observedFiles = 0;
@@ -169,6 +172,7 @@ class SourceExtractionOperation {
           packet.totalFiles > this.total
         )
           throw Error("Invalid native extraction progress.");
+        this.expectedTotal = Math.max(this.expectedTotal, packet.totalFiles);
         this.notify("onStage", packet);
       } else if (packet.event === "source.permitRequired") {
         const ticketKey = typeof packet.ticket + ":" + packet.ticket;
@@ -179,7 +183,7 @@ class SourceExtractionOperation {
           !validTicket ||
           this.seenTickets.has(ticketKey) ||
           this.pendingPermit ||
-          !this.remaining.has(key(packet.path)) ||
+          !this.allowed.has(key(packet.path)) ||
           !integer(packet.expiresInMs) ||
           packet.expiresInMs < 1 ||
           packet.expiresInMs > 30000
@@ -212,7 +216,7 @@ class SourceExtractionOperation {
         const fileKey = key(packet.path);
         if (
           !this.started ||
-          !this.remaining.has(fileKey) ||
+          !this.allowed.has(fileKey) ||
           !outcomes.has(packet.outcome) ||
           !/^[a-fA-F0-9]{64}$/.test(packet.sha256 || "") ||
           !integer(packet.bytes)
@@ -230,6 +234,7 @@ class SourceExtractionOperation {
             "Native source was promoted without this client's permission.",
           );
         this.remaining.delete(fileKey);
+        this.allowed.delete(fileKey);
         this.pendingPermit = undefined;
         this.observedFiles++;
         this.observedCounts[packet.outcome] =
@@ -267,7 +272,10 @@ class SourceExtractionOperation {
         (outcome) =>
           (result.counts[outcome] || 0) !== (this.observedCounts[outcome] || 0),
       ) ||
-      (result.passed && (this.remaining.size > 0 || this.pendingPermit))
+      (result.passed &&
+        (this.remaining.size > 0 ||
+          this.pendingPermit ||
+          this.observedFiles !== this.expectedTotal))
     )
       return this.failedResult(
         "Native extraction result does not match received file outcomes.",

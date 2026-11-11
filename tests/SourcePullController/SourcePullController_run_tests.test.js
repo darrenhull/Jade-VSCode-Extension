@@ -232,7 +232,7 @@ test("late dirty edit cancels and partial failure still refreshes scope before u
   });
   const value = await f.controller.run();
   assert.equal(value.status, "cancelled");
-  assert.equal(f.scheduled.size, 1);
+  assert.equal(f.scheduled.size, 2);
   assert.equal(f.refreshes.length, 2);
   assert.equal(f.bulk(), false);
   assert.equal(f.busy(), false);
@@ -310,11 +310,45 @@ test("unacknowledged native completion refreshes scope and reports uncertainty i
   );
   const value = await f.controller.run();
   assert.equal(value.passed, false);
-  assert.equal(f.scheduled.size, 1);
+  assert.equal(f.scheduled.size, 2);
   assert.equal(f.refreshes.length, 2);
   assert.match(
     f.warnings.join("\n"),
     /before confirmation|may already have changed/,
   );
   assert.match(f.logs.join("\n"), /acknowledged|uncertain/);
+});
+
+test("dirty same-stem Form DDX blocks native promotion before its first candidate", async (t) => {
+  let invoked = false;
+  const f = fixture(t, async () => {
+    invoked = true;
+    return result();
+  });
+  f.doc.uri.fsPath = path.join(f.root, "Fish.ddx");
+  f.doc.isDirty = true;
+  const value = await f.controller.run();
+  assert.equal(invoked, false);
+  assert.equal(value.status, "cancelled");
+  assert.equal(f.refreshes.length, 2);
+  assert.equal(f.scheduled.size, 0);
+});
+test("native-discovered Form companion total is shown without class-count overflow", async (t) => {
+  const f = fixture(t, async (state) => {
+    state.callbacks.onStage({
+      stage: "inventory",
+      completedFiles: 0,
+      totalFiles: 2,
+    });
+    assert.equal(state.callbacks.onPermit({ path: "Fish.cls" }), true);
+    state.callbacks.onFile(file("Fish.cls", "updated"));
+    assert.equal(state.callbacks.onPermit({ path: "Fish.ddx" }), true);
+    state.callbacks.onFile(file("Fish.ddx", "updated"));
+    return result({ counts: { updated: 2 }, completedFiles: 2 });
+  });
+  const value = await f.controller.run();
+  assert.equal(value.passed, true);
+  assert.match(f.reports.at(-1).message, /2\/2 selected files/);
+  assert.equal(f.scheduled.size, 2);
+  assert.equal(f.refreshes.length, 2);
 });

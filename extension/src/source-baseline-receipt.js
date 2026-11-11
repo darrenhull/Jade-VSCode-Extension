@@ -6,6 +6,7 @@ const {
   sourceTargetPath,
   pathIdentity,
   relativeIdentity,
+  selectedSourcePaths,
 } = require("./source-pull-path");
 
 /** Import selected saved remote hashes; never derive a baseline from local source. */
@@ -53,9 +54,9 @@ function readSelectedBaselineReceipt({
   if (typeof receipt.mode !== "string" || !/^Every\s*;/.test(receipt.mode))
     return;
   const selected = new Set(
-    selection.map((item) => {
-      sourceTargetPath(destination, item.path);
-      return relativeIdentity(item.path);
+    selectedSourcePaths(selection).map((relative) => {
+      sourceTargetPath(destination, relative);
+      return relativeIdentity(relative);
     }),
   );
   const found = new Set(),

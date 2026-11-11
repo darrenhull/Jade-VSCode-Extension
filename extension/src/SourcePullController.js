@@ -3,7 +3,7 @@ const path = require("node:path");
 const { SourcePullEditorGuard } = require("./SourcePullEditorGuard");
 const { resolveSourcePullSelection } = require("./source-pull-selection");
 const { readSelectedBaselineReceipt } = require("./source-baseline-receipt");
-const { sourceTargetPath } = require("./source-pull-path");
+const { sourceTargetPath, selectedSourcePaths } = require("./source-pull-path");
 const { elapsedLabel } = require("./pull-progress");
 const stageLabels = {
   opening: "Opening Source",
@@ -38,6 +38,7 @@ class SourcePullController {
       result,
       resolved;
     const refreshPaths = new Set();
+    let expectedFiles = 0;
     try {
       if (this.disposed) throw Error("Source pull is closed.");
       if (services.isBusy())
@@ -51,6 +52,7 @@ class SourcePullController {
         { prepareSource: services.prepareSource },
       );
       const { folder, config, destination, selection } = resolved;
+      expectedFiles = selection.length;
       const capabilities = await services.service.sourceCapabilities(config);
       const capability = capabilities?.sourceExtraction;
       if (
@@ -112,7 +114,7 @@ class SourcePullController {
         workspace: vscode.workspace,
         destination,
         pendingSources: services.pendingSources,
-        selectedPaths: selection.map((item) => item.path),
+        selectedPaths: selectedSourcePaths(selection),
         onInvalidated: (reason) => {
           log(reason);
           cancelledEarly = true;
@@ -145,7 +147,7 @@ class SourcePullController {
                   " · " +
                   completed.toLocaleString() +
                   "/" +
-                  selection.length.toLocaleString() +
+                  expectedFiles.toLocaleString() +
                   " selected files processed · " +
                   elapsedLabel(now() - start) +
                   " elapsed",
@@ -205,6 +207,7 @@ class SourcePullController {
                 onStarted: () => report(false),
                 onStage: (event) => {
                   completed = event.completedFiles;
+                  expectedFiles = event.totalFiles;
                   stageChanged(event.stage);
                 },
                 onPermit: (event) =>
@@ -240,7 +243,8 @@ class SourcePullController {
               native.indeterminate ||
               native.report?.outcomesUncertain
             )
-              for (const item of selection) refreshPaths.add(item.path);
+              for (const relative of selectedSourcePaths(selection))
+                refreshPaths.add(relative);
             completed = native.completedFiles;
             report(true);
             return native;
@@ -275,7 +279,7 @@ class SourcePullController {
           " · " +
           result.completedFiles +
           "/" +
-          selection.length +
+          expectedFiles +
           " selected files processed · " +
           written +
           " written · " +
@@ -343,7 +347,8 @@ class SourcePullController {
         operation.stop();
         const native = await operation.completion;
         if (!native.indeterminate) guard?.nativeClosed();
-        for (const item of resolved.selection) refreshPaths.add(item.path);
+        for (const relative of selectedSourcePaths(resolved.selection))
+          refreshPaths.add(relative);
         log("Source pull presentation failed: " + error.message);
         return { ...native, clientError: error.message };
       }

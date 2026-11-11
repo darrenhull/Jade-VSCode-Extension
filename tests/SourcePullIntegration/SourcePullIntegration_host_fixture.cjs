@@ -111,6 +111,54 @@ async function run() {
     assert.equal(dirty.passed, false);
     assert.match(dirty.report.error, /unsaved/);
     assert.ok(fs.readFileSync(target).equals(bytes));
+    const formRow = {
+      kind: "class",
+      schema: "ErewhonSelfDocumentorSchema",
+      name: "DisplaySelfDocumentorDetails",
+      projectRoot: workspace,
+    };
+    const form = await vscode.commands.executeCommand(
+      "jadeNative.pullSelectedClassFromSource",
+      formRow,
+    );
+    assert.equal(form.passed, true, JSON.stringify(form));
+    assert.equal(form.counts.added, 2);
+    assert.equal(form.completedFiles, 2);
+    const formTarget = path.join(
+        workspace,
+        "schemas/ErewhonSelfDocumentorSchema/types/DisplaySelfDocumentorDetails.cls",
+      ),
+      ddx = formTarget.replace(/\.cls$/i, ".ddx");
+    assert.ok(fs.existsSync(ddx));
+    const formBytes = fs.readFileSync(formTarget),
+      ddxBytes = fs.readFileSync(ddx);
+    const repeatedForm = await vscode.commands.executeCommand(
+      "jadeNative.pullSelectedClassFromSource",
+      formRow,
+    );
+    assert.equal(
+      repeatedForm.counts.unchanged,
+      2,
+      JSON.stringify(repeatedForm),
+    );
+    const ddxDoc = await vscode.workspace.openTextDocument(
+        vscode.Uri.file(ddx),
+      ),
+      ddxEdit = new vscode.WorkspaceEdit();
+    ddxEdit.insert(
+      ddxDoc.uri,
+      new vscode.Position(0, 0),
+      "<!-- unsaved DDX -->\n",
+    );
+    assert.ok(await vscode.workspace.applyEdit(ddxEdit));
+    assert.equal(ddxDoc.isDirty, true);
+    const dirtyDdx = await vscode.commands.executeCommand(
+      "jadeNative.pullSelectedClassFromSource",
+      formRow,
+    );
+    assert.equal(dirtyDdx.passed, false);
+    assert.ok(fs.readFileSync(formTarget).equals(formBytes));
+    assert.ok(fs.readFileSync(ddx).equals(ddxBytes));
     fs.writeFileSync(
       path.join(stage, "host-report.json"),
       JSON.stringify({
@@ -127,6 +175,11 @@ async function run() {
         unchanged: second.counts.unchanged,
         unchangedMtime: true,
         unsavedDocumentRetained: true,
+        formCompanion: {
+          added: form.counts.added,
+          unchanged: repeatedForm.counts.unchanged,
+          dirtyDdxRetained: true,
+        },
       }),
     );
   } catch (error) {

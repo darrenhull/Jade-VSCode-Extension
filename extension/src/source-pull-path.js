@@ -34,4 +34,17 @@ function sourceTargetPath(destination, relative) {
 const pathIdentity = (value) => path.resolve(value).toLowerCase();
 const relativeIdentity = (value) =>
   value.replaceAll(String.fromCharCode(92), "/").toLowerCase();
-module.exports = { sourceTargetPath, pathIdentity, relativeIdentity };
+// Only a native selected class can own its exact same-stem Form definition.
+function selectedSourcePaths(selection) {
+  return selection.flatMap((item) =>
+    item.kind === "class" && /\.cls$/i.test(item.path)
+      ? [item.path, item.path.replace(/\.cls$/i, ".ddx")]
+      : [item.path],
+  );
+}
+module.exports = {
+  sourceTargetPath,
+  pathIdentity,
+  relativeIdentity,
+  selectedSourcePaths,
+};

@@ -126,7 +126,7 @@ Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 sec
 
 ### Pull one selected class from Source
 
-**Jade: Pull Selected Class from Source (Streaming)** is available from a saved, single-class/interface CLS editor or an Object Explorer class context menu when the bundled CLI advertises the streaming capability. It pulls the **current** Source version directly to that class file, with native comparison and one file candidate at a time. It does not run a full schema export. Multi-class files and unsaved editor/class-view changes are refused.
+**Jade: Pull Selected Class from Source (Streaming)** is available from a saved, single-class/interface CLS editor or an Object Explorer class context menu when the bundled CLI advertises the streaming capability. It pulls the **current** Source version directly to that class file, with native comparison and one file candidate at a time. It does not run a full schema export. Selected Forms include their same-stem DDX definition with a separate editor permission check. Multi-class files and unsaved editor/class-view changes are refused.
 
 An unchanged file keeps its timestamp. Local edits and conflicts are retained; a verified saved remote receipt can supply the prior baseline. No baseline is invented from the current local bytes. The output distinguishes files written, unchanged, kept locally and conflicted, with native stage timings. Cancellation or failure may leave already-applied files in place; a lost native completion is reported as uncertain and the selected source scope is refreshed.
 
