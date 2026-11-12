@@ -24,8 +24,12 @@ Focused registered command tests pass (6), including unchanged aggregate-resourc
 ## Required remaining gates
 
 - Actual unchanged extracted-to-native full publication through the registered command on separate owned disposable Working and target databases, run only by the native coordinator. Include aggregate DDX and _exposedListDefinitions.sec, resource/class parity and cleanup evidence. No user Source publication.
-- Current full database-free suite, VSIX packaging/receipt/portable smoke and exact-head hosted checks; relevant actual native candidate validation before any new CLI dependency is pinned.
+- Preliminary full database-free suite passed at 39272c8: 1,149 passed / 45 connected skips plus 18 isolated PowerShell contracts; VSIX packaging, current official 0.8 receipt/runtime checks, no-Node/database-free portable smoke and release metadata passed. Repeat final packaging/native checks after the required official 0.10 dependency is pinned; this preliminary package is not the deliverable.
 - Keep the linked PR Draft during implementation/native validation; mark Ready once gates clear to trigger Codex, clear actual findings, then request owner approval and protected squash auto-merge.
+
+## Release dependency
+
+CLI PR #40 must qualify, pass review/owner approval, merge and publish official CLI 0.10. After independently verifying that release, fold its exact archive/distribution pin into this complete-workflow PR with a new extension feature version and honest feature notes. Do not merge source-only changes on existing extension 0.21.0, prematurely pin an unreleased commit, or ship a separate comparison-only package as the outcome. Preserve held dependency PRs until their changes are explicitly superseded by this complete reviewed package.
 
 ## Honest publication guarantee
 

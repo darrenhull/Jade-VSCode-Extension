@@ -1,6 +1,6 @@
 'use strict';
 // Explicit owned-fixture driver. Not included in the default database-free suite.
-const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process'),crypto=require('node:crypto');
 const {CliWorkingSession}=require('../../extension/src/cli-client'),gateway=require('../../extension/src/cli-gateway');
 const {scanProject}=require('../../extension/src/native-project'),{registerProjectTools}=require('../../extension/src/project-tools');
 async function main(){
@@ -21,7 +21,9 @@ async function main(){
  const service={runNative:async(executable,args,options,output)=>{
   if(args.includes('app=JadeBatchExtract'))throw Error('Native publication unexpectedly used legacy Every extraction.');
   const publishing=args.includes('path='+target.databasePath)&&args.some(value=>value.startsWith('schemaFile='));if(publishing&&!approved)throw Error('Target load began without explicit fixture approval.');
-  calls.push({application:args.find(value=>value.startsWith('app='))||'jadloadb',publishing});return session.runNative(executable,args,options,output);
+  const input=args.find(value=>value.startsWith('schemaFile='))?.slice('schemaFile='.length);let frozenBundleSha256;
+  if(input){const directory=path.dirname(input),digest=crypto.createHash('sha256');for(const file of fs.readdirSync(directory).filter(file=>/\.(mul|scm|ddx)$/i.test(file)).sort()){digest.update(file);digest.update(fs.readFileSync(path.join(directory,file)));}frozenBundleSha256=digest.digest('hex');}
+  calls.push({application:args.find(value=>value.startsWith('app='))||'jadloadb',publishing,...(frozenBundleSha256?{frozenBundleSha256}:{})});return session.runNative(executable,args,options,output);
  }};
  gateway.configure(service);
  const folder={uri:{scheme:'file',fsPath:workspace}},commands=new Map(),context={subscriptions:[],workspaceState:{get:(_key,fallback)=>fallback,update:async()=>{}}};
@@ -31,8 +33,11 @@ async function main(){
   fs.mkdirSync(path.join(working.root,'logs'),{recursive:true});target.workspaceRoots=[workspace];target.schema=project.schemas[0].name;
   registerProjectTools(vscode,context,{service:session,config:()=>target,isBusy:()=>busy,setBusy:async value=>busy=value,output:{clear(){},show(){},append:record,appendLine:text=>record(text+'\n')},prepareWorking:async()=>working});
   const result=await commands.get('jadeNative.publishWorkspace')();
-  const receipt={success:result?.success===true,code:result?.code,approved,workspaceSchemaCount:project.schemas.length,workspaceEntryCount:project.entries.length,aggregateDdx:project.entries.filter(entry=>path.basename(entry.file)==='schemaResources.ddx').length,nativeExposureSections:project.entries.filter(entry=>path.basename(entry.file)==='_exposedListDefinitions.sec').length,targetLoads:calls.filter(call=>call.publishing).length,nativeCalls:calls,busyReleased:busy===false,userDatabaseOpened:false,ownedTargetPublished:result?.success===true,legacyEveryUsed:false};
+  const receipt={success:result?.success===true,code:result?.code,approved,sourceSnapshotSha256:project.hash,workspaceSchemaCount:project.schemas.length,workspaceEntryCount:project.entries.length,aggregateDdx:project.entries.filter(entry=>path.basename(entry.file)==='schemaResources.ddx').length,nativeExposureSections:project.entries.filter(entry=>path.basename(entry.file)==='_exposedListDefinitions.sec').length,targetLoads:calls.filter(call=>call.publishing).length,nativeCalls:calls,busyReleased:busy===false,userDatabaseOpened:false,ownedTargetPublished:result?.success===true,legacyEveryUsed:false};
+  const bundleHashes=calls.filter(call=>call.frozenBundleSha256).map(call=>call.frozenBundleSha256);receipt.identicalFrozenBundle=bundleHashes.length===2&&bundleHashes[0]===bundleHashes[1];
   fs.writeFileSync(path.join(evidence,'registered-full-publish.json'),JSON.stringify(receipt,null,2));fs.writeFileSync(path.join(evidence,'registered-full-publish.log'),log);
+
+  if(!receipt.identicalFrozenBundle)throw Error('Working validation and target publication did not consume identical frozen joined inputs.');
   if(!receipt.success||!approved||receipt.targetLoads!==1||busy)throw Error('Actual owned-fixture full publication failed: '+(result?.error||result?.code));
   console.log(JSON.stringify(receipt));
  }finally{
