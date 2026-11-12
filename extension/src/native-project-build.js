@@ -4,6 +4,7 @@ const {createProjectStage,cleanupProjectStage}=require('./native-project-stage-l
 const {stageProject,decode}=require('./native-project');
 const {nativeProcess}=require('./native-utility');
 const {compilerDiagnostics}=require('./native-reports');
+const {isEmptyInheritedType}=require('./native-source-filter');
 const {parseSource,sourcePosition}=require('./source_symbols');
 async function joinProject(working,project,output=()=>{}){
  // Some supported Jade utilities still enforce MAX_PATH. Keep private native
@@ -19,10 +20,11 @@ async function joinProject(working,project,output=()=>{}){
   if(!result.success||/Unhandled\s+(?:System)?Exception/i.test(errors))throw Error('Native schema rejoin failed for '+schema.name+'. '+(errors||result.output));
   if(!fs.existsSync(schema.output))throw Error('Native join did not create '+schema.name+'.scm');
   const text=decode(fs.readFileSync(schema.output));
-  if(schema.classes.length&&!/^typeDefinitions\s*$/m.test(text))throw Error('Native join produced a truncated schema: '+schema.name);
+  const expectedClasses=schema.classes.filter(cls=>!isEmptyInheritedType(cls.text));
+  if(expectedClasses.length&&!/^typeDefinitions\s*$/m.test(text))throw Error('Native join produced a truncated schema: '+schema.name);
   const model=parseSource(text,schema.output+'.cls');
   const joinedOwners=new Set(model.classes.map(value=>value.name));
-  for(const cls of schema.classes)if(!joinedOwners.has(cls.owner))throw Error('Native join omitted '+schema.name+'::'+cls.owner);
+  for(const cls of expectedClasses)if(!joinedOwners.has(cls.owner))throw Error('Native join omitted '+schema.name+'::'+cls.owner);
   schema.text=text;
  }
  const batch=path.join(staged.directory,'workspace.mul');

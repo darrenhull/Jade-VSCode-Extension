@@ -37,8 +37,8 @@ async function main(){
   const bundleHashes=calls.filter(call=>call.frozenBundleSha256).map(call=>call.frozenBundleSha256);receipt.identicalFrozenBundle=bundleHashes.length===2&&bundleHashes[0]===bundleHashes[1];
   fs.writeFileSync(path.join(evidence,'registered-full-publish.json'),JSON.stringify(receipt,null,2));fs.writeFileSync(path.join(evidence,'registered-full-publish.log'),log);
 
-  if(!receipt.identicalFrozenBundle)throw Error('Working validation and target publication did not consume identical frozen joined inputs.');
   if(!receipt.success||!approved||receipt.targetLoads!==1||busy)throw Error('Actual owned-fixture full publication failed: '+(result?.error||result?.code));
+  if(!receipt.identicalFrozenBundle)throw Error('Working validation and target publication did not consume identical frozen joined inputs.');
   console.log(JSON.stringify(receipt));
  }finally{
   gateway.configure(undefined);await session.dispose();const stopped=cp.spawnSync(path.resolve(entry),['shutdown','--json'],{cwd:run,env:process.env,encoding:'utf8',windowsHide:true,timeout:20000,maxBuffer:1048576});

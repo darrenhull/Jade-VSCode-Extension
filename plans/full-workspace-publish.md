@@ -51,3 +51,8 @@ node tests/ProjectTools/ProjectTools_fullPublish_native_tests.cjs `
 ```
 
 The driver refuses missing opt-in, paths outside the owned seed, missing control files or identical Working/target databases. It invokes the registered Publish Workspace command, requires explicit fixture approval before target load, disallows the legacy Every application, records a bounded log/receipt, uses a private broker and cleans its run after shutdown. The coordinator additionally verifies actual native resource/class parity after publication. Driver syntax checking is not an actual native roundtrip claim.
+## First actual native publication checkpoint
+
+The coordinator ran the real registered command with an actual saved ProbeItem.name descriptor edit (String[50] to String[51]), separate original Source/Working/target databases, aggregate DDX and exposure sections. Native JadeJoinSchema returned zero but the frontend rejected `ThinExportProbe::Application` before any loader/target write: stock native output includes empty inherited placeholder files that the expanded join legitimately omits.
+
+Reproduced that exact shape with a failing join regression, then reused the existing `isEmptyInheritedType` helper to exempt only empty inherited shapes from local-definition coverage. Real extracted Application/Object specimens both satisfy that helper. Substantive inherited overrides remain strictly required; no class-name allowlist or serializer rewrite was added. Twelve focused join/lifecycle/full-publish tests pass. The test driver now reports the primary native failure before any frozen-bundle assertion. The coordinator must rerun the actual edited publication/readback gate; this checkpoint is not a publication success claim.
