@@ -1,3 +1,8 @@
+# 0.21.1 - Source comparison tools
+
+- Includes [Jade CLI 0.9.0](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.9.0): compare a selected database class against a committed Git baseline and your local CLS file with `jade-cli source compare`.
+- Identify local changes, database changes, converged edits and conflicts, including additions, deletions, formatting and encoding differences, without changing source files, the database or Git state.
+
 # 0.21.0 - Native full source extraction
 
 - Extract complete current schema sources into a new empty project without selecting a class first.
