@@ -13,6 +13,10 @@ const outcomes = new Set([
 const stages = new Set([
   "opening",
   "inventory",
+  "git-baseline",
+  "local-snapshot",
+  "hash-and-compare",
+  "guarded-apply",
   "native-write",
   "reconcile",
   "closing",

@@ -91,7 +91,9 @@ function setup() {
                     ? { applyRenames: async () => record("rename") }
                     : name === "./native-source-inventory"
                       ? require("../extension/src/native-source-inventory")
-                      : require(name),
+                      : name === "./native-project-stage-lifecycle"
+                        ? require("../extension/src/native-project-stage-lifecycle")
+                        : require(name),
     exported,
   );
   function record(mode) {

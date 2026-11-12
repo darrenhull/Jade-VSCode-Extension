@@ -1,11 +1,10 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const {scanProject,scaffoldSchema,hash}=require('./native-project');
+const {scanProject,scaffoldSchema}=require('./native-project');
 const {nativeProcess}=require('./native-utility');
 const {joinProject,loadProject}=require('./native-project-build');
-const {resolveExtractConfig,startExtract}=require('./extract');
-const {organizeSources}=require('./source-layout');
-const {parseSource}=require('./source_symbols');
+const {capturePublishTarget}=require('./project-publish-target');
+const {cleanupProjectStage}=require('./native-project-stage-lifecycle');
 const {targetKey}=require('./publish-changes');
 const {jadeSourceUri}=require('./active-jade-source');
 const {applyRenames,planRenames,projectRenames,sourceClasses}=require('./native-renames');
@@ -31,32 +30,37 @@ function registerProjectTools(vscode,context,options){
   const source=await options.resolveSource?.(uri),selected=await folder(source?.uri||jadeSourceUri(vscode,uri)),root=selected.uri.fsPath;
   await options.beforeOperation?.();
   await save(root);const project=await scanProject(root);
+  function requireCleanSources(){
+   for(const document of vscode.workspace.textDocuments){const file=document.uri?.fsPath;if(document.isDirty&&file&&path.isAbsolute(file)&&inside(root,file)&&/\.(cls|scm|sec|ddx|ddb|jcf)$/i.test(file))throw Error('Source editor is dirty after the publish snapshot. Save and publish again: '+file);}
+   for(const entry of project.entries)if(options.hasPendingSource?.(entry.file))throw Error('Pending source edits changed after the publish snapshot. Save and publish again: '+entry.file);
+  }
+  requireCleanSources();
   if(!project.schemas.length){if(required||project.migrations?.length)throw Error('Create or pull native schema headers first.');return;}
   if(options.isBusy())throw Error('A Jade operation is already running.');await options.setBusy(true);
-  const output=options.output;let temporary;
+  const output=options.output;let temporary,bundle,primary;
   try{
    const document=await vscode.workspace.openTextDocument(project.schemas[0].header.file),config=options.config(document),id=targetKey(config),saved=context.workspaceState.get('jadeNative.nativeProjectPublished',{});
-   if(saved[id]===project.hash){output.appendLine('No workspace source changes to publish.');return {success:true,results:[]};}
    output.clear();output.show(true);output.appendLine('Preparing and compiling a frozen native project in the working database ...');
-   const working=await options.prepareWorking(config,text=>output.append(text));await applyRenames(working,project,text=>output.append(text));const bundle=await joinProject(working,project,text=>output.append(text));
+   const working=await options.prepareWorking(config,text=>output.append(text));await applyRenames(working,project,text=>output.append(text));bundle=await joinProject(working,project,text=>output.append(text));
    const checked=await loadProject(working,bundle,text=>output.append(text));if(!checked.success)throw Error('Working-base validation failed. Nothing was published to the target.');
    temporary=fs.mkdtempSync(path.join(os.tmpdir(),'jade-publish-review-'));
-   const extracted=await startExtract(resolveExtractConfig(config),path.join(temporary,'raw'),text=>output.append(text)).completion;
-   if(!extracted.success)throw Error('Could not inspect the target for publish review. Nothing was published.');
-   const organized=organizeSources(extracted.destination,path.join(temporary,'organized')),before=await scanProject(organized.directory),renames=planRenames(projectRenames(project),new Set(catalog(before).keys()),sourceClasses(project)),changes=reviewChanges(before,project,renames);
+   const before=await capturePublishTarget(options.service,config,path.join(temporary,'target'),text=>output.append(text)),renames=planRenames(projectRenames(project),new Set(catalog(before).keys()),sourceClasses(project)),changes=reviewChanges(before,project,renames);
    // Schemas omitted from this source project are never implicitly dropped from
    // an arbitrary target. Explicitly owned schema removals are listed separately.
    output.appendLine(changes.join('\n'));
    const choice=await vscode.window.showWarningMessage('Publish the native Jade workspace?',{modal:true,detail:'Database: '+config.databasePath+'\n\n'+changes.slice(0,20).join('\n')+(changes.length>20?'\n... full list in Jade Publish output.':'')+'\n\nComplete schemas are authoritative. Native loading removes absent classes, methods, properties and resources within the listed schemas. Earlier successful schema loads can remain committed if a later load fails.'},'Update Jade Base');
-   if(choice!=='Update Jade Base')return {success:false,cancelled:true};
-   for(const entry of project.entries)if(hash(fs.readFileSync(entry.file))!==entry.hash)throw Error('Source changed after review. Publish again: '+entry.file);
+   if(choice!=='Update Jade Base'){primary={success:false,cancelled:true};return primary;}
+   requireCleanSources();
+   const current=await scanProject(root);if(current.hash!==project.hash)throw Error('Source files changed after review (including additions or deletions). Publish again.');
+   requireCleanSources();
    const target={...working,databasePath:config.databasePath,iniPath:config.iniPath,server:config.server};
    await applyRenames(target,project,text=>output.append(text),new Set(catalog(before).keys()));
    const result=await loadProject(target,bundle,text=>output.append(text));output.appendLine('LoaderExitCode='+result.code);
    if(result.success){saved[id]=project.hash;await context.workspaceState.update('jadeNative.nativeProjectPublished',saved);void vscode.window.showInformationMessage('Published native Jade schemas and resources.');}
    else void vscode.window.showErrorMessage('Native workspace publish failed. See Jade Publish output.');
+   if(!result.success)primary=result;
    return result;
-  }finally{if(temporary&&path.dirname(path.resolve(temporary))===path.resolve(os.tmpdir())&&path.basename(temporary).startsWith('jade-publish-review-'))fs.rmSync(temporary,{recursive:true,force:true});await options.setBusy(false);}
+  }catch(error){primary=error;throw error;}finally{try{await cleanupProjectStage(bundle,primary);}finally{try{if(temporary&&path.dirname(path.resolve(temporary))===path.resolve(os.tmpdir())&&path.basename(temporary).startsWith('jade-publish-review-'))fs.rmSync(temporary,{recursive:true,force:true});}catch(error){if(primary)primary.cleanupError=error.message;else throw error;}finally{await options.setBusy(false);}}}
  }
  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.publishWorkspace',uri=>publish(true,uri).catch(error=>{options.output.appendLine(error.message);options.output.show(true);void vscode.window.showErrorMessage(error.message);return {success:false,error:error.message};})),
  vscode.commands.registerCommand('jadeNative.createSchema',async(properties={})=>{

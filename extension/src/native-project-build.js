@@ -1,6 +1,6 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const os=require('node:os');
+const fs=require('node:fs'),path=require('node:path');
+const {createProjectStage,cleanupProjectStage}=require('./native-project-stage-lifecycle');
 const {stageProject,decode}=require('./native-project');
 const {nativeProcess}=require('./native-utility');
 const {compilerDiagnostics}=require('./native-reports');
@@ -8,8 +8,9 @@ const {parseSource,sourcePosition}=require('./source_symbols');
 async function joinProject(working,project,output=()=>{}){
  // Some supported Jade utilities still enforce MAX_PATH. Keep private native
  // inputs short even when VS Code global storage or the source root is deep.
- const identity=crypto.createHash('sha256').update(path.resolve(working.root).toLowerCase()).digest('hex').slice(0,8);
- const staged=await stageProject(project,path.join(os.tmpdir(),'jd-'+identity,crypto.randomUUID().slice(0,8)),{signal:working.signal});
+ const stage=createProjectStage(working.root);
+ try{
+ const staged=await stageProject(project,stage.directory,{signal:working.signal});
  for(const schema of staged.schemas){
   output('Rejoining native schema '+schema.name+' ...\n');
   const log=path.join(working.root,'logs/jadejoinschema.log'),previous=fs.existsSync(log)?decode(fs.readFileSync(log)):'';
@@ -26,7 +27,8 @@ async function joinProject(working,project,output=()=>{}){
  }
  const batch=path.join(staged.directory,'workspace.mul');
  fs.writeFileSync(batch,'#MULTIPLE_SCHEMA_EXTRACT\r\n'+staged.schemas.map(s=>path.basename(s.output)+(s.ddxFile?' '+path.basename(s.ddxFile):'')).join('\r\n')+'\r\n');
- return {...staged,batch};
+ return {...staged,batch,cleanup:stage.cleanup};
+ }catch(error){await cleanupProjectStage(stage,error);throw error;}
 }
 function projectDiagnostics(output,bundle){
  const diagnostics=[];

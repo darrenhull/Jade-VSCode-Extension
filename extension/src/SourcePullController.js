@@ -13,6 +13,10 @@ const stageLabels = {
   inventory: "Selecting class sources",
   "native-write": "Writing native class sources",
   reconcile: "Checking local source changes",
+  "git-baseline": "Reading committed Git baseline",
+  "local-snapshot": "Capturing local source snapshot",
+  "hash-and-compare": "Hashing and comparing source content",
+  "guarded-apply": "Applying approved source changes",
   closing: "Closing Source",
 };
 
