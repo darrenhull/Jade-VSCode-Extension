@@ -1,0 +1,21 @@
+{
+  "extensionVersion": "0.22.1",
+  "cliVersion": "0.10.1",
+  "officialRelease": false,
+  "sourceRepository": "darrenhull/Jade-CLI",
+  "sourcePullRequest": 42,
+  "sourceCommit": "0cd613705082bf85c1b821c9ac29aab618a3c399",
+  "versionIdentityTag": "v0.10.1",
+  "archiveSha256": "1f2d672a391912c8f6e3b394770973da65cb0e2769fc2bf9b85f3c874410d8b9",
+  "executableSha256": "e233ad5df08bf6e370bc0547b4a6b526177ab06c1ccf1afd87410314988a0635",
+  "rawManifestSha256": "e283413f29064c11288797aee9cdd4d6671b9131da72987f35506d6ce48fc84d",
+  "runtimeFilesVerified": 15,
+  "nativeQualificationReceipt": "https://github.com/darrenhull/Jade-CLI/blob/0cd613705082bf85c1b821c9ac29aab618a3c399/tests/NativeSchemaClassification/receipts/classification-and-extraction.json",
+  "nativeQualificationReceiptSha256": "97d58f467122ee1d401879f53b92a8f5c31d0ac99c466a6752f18df3ebdd02b8",
+  "ansiNativeArtifactsVerified": 33,
+  "unicodeNativeArtifactsVerified": 108,
+  "nativeFaultTraceBothCharacterSetsVerified": true,
+  "customerNullReceiverReproduced": false,
+  "installed": false,
+  "userDatabaseOpened": false
+}
