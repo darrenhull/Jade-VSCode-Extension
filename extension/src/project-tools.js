@@ -5,14 +5,15 @@ const {nativeProcess}=require('./native-utility');
 const {joinProject,loadProject}=require('./native-project-build');
 const {capturePublishTarget}=require('./project-publish-target');
 const {cleanupProjectStage}=require('./native-project-stage-lifecycle');
+const {isEmptyInheritedType}=require('./native-source-filter');
 const {targetKey}=require('./publish-changes');
 const {jadeSourceUri}=require('./active-jade-source');
 const {applyRenames,planRenames,projectRenames,sourceClasses}=require('./native-renames');
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
-function catalog(project){const values=new Map();for(const s of project.schemas)for(const c of s.classes)values.set(s.name+'::'+c.owner,c);return values;}
+function catalog(project,forReview=false){const values=new Map();for(const s of project.schemas)for(const c of s.classes)if(!forReview||!isEmptyInheritedType(c.text))values.set(s.name+'::'+c.owner,c);return values;}
 function reviewChanges(before,after,renames=[]){
  const authoritative=new Set(after.schemas.map(schema=>schema.name));
- const old=catalog({schemas:before.schemas.filter(schema=>authoritative.has(schema.name))}),current=catalog(after),rows=[];
+ const old=catalog({schemas:before.schemas.filter(schema=>authoritative.has(schema.name))},true),current=catalog(after,true),rows=[];
  const renamedOld=new Set(renames.map(op=>op.old));
  for(const op of renames)rows.push('RENAME class '+op.old+' -> '+op.next+' (preserve instances)');
  for(const name of old.keys())if(!current.has(name)&&!renamedOld.has(name))rows.push('DELETE class/override '+name);
