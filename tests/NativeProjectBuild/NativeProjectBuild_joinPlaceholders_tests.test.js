@@ -16,3 +16,12 @@ test('native join may omit exact empty inherited placeholders from its expanded 
 test('native join must still retain substantive inherited overrides',async t=>{
  const f=await fixture(t,' attributeDefinitions\n  localOverride: String[50];');await assert.rejects(joinProject(f.working,f.project),/Native join omitted Pets::Application/);
 });
+
+for(const present of [true,false])test('native join '+(present?'retains':'must not omit')+' native interface definitions outside the class parser',async t=>{
+ const f=await fixture(t),file=path.join(f.root,'Pets/types/ProbeInterface.cls');
+ const text='jadeVersionNumber "25.0.02";\nschemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ninterfaceDefs\n ProbeInterface number = 1280\n (\n jadeMethodDefinitions\n  describe(): String number = 1001;\n )\ntypeSources\n';fs.writeFileSync(file,text);f.project=await scanProject(f.root);
+ const own=fs.readFileSync(path.join(f.root,'Pets/types/Local.cls'),'utf8');
+ gateway.configure({runNative:async(_exe,args)=>{fs.writeFileSync(args.at(-2),own+(present?'\ninterfaceDefs\n ProbeInterface number = 1280\n (\n jadeMethodDefinitions\n describe(): String number = 1001;\n )\n':''));return {success:true,code:0,output:''};}});
+ if(!present){await assert.rejects(joinProject(f.working,f.project),/Native join omitted Pets::ProbeInterface/);return;}
+ let bundle;try{bundle=await joinProject(f.working,f.project);assert.ok(fs.existsSync(bundle.batch));}finally{await bundle?.cleanup?.();}
+});

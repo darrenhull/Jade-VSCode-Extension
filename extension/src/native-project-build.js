@@ -5,6 +5,7 @@ const {stageProject,decode}=require('./native-project');
 const {nativeProcess}=require('./native-utility');
 const {compilerDiagnostics}=require('./native-reports');
 const {isEmptyInheritedType}=require('./native-source-filter');
+const {topLevelMatches}=require('./source-context');
 const {parseSource,sourcePosition}=require('./source_symbols');
 async function joinProject(working,project,output=()=>{}){
  // Some supported Jade utilities still enforce MAX_PATH. Keep private native
@@ -24,6 +25,9 @@ async function joinProject(working,project,output=()=>{}){
   if(expectedClasses.length&&!/^typeDefinitions\s*$/m.test(text))throw Error('Native join produced a truncated schema: '+schema.name);
   const model=parseSource(text,schema.output+'.cls');
   const joinedOwners=new Set(model.classes.map(value=>value.name));
+  // Native interfaces have numbered interfaceDefs blocks, not class definitions.
+  if(topLevelMatches(model.code,/^\s*interfaceDefs\s*$/gm).length)
+   for(const match of topLevelMatches(model.code,/^\s*([A-Za-z_]\w*)\s+number\s*=\s*\d+\s*\(/gm))joinedOwners.add(match[1]);
   for(const cls of expectedClasses)if(!joinedOwners.has(cls.owner))throw Error('Native join omitted '+schema.name+'::'+cls.owner);
   schema.text=text;
  }
