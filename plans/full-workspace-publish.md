@@ -31,4 +31,19 @@ Focused registered command tests pass (6), including unchanged aggregate-resourc
 
 Source bytes and file membership are frozen and rechecked locally before publication; the exact validated bundle is loaded. Target review is a point-in-time native snapshot. It does not hold an atomic database compare-and-apply lease against an external writer during the approval dialog. No second full target export or invented native lock is added. Complete schema loads are authoritative within selected schemas; earlier successful schema loads can remain if a later schema fails, as the existing confirmation already states.
 
+The full-publish scanner still retains bytes, decoded text and parsed models for both complete local and target snapshots. Its 30,000-class memory use is unmeasured; per-file native extraction does not imply bounded full-publish memory. Do not infer real native scale performance from mocked tests.
+
 The profiling helper is separate and opt-in; it is not a release prerequisite or evidence of real 30,000-class export performance. Avoid expanding this change into a synchronization framework.
+
+## Native coordinator driver
+
+Only the native coordinator may execute this against its prepared fixture:
+
+```powershell
+$env:JADE_PUBLISH_OWNED_NATIVE='1'
+node tests/ProjectTools/ProjectTools_fullPublish_native_tests.cjs `
+  <candidate-cli.exe> <owned-temp-stream-seed> <extracted-workspace> `
+  <working-config.json> <separate-target-config.json> <durable-evidence-directory>
+```
+
+The driver refuses missing opt-in, paths outside the owned seed, missing control files or identical Working/target databases. It invokes the registered Publish Workspace command, requires explicit fixture approval before target load, disallows the legacy Every application, records a bounded log/receipt, uses a private broker and cleans its run after shutdown. The coordinator additionally verifies actual native resource/class parity after publication. Driver syntax checking is not an actual native roundtrip claim.

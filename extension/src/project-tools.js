@@ -11,7 +11,8 @@ const {applyRenames,planRenames,projectRenames,sourceClasses}=require('./native-
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
 function catalog(project){const values=new Map();for(const s of project.schemas)for(const c of s.classes)values.set(s.name+'::'+c.owner,c);return values;}
 function reviewChanges(before,after,renames=[]){
- const old=catalog(before),current=catalog(after),rows=[];
+ const authoritative=new Set(after.schemas.map(schema=>schema.name));
+ const old=catalog({schemas:before.schemas.filter(schema=>authoritative.has(schema.name))}),current=catalog(after),rows=[];
  const renamedOld=new Set(renames.map(op=>op.old));
  for(const op of renames)rows.push('RENAME class '+op.old+' -> '+op.next+' (preserve instances)');
  for(const name of old.keys())if(!current.has(name)&&!renamedOld.has(name))rows.push('DELETE class/override '+name);
