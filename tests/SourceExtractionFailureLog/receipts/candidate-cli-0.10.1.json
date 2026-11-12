@@ -17,5 +17,19 @@
   "nativeFaultTraceBothCharacterSetsVerified": true,
   "customerNullReceiverReproduced": false,
   "installed": false,
-  "userDatabaseOpened": false
+  "userDatabaseOpened": false,
+  "consumerVerification": {
+    "testsPassed": 1164,
+    "connectedTestsSkipped": 45,
+    "isolatedPowerShellTestsPassed": 18,
+    "vsixSha256": "c46980f0c200755b95582174bac526100495058e875e5eb8f635c5d4b3e44c89",
+    "vsixBytes": 5142248,
+    "allRuntimeHashesVerifiedInActualVsix": true,
+    "rawManifestBytesPreservedInActualVsix": true,
+    "packagedDiagnosticCodeMatchesTestedSource": true,
+    "outsideCheckoutNoNodeDiscoveryPassed": true,
+    "releaseMetadataPassed": true,
+    "userDatabaseOpened": false,
+    "installed": false
+  }
 }
