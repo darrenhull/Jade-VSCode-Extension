@@ -26,3 +26,8 @@ test('oversized metadata and trace cannot exceed the total output cap and retain
 test('lastOperation is available when the operation ring is absent',()=>{
  assert.match(sourceExtractionFailureContext(failed({lastOperation:operation(3)})).join('\n'),/Fish3/);
 });
+
+test('native-trimmed history remains visibly incomplete even when fewer than 32 operations survive',()=>{
+ const text=sourceExtractionFailureContext(failed({historyTruncated:true,recentOperations:[operation(1),operation(2)]})).join('\n');assert.match(text,/last 2; older operations omitted/);assert.match(text,/Fish2/);
+ assert.doesNotMatch(sourceExtractionFailureContext(failed({historyTruncated:'true',recentOperations:[operation(2)]})).join('\n'),/older operations omitted/);
+});

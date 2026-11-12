@@ -40,7 +40,7 @@ function sourceExtractionFailureContext(result){
    if(bytes>remaining)break;
    recent.unshift(line);remaining-=bytes;
   }
-  if(recent.length){const truncated=recent.length<operations.length||(Array.isArray(report.recentOperations)&&report.recentOperations.length>MAX_OPERATIONS);lines.push('Recent native operations (last '+recent.length+(truncated?'; older operations omitted':'')+'):',...recent);}
+  if(recent.length){const truncated=report.historyTruncated===true||recent.length<operations.length||(Array.isArray(report.recentOperations)&&report.recentOperations.length>MAX_OPERATIONS);lines.push('Recent native operations (last '+recent.length+(truncated?'; older operations omitted':'')+'):',...recent);}
   return lines;
  }catch{return [];}
 }
