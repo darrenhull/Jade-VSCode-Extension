@@ -72,6 +72,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $paths = @('package.json','package-lock.json','extension/package.json','extension/CHANGELOG.md','packages') | Where-Object { Test-Path -LiteralPath $_ }
           git add -- $paths
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git commit -m "Update Jade CLI to $env:CLI_TAG"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git push --set-upstream origin "$env:CLI_BRANCH"

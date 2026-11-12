@@ -21,6 +21,6 @@ test('bumpConsumerVersion prepares exact release notes and preserves prior conte
  }
 });
 test('bumpConsumerVersion rejects invalid preparation before modifying any files',t=>{
- const mutations=[root=>fs.unlinkSync(path.join(root,'packages/jade-cli-pin.json')),root=>fs.writeFileSync(path.join(root,'packages/jade-cli-pin.json'),JSON.stringify({version:'0.9.0',tag:'v0.8.0'})),root=>fs.writeFileSync(path.join(root,'extension/package.json'),JSON.stringify({version:'0.20.0'})),root=>fs.writeFileSync(path.join(root,'package-lock.json'),JSON.stringify({version:'0.21.0',packages:{'':{version:'0.20.0'}}})),root=>fs.appendFileSync(path.join(root,'extension/CHANGELOG.md'),'\n# 0.21.1 - Existing\n')];
+ const mutations=[root=>fs.writeFileSync(path.join(root,'packages/jade-cli-pin.json'),JSON.stringify({version:'0.9.0\n',tag:'v0.9.0\n'})),root=>fs.unlinkSync(path.join(root,'packages/jade-cli-pin.json')),root=>fs.writeFileSync(path.join(root,'packages/jade-cli-pin.json'),JSON.stringify({version:'0.9.0',tag:'v0.8.0'})),root=>fs.writeFileSync(path.join(root,'extension/package.json'),JSON.stringify({version:'0.20.0'})),root=>fs.writeFileSync(path.join(root,'package-lock.json'),JSON.stringify({version:'0.21.0',packages:{'':{version:'0.20.0'}}})),root=>fs.appendFileSync(path.join(root,'extension/CHANGELOG.md'),'\n# 0.21.1 - Existing\n')];
  for(const mutate of mutations){const root=fixture(t);mutate(root);const before=snapshot(root);assert.throws(()=>bumpConsumerVersion(root));assert.deepEqual(snapshot(root),before);}
 });
