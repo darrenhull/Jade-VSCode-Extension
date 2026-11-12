@@ -1,4 +1,5 @@
 "use strict";
+const { sourceExtractionFailureContext } = require("./source-extraction-failure-log");
 const path = require("node:path");
 const fs = require("node:fs");
 const { isIndexableSourcePath } = require("./source-index-scope");
@@ -431,6 +432,7 @@ class SourcePullController {
           " rejected.",
       );
       if (result.report?.error) log(result.report.error);
+      for (const line of sourceExtractionFailureContext(result)) log(line);
       if (result.clientError)
         log("Source client validation: " + result.clientError);
       if (result.indeterminate || result.report?.outcomesUncertain)
