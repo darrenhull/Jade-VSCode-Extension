@@ -1,3 +1,7 @@
+# 0.22.1 - Source extraction diagnostics
+
+- Inspect recent native extraction steps, the active schema context and the failing operation directly in Jade Source Pull output.
+
 # 0.22.0 - Complete source workflow
 
 - Extract and refresh complete current schema source, including native interfaces and schema resources.
