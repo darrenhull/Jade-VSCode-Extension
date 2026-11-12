@@ -1,3 +1,7 @@
+# 0.22.2 - Imported interface extraction
+
+- Extract schemas containing imported interface references without stopping on a missing reflected schema owner.
+
 # 0.22.1 - Source extraction diagnostics
 
 - Inspect recent native extraction steps, the active schema context and the failing operation directly in Jade Source Pull output.
