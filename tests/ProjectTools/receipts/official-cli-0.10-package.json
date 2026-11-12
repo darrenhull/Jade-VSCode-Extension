@@ -1,0 +1,26 @@
+{
+  "extensionVersion": "0.22.0",
+  "minimumCliVersion": "0.10.0",
+  "officialCli": {
+    "version": "0.10.0",
+    "tag": "v0.10.0",
+    "reviewedMain": "41b5816025a0dc23a5db7fdc3b6382b5f78cb2f0",
+    "archiveSha256": "173283d0ae189a640425010ff3b8caf485be8d108ac4a61fa4f9a4ab4759ba7e",
+    "manifestSha256": "fc1e359bdc25d0af7c9eefad41b0324b6af68dcee110fb2602e4737a52638b34",
+    "executableSha256": "6e52caac0fbab96de24121d732da8a98712ca71ee77ea123e654b667e171c783",
+    "runtimeFiles": 15
+  },
+  "localPackage": {
+    "sha256": "7e06244514a89a2bf48b2db8269f19b54e866caf0e9ef43dabfa4df923f46b24",
+    "bytes": 5114213,
+    "testsPassed": 1154,
+    "connectedTestsSkipped": 45,
+    "isolatedPowerShellTestsPassed": 18,
+    "pinAndRuntimeHashesVerified": true,
+    "noNodePortableDiscoveryPassed": true,
+    "releaseMetadataPassed": true
+  },
+  "nativeProof": "Private-candidate edited native publication/readback remains independently bound in owned-native-full-publish.json; exact official package native compatibility is a separate gate.",
+  "installed": false,
+  "userDatabaseOpened": false
+}

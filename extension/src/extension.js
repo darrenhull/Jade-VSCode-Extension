@@ -230,7 +230,8 @@ function activate(context) {
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
   });
   const projectTools=require('./project-tools').registerProjectTools(vscode,context,{
-    beforeOperation,resolveSource,
+    service:nativeTests,beforeOperation,resolveSource,
+    hasPendingSource:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
     prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),
     config:classConfig,output:publishOutput,isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},

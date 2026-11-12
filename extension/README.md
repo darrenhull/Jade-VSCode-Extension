@@ -100,9 +100,9 @@ After updating, reload all VS Code windows and reconnect other clients. If an ol
 
 ## Source-pull progress
 
-**Extract All Sources** shows native extraction, file discovery and hashing, source organization, comparison, application and editor refresh as separate stages. **Jade Extract** output records elapsed stage durations. The native-stage class count only observes files written so far; it is not a completion percentage. Hashing uses the actual discovered file total. Native observation scans stop once the extractor exits.
+**Extract All Sources** distinguishes preparation, native inventory/writing, local snapshots, content hashing/comparison, guarded file updates and editor refresh. **Jade Source Pull** output records elapsed stages. Counts acknowledge processed native files; they are not an estimated completion percentage. Native serialization can still be running before file-completion counts advance.
 
-This progress reporting does not make a pull incremental: the current batch route still exports all source. Local-conflict review and unsaved-editor protection remain in effect.
+Complete pulls still serialize the selected scope each time; content comparison avoids rewriting unchanged workspace files. Local-conflict and unsaved-editor protection remain in effect. No large-database speed or memory guarantee is implied.
 
 ## Extract all source into a new folder
 
@@ -137,4 +137,6 @@ Debugger support requires a compatible runtime. GUI application hosting, arbitra
 
 Jade Tools is an independent third-party extension and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
 
-Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. Whole-schema aggregate resources are not automatically attached to a single-class publish; unsupported resource publication is refused.
+Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. For a complete extracted project, run **Jade: Publish Workspace Schemas and Resources**. The command validates a frozen native joined bundle in Working, captures the target for review, then loads those same joined bytes after approval. Source files added, deleted or changed during approval, and dirty/pending source editors, stop publication. Empty inherited reference files remain on disk without being advertised as local class additions/deletions. Whole-schema aggregate resources are not automatically attached to a single-class publish.
+
+Review is a point-in-time target snapshot, not an atomic lease against external database writers. Complete-schema loading is authoritative within the listed schemas, and earlier successful schema loads may remain if a later load fails.
