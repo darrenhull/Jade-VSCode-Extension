@@ -1,6 +1,6 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.8.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.10.0 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
@@ -28,6 +28,7 @@ jade-cli test .\FishTest.cls --json
 jade-cli workspace run .\scratch.jade --schema ExampleSchema --json
 jade-cli tests list --config jade.json --json
 jade-cli source search --config jade.json --query Fish --json
+jade-cli source compare --schema ExampleSchema --class Fish --file schemas/ExampleSchema/types/Fish.cls --base HEAD --json
 jade-cli inspect catalog --config jade.json --target working --json
 jade-cli inspect instances --config jade.json --target working --args "{...}" --json
 jade-cli status --json
@@ -76,6 +77,18 @@ One read-only native batch session writes a complete file into a private candida
 
 Files apply one at a time. Cancellation, failure or a later conflict can therefore leave earlier successful files applied; the result reports this partial outcome. Unpromoted candidates are discarded after native closure. Conflicts and rejected promotions return `result.code: 4` and `passed: false`; inspect the final result even when earlier files were added or updated. Files absent from the native inventory are not automatically deleted from the workspace. Each pull still exports the requested scope through Jade; unchanged-file comparison avoids workspace rewrites rather than claiming an incremental native export.
 
+To compare a full pull with a specific committed Git baseline, run from the repository root:
+
+```powershell
+jade-cli source extract --all --base HEAD --json
+```
+
+The explicit ref is resolved once for the whole operation. Git blob IDs use the repository's SHA1 or SHA256 format and exact file bytes, including formatting, BOM and line endings; no clean filter runs. The CLI adds `gitComparison` metadata to file outcomes and the final summary. This comparison context never grants permission to replace a file: accepted native baselines and current editor permits still protect committed-but-unpublished, staged, unstaged and deleted local work. Without `--base`, existing extraction behavior is unchanged. Git's index, refs, HEAD and object database remain unchanged.
+
+The summary counts tracked paths in the selected schema namespace that were not emitted, with a bounded sample. These are reported as `baselinePathsNotExtracted`, not silently assumed equal or automatically deleted. Native extraction still serializes every selected artifact; Git comparison avoids additional payload reads and does not claim incremental database export.
+
+Progress distinguishes native inventory, local snapshot, native writing, completed-candidate hashing/comparison, guarded apply and native close. The result separates native-write, hash/compare, guarded-apply and Git-baseline timing from total wall time.
+
 A selected class can still be pulled to an explicit relative path:
 
 ```powershell
@@ -88,11 +101,21 @@ This route requires `--output` within the chosen root and supports its existing 
 
 In the qualified full-source package, `doctor.capabilities.sourceExtraction` reports protocol 1, scopes `classes`, `schemas` and `all`, versions `["current"]`, `fullSchema: true`, `layout: "schema-ddx"` and required client promotion permits. Check that capability before offering full extraction; older packages can advertise classes-only support.
 
-JSONL clients send `source.extract` with `config`, an absolute existing `destination` and `promotion: "client"`. Use `scope: "all"` for all user schemas, or `scope: "schemas", schemas: ["ExampleSchema"]` for named schemas. Full scopes cannot be mixed with class selection. Selected-class requests retain explicit `selection: [{schema, name, kind: "class"|"interface", path}]`.
+JSONL clients send `source.extract` with `config`, an absolute existing `destination` and `promotion: "client"`. Use `scope: "all"` for all user schemas, or `scope: "schemas", schemas: ["ExampleSchema"]` for named schemas. Full scopes cannot be mixed with class selection. Add an explicit `base: "HEAD"` (or another ref) to request Git comparison context. Selected-class requests retain explicit `selection: [{schema, name, kind: "class"|"interface", path}]`.
 
 The typed `source.started`, `source.stage`, `source.permitRequired` and `source.file` events retain the extraction request id. Reply to promotion tickets using `source.permit` with their lease, ticket and allow boolean; `source.cancel` uses the owning lease. Both controls bypass the native job queue. Before receiving a lease, use the existing cancel operationId. Expired permits and client disconnection deny unpromoted files and wait for native closure.
 
 The compact final result follows actual process exit and reports counts, appliedFiles, completedFiles, status, partial, scope and native stage timings. Only a successfully completed full pull without conflicts or rejected promotions reports `authoritative: true`. Failed, cancelled and selected-class pulls cannot establish that authority. Events contain file metadata rather than source bodies. See the checked-in [full-schema implementation plan](plans/full-schema-source-extraction.md) and [selected-source plan](plans/selected-source-extraction.md) for the protocol and baseline details.
+
+## Compare selected class source with Git
+
+`jade-cli source compare --schema ExampleSchema --class Fish --file schemas/ExampleSchema/types/Fish.cls --base HEAD --json` compares CURRENT class source in the configured Source database, the selected committed Git baseline and the current local file. Run it at a checked-out Git repository root with one configured workspace root, or select that root using `--workspace`. Git must be installed on PATH; the verified Git version is 2.48.1 and comparison requires its `--no-lazy-fetch` option. `doctor.capabilities.sourceComparison` reports the packaged capability. The baseline can be a commit or ref; it is resolved once and remains fixed if HEAD later moves. Selected comparison reads only the path's parent-tree listings rather than recursively inventorying unrelated source trees.
+
+The result includes all three Git blob IDs and an explicit change/conflict status. A completed comparison returns code 0 even when it finds a conflict; scripts must inspect `status` before any separate merge or publication. This is read-only: it does not change Source, Working, local source files, the Git index, refs or object database. Missing native classes are absent targets; native errors remain errors. A genuine native owner mismatch requires its defining schema; official per-schema placeholders such as Object.cls are preserved. This first command compares class CLS source only; it does not claim full schema, DDX/resource or database deletion inventory, or implement a pull/publish merge.
+
+Comparison hashes **exact bytes** using the repository's SHA1/SHA256 Git blob rules. It preserves formatting, BOM and line endings and runs no Git clean filters. If your Git commit normalizes CRLF to LF, those different bytes are reported as a difference. It uses the same native section-CLS serializer as extraction; a different native memory-envelope representation is not silently normalized to match.
+
+Jade serializes one selected class into one owned private candidate. The CLI hashes it and removes it after the native connection closes; it does not create another complete source tree. Cancellation waits for the current native serializer to finish and close safely. This selected-class command is a first integration slice; a future full-schema comparison must reuse a single baseline/session rather than invoke it once per class.
 
 ## Jade Workspace execution
 

@@ -1,3 +1,10 @@
+# 0.22.0 - Complete source workflow
+
+- Extract and refresh complete current schema source, including native interfaces and schema resources.
+- Review and publish complete workspaces after Working validation, using the same frozen source bundle for the target load.
+- Stop publication if files are added, removed, changed or left unsaved while you review; keep inherited reference files out of misleading class-change lists.
+- Distinguish source snapshots, native writing, content hashing/comparison and guarded file updates in progress reporting.
+
 # 0.21.0 - Native full source extraction
 
 - Extract complete current schema sources into a new empty project without selecting a class first.
