@@ -18,14 +18,14 @@ function fixture(t,change=()=>{}){
   return {success:true,code:0,output:''};
  }});t.after(()=>gateway.configure(undefined));
  const service={sourceCapabilities:async()=>({sourceExtraction:{protocol:1,fullSchema:true,available:true,layout:'schema-ddx',requiresPromotionPermit:true,scopes:['all'],versions:['current']}}),startSourceExtraction:(_config,selection,callbacks)=>{
-  calls.push({kind:'snapshot',selection});fs.cpSync(path.join(workspace,'schemas'),path.join(selection.destination,'schemas'),{recursive:true});callbacks.onStage?.({stage:'inventory',completedFiles:0,totalFiles:4});return {completion:Promise.resolve({passed:true,authoritative:true,completedFiles:4}),stop(){}};
+  calls.push({kind:'snapshot',selection,configuration:_config});fs.cpSync(path.join(workspace,'schemas'),path.join(selection.destination,'schemas'),{recursive:true});callbacks.onStage?.({stage:'inventory',completedFiles:0,totalFiles:4});return {completion:Promise.resolve({passed:true,authoritative:true,completedFiles:4}),stop(){}};
  }};
  const vscode={workspace:{workspaceFolders:[folder],textDocuments:documents,openTextDocument:async file=>({uri:{scheme:'file',fsPath:file}})},commands:{registerCommand:(name,handler)=>(commands.set(name,handler),{dispose(){}})},window:{showErrorMessage:async()=>{},showInformationMessage:async()=>{},showWarningMessage:async()=>{await change({root,workspace,source,types,documents,calls});return 'Update Jade Base';}}};
  registerProjectTools(vscode,{subscriptions:[],workspaceState:{get:(_key,fallback)=>fallback,update:async()=>{}}},{service,config:()=>config,isBusy:()=>busy,setBusy:async value=>busy=value,output:{clear(){},show(){},append(){},appendLine(){}},prepareWorking:async()=>working});
  return {run:()=>commands.get('jadeNative.publishWorkspace')(),calls,config,working,busy:()=>busy};
 }
 test('full publication reviews a native streamed snapshot and carries aggregate resources through native join/load',async t=>{
- const f=fixture(t),result=await f.run();assert.equal(result.success,true,result.error);assert.equal(f.calls.filter(c=>c.kind==='snapshot').length,1);assert.equal(f.calls.find(c=>c.kind==='snapshot').selection.scope,'all');assert.equal(f.calls.filter(c=>c.kind==='native'&&c.args.some(a=>a==='path='+f.config.databasePath)).length,1);assert.equal(f.busy(),false);
+ const f=fixture(t),result=await f.run();assert.equal(result.success,true,result.error);assert.equal(f.calls.filter(c=>c.kind==='snapshot').length,1);assert.equal(f.calls.find(c=>c.kind==='snapshot').selection.scope,'all');const captured=f.calls.find(c=>c.kind==='snapshot');assert.deepEqual(captured.configuration.workspaceRoots,[captured.selection.destination]);assert.equal(captured.selection.cwd,captured.selection.destination);assert.notEqual(f.config.workspaceRoots[0],captured.selection.destination);assert.equal(f.calls.filter(c=>c.kind==='native'&&c.args.some(a=>a==='path='+f.config.databasePath)).length,1);assert.equal(f.busy(),false);
 });
 for(const [name,change] of [
  ['new source',({types,source})=>fs.copyFileSync(source,path.join(types,'NewSource.cls'))],
