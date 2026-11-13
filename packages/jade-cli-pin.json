@@ -1,10 +1,6 @@
 {
-  "version": "0.10.2",
+  "sha256": "0337ab07a9884d5cf79a7171428f177af939c700d330395f119a297b6c9d1949",
   "tag": "v0.10.2",
-  "sha256": "e79c196a01f5772e539b32e590d1e109533d6f6ecc86c38d8c1e2f6f211f6d6a",
-  "distributionSha256": "b09021116cfd6ce404cb50a09fe65e026daf1e47360f46a3d8cb670bbc07b3d0",
-  "officialRelease": false,
-  "sourceRepository": "darrenhull/Jade-CLI",
-  "sourcePullRequest": 44,
-  "sourceCommit": "78592068660908f3cab8ae7f17c502909edb0eb8"
+  "distributionSha256": "56e0001926766f1aed23567d393e6b6c88fff4e22122938a9264ddfcf9f82ece",
+  "version": "0.10.2"
 }
