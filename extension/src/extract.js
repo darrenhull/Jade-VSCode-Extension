@@ -5,6 +5,8 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { StringDecoder } = require("node:string_decoder");
 
+const DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 7200;
+
 function resolveExtractionDirectory(workspaceRoot, value = ".") {
   const root = path.resolve(workspaceRoot);
   // A leading slash denotes the workspace root in this setting, so /src
@@ -38,7 +40,7 @@ function resolveExtractConfig(settings) {
   const server = settings.server || "singleUser";
   if (!["singleUser", "multiUser"].includes(server))
     throw new Error("Invalid Jade server mode.");
-  return { executable, databasePath, iniPath, server, extractionTimeoutSeconds: settings.extractionTimeoutSeconds ?? 3600 };
+  return { executable, databasePath, iniPath, server, extractionTimeoutSeconds: settings.extractionTimeoutSeconds ?? DEFAULT_EXTRACTION_TIMEOUT_SECONDS };
 }
 
 function extractArguments(config, destination) {
@@ -141,7 +143,7 @@ function startExtract(
   // Progress observers are presentation only and must never replace a native
   // error, cancellation or successful extraction result.
   const report = (event) => { try { onProgress(event); } catch {} };
-  const timeoutSeconds = config.extractionTimeoutSeconds ?? 3600;
+  const timeoutSeconds = config.extractionTimeoutSeconds ?? DEFAULT_EXTRACTION_TIMEOUT_SECONDS;
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 86400)
     throw new Error("jadeNative.extractionTimeoutSeconds must be an integer from 1 to 86400.");
   // mkdir is deliberately exclusive: never refresh over someone's edited files.
@@ -490,6 +492,7 @@ function applySourceUpdate(plan, replaceConflicts = false, options = {}) {
 }
 
 module.exports = {
+  DEFAULT_EXTRACTION_TIMEOUT_SECONDS,
   resolveExtractConfig,
   resolveExtractionDirectory,
   extractArguments,

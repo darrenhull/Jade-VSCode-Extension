@@ -1,0 +1,18 @@
+{
+  "defaultValue": 7200,
+  "effectiveValue": 7200,
+  "screenshot": "docs/screenshots/extraction/two-hour-default.png",
+  "packagedVsix": true,
+  "databaseOpened": false,
+  "installed": false,
+  "extensionVersion": "0.22.4",
+  "cliVersion": "0.10.3",
+  "javascriptTestsPassed": 1166,
+  "connectedTestsSkipped": 45,
+  "powerShellContractsPassed": 18,
+  "focusedTestsPassed": 24,
+  "nativeNoNodeSmokePassed": true,
+  "releaseMetadataPassed": true,
+  "vsixSha256": "17c3faece09ddaf56898804dff333bca7467ca964d79f1ad586cb1da33f28816",
+  "issue": 80
+}

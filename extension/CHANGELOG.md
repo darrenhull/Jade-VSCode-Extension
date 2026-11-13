@@ -1,3 +1,8 @@
+# 0.22.4 - Two-hour extraction default
+
+- Allow Source extraction to run for two hours by default, including streaming extraction. Explicit workspace and user timeout overrides remain unchanged.
+- Clarify that cancellation retains files already applied.
+
 # 0.22.3 - Case-distinct source extraction
 
 - Bundle released Jade CLI 0.10.3 so Extract All Sources preserves classes whose names differ only by case on Windows.

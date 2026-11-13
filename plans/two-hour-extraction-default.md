@@ -8,3 +8,5 @@ Closes #80. The user requested a 7200-second extension default after a large sou
 4. Run focused extraction/protocol tests, package/integrity/no-Node smoke and inspect the actual Settings UI in an isolated extension-development profile. Include evidence. Batch one final push, then hosted CI and automated review before owner approval. No live database access or user-profile installation.
 
 Object Explorer loading on the large workspace is an additional investigation; it must not delay this small default change or expand its product scope.
+
+Validation: three intended RED failures (setting, native fallback, streaming forwarding); 24 focused tests GREEN. Full suite1166 passed/45connected skipped plus18PowerShell contracts. Packaged VSIX/native integrity/no-Node smoke and release checks pass. Actual packaged Settings UI in a new private profile reports defaultValue=7200 and effectiveValue=7200; screenshot docs/screenshots/extraction/two-hour-default.png. Receipt docs/verification/two-hour-extraction-default.json. User profile and database were not modified.

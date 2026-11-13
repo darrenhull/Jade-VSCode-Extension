@@ -122,7 +122,7 @@ Jade Tools is independent third-party tooling and is not affiliated with or endo
 
 ### Large-schema extraction
 
-Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Streaming extraction retains already-applied files after timeout or cancellation; its output reports the acknowledged prefix and any uncertainty. Timeout failures identify the setting in the error message.
+Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 7200 seconds (two hours), configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Streaming extraction retains already-applied files after timeout or cancellation; its output reports the acknowledged prefix and any uncertainty. Timeout failures identify the setting in the error message.
 
 ### Pull one selected class from Source
 
