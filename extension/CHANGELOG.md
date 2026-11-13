@@ -1,7 +1,7 @@
 # 0.22.2 - Imported interface extraction
 
 - Extract schemas containing imported interface references without stopping on a missing reflected schema owner.
-- Keep imported aliases distinct when checking whether a removed source requires a complete schema header.
+- Preserve both imported aliases and declared class names when checking whether source removals or renames require a complete schema header.
 
 # 0.22.1 - Source extraction diagnostics
 
