@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { resolveConfig, inspectInstall, schemaFromSource } = require('./config');
+const {resolveWorkingDirectory}=require('./working-directory');
+const {isManagedProjectPath}=require('./source-index-scope');
 const { startCpp } = require('./cpp-runner');
 const { CliWorkingSession } = require('./cli-client');
 const { resolvePublishConfig, startPublish } = require('./publish');
@@ -144,6 +146,7 @@ function activate(context) {
     resolveSource,publishNativeProject: uri => projectTools.publish(false,uri)
   });
   function classConfig(document) {
+    if(isManagedProjectPath(document.uri.fsPath))throw Error('Managed .jade files are not workspace source.');
     const folder = vscode.workspace.getWorkspaceFolder(document.uri);
     const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder, document.uri)]));
     let schema = schemaFromSource(document.getText()) || /\bRename\s+Class\s+(\w+)::/i.exec(document.getText())?.[1] || (document.uri.fsPath.toLowerCase().endsWith('.ddx') ? /<schema\b[^>]*\bname="([^"]+)"/.exec(document.getText())?.[1] : undefined);
@@ -161,7 +164,7 @@ function activate(context) {
     config.helperPath = settings.cppHelperPath || path.join(context.extensionPath, 'vendor', 'jade-tools-cli', 'native', 'jade-native-helper.exe');
     config.systemSnapshotPath = settings.systemSnapshotPath;
     config.testDependencyScope = settings.testDependencyScope || 'auto';
-    config.workingDatabaseDirectory = settings.workingDatabaseDirectory || undefined;
+    config.workingDatabaseDirectory = resolveWorkingDirectory(settings.workingDatabaseDirectory,workspaceRoots[0]);
     config.workingDatabaseGeneration = context.workspaceState.get('jadeNative.workingDatabaseGeneration', 'initial');
     return config;
   }
@@ -170,7 +173,7 @@ function activate(context) {
     if(!folder)throw Error('Open a workspace folder and configure its Jade connection.');
     const settings=Object.fromEntries(Object.entries(defaults(document?.uri||folder.uri)).map(([key,value])=>[key,expand(value,folder,document?.uri||folder.uri)]));
     const installPath=settings.installPath||process.env.JADE_INSTALL;if(!installPath)throw Object.assign(Error('Set jadeNative.installPath or use Detect Runtime Settings.'),{code:'JADE_RUNTIME_NOT_CONFIGURED'});
-    return {...settings,installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
+    return {...settings,workingDatabaseDirectory:resolveWorkingDirectory(settings.workingDatabaseDirectory,folder.uri.fsPath),installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
   }

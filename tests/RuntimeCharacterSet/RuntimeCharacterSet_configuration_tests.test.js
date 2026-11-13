@@ -14,7 +14,7 @@ function activation(inspectionField='workspaceFolderValue',override){
   if(name==='./language-tools')return{registerLanguageTools:()=>language};
   if(name==='./config'){const loaded={exports:{}};vm.runInNewContext('(function(require,module){'+fs.readFileSync(path.join(root,'extension/src/config.js'),'utf8')+'\n})',{process})((key)=>key==='node:fs'?{...fs,existsSync:()=>true}:require(key),loaded);return loaded.exports;}
   if(name==='./cli-client')return{CliWorkingSession:class{}};
-  if(name==='./ProjectSkillInstaller'||name==='./WorkspaceOperationGuard')return localRequire(name);
+  if(['./ProjectSkillInstaller','./WorkspaceOperationGuard','./working-directory','./source-index-scope'].includes(name))return localRequire(name);
   if(registrations[name])return{[registrations[name]]:(_v,_c,value)=>{services[name]=value;return{schemaFor(){},resourceFor(){}};}};
   return noop;
  },module);
@@ -38,4 +38,12 @@ for(const characterSet of ['',null,17])test('explicit invalid '+JSON.stringify(c
  const host=activation('workspaceFolderValue',{characterSet}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
  const configs=[host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri}),host.services['./debugger'].config(document)];
  assert.ok(configs.every(config=>config.characterSet===characterSet));assert.deepEqual(host.writes,[]);
+});
+
+
+test('actual class and Working inspection configuration resolve relative directories in the selected workspace',()=>{
+ const host=activation('workspaceFolderValue',{workingDatabaseDirectory:'.jade/working'}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
+ const expected=path.resolve(folder.uri.fsPath,'.jade/working');
+ for(const config of [host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri}),host.services['./debugger'].config(document)])assert.equal(config.workingDatabaseDirectory,expected);
+ assert.deepEqual(host.writes,[]);
 });
