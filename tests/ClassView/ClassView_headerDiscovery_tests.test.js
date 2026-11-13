@@ -23,3 +23,8 @@ test('schema discovery retains open dirty header buffers and decodes native UTF1
   const rows=await s.api.provider.getChildren();assert.ok(rows.some(row=>row.name==='Unsaved'));assert.ok(rows.some(row=>row.name==='Wide'));
  }finally{s.dispose();}
 });
+test('index progress reports active file and refreshes partial schema counts',async()=>{
+ const s=setup();try{await s.api.provider.getChildren();let refreshed=0;const listener=s.api.provider.onDidChangeTreeData(()=>{refreshed++;});
+ const uri=s.vscode.Uri.file('/workspace/NewFish.cls');s.index.document(s.doc(uri,'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ntypeHeaders\nNewFish subclassOf Object;'));await new Promise(resolve=>setTimeout(resolve,1050));s.index.announce({phase:'indexing',completed:128,total:40096,currentUri:'file:///workspace/SlowFish.cls',elapsedMs:1200},true);
+ assert.match(s.api.view.message,/128\/40,096.*1s.*SlowFish.cls/);assert.ok(refreshed>0,'Loaded classes did not trigger a tree refresh');const schemas=await s.api.provider.getChildren(),pets=schemas.find(row=>row.name==='Pets');assert.ok(pets);const children=await s.api.provider.getChildren(pets);assert.ok(children.some(row=>row.name==='NewFish'));assert.doesNotMatch(s.api.provider.getTreeItem(pets).description,/^0 classes/);listener.dispose();}finally{s.dispose();}
+});

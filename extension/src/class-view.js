@@ -353,9 +353,10 @@ function registerClassView(vscode, context, language, options={}) {
     treeDataProvider: provider,
     showCollapseAll: true,
   });
+  let lastIndexRefresh=0;
   const indexChange=language.index.onDidChange?.(state=>{
-    view.message=state.phase==='cached'?'Checking cached workspace sources…':state.phase==='indexing'?'Indexing workspace sources · '+state.completed.toLocaleString()+'/'+state.total.toLocaleString():undefined;
-    if(state.phase==='ready')events.fire();
+    view.message=state.phase==='cached'?'Checking cached workspace sources…':state.phase==='indexing'?'Indexing workspace sources · '+state.completed.toLocaleString()+'/'+state.total.toLocaleString()+' · '+Math.floor((state.elapsedMs||0)/1000)+'s'+(state.currentUri?' · '+decodeURIComponent(state.currentUri.split('/').at(-1)):'' ):undefined;
+    if(state.phase==='ready'||state.phase==='indexing'&&Date.now()-lastIndexRefresh>=1000){lastIndexRefresh=Date.now();events.fire();}
   });
   if(indexChange)context.subscriptions.push(indexChange);
   if(vscode.workspace.onDidRenameFiles)context.subscriptions.push(vscode.workspace.onDidRenameFiles(()=>{resources=undefined;events.fire();}));

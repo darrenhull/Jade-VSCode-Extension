@@ -1,3 +1,9 @@
+# 0.22.5 - Responsive source indexing
+
+- Avoid repeated scans of comment and blank lines when indexing native class sources.
+- Show the active file and elapsed time during indexing, keep partial class counts refreshed, and yield between parsing batches.
+- Preserve cached-source validation and dirty editor protection.
+
 # 0.22.4 - Large-workspace indexing and extraction
 
 - Allow Source extraction to run for two hours by default, including streaming extraction. Explicit workspace and user timeout overrides remain unchanged.

@@ -1,0 +1,80 @@
+{
+  "issue": 83,
+  "extensionVersion": "0.22.5",
+  "cliVersion": "0.10.3",
+  "javascriptPassed": 1184,
+  "connectedSkipped": 45,
+  "powerShellPassed": 18,
+  "focusedPassed": 6,
+  "nativePortableSmokePassed": true,
+  "releaseMetadataPassed": true,
+  "vsixSha256": "1516406a47187d266e2eec54c674d54530f0014ce310b276bc7b0de19178a26a",
+  "parserRed": "24,000 comment-line native class exceeded the 4,000ms isolated-worker deadline before the fix",
+  "parserGreen": "same regression passes in about90ms including worker startup; native symbol positions/signature/body retained",
+  "mixedFilesystem": {
+    "platform": "win32",
+    "node": "v24.22.1",
+    "files": 40096,
+    "heavyFiles": 157,
+    "commentLinesPerHeavyFile": 8000,
+    "bytes": 35017454,
+    "coldMs": 10465.876799999998,
+    "cachedBrowseMs": 2999.2927000000054,
+    "warmSourceReads": 0,
+    "progressEvents": 124,
+    "maxHeartbeatDelayMs": 191.61149999999907,
+    "limitations": "Generated mixed-size native CLS on local Windows; event-loop heartbeat measured during cold indexing, warm OS filesystem caches. No customer filesystem, database or JADE extraction benchmark."
+  },
+  "packagedUi": {
+    "platform": "win32",
+    "classes": 40096,
+    "receipts": [
+      {
+        "mode": "cold",
+        "classes": 128,
+        "schemas": 100,
+        "pageClasses": 100,
+        "schemaClasses": 128,
+        "sourceReads": 136,
+        "systemTypeLoads": 0,
+        "rootReadyMs": 1585.6305000000002,
+        "indexPhase": "indexing",
+        "progressMessage": "Indexing workspace sources · 128/40,096 · 0s · Class27213.cls",
+        "final": {
+          "sourceReads": 40098,
+          "systemTypeLoads": 0,
+          "models": 40096
+        },
+        "screenshot": "docs/screenshots/object-explorer/cold-40096-classes.png",
+        "packagedVsix": true,
+        "controlledWarmValidationGate": false,
+        "controlledColdReadGate": true
+      },
+      {
+        "mode": "warm",
+        "classes": 40096,
+        "schemas": 100,
+        "pageClasses": 100,
+        "schemaClasses": 401,
+        "sourceReads": 0,
+        "systemTypeLoads": 0,
+        "rootReadyMs": 2747.4252,
+        "indexPhase": "indexing",
+        "progressMessage": "Indexing workspace sources · 0/40,096 · 0s",
+        "final": {
+          "sourceReads": 0,
+          "systemTypeLoads": 0,
+          "models": 40096
+        },
+        "screenshot": "docs/screenshots/object-explorer/warm-40096-classes.png",
+        "packagedVsix": true,
+        "controlledWarmValidationGate": true,
+        "controlledColdReadGate": false
+      }
+    ],
+    "databaseOpened": false,
+    "userProfileInstalled": false,
+    "limitations": "Generated CLS fixture in isolated extension-development profiles; warm validation and optional mixed cold reads intentionally gated for UI capture, so UI timing is not an unrestricted performance benchmark."
+  },
+  "limitations": "Customer reports15minutes; exact customer source/filesystem not reproduced. One timing-sensitive extraction coalescing test failed while a competing filesystem benchmark ran; isolated13test regression and clean complete1184pass rerun passed. UI cold reads/warm validation intentionally gated; API partial metadata queried separately from the initial UI tree request. No native extraction speed claim, live database access or user installation."
+}
