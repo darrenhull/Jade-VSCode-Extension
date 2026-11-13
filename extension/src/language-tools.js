@@ -23,7 +23,7 @@ function registerLanguageTools(vscode,context){
     list:async()=>filterScan(await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git,.jade}/**')).map(uri=>uri.toString()),
     read:async uri=>decodeSourceBytes(await vscode.workspace.fs.readFile(vscode.Uri.parse(uri))),
     stat:async uri=>{const value=await vscode.workspace.fs.stat(vscode.Uri.parse(uri));return {mtime:value.mtime,size:value.size};},
-    cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError
+    cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError,onTiming:timing=>{if(timing.totalMs>=1000)output.appendLine('Slow workspace source: '+JSON.stringify(timing));}
   });
   context.subscriptions.push(index);
   let bulkMarkers;

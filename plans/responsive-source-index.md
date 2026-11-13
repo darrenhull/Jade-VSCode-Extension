@@ -1,0 +1,9 @@
+# Responsive source indexing
+
+Closes #83. Follow-up to merged PR82 after a real40,096-file workspace stalled at128. Preserve local/dirty source protection; no database operations.
+
+1. Reproduce comment-heavy parsing in a terminable worker:2,000 lines ~481ms;8,000/24,000 exceed2.5s. Add failing regressions preserving positions/native signatures. Replace unbounded leading multiline whitespace scans with line-local indentation.
+2. Report accurate completed/total, active filename and elapsed time during pending reads. Yield between batches, dispose timers, keep watcher flushes from falsely reporting indexing complete. Refresh partial class counts at bounded frequency.
+3. Verify mixed-size40k fixtures including comment-heavy classes, blocked reads and UI responsiveness. Full regressions, exact portable VSIX, actual UI/screenshots. Increment patch version, push issue-linked PR from current main, CI and fresh automated review before owner approval/release.
+
+Verified: both parser/progress REDs reproduced,6 focused regressions and clean1184JavaScript/45connectedskip+18PowerShell pass. Portable VSIX/native hashes/no-Node and release metadata pass. Mixed40,096-file filesystem fixture cold10.47s/warmbrowse3s/zero source rereads; max measured50ms heartbeat interval192ms. Actual final VSIX cold partial128/40,096 progress (current file/elapsed), all40,096 eventual models, warmzero reads/100-row paging, no native loads. Screenshots/precise limitations under docs/verification/responsive-source-index.json. Reproduce with node tests/SourceIndex/SourceIndex_mixedBenchmark.cjs --execute and JADE_TEST_CODE set to official Code.exe for node tests/SourceIndexCache/SourceIndexCache_ui_fixture.cjs --execute --mixed. Fixtures cleaned after owned hosts closed. Working-default issue46 is separate and not bundled here.

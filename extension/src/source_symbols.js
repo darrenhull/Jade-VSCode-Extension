@@ -15,25 +15,25 @@ function parseSource(text, uri = '') {
     selection: match.index, members: [], regions: []
   }));
   const classByName=new Map();for(const cls of classes)if(!classByName.has(cls.name))classByName.set(cls.name,cls);
-  const definitions = [...code.matchAll(/^\s*([A-Za-z_]\w*)\s+(completeDefinition|partialDefinition)\s*$/gm)];
+  const definitions = [...code.matchAll(/^[ \t]*([A-Za-z_]\w*)\s+(completeDefinition|partialDefinition)\s*$/gm)];
   for (let i = 0; i < definitions.length; i++) {
     const definition = definitions[i];
     let cls = classByName.get(definition[1]);
     if(!cls){cls={name:definition[1],kind:'class',partial:true,start:definition.index,selection:definition.index,end:definition.index,members:[],regions:[]};classes.push(cls);classByName.set(cls.name,cls);}
     else cls.partial=definition[2]==='partialDefinition';
     const nextDefinition=definitions[i+1]?.index??code.length;
-    const stop = code.slice(definition.index,nextDefinition).search(/^\s*(?:typeSources|databaseDefinitions)\s*$/m);
+    const stop = code.slice(definition.index,nextDefinition).search(/^[ \t]*(?:typeSources|databaseDefinitions)\s*$/m);
     const end = stop<0?nextDefinition:definition.index+stop;
     cls.regions.push([definition.index, end]);
     cls.end = Math.max(cls.end, end);
     const section = code.slice(definition.index, end);
     const fields=section.split(/\bjadeMethodDefinitions\b/)[0];
-    for (const match of fields.matchAll(/^\s*([A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)(?:\s*,\s*(\d+))?\])?([^;]*);/gm)) {
+    for (const match of fields.matchAll(/^[ \t]*([A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)(?:\s*,\s*(\d+))?\])?([^;]*);/gm)) {
       const selection = definition.index + match.index + match[0].indexOf(match[1]);
       cls.members.push({ name: match[1], type: match[2], length:match[3] && match[2] !== 'Decimal'?Number(match[3]):undefined,precision:match[3] && match[2] === 'Decimal'?Number(match[3]):undefined,scale:match[4]?Number(match[4]):undefined,access:/\bprotected\b/i.test(match[5])?2:/\breadOnly\b/i.test(match[5])?1:0,subaccess:/\bsubschemaHidden\b/i.test(match[5])?3:0,kind: 'property', start: selection,
         selection, end: definition.index + match.index + match[0].length });
     }
-    for (const match of section.matchAll(/^\s*([A-Za-z_]\w*)\s*\([^)]*\)\s*(?::\s*\w+(?:\[\d+\])?)?[^;]*;/gm)) {
+    for (const match of section.matchAll(/^[ \t]*([A-Za-z_]\w*)\s*\([^)]*\)\s*(?::\s*\w+(?:\[\d+\])?)?[^;]*;/gm)) {
       if(['completeDefinition','partialDefinition'].includes(match[1]))continue;
       const selection = definition.index + match.index+match[0].indexOf(match[1]);
       const metadata=signature(match[0]);
@@ -41,7 +41,7 @@ function parseSource(text, uri = '') {
         end: definition.index + match.index + match[0].length, declaration: true });
     }
   }
-  const sources = topLevelMatches(code,/^\s*([A-Za-z_]\w*)\s*\(\s*\r?\n\s*jadeMethodSources\s*$/gm);
+  const sources = topLevelMatches(code,/^[ \t]*([A-Za-z_]\w*)\s*\([ \t]*\r?\n\s*jadeMethodSources\s*$/gm);
   for (let i = 0; i < sources.length; i++) {
     const header = sources[i];
     const cls = classByName.get(header[1]);
@@ -50,7 +50,7 @@ function parseSource(text, uri = '') {
     const end = sources[i + 1]?.index ?? code.length;
     cls.regions.push([header.index, end]);
     cls.end = Math.max(cls.end, end);
-    const bodies=topLevelMatches(code.slice(start,end),/^\s*([A-Za-z_]\w*)\s*\r?\n\s*\{/gm);
+    const bodies=topLevelMatches(code.slice(start,end),/^[ \t]*([A-Za-z_]\w*)[ \t]*\r?\n\s*\{/gm);
     for (const match of bodies) {
       const selection = start + match.index + match[0].indexOf(match[1]);
       const bodyStart=start+match.index+match[0].length;let depth=1,bodyEnd=bodyStart;for(;bodyEnd<end;bodyEnd++){if(code[bodyEnd]==='{')depth++;else if(code[bodyEnd]==='}'&&!--depth){bodyEnd++;break;}}
