@@ -6,12 +6,12 @@
   "pr": 82,
   "extensionVersion": "0.22.4",
   "cliVersion": "0.10.3",
-  "vsixSha256": "c0a909482c36a96134f4b704aafbe3ef37ca7dbdf1a91a4804e1d6ef253e4514",
+  "vsixSha256": "0835b405ebc98ae93475a14300d71761bb58ee7cda72b73629be93d9f0f2825e",
   "cacheDirectory": ".jade/source-index",
-  "javascriptTestsPassed": 1179,
+  "javascriptTestsPassed": 1180,
   "connectedTestsSkipped": 45,
   "powerShellContractsPassed": 18,
-  "focusedIndexTestsPassed": 18,
+  "focusedIndexTestsPassed": 19,
   "nativeNoNodeSmokePassed": true,
   "releaseMetadataPassed": true,
   "filesystemBenchmark": {
@@ -48,12 +48,12 @@
         "classes": 30000,
         "schemas": 100,
         "pageClasses": 100,
-        "sourceReads": 30002,
+        "sourceReads": 30001,
         "systemTypeLoads": 0,
-        "rootReadyMs": 35096.2741,
+        "rootReadyMs": 32571.356400000004,
         "indexPhase": "ready",
         "final": {
-          "sourceReads": 30002,
+          "sourceReads": 30001,
           "systemTypeLoads": 0,
           "models": 30000
         },
@@ -68,7 +68,7 @@
         "pageClasses": 100,
         "sourceReads": 0,
         "systemTypeLoads": 0,
-        "rootReadyMs": 2721.9683,
+        "rootReadyMs": 2346.2288,
         "indexPhase": "indexing",
         "final": {
           "sourceReads": 0,
@@ -85,5 +85,6 @@
     "limitations": "Generated CLS fixture in isolated extension-development profiles; warm validation intentionally gated for UI capture, so UI timing is not an unrestricted performance benchmark."
   },
   "userDatabaseOpened": false,
-  "installed": false
+  "installed": false,
+  "startupEventRaceRegressionPassed": true
 }

@@ -7,13 +7,13 @@
   "installed": false,
   "extensionVersion": "0.22.4",
   "cliVersion": "0.10.3",
-  "javascriptTestsPassed": 1179,
+  "javascriptTestsPassed": 1180,
   "connectedTestsSkipped": 45,
   "powerShellContractsPassed": 18,
   "focusedTestsPassed": 24,
   "nativeNoNodeSmokePassed": true,
   "releaseMetadataPassed": true,
-  "vsixSha256": "c0a909482c36a96134f4b704aafbe3ef37ca7dbdf1a91a4804e1d6ef253e4514",
+  "vsixSha256": "0835b405ebc98ae93475a14300d71761bb58ee7cda72b73629be93d9f0f2825e",
   "issue": 80,
   "finalCombinedPackage": true
 }

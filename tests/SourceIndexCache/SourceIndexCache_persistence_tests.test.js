@@ -60,3 +60,10 @@ test('a newly saved open file is cached from disk while later unsaved edits stay
  document.version++;document.isDirty=true;document.getText=()=>source('UnsavedBird');current.index.document(document);current.index.schedule(uri);await current.index.flush();await current.index.persist();
  rows=await new SourceIndexCache({roots:()=>[f.root]}).load();assert.equal(rows.find(row=>row.uri===uri).model.classes[0].name,'SavedBird');assert.ok(current.index.project.groups.has('Pets::UnsavedBird'));current.index.dispose();
 });
+test('startup cache reads cannot resurrect a deletion or overwrite a newer index update',async t=>{
+ const f=await fixture(t),first=build(f);await first.index.ready();await first.index.persist();const original=(await new SourceIndexCache({roots:()=>[f.root]}).load())[0];first.index.dispose();
+ const deleted=new SourceIndexCache({roots:()=>[f.root]}),loadingDeleted=deleted.load();deleted.delete(f.uri);assert.equal((await loadingDeleted).some(row=>row.uri===f.uri),false,'Startup loading resurrected a deleted path');await deleted.flush();
+ const seed=build(f);await seed.index.ready();await seed.index.persist();seed.index.dispose();
+ const newer=new SourceIndexCache({roots:()=>[f.root]}),loadingNewer=newer.load(),model={...original.model,classes:original.model.classes.map(cls=>({...cls,name:'NewerFish'}))};newer.set(f.uri,{model,stamp:original.stamp});await loadingNewer;await newer.flush();
+ const final=await new SourceIndexCache({roots:()=>[f.root]}).load();assert.equal(final.find(row=>row.uri===f.uri).model.classes[0].name,'NewerFish','Startup loading overwrote a new saved index entry');
+});

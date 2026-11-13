@@ -6,7 +6,7 @@ const key=value=>process.platform==='win32'?value.toLowerCase():value;
 const within=(root,file)=>{const relative=path.relative(root,file);return relative!==''&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);};
 /** Disposable browsing metadata. Never a source/build/publish authority. */
 class SourceIndexCache{
- constructor({roots,onError=()=>{}}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.writing=Promise.resolve();this.reported=new Set();}
+ constructor({roots,onError=()=>{}}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.changed=new Set();this.writing=Promise.resolve();this.reported=new Set();}
  report(error){if(!this.reported.has(error.message)){this.reported.add(error.message);try{this.onError(error);}catch{}}}
  location(uri){
   try{
@@ -41,15 +41,15 @@ class SourceIndexCache{
    await Promise.all(Array.from({length:4},async()=>{while(next<SHARDS){const shard=next++,file=path.join(directory,'v'+FORMAT+'-'+shard+'.json');try{
     const stat=await fs.lstat(file);if(stat.isSymbolicLink()||!stat.isFile()||stat.size>MAX_BYTES)continue;
     const data=JSON.parse(await fs.readFile(file,'utf8'));if(data.format!==FORMAT||data.parser!==PARSER_ID||typeof data.root!=='string'||key(data.root)!==key(root)||!Array.isArray(data.entries)||data.entries.length>20000)continue;
-    for(const entry of data.entries){const location=this.location(entry?.uri);if(!this.valid(entry)||!location||key(location.root)!==key(root)||location.shard!==shard)continue;
+    for(const entry of data.entries){const location=this.location(entry?.uri);if(this.changed.has(entry.uri)||!this.valid(entry)||!location||key(location.root)!==key(root)||location.shard!==shard)continue;
      const value={uri:entry.uri,stamp:entry.stamp,model:{...entry.model,text:'',code:'',excluded:[]}};this.bucket(root,shard)[1].entries.set(entry.uri,value);result.push(value);
     }
    }catch(error){if(error.code!=='ENOENT')this.report(error);}}}));
   }
   return result;
  }
- set(uri,record){const location=this.location(uri),entry={uri,model:record.model,stamp:record.stamp};if(!location||!this.valid(entry))return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.set(uri,entry);this.dirty.add(id);}
- delete(uri){const location=this.location(uri);if(!location)return;const [id,bucket]=this.bucket(location.root,location.shard);if(bucket.entries.delete(uri))this.dirty.add(id);}
+ set(uri,record){const location=this.location(uri),entry={uri,model:record.model,stamp:record.stamp};if(!location||!this.valid(entry))return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.set(uri,entry);this.changed.add(uri);this.dirty.add(id);}
+ delete(uri){const location=this.location(uri);if(!location)return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.delete(uri);this.changed.add(uri);this.dirty.add(id);}
  flush(){
   this.writing=this.writing.then(async()=>{
    while(this.dirty.size){const ids=[...this.dirty];this.dirty.clear();
@@ -63,6 +63,6 @@ class SourceIndexCache{
    }
   }).catch(error=>this.report(error));return this.writing;
  }
- invalidate(){this.buckets.clear();this.dirty.clear();}
+ invalidate(){this.buckets.clear();this.dirty.clear();this.changed.clear();}
 }
 module.exports={SourceIndexCache};
