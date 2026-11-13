@@ -122,7 +122,7 @@ Jade Tools is independent third-party tooling and is not affiliated with or endo
 
 ### Large-schema extraction
 
-Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 3600 seconds, configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Streaming extraction retains already-applied files after timeout or cancellation; its output reports the acknowledged prefix and any uncertainty. Timeout failures identify the setting in the error message.
+Extract All Sources uses `jadeNative.extractionTimeoutSeconds` (default 7200 seconds (two hours), configurable from 1 to 86400 per workspace). Increase it for very large schemas. This is separate from the test timeout and prevents the generic two-minute native utility limit from interrupting extraction. Cancel requests termination of the owned extraction; the operation waits for native completion before cleaning up. Streaming extraction retains already-applied files after timeout or cancellation; its output reports the acknowledged prefix and any uncertainty. Timeout failures identify the setting in the error message.
 
 ### Pull one selected class from Source
 
@@ -143,3 +143,9 @@ Saved local edits, conflicts, dirty source editors and unsubmitted class-view dr
 Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. For a complete extracted project, run **Jade: Publish Workspace Schemas and Resources**. The command validates a frozen native joined bundle in Working, captures the target for review, then loads those same joined bytes after approval. Source files added, deleted or changed during approval, and dirty/pending source editors, stop publication. Empty inherited reference files remain on disk without being advertised as local class additions/deletions. Whole-schema aggregate resources are not automatically attached to a single-class publish.
 
 Review is a point-in-time target snapshot, not an atomic lease against external database writers. Complete-schema loading is authoritative within the listed schemas, and earlier successful schema loads may remain if a later load fails.
+
+### Workspace source index
+
+Jade Tools keeps disposable browsing metadata in `.jade/source-index` inside each local project. Cached classes can appear while files are checked in the background; first-time indexing reports progress. Saved-file additions, deletions and moves update the index. Open editor buffers take precedence and unsaved text is not persisted into the disk cache.
+
+The cache is ignored by Git through its own `.gitignore` files. It can be deleted and is rebuilt automatically. File size/mtime is a browsing-cache reuse hint; **Refresh Object Explorer** forces a fresh source read. Native build, extraction comparison and publication still read authoritative saved source and do not trust this cache. It is not a database change tracker.

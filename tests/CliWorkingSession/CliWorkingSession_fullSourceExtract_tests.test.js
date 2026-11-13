@@ -265,3 +265,12 @@ test("full native primitive override keeps its exact permit and outcome identity
   assert.equal((await op.completion).passed, true);
   f.session.dispose();
 });
+
+test('streaming extraction explicitly forwards two-hour default and preserves overrides',async()=>{
+ for(const timeout of [undefined,3600,14400]){
+  const f=fixture(),config=timeout===undefined?{}:{extractionTimeoutSeconds:timeout};
+  const op=f.session.startSourceExtraction(config,{destination:'C:/empty',scope:'all'},{onPermit:()=>true});
+  assert.equal(f.packets[0].config.extractionTimeoutSeconds,timeout??7200);
+  const id=begin(f);end(f,id,{count:0,counts:{}});await op.completion;
+ }
+});

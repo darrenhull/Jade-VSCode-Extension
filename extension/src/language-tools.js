@@ -1,6 +1,8 @@
 'use strict';
 const path=require('node:path'),os=require('node:os');
 const {SourceIndex}=require('./workspace-index');
+const {SourceIndexCache}=require('./SourceIndexCache');
+const {decodeSourceBytes}=require('./source-file-text');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
@@ -14,10 +16,30 @@ function registerLanguageTools(vscode,context){
   const output=vscode.window.createOutputChannel('Jade Language Tools');let lastError,lastCache,lastProject;
   const supported=uri=>uri.scheme==='untitled'||isIndexableSourcePath(uri.fsPath);
   const accepted=uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace);
+  const filterScan=uris=>{const markers=new Map();return uris.filter(uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers));};
+  const reportIndexError=error=>output.appendLine('Workspace index: '+error.message);
+  const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),onError:reportIndexError});
   const index=new SourceIndex({
-    list:async()=> (await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git}/**')).filter(accepted).map(uri=>uri.toString()),
-    read:async uri=>Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.parse(uri))).toString('utf8')
+    list:async()=>filterScan(await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git,.jade}/**')).map(uri=>uri.toString()),
+    read:async uri=>decodeSourceBytes(await vscode.workspace.fs.readFile(vscode.Uri.parse(uri))),
+    stat:async uri=>{const value=await vscode.workspace.fs.stat(vscode.Uri.parse(uri));return {mtime:value.mtime,size:value.size};},
+    cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError
   });
+  context.subscriptions.push(index);
+  let bulkMarkers;
+  const acceptedDisk=uri=>{
+    if(!index.bulkUpdating){bulkMarkers=undefined;return accepted(uri);}
+    if(bulkMarkers?.generation!==index.bulkGeneration)bulkMarkers={generation:index.bulkGeneration,values:new Map()};
+    return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,bulkMarkers.values);
+  };
+  if(vscode.workspace.onDidCreateFiles)context.subscriptions.push(vscode.workspace.onDidCreateFiles(event=>{const markers=new Map();for(const uri of event.files)if(supported(uri)&&vscode.workspace.getWorkspaceFolder(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers))index.schedule(uri.toString());}));
+  if(vscode.workspace.onDidDeleteFiles)context.subscriptions.push(vscode.workspace.onDidDeleteFiles(event=>{for(const uri of event.files){const prefix=uri.toString().replace(/\/$/,'');for(const known of [...index.records.keys()])if(known===prefix||known.startsWith(prefix+'/'))index.removeSaved(known);}}));
+  if(vscode.workspace.onDidRenameFiles)context.subscriptions.push(vscode.workspace.onDidRenameFiles(event=>{
+    const markers=new Map();for(const {oldUri,newUri} of event.files){const from=oldUri.toString().replace(/\/$/,''),to=newUri.toString().replace(/\/$/,''),known=[...index.records.keys()].filter(uri=>uri===from||uri.startsWith(from+'/'));
+      if(!known.length&&supported(oldUri))known.push(from);
+      for(const uri of known){const target=to+uri.slice(from.length),newSource=vscode.Uri.parse(target);if(vscode.workspace.getWorkspaceFolder(newSource)&&supported(newSource)&&!isNestedSnapshot(newSource,vscode.workspace,markers))index.rename(uri,target);else index.remove(uri);}
+    }
+  }));
   const systemCache=new SystemTypeCache();
   function expanded(value,folder){return typeof value==='string'?value.replace(/\$\{env:([^}]+)\}/g,(_,name)=>process.env[name]||'').replaceAll('${workspaceFolder}',folder?.uri.fsPath||'').replaceAll('${userHome}',os.homedir()):value;}
   async function ready(document,token){
@@ -79,7 +101,7 @@ function registerLanguageTools(vscode,context){
     vscode.workspace.onDidChangeConfiguration(event=>{if(event.affectsConfiguration('jadeNative')){lastCache=undefined;lastProject=undefined;}})
   );
   const watcher=vscode.workspace.createFileSystemWatcher('**/*.{cls,jade,sec}');
-  context.subscriptions.push(watcher,watcher.onDidCreate(uri=>{if(accepted(uri))index.schedule(uri.toString());}),watcher.onDidChange(uri=>{if(accepted(uri))index.schedule(uri.toString());}),watcher.onDidDelete(uri=>{if(accepted(uri))index.remove(uri.toString());}));
+  context.subscriptions.push(watcher,watcher.onDidCreate(uri=>{if(acceptedDisk(uri))index.schedule(uri.toString());}),watcher.onDidChange(uri=>{if(acceptedDisk(uri))index.schedule(uri.toString());}),watcher.onDidDelete(uri=>{if(acceptedDisk(uri))index.removeSaved(uri.toString());}));
   return {index,model,ready,setWorkspaceSchemaResolver:resolver=>{workspaceSchema=resolver;},setWorkspaceResourceResolver:resolver=>{workspaceResource=resolver;}};
 }
 module.exports={registerLanguageTools};

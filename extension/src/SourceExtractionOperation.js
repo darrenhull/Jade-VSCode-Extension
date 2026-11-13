@@ -1,5 +1,6 @@
 "use strict";
 const path = require("node:path");
+const { DEFAULT_EXTRACTION_TIMEOUT_SECONDS } = require("./extract");
 const { selectedSourcePaths } = require("./source-pull-path");
 const { sourceArtifact } = require("./source-extraction-artifact");
 const outcomes = new Set([
@@ -111,7 +112,7 @@ class SourceExtractionOperation {
     this.request = session.request(
       "source.extract",
       {
-        config,
+        config: { ...config, extractionTimeoutSeconds: config?.extractionTimeoutSeconds ?? DEFAULT_EXTRACTION_TIMEOUT_SECONDS },
         destination,
         ...(cwd ? { cwd } : {}),
         ...(full ? { scope, ...(schemas ? { schemas } : {}) } : { selection }),

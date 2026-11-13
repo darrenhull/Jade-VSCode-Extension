@@ -1,0 +1,89 @@
+{
+  "issues": [
+    80,
+    81
+  ],
+  "pr": 82,
+  "extensionVersion": "0.22.4",
+  "cliVersion": "0.10.3",
+  "vsixSha256": "c0a909482c36a96134f4b704aafbe3ef37ca7dbdf1a91a4804e1d6ef253e4514",
+  "cacheDirectory": ".jade/source-index",
+  "javascriptTestsPassed": 1179,
+  "connectedTestsSkipped": 45,
+  "powerShellContractsPassed": 18,
+  "focusedIndexTestsPassed": 18,
+  "nativeNoNodeSmokePassed": true,
+  "releaseMetadataPassed": true,
+  "filesystemBenchmark": {
+    "platform": "win32",
+    "node": "v24.22.1",
+    "files": 30000,
+    "methodsPerFile": 8,
+    "sourceBytes": 31740000,
+    "baselineFirstFullRebuild": {
+      "ms": 10170.224699999999,
+      "reads": 30000
+    },
+    "baselineRepeatFullRebuild": {
+      "ms": 10070.828300000001,
+      "reads": 30000
+    },
+    "initialCacheBuildMs": 10614.381999999998,
+    "cacheSaveMs": 651.2097999999969,
+    "cachedBrowseMs": 1111.5638999999937,
+    "remainingValidationMs": 3068.8557,
+    "warmSourceReads": 0,
+    "cachedRowsBeforeValidation": true,
+    "cacheShards": 32,
+    "cacheBytes": 86774924,
+    "rssMiB": 480.82421875,
+    "limitations": "Generated native-style CLS files on local Windows filesystem; Node benchmark excludes VS Code IPC/UI, enterprise security policy and customer file sizes. Baseline repeat and cached runs use warm OS filesystem caches; no native JADE database/extraction performance claim."
+  },
+  "packagedUi": {
+    "platform": "win32",
+    "classes": 30000,
+    "receipts": [
+      {
+        "mode": "cold",
+        "classes": 30000,
+        "schemas": 100,
+        "pageClasses": 100,
+        "sourceReads": 30002,
+        "systemTypeLoads": 0,
+        "rootReadyMs": 35096.2741,
+        "indexPhase": "ready",
+        "final": {
+          "sourceReads": 30002,
+          "systemTypeLoads": 0,
+          "models": 30000
+        },
+        "screenshot": "docs/screenshots/object-explorer/cold-30000-classes.png",
+        "packagedVsix": true,
+        "controlledWarmValidationGate": false
+      },
+      {
+        "mode": "warm",
+        "classes": 30000,
+        "schemas": 100,
+        "pageClasses": 100,
+        "sourceReads": 0,
+        "systemTypeLoads": 0,
+        "rootReadyMs": 2721.9683,
+        "indexPhase": "indexing",
+        "final": {
+          "sourceReads": 0,
+          "systemTypeLoads": 0,
+          "models": 30000
+        },
+        "screenshot": "docs/screenshots/object-explorer/warm-30000-classes.png",
+        "packagedVsix": true,
+        "controlledWarmValidationGate": true
+      }
+    ],
+    "databaseOpened": false,
+    "userProfileInstalled": false,
+    "limitations": "Generated CLS fixture in isolated extension-development profiles; warm validation intentionally gated for UI capture, so UI timing is not an unrestricted performance benchmark."
+  },
+  "userDatabaseOpened": false,
+  "installed": false
+}
