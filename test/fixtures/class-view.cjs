@@ -5,7 +5,7 @@ const { registerClassView } = require("../../extension/src/class-view"),
 function fixture(schema, owner, value) {
   return `schemaDefinition\n${schema} subschemaOf RootSchema partialDefinition;\ntypeHeaders\n${owner} subclassOf Object transient;\ntypeDefinitions\n${owner} completeDefinition\n(\nattributeDefinitions\n name: String;\njadeMethodDefinitions\n getName() : String;\n)\ntypeSources\n${owner} (\njadeMethodSources\ngetName\n{\ngetName() : String;\nbegin\n return "${value}";\nend;\n}\n)`;
 }
-function setup() {
+function setup({ready}={}) {
   class Uri {
     constructor(scheme, pathname, query = "") {
       this.scheme = scheme;
@@ -213,7 +213,7 @@ function setup() {
   };
   const stored=new Map();
   const context = { subscriptions: [], extensionPath: "/extension",extensionUri:Uri.file('/extension'),workspaceState:{get:key=>stored.get(key),update:async(key,value)=>stored.set(key,value)} },
-    api = registerClassView(vscode, context, { index });
+    api = registerClassView(vscode, context, { index, ready });
   return {
     api,
     index,

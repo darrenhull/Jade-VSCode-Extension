@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.3",
+  "version": "0.22.4",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -626,11 +626,11 @@
         },
         "jadeNative.extractionTimeoutSeconds": {
           "type": "integer",
-          "default": 3600,
+          "default": 7200,
           "minimum": 1,
           "maximum": 86400,
           "scope": "resource",
-          "description": "Timeout in seconds for Extract All Sources. Defaults to one hour; increase for large schemas. Cancel stops extraction without applying partial source files."
+          "description": "Timeout in seconds for Extract All Sources. Defaults to two hours; increase for large schemas. Cancel retains already-applied files and discards the unfinished file."
         },
         "jadeNative.testTimeoutSeconds": {
           "type": "integer",

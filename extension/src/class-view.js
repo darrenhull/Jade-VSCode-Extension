@@ -1,6 +1,7 @@
 "use strict";
 const path = require("node:path");
 const { schemaFromSource } = require("./config");
+const { decodeSourceBytes } = require("./source-file-text");
 const { isNestedSnapshot } = require("./source-snapshots");
 const { classSections } = require("./class-view-model");
 const {createClassWorkspaceModel,memberId}=require('./class-workspace-model');
@@ -83,7 +84,7 @@ function registerClassView(vscode, context, language, options={}) {
   const classRows=createClassDiscoveryRows(uri=>vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(uri)));
   const allClasses=()=>classRows(language.index.project.groups);
   async function syncBrowser() {
-    await language.index.ready();
+    await (language.index.browserReady?.() || language.index.ready());
     await language.index.flush();
     const project = language.index.project;
     if (
@@ -113,18 +114,19 @@ function registerClassView(vscode, context, language, options={}) {
       const files = (
         await vscode.workspace.findFiles(
           "**/*.{scm,sec,ddx}",
-          "**/{node_modules,.git}/**",
+          "**/{node_modules,.git,.jade}/**",
         )
-      ).filter((uri) => !isNestedSnapshot(uri, vscode.workspace));
+      );
+      const markers=new Map();
+      const scoped=files.filter(uri=>!isNestedSnapshot(uri,vscode.workspace,markers));
       const result = new Map(),
         headers = [];
-      for (const uri of files.filter(
-        (u) =>
-          /\.scm$/i.test(u.fsPath) ||
-          /[/\\]schemaDefinitions\.sec$/i.test(u.fsPath),
-      )) {
-        const { text } = await source(uri.toString()),
-          name = schemaFromSource(text);
+      const headerFiles=scoped.filter(uri=>/\.scm$/i.test(uri.fsPath)||/[/\\]schemaDefinitions\.sec$/i.test(uri.fsPath));
+      const open=new Map((vscode.workspace.textDocuments||[]).map(document=>[document.uri.toString(),document]));
+      const texts=new Array(headerFiles.length);let next=0;
+      await Promise.all(Array.from({length:Math.min(8,headerFiles.length)},async()=>{while(next<headerFiles.length){const at=next++,uri=headerFiles[at],document=open.get(uri.toString());texts[at]=document?document.getText():decodeSourceBytes(await vscode.workspace.fs.readFile(uri));}}));
+      for (let at=0;at<headerFiles.length;at++) {
+        const uri=headerFiles[at],name=schemaFromSource(texts[at]);
         if (!name) continue;
         const folder = /\.scm$/i.test(uri.fsPath)
           ? path.join(path.dirname(uri.fsPath), name)
@@ -140,7 +142,7 @@ function registerClassView(vscode, context, language, options={}) {
           },
         ]);
       }
-      for (const uri of files) {
+      for (const uri of scoped) {
         if (headers.some((h) => h.uri.toString() === uri.toString())) continue;
         const match = headers
           .filter((h) => {
@@ -351,6 +353,12 @@ function registerClassView(vscode, context, language, options={}) {
     treeDataProvider: provider,
     showCollapseAll: true,
   });
+  const indexChange=language.index.onDidChange?.(state=>{
+    view.message=state.phase==='cached'?'Checking cached workspace sources…':state.phase==='indexing'?'Indexing workspace sources · '+state.completed.toLocaleString()+'/'+state.total.toLocaleString():undefined;
+    if(state.phase==='ready')events.fire();
+  });
+  if(indexChange)context.subscriptions.push(indexChange);
+  if(vscode.workspace.onDidRenameFiles)context.subscriptions.push(vscode.workspace.onDidRenameFiles(()=>{resources=undefined;events.fire();}));
   async function revealClass(selected,{focus=false,preserveFilter=false}={}) {
     await syncBrowser();
     selected = browser.find({ schema: selected.schema, name: selected.name,projectId:selected.projectId });

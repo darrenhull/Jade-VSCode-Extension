@@ -1,3 +1,11 @@
+# 0.22.4 - Large-workspace indexing and extraction
+
+- Allow Source extraction to run for two hours by default, including streaming extraction. Explicit workspace and user timeout overrides remain unchanged.
+- Clarify that cancellation retains files already applied.
+- Keep a disposable source index in each project .jade folder, reuse unchanged files on restart and update the index for saved-file adds, deletes and moves.
+- Show indexing progress and let Object Explorer use cached class metadata while checking files in the background.
+- Share directory-marker checks during large discoveries and read schema headers without opening editor documents or initialising native type metadata.
+
 # 0.22.3 - Case-distinct source extraction
 
 - Bundle released Jade CLI 0.10.3 so Extract All Sources preserves classes whose names differ only by case on Windows.
