@@ -1,3 +1,9 @@
+# 0.22.3 - Case-distinct source extraction
+
+- Bundle released Jade CLI 0.10.3 so Extract All Sources preserves classes whose names differ only by case on Windows.
+- Keep native class identities and source bodies unchanged, retain stable native index references and protect local edits and deletions.
+- Report ambiguous legacy filename collisions before writing any files.
+
 # 0.22.2 - Imported interface extraction
 
 - Extract schemas containing imported interface references without stopping on a missing reflected schema owner.
