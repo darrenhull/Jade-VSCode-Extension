@@ -8,3 +8,5 @@ Closes #78. Follow-up to source extraction issue #77 and Jade-CLI PR #45.
 4. Batch the final code/distribution/version/notes/verification receipt into one push and bot-authored Draft PR. Finish exact-head CI, then mark Ready for fresh automated review. Request human approval only after that review is clear. Do not merge or install on the user's behalf.
 
 The CLI fix changes only conflicting physical filename references through native indexes. Both native class identities and serialization remain unchanged; local edits/deletions remain protected. CLI #45 includes connected ANSI/Unicode extraction, repeat, indexed staging, Join and reload evidence. No additional live database operations are needed for this consumer-only update.
+
+Verified: official pin/runtime hashes and qualified helper bytes match; local 1164 JavaScript tests passed, 45 connected skips, 18 PowerShell contracts passed; actual VSIX package, extracted official pin/no-Node smoke and release metadata passed on Node 24.22.1. Receipt: docs/verification/cli-0.10.3.json. No database connection or installation. Hosted exact-head CI and fresh automated review remain the PR gates.
