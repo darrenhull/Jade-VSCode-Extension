@@ -50,6 +50,15 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   const changes=new vscode.EventEmitter(),history=new WorkspaceRunHistory(),diagnosticState=new WorkspaceDiagnostics(),failures=new ScratchPadFailures();
   const sourceContext=new WorkspaceContext({workspace:vscode.workspace,pickFolder:()=>vscode.window.showWorkspaceFolderPick({placeHolder:'Choose the project and Jade connection for this Scratch Pad'})});
   const runner=new JadeWorkspaceRunner({client,configFor:async document=>configFor(document,await sourceContext.resolve(document.uri)),beforeOperation,afterOperation}),plainSchemas=new Map();
+  function progressReporter(progress,started){
+    let stage;
+    return value=>{
+      progress.update(value.message);
+      if(stage===value.stage)return;
+      stage=value.stage;
+      output.appendLine('[Scratch Pad] '+value.message+' · '+Math.max(0,Date.now()-started)+'ms elapsed');
+    };
+  }
   let order=0;
   const controller=vscode.notebooks.createNotebookController('jade-working-workspaces',notebookType,'Jade · Working database');
   controller.supportedLanguages=['jade-nz'];controller.supportsExecutionOrder=true;
@@ -108,10 +117,11 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     await execution.clearOutput();const started=Date.now();let result;
     const progress=new ScratchPadProgress(message=>execution.replaceOutput([new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.text(message,'text/plain')])]));
     try {
-      result=await runner.run({document:cell.document,schema,token:execution.token,onProgress:value=>progress.update(value.message),onOutput:text=>{output.append(text);progress.native(text);}});
+      result=await runner.run({document:cell.document,schema,token:execution.token,onProgress:progressReporter(progress,started),onOutput:text=>{output.append(text);progress.native(text);}});
       const progressError=await progress.stop();if(progressError)output.appendLine('Scratch Pad progress display failed: '+progressError.message);
       failures.record(cell.document,result,schema,version);
       const elapsed=Date.now()-started,text=resultText(result);
+      output.appendLine(summary(result,schema,elapsed));
       if(result.report?.outputCharacterLossPossible)output.appendLine('Native output encoding: '+result.report.outputEncoding+'. Characters outside that encoding may be replaced by Jade.');
       if(result.snapshot) {
         history.record(cell.document.uri.toString(),{sourceText:result.snapshot.text,output:text,schema,workingDatabase:result.report?.workingDatabase,status:result.passed?'Completed':result.cancelled?'Cancelled':result.timedOut?'Timed out':'Failed',duration:elapsed});
@@ -153,7 +163,7 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
       output.show(true);output.appendLine('\nPreparing '+(selection?'selection':'Scratch Pad')+' in '+schema+' · Working database');const started=Date.now();
       const progress=new ScratchPadProgress(message=>notification.report?.({message}));
       let result;
-      try{result=await runner.run({document,schema,selection,token,onProgress:value=>progress.update(value.message),onOutput:text=>{output.append(text);progress.native(text);}});}
+      try{result=await runner.run({document,schema,selection,token,onProgress:progressReporter(progress,started),onOutput:text=>{output.append(text);progress.native(text);}});}
       finally{const progressError=await progress.stop();if(progressError)output.appendLine('Scratch Pad progress display failed: '+progressError.message);}
       const text=resultText(result),elapsed=Date.now()-started;
       output.appendLine(summary(result,schema,elapsed));if(text)output.appendLine(text);
