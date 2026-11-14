@@ -55,3 +55,11 @@ test('cancellation between request handoff and subscription cancels the owned na
  try{assert.deepEqual(calls.map(call=>call.command),['workspace.run','cancel']);assert.equal(calls[1].body.operationId,23);}
  finally{finish({code:130,passed:false,cancelled:true,report:{executed:false}});await operation;}
 });
+test('native response and pending ownership release remain distinct until cleanup settles',async()=>{
+ const stages=[];let release,settled=false;
+ const runner=new JadeWorkspaceRunner({configFor:async()=>({schema:'Pets'}),client:{request:()=>({id:31,promise:Promise.resolve({code:0,passed:true,report:{compiled:true,executed:true}})})},afterOperation:()=>new Promise(resolve=>release=resolve)});
+ const operation=runner.run({document:document(),onProgress:progress=>stages.push(progress.stage)}).then(result=>{settled=true;return result;});
+ while(!release)await new Promise(resolve=>setImmediate(resolve));
+ try{assert.equal(settled,false);assert.deepEqual(stages.slice(-2),['received','releasing'],'Native response must be visible before the still-pending UI ownership release');}
+ finally{release();assert.equal((await operation).passed,true);}
+});
