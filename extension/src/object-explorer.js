@@ -452,19 +452,14 @@ function registerObjectExplorer(vscode, context, services) {
     if (operation) await operation.promise;
   }
   function inspectionIdentity(config) {
-    const canonical = value => {
+    // Credential reuse/Forget must not depend on database or INI filesystem availability.
+    const configuredPath = value => {
       const absolute = path.resolve(value);
-      let actual;
-      try { actual = fs.realpathSync.native(absolute); }
-      catch (error) {
-        if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error;
-        actual = absolute;
-      }
-      return process.platform === 'win32' ? actual.toLowerCase() : actual;
+      return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
     };
-    const scope = canonical(config.workspaceRoots[0]);
-    const key = JSON.stringify([scope, canonical(config.installPath), canonical(config.databasePath),
-      canonical(config.iniPath), config.server || 'singleUser', config.schema || 'RootSchema',
+    const scope = configuredPath(config.workspaceRoots[0]);
+    const key = JSON.stringify([scope, configuredPath(config.installPath), configuredPath(config.databasePath),
+      configuredPath(config.iniPath), config.server || 'singleUser', config.schema || 'RootSchema',
       config.application || 'RootSchemaApp', config.characterSet || 'auto']);
     return { scope, secretKey: 'jadeNative.inspectionSignIn.' + crypto.createHash('sha256').update(key).digest('hex') };
   }

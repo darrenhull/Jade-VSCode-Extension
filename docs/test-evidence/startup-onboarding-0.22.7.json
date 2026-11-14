@@ -39,12 +39,12 @@
     "affectedNativeOptInSkipped": 1,
     "independentReview": "Premature saved-entry deletion on cancelled or rejected Sign In replacement reproduced and fixed with regressions.",
     "ui": {
+      "passed": true,
       "artifact": "isolated-development-host/source-modules (not packaged VSIX)",
       "extensionVersion": "0.22.7",
-      "nativeDistributionVersion": "0.10.4",
+      "nativeDistributionVersion": "0.10.5",
       "nativeRuntimeExecuted": false,
       "applicationAuthorizationTested": false,
-      "passed": true,
       "standardSecretStorage": true,
       "reusedAcrossRestart": true,
       "forgotSelectedSecureEntry": true,
@@ -55,23 +55,23 @@
       "screenshots": [
         {
           "file": "docs/screenshots/inspection-sign-on/username.png",
-          "sha256": "2ac13c182b46ba67423642d117f87f4589cded7bead29416483b2860c40c1b10"
+          "sha256": "de7829b048b4c5df6ee014a8326f33db505829f60d0e09bc19957ff0907a5e93"
         },
         {
           "file": "docs/screenshots/inspection-sign-on/password.png",
-          "sha256": "860d381b03acec76796f6325424523a1a4ecf504b0c8b2657618bdfc1db1f83a"
+          "sha256": "c49cbef55128f7f3086e09d33454993daab2f4f58b5b868b896d7af6d42dde12"
         },
         {
           "file": "docs/screenshots/inspection-sign-on/policy-denial.png",
-          "sha256": "91aba1bd6c11f2b467f900afd426896c138878ad59bc103f4d7130d31a63cbdc"
+          "sha256": "a6f3fda44a767b699353b2fb84f2e6994743f464f6fdf31d6ba142ed1692f10f"
         },
         {
           "file": "docs/screenshots/inspection-sign-on/reused-sign-in.png",
-          "sha256": "c55125ee5b55739131e0a4df96268e77e4702c1713a341cdf201a929cc0cbf07"
+          "sha256": "dce1fb636b8a9b4f536c648b3ee66b6674ae0a5d85456c7e5d9f93a9e09beef2"
         },
         {
           "file": "docs/screenshots/inspection-sign-on/forgotten.png",
-          "sha256": "16513b7f0ad0cccac18056ee8027925f534348634d7bf54fe2be089689fc7876"
+          "sha256": "a141ac696866ff4aa33ff3c8f06ab3e3ea6bd1efaffc5eac446b93374b04d517"
         }
       ]
     }
@@ -115,13 +115,13 @@
   },
   "packagedArtifact": {
     "file": "dist/jade-native-runner-cpp-preview-0.22.7.vsix",
-    "sha256": "22cf96b4813ceac9d141fca753a0d2ed00bfc89358e262aedd6c5ab71dc51551",
-    "bytes": 5217622,
+    "sha256": "28c55d399b32f45292213f704ecbeeb3af92fa98b2c70531c355c3610ad122b8",
+    "bytes": 5217662,
     "minimumCli": "0.10.5",
     "sourceIdentityPassed": true,
     "sourceHashes": {
       "extension/src/workspace-initialization.js": "320e13a93d9578108c9d2e0499c5d82dd19468ece4d963ccc8565e908585ee44",
-      "extension/src/object-explorer.js": "4c87aa539f4ccf9ed26432de6bd19f411e3136bb7a6a8a96b0875d4b7c1d550f",
+      "extension/src/object-explorer.js": "6250a00744c4f15b2ec2560a34f08cbe7cd6d41e46b6bbd12d1c7fd992e71488",
       "extension/src/inspection-credentials.js": "e2ab66d6bc79c76d81727a6efa6b7d652baee4591fb2cecaaa74ae25e701e82f",
       "extension/package.json": "9d2d57bee188935ad0c027ab34170dbcbd7a5e4e596be0270292872530377d74",
       "extension/README.md": "728d9181aba229bb8fb277fcb96e2e5c4c14324b07b1bd1251770ab49dd628c3"
@@ -147,7 +147,9 @@
       "missing-profile.png",
       "review-machine-profile.png",
       "configuration-complete.png"
-    ]
+    ],
+    "carryForwardFromVsixSha256": "22cf96b4813ceac9d141fca753a0d2ed00bfc89358e262aedd6c5ab71dc51551",
+    "carryForwardReason": "Initializer source, native runtime, manifest and README are byte-identical in the rebuilt VSIX. Initialization UI was not rerun for this Object Explorer identity-only fix."
   },
   "packagedConnectionUi": {
     "passed": true,
@@ -185,15 +187,41 @@
     },
     {
       "file": "docs/screenshots/connect-progress/packaged-backup.png",
-      "sha256": "7ecf25b88a4d1cefdc2e1686f778085a2a43d532347de536b0e60815449b4a3c"
+      "sha256": "bd54948da3655b3a8b9c3a9e00a47cc1ea826645aa951636352ccf44348a4d59"
     },
     {
       "file": "docs/screenshots/connect-progress/packaged-restore.png",
-      "sha256": "57af3b945b954cf5808082b49d2b3cf4b05044e7c43fa18157f1fe2f845a7f5e"
+      "sha256": "3a664590fbe63069dd65e7e131b8f1c59d9fd0accb655c2a25e10e0bdba5a0b6"
     },
     {
       "file": "docs/screenshots/connect-progress/packaged-cancelling.png",
-      "sha256": "1e349ac8249128726415c3931a7a5669f8f64d903dc1edd954902d591930d970"
+      "sha256": "c682dfd0d59d2dfbf46c5e6fb0743c4a08df5581a217ca32ab8d977c76a23163"
     }
-  ]
+  ],
+  "credentialIdentityFollowUp": {
+    "priorHead": "1300dde85dd1191ef7682afc92cfd296bd412759",
+    "failedRun": 43597355881,
+    "failedJob": 132454619160,
+    "failure": "Forget recomputed a realpath-dependent secret key after Source path availability changed; original scoped-deletion assertion failed.",
+    "failingFirstRegressions": 5,
+    "focusedPassed": 35,
+    "regularJavaScriptPassed": 1255,
+    "explicitNativeOptInSkipped": 46,
+    "failed": 0,
+    "nativeConfigurationOnlyProofPassed": true,
+    "nativeVersion": "0.10.5",
+    "nativeRuntimeAndPinUnchanged": true,
+    "configuredIdentity": "path.resolve plus Windows case folding; no filesystem access. Same configured Source/Working identity stays stable offline; different configured aliases have separate entries.",
+    "securityTradeoff": "Logical configured aliases retain identity if their physical target changes; no automatic rekey/migration or cross-alias sharing.",
+    "currentVsixRebuilt": true,
+    "currentPackagedSourceIdentityPassed": true,
+    "currentIntegrityAndPortableNoNodePassed": true,
+    "currentRealSecretStorageRestartForgetUiPassed": true,
+    "currentPackagedProgressUiPassed": true,
+    "currentUiScreenshotsVisuallyInspected": true,
+    "noDatabaseOpened": true,
+    "regularLog": "C:/Git/Jade-VScode/artifacts/startup-identity-regular-js.log",
+    "packageLog": "C:/Git/Jade-VScode/artifacts/startup-identity-package.log",
+    "unchangedPowerShellAndCppNotRepeated": true
+  }
 }
