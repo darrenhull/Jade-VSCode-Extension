@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget, secretStorage } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget, secretStorage, resolveConfig, closeAutomatically = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -166,7 +166,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
   const controller = registerObjectExplorer(vscode, context, {
     sourceContext,
     pullSource,
-    config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw configError instanceof Error ? configError : Error(configError); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
+    config: (doc, folder) => { configCalls.push({ doc, folder }); if (configError) throw configError instanceof Error ? configError : Error(configError); if (resolveConfig) return resolveConfig(doc, folder, config); return projectScopedConfig && folder ? {...config,workspaceRoots:[folder.uri.fsPath],databasePath:path.join(folder.uri.fsPath,"system")} : config; },
     inspectionTarget: async (config,selection,output) => { if(resolveInspectionTarget) return resolveInspectionTarget(config,selection,output); if(delayedBusy) await new Promise(r => allowBusy=r); return ({...config,readOnly:true,...(nativeTarget?{databasePath:path.join(root,'actual-native-working/system'),iniPath:path.join(root,'actual-native-working/working.ini'),server:'singleUser'}:{})}); },
     workingLocation: async () => ({databasePath:path.join(root,'actual-native-working/system')}),
     disconnectTarget: async (config,target) => { targetDisconnections.push({config,target}); },
@@ -187,7 +187,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       c.stop = options => {
         c.stopOptions = options;
         c.stopCalled = true;
-        if (denied || closeSubsequentAutomatically && clients.indexOf(c) > 0) queueMicrotask(() => c.finishClose());
+        if (denied || closeAutomatically || closeSubsequentAutomatically && clients.indexOf(c) > 0) queueMicrotask(() => c.finishClose());
         return c.closed;
       };
       c.finishClose = () => {
