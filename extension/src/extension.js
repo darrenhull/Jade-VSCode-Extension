@@ -14,7 +14,7 @@ const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
 let activeNativeService;
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
+const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));
@@ -177,6 +177,7 @@ function activate(context) {
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
   }
+  require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings});
   async function refreshCache(config, output = compileOutput, fromDatabase = true) {
     if (!fromDatabase && !config.systemSnapshotPath) throw new Error('Run Jade: Refresh Type Cache to read system metadata from the configured database.');
     output.appendLine(fromDatabase ? 'Refreshing RootSchema system definitions in a read-only database session ...' : 'Importing RootSchema system definitions into external C++ cache ...');

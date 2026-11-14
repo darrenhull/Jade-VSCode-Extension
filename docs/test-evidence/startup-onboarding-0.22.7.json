@@ -1,0 +1,85 @@
+{
+  "formatVersion": 1,
+  "status": "Frontend verified; official CLI 0.10.5 dependency and final VSIX proof pending",
+  "extensionVersion": "0.22.7",
+  "baseNativeDistribution": {
+    "version": "0.10.4",
+    "executableSha256": "7f69ebede455b7d0a7f001c5cb2824fed3ec86d15d0853246bc73144565c2759"
+  },
+  "defaultChecks": {
+    "javascriptPassed": 1248,
+    "explicitNativeOptInSkipped": 46,
+    "isolatedPowerShellPassed": 18,
+    "failed": 0,
+    "note": "Initial default run found three obsolete scale-fixture prerequisites; fixture corrected, its three cases and full regular JS phase passed. Unchanged isolated PowerShell phase passed in the initial run."
+  },
+  "initialization": {
+    "focusedPassed": 23,
+    "failingFirstCases": 7,
+    "nativeServiceProofPassed": true,
+    "nativeVersion": "0.10.4",
+    "isolatedProfileAndBroker": true,
+    "nonexistentRuntimeAndSourcePaths": true,
+    "existingProjectBytesPreserved": true,
+    "missingClonedProfileBootstrap": true,
+    "noDatabaseOpened": true,
+    "ownedBrokerShutdownAndFixtureCleanup": true,
+    "packagedUiScriptPrepared": true,
+    "packagedUiExecuted": false
+  },
+  "inspection": {
+    "affectedPassed": 164,
+    "affectedNativeOptInSkipped": 1,
+    "independentReview": "Premature saved-entry deletion on cancelled or rejected Sign In replacement reproduced and fixed with regressions.",
+    "ui": {
+      "artifact": "isolated-development-host/source-modules (not packaged VSIX)",
+      "extensionVersion": "0.22.7",
+      "nativeDistributionVersion": "0.10.4",
+      "nativeRuntimeExecuted": false,
+      "applicationAuthorizationTested": false,
+      "passed": true,
+      "standardSecretStorage": true,
+      "reusedAcrossRestart": true,
+      "forgotSelectedSecureEntry": true,
+      "noDatabaseConnection": true,
+      "fakeNative": true,
+      "noPlaintextSettings": true,
+      "screenshotsVisuallyInspected": true,
+      "screenshots": [
+        {
+          "file": "docs/screenshots/inspection-sign-on/username.png",
+          "sha256": "debfadeacd9e41d68d185f38f7d362edb3f8b8daab07752cb2c8436a1c5a3925"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/password.png",
+          "sha256": "e056ec46ca3ae7528eca773215727a6477bb8c831e5cf1756fc2448eb54aeb36"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/policy-denial.png",
+          "sha256": "91aba1bd6c11f2b467f900afd426896c138878ad59bc103f4d7130d31a63cbdc"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/reused-sign-in.png",
+          "sha256": "c55125ee5b55739131e0a4df96268e77e4702c1713a341cdf201a929cc0cbf07"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/forgotten.png",
+          "sha256": "16513b7f0ad0cccac18056ee8027925f534348634d7bf54fe2be089689fc7876"
+        }
+      ]
+    }
+  },
+  "securityBoundary": {
+    "durableCredentialStorage": "VS Code ExtensionContext.secrets SecretStorage",
+    "nativeHandoff": "Active native inspect/test configuration may contain plaintext credentials in standard current-user SID/SYSTEM ACL-protected transient files, cleaned after owned process exit.",
+    "noDiskHandoffHardeningQueued": "https://github.com/darrenhull/Jade-CLI/issues/52",
+    "noCustomCipherOrSecretRegistry": true
+  },
+  "pending": [
+    "Official CLI 0.10.5 release and verified pin/payload/minimum-version update",
+    "Final VSIX native integrity and portable proof",
+    "Actual packaged initialization/connection UI proof",
+    "Hosted current-head checks and required reviews"
+  ],
+  "userEnvironmentChanged": false
+}

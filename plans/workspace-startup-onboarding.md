@@ -2,7 +2,7 @@
 
 Issue: [#87](https://github.com/darrenhull/Jade-VSCode-Extension/issues/87)
 
-Status: proposed onboarding implementation, grounded in extension 0.22.6 / CLI 0.10.4. Timeout, installation-instruction and connection-progress changes are immediate delivery work; the native timeout separation is tracked in [CLI #50](https://github.com/darrenhull/Jade-CLI/issues/50). This plan does not claim that the onboarding command exists or has been tested.
+Status: the initial configuration-only Initialise Workspace command is implemented for the next extension release. Git installation/cloning, source acquisition and complete first-run orchestration below remain planned. The starting baseline was extension 0.22.6 / CLI 0.10.4; native timeout separation is tracked in [CLI #50](https://github.com/darrenhull/Jade-CLI/issues/50). Official CLI 0.10.5 packaging and final packaged UI/review evidence remain delivery gates.
 
 ## Outcome and responsibilities
 
@@ -14,7 +14,7 @@ Do not automatically build, execute tests/scratch code, commit, push, publish to
 
 ## Verified starting point
 
-- [extension/package.json](../extension/package.json) contributes **Jade: Detect Runtime Settings** and **Jade: Extract All Sources**, but no Initialise Workspace command. The proposed command is NEW work.
+- [extension/package.json](../extension/package.json) at the starting baseline contributed **Jade: Detect Runtime Settings** and **Jade: Extract All Sources**, without Initialise Workspace. The initial implementation now contributes the new configuration-only command.
 - [extension/src/extension.js](../extension/src/extension.js), detectSettings, selects the installation containing bin/jom.dll, Source database/INI and server mode, then saves four folder-scoped VS Code settings. It does not initialize Git or prepare Working.
 - The bundled CLI's [Project setup documentation](../packages/jade-cli-win-x64/README.md#project-setup) describes native init: minimal jade.json references a private machine connection profile. It writes configuration only; it does not connect, extract, compile or publish. Its service accepts command "cli", operation "init", explicit arguments and project cwd. Noninteractive setup must not depend on terminal prompts.
 - [extension/src/cli-client.js](../extension/src/cli-client.js) already forwards native requests/output and exposes working.prepare and inspect.target. [extension/src/object-explorer.js](../extension/src/object-explorer.js) shares a pending Connect promise and forwards progress/cancellation. Reuse these paths and their ownership rules.
@@ -55,7 +55,7 @@ Do not automatically build, execute tests/scratch code, commit, push, publish to
 | .jade/working and managed generations | Persistent databases that may hold unpublished state; never automatic cache cleanup, move/adoption or recreation. |
 | Owned transient staging/logs | Reproducible artifacts with bounded retention; cleanup only after owned native processes close. |
 
-Use existing native ownership for managed-folder Git exclusion and preserve .gitignore contents. Keep .jade outside source/test/publish discovery. Missing cache can rebuild; missing/inconsistent Working ownership fails closed.
+Native Working preparation currently creates a wildcard .gitignore inside a new Working root if absent; native init does not exclude all .jade state from Git. Immediate installation instructions therefore ask the user to add .jade/ to the project .gitignore, preserving existing rules, and review status before committing; already tracked files remain tracked. The complete onboarding flow should offer a reviewed ignore update through the appropriate existing owner. Keep .jade outside source/test/publish discovery. Missing cache can rebuild; missing/inconsistent Working ownership fails closed.
 
 Initially add no persistent onboarding checkpoint database. Re-check repository/configuration and native readiness instead of a wizard success flag. Reopening or re-running setup must not automatically clone, extract, back up again or reset Working. Partial preparation is not a ready database.
 
@@ -82,3 +82,19 @@ Per-project choices are folder, source route and connection. No extra global des
 ## Official references
 
 VS Code owns [built-in Git integration](https://code.visualstudio.com/docs/sourcecontrol/overview) and the [clone/remote workflow](https://code.visualstudio.com/docs/sourcecontrol/repos-remotes). The [official Git for Windows installation page](https://git-scm.com/install/win) documents installer and winget routes, noting the winget package is not maintained by Git for Windows. Setup must preserve the user's/organisation's installation choice.
+
+## Initial configuration phase evidence
+
+The command delegates directly to native CLI init. New project files receive a unique private profile name. Existing jade.json bytes are preserved. A native unknown-profile error enables a user-selected Configure This Machine action and a modal review of runtime/Source/INI/server before native init creates that existing alias; native profile ownership refuses conflicting repoints. Other native failures remain failures. Cancelled runtime detection settles as cancelled. Explicit outside-workspace resources, changed project bytes, dirty configuration buffers, changed runtime settings and removed roots prevent stale configuration work. This is not the complete wizard, a native Source authorization workaround or a database preparation command.
+
+Seven added behavior cases first failed. The configuration module now passes 23 focused cases, including repair denial/collision, cancellation and retry. An explicitly opted-in proof ran the actual pinned CLI service with isolated temporary profile/broker state and nonexistent runtime/database paths: a cloned missing profile was created, existing project bytes and repeated initialization were preserved, and no database/Working directory was opened or created. The owned broker was shut down and the disposable fixture cleaned. This proof does not establish database sign-on, backup/restore or final 0.10.5 artifact verification.
+## Inspection sign-in delivery boundary
+
+The initial connection update uses the standard VS Code SecretStorage get/store/delete API to remember an accepted sign-in across restarts for the same configured Source/Working identity, including an explicit anonymous choice and empty passwords. There is no custom cipher or secret-bearing registry. Sign In bypasses the saved value but replaces it only after successful native readiness; cancelling or rejecting newly entered replacement credentials preserves the prior accepted entry. Forget Saved Inspection Sign-In deletes only the selected entry, waits for any accepted pending save and closes owned inspection. A rejected reused startup sign-in is removed for deliberate manual retry; a per-object policy denial does not clear credentials for other allowed objects.
+
+Durable SecretStorage protection does not mean credentials never reach disk elsewhere: current native inspect/test jobs can serialize them in standard SID/SYSTEM ACL-protected transient configuration, cleaned after owned process exit. The separately queued CLI52 no-disk handoff is not implemented or added to CLI51. Native application authorization remains authoritative.
+## Frontend integration checkpoint
+
+The stable frontend passes 1248 regular JavaScript checks with 46 explicit native opt-in skips and 18 isolated PowerShell contracts. The first integrated run detected three outdated standalone 30,000-class test-fixture prerequisites; after the fixture-only correction, those focused cases and the complete regular JavaScript phase passed. No product change was needed for that correction.
+
+Actual inspection screenshots demonstrate unchanged product modules in an isolated development host, real VS Code SecretStorage reuse across a private-profile restart and scoped Forget, with fake native responses. This is not packaged VSIX, native-runtime or customer-authorization proof. The copied native0.10.4 distribution was not executed by that UI fixture. The initialization native service proof separately executed the pinned CLI only for configuration, with no installed runtime/database. See the metadata-only [startup receipt](../docs/test-evidence/startup-onboarding-0.22.7.json). Official0.10.5 consumer pin/payload/minimum-version, final VSIX/portable verification and packaged initialization UI remain outstanding.

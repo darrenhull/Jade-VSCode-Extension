@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.6",
+  "version": "0.22.7",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -70,6 +70,11 @@
       ]
     },
     "commands": [
+      {
+        "command": "jadeNative.initializeWorkspace",
+        "title": "Initialise Workspace",
+        "category": "Jade"
+      },
       {
         "command": "jadeNative.createDefinition",
         "title": "Jade: Create Schema, Class or Collection",
@@ -170,6 +175,18 @@
         "command": "jadeNative.connectObjects",
         "title": "Jade: Connect Database Objects",
         "icon": "$(plug)",
+        "enablement": "!jadeNative.connectingObjects"
+      },
+      {
+        "command": "jadeNative.signInObjects",
+        "title": "Jade: Sign In to Database Objects",
+        "icon": "$(account)",
+        "enablement": "!jadeNative.connectingObjects"
+      },
+      {
+        "command": "jadeNative.forgetInspectionSignIn",
+        "title": "Jade: Forget Saved Inspection Sign-In",
+        "icon": "$(sign-out)",
         "enablement": "!jadeNative.connectingObjects"
       },
       {
@@ -503,6 +520,16 @@
           "group": "navigation@4"
         },
         {
+          "command": "jadeNative.signInObjects",
+          "when": "view == jadeNative.objects",
+          "group": "objects@0"
+        },
+        {
+          "command": "jadeNative.forgetInspectionSignIn",
+          "when": "view == jadeNative.objects",
+          "group": "objects@0"
+        },
+        {
           "command": "jadeNative.toggleSystemObjects",
           "when": "view == jadeNative.objects",
           "group": "objects@1"
@@ -638,7 +665,7 @@
           "minimum": 1,
           "maximum": 86400,
           "scope": "resource",
-          "description": "Timeout in seconds for each native working-database utility process, including test execution."
+          "description": "Timeout in seconds for native test/helper execution and source load utilities. Working database backup and restore use Working Database Timeout Seconds."
         },
         "jadeNative.installPath": {
           "type": "string",
@@ -723,6 +750,14 @@
           "default": "auto",
           "scope": "resource",
           "description": "Auto builds the complete native workspace when dynamic type lookup is detected; otherwise selects test dependencies. Workspace always builds all schemas/resources. Dependencies forces a static subset."
+        },
+        "jadeNative.workingDatabaseTimeoutSeconds": {
+          "type": "integer",
+          "default": 7200,
+          "minimum": 1,
+          "maximum": 86400,
+          "scope": "resource",
+          "description": "Timeout in seconds for each Working database preparation utility: Source backup, retained-backup verification and private restore. Test execution has a separate timeout."
         }
       }
     },

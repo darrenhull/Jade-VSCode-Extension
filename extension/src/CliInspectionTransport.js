@@ -105,6 +105,8 @@ class CliInspectionTransport extends EventEmitter {
   close(code) {
     if(this.state==='closed')return;
     this.state='closed';
+    delete this.config.user;
+    delete this.config.password;
     this.initialCatalog=undefined;
     this.child.removeListener('close',this.onServiceClose);
     this.child.removeListener('error',this.onServiceError);

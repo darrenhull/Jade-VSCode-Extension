@@ -8,13 +8,26 @@ A compatible **Windows Jade runtime** is required. The **Jade IDE is not require
 
 ## Get started
 
-1. Install the `.vsix` from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest) using **Extensions: Install from VSIX…**. Reload VS Code when prompted.
-2. Create a new folder for your Jade source, or use **File: Open Folder** to open an existing source folder. It can be empty before your first pull.
-3. Run **Jade: Detect Runtime Settings**. Choose a detected installation or **Browse to another installation folder…** and select the installation root containing `bin/jom.dll`, for example `C:\Jade2025`. This is separate from your source folder. Then select the Source database, INI and server mode when prompted. Settings belong to that workspace folder; Connect identifies folders by name and path in a multi-folder workspace.
-4. Use **Jade: Extract All Sources** to pull source inside your workspace, or work with your existing native files.
-5. Open a class file and press **F5** to compile. Use **Testing** or **Run Local Test** above a test to run it.
+1. Install a compatible licensed Windows Jade runtime and Visual Studio Code. Use the runtime matching your database (ANSI or Unicode); the extension normally detects it automatically.
+2. If your source is in Git, install [Git for Windows](https://gitforwindows.org/) (or your organisation's approved installer), then use **Git: Clone** and open the cloned folder. Otherwise create an empty source directory and use **File: Open Folder**. Git is optional for Jade extraction; preserve existing folders and local edits.
+3. Download the VSIX from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest), run **Extensions: Install from VSIX…**, then reload VS Code.
+4. Run **Jade: Detect Runtime Settings**. Select the installation root containing `bin/jom.dll`, then the original **Source** database, INI and server mode. These are separate from your source directory and private Working database. Settings are saved for the selected workspace folder.
+5. Run **Jade: Initialise Workspace**. It delegates configuration creation to the bundled native CLI. For a new project, a shareable `jade.json` refers to a private local connection profile. Existing project configuration is preserved. If a cloned project references a profile missing on this machine, choose **Configure This Machine**, review the selected runtime/Source paths, then confirm **Create Machine Profile**. A profile already pointing elsewhere is refused. This step does not extract sources, prepare a database, build or publish; the complete startup wizard remains planned.
+6. If the folder does not already contain native source, run **Jade: Extract All Sources**. Existing local edits remain protected. Cloning existing source and extracting from a database are separate routes.
+7. Run **Jade: Connect Database Objects** with **Working** selected to prepare the private database at `.jade/working`. First use takes a native Source backup and restores it separately; subsequent valid connections reuse Working. When no saved sign-in exists for the configured Source, the connection asks for an optional user name; leave it empty to connect anonymously, or enter the application credentials required by your development-security policy. The password is masked and may be empty. VS Code SecretStorage remembers the choice securely across restarts and reuses it for the same configured Source and its Working database. Credentials are not saved in settings or extension logs. The notification and **Jade Objects** output identify stages and elapsed time. Wait for completion before starting a build or test. Use **Jade: Sign In to Database Objects** to enter replacement credentials. They replace saved values only after a successful native connection; Cancel preserves the prior saved sign-in. **Jade: Forget Saved Inspection Sign-In** removes only the saved sign-in for the selected connection and closes its owned inspection; connect again to sign in. JADE remains responsible for allowing access.
+8. Open a class and use **F5** to build or **Testing** to run tests. Publish controls are separate actions that update Source after review.
+
+VS Code SecretStorage protects durable extension sign-in. Active native jobs currently also use access-restricted temporary configuration that can contain credentials, protected by the standard Windows current-user/SYSTEM ACL and cleaned after owned process exit. Removing credentials from that native disk handoff is separately tracked in [CLI #52](https://github.com/darrenhull/Jade-CLI/issues/52); it is not part of this update.
+
+Before preparing Working or making a Git commit, add `.jade/` to the project `.gitignore`, preserving existing rules. Check Source Control or `git status --short` before committing: ignore rules do not untrack files already in Git. Keep databases, cache and logs out of commits; do not delete Working files to clear Git status.
 
 GitHub VSIX updates are installed manually. Installing a newer VSIX updates the same extension; there is no need to uninstall it first.
+
+## Initial preparation timeout and progress
+
+**Jade Native: Working Database Timeout Seconds** (`jadeNative.workingDatabaseTimeoutSeconds`) defaults to 7200 seconds per backup, retained-backup verification or restore utility. It is independent of **Test Timeout Seconds**, which remains 120 by default. If you raised the test timeout only for initial backup, restore your normal test limit after updating to this version. Explicit CLI API `timeoutMilliseconds` limits take precedence.
+
+A map/file reporting `backup complete` does not mean the whole database backup has finished. Wait for whole-stage completion and Working connection readiness. Quiet native stages show elapsed time and periodic log messages; no completion percentage is invented. Cancellation can wait for the Source backup's safe boundary before skipping restore. Timeout/failure output retains the stage, native error and relevant paths.
 
 ## Working database location
 

@@ -1,0 +1,56 @@
+'use strict';
+// Actual product UI and VS Code SecretStorage; native requests are allowlisted fakes.
+// This is an isolated development-host proof, not a connected JADE authorization test.
+const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+const {HostTestArtifacts}=require('./HostTestArtifacts.cjs');
+const {connectPrivateDebugger}=require('./creation-ui-capture.cjs');
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function main(){
+ if(!process.env.JADE_TEST_CODE)throw Error('Set JADE_TEST_CODE to a local VS Code executable.');
+ const root=path.resolve(__dirname,'..'),artifacts=new HostTestArtifacts({evidencePath:path.join(root,'evidence/inspection-sign-on-ui.json')});
+ await artifacts.run(async stage=>{
+  const extension=path.join(stage,'extension'),workspace=path.join(stage,'workspace');
+  fs.cpSync(path.join(root,'extension'),extension,{recursive:true});fs.mkdirSync(path.join(workspace,'.vscode'),{recursive:true});
+  fs.writeFileSync(path.join(workspace,'.vscode/settings.json'),JSON.stringify({'jadeNative.installPath':path.join(stage,'fixture-install-never-opened'),'jadeNative.databasePath':path.join(stage,'database-never-opened')}));
+  const manifestPath=path.join(extension,'package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath)),nativeVersion=JSON.parse(fs.readFileSync(path.join(extension,'vendor/jade-tools-cli/distribution.json'))).packageVersion;manifest.main='./test/sign-on-main.cjs';manifest.activationEvents=[...(manifest.activationEvents||[]),'onStartupFinished'];fs.writeFileSync(manifestPath,JSON.stringify(manifest));fs.mkdirSync(path.join(extension,'test'),{recursive:true});
+  fs.writeFileSync(path.join(extension,'test/sign-on-main.cjs'),[
+   "const fs=require('node:fs'),path=require('node:path'),{EventEmitter}=require('node:events'),vscode=require('vscode');let controller,secretKey,usedSaved=false;const stage=process.env.JADE_SIGNON_STAGE,phase=process.env.JADE_SIGNON_PHASE,marker=name=>path.join(stage,name);const calls=[];",
+   "const secure=require('../src/inspection-credentials'),read=secure.readInspectionCredentials;secure.readInspectionCredentials=async(secrets,key)=>{secretKey=key;const value=await read(secrets,key);usedSaved=value!==undefined;return value;};",
+   "const session=require('../src/cli-client').CliWorkingSession;session.prototype.connect=function(){return{child:new EventEmitter()};};session.prototype.inspectionTarget=async function(config,target){calls.push({command:'inspect.target',hasUser:!!config.user,hasPassword:!!config.password});return{...config,readOnly:true};};",
+   "session.prototype.request=function(command,request){calls.push({command,hasUser:!!request.config?.user,hasPassword:!!request.config?.password});if(!['inspect.catalog','inspect.instances','inspect.close','cancel'].includes(command))throw Error('Unexpected native operation blocked by sign-on proof: '+command);const body={readOnly:true,oidFormat:'jade-native',connectionEpoch:'sign-on-ui-fixture',schemas:[{name:'DemoSchema',oid:'1.1',classes:[{name:'ProtectedCustomer',schema:'DemoSchema',oid:'100.1'}]}]};const result=command==='inspect.instances'?{passed:false,code:2,report:{error:'Application inspection policy denied this object.'}}:{passed:true,code:0,sessionId:request.sessionId,body};return{id:'fake-'+calls.length,promise:Promise.resolve(result)};};",
+   "const explorer=require('../src/object-explorer'),register=explorer.registerObjectExplorer;explorer.registerObjectExplorer=(...args)=>controller=register(...args);const original=require('../src/extension');",
+   "exports.activate=async context=>{fs.writeFileSync(process.env.JADE_HOST_PROCESS_FILE,JSON.stringify({pid:process.pid,nonce:process.env.JADE_HOST_OWNER}));await original.activate(context);await vscode.commands.executeCommand('workbench.view.extension.jadeNative');await vscode.commands.executeCommand('jadeNative.objects.focus');setTimeout(async()=>{try{await vscode.commands.executeCommand('jadeNative.connectObjects');const schema=(await controller.provider.getChildren()).find(row=>row.kind==='schema');await controller.view.reveal(schema,{expand:true,select:true});const cls=(await controller.provider.getChildren(schema))[0];await controller.view.reveal(cls,{expand:true,select:true});const rows=await controller.provider.getChildren(cls);const available=secretKey&&(await context.secrets.get(secretKey))!==undefined;fs.writeFileSync(marker('host-report.json'),JSON.stringify({phase,passed:rows[0]?.command==='jadeNative.signInObjects'&&calls.some(row=>row.command==='inspect.catalog'&&row.hasUser&&row.hasPassword)&&available,usedSavedCredentials:usedSaved,standardSecretStorage:true,fakeNative:true,noDatabaseConnection:true,calls}));}catch(error){fs.writeFileSync(marker('host-error.txt'),error.message);}},400);let forgotten=false;const timer=setInterval(()=>{if(!forgotten&&fs.existsSync(marker('forget'))){forgotten=true;void(async()=>{const result=await vscode.commands.executeCommand('jadeNative.forgetInspectionSignIn');const absent=(await context.secrets.get(secretKey))===undefined;fs.writeFileSync(marker('forgot-report.json'),JSON.stringify({forgotten:result?.forgotten===true,secureEntryAbsent:absent,inspectionClosed:!controller.session.client}));})();}if(fs.existsSync(marker('stop'))){clearInterval(timer);void vscode.commands.executeCommand('workbench.action.quit');}},50);context.subscriptions.push({dispose(){clearInterval(timer)}});};exports.deactivate=()=>original.deactivate?.();",
+  ].join('\n'));
+  async function runPhase(phase){
+   for(const name of ['stop','forget','host-report.json','host-error.txt','forgot-report.json'])fs.rmSync(path.join(stage,name),{force:true});
+   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
+   const env={...process.env,JADE_SIGNON_STAGE:stage,JADE_SIGNON_PHASE:phase,JADE_HOST_PROCESS_FILE:path.join(stage,'host-process.json'),JADE_HOST_OWNER:artifacts.nonce,JADE_TOOLS_STATE_DIRECTORY:path.join(stage,'broker'),JADE_TOOLS_CONNECTIONS_FILE:path.join(stage,'connections.json')};delete env.ELECTRON_RUN_AS_NODE;delete env.JADE_INSTALL;
+   const child=spawn(process.env.JADE_TEST_CODE,['--new-window','--remote-debugging-port='+port,'--user-data-dir',path.join(stage,'vscode-data'),'--extensions-dir',path.join(stage,'extensions'),'--extensionDevelopmentPath='+extension,'--disable-workspace-trust','--skip-welcome','--skip-release-notes',workspace],{env,windowsHide:true,stdio:'ignore'});artifacts.track(child);
+   let client,session;try{
+    for(let i=0;i<100&&!client;i++){try{client=await connectPrivateDebugger(port);}catch{await pause(100);}}assert.ok(client,'Private debugger did not start');
+    async function evaluate(expression){return(await client.request('Runtime.evaluate',{expression,returnByValue:true},session)).result.value;}
+    async function waitText(expected){for(let i=0;i<200;i++){if(!session){const {targetInfos}=await client.request('Target.getTargets');const page=targetInfos.find(row=>row.type==='page'&&row.url.startsWith('vscode-file://'));if(page)session=(await client.request('Target.attachToTarget',{targetId:page.targetId,flatten:true})).sessionId;}if(session&&String(await evaluate('document.body.innerText')).includes(expected))return;if(fs.existsSync(path.join(stage,'host-error.txt')))throw Error(fs.readFileSync(path.join(stage,'host-error.txt'),'utf8'));await pause(100);}throw Error('Sign-on UI text not visible: '+expected);}
+    async function capture(name){await pause(250);const {data}=await client.request('Page.captureScreenshot',{format:'png'},session);const file=path.join(root,'docs/screenshots/inspection-sign-on',name+'.png');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,Buffer.from(data,'base64'));}
+    async function accept(){await client.request('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13},session);await client.request('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13},session);}
+    if(phase==='first'){
+     await waitText('Jade inspection sign-on');await capture('username');await client.request('Input.insertText',{text:'demo-inspector'},session);await accept();
+     await waitText('Jade inspection password');await client.request('Input.insertText',{text:'fixture-password'},session);assert.equal(await evaluate("document.querySelector('.quick-input-widget input.input')?.type"),'password');await capture('password');await accept();
+    }
+    await waitText('Sign in to retry inspection');await capture(phase==='first'?'policy-denial':'reused-sign-in');
+    for(let i=0;i<100&&!fs.existsSync(path.join(stage,'host-report.json'));i++)await pause(50);const report=JSON.parse(fs.readFileSync(path.join(stage,'host-report.json')));assert.equal(report.passed,true,JSON.stringify(report));assert.equal(report.usedSavedCredentials,phase==='second');
+    if(phase==='second'){
+     fs.writeFileSync(path.join(stage,'forget'),'forget');await waitText('Saved inspection sign-in forgotten for this connection.');await capture('forgotten');
+     for(let i=0;i<100&&!fs.existsSync(path.join(stage,'forgot-report.json'));i++)await pause(50);const forgot=JSON.parse(fs.readFileSync(path.join(stage,'forgot-report.json')));assert.deepEqual(forgot,{forgotten:true,secureEntryAbsent:true,inspectionClosed:true});report.forget=forgot;
+    }
+    const settings=fs.readFileSync(path.join(workspace,'.vscode/settings.json'),'utf8');assert.ok(!settings.includes('fixture-password')&&!settings.includes('demo-inspector'));assert.equal(fs.existsSync(path.join(stage,'database-never-opened')),false);assert.equal(fs.existsSync(path.join(stage,'broker')),false);return report;
+   }finally{
+    client?.close();fs.writeFileSync(path.join(stage,'stop'),'stop');await new Promise((resolve,reject)=>{if(child.exitCode!==null)return resolve();const timer=setTimeout(()=>reject(Error('Private host did not exit')),10000);child.once('close',()=>{clearTimeout(timer);resolve();});});
+    const owner=JSON.parse(fs.readFileSync(path.join(stage,'host-process.json')));assert.equal(owner.nonce,artifacts.nonce);await artifacts.waitClosed([owner.pid]);
+   }
+  }
+  const first=await runPhase('first'),second=await runPhase('second');
+  const report={passed:true,artifact:'isolated-development-host/source-modules (not packaged VSIX)',extensionVersion:manifest.version,nativeDistributionVersion:nativeVersion,nativeRuntimeExecuted:false,applicationAuthorizationTested:false,standardSecretStorage:true,reusedAcrossRestart:true,forgotSelectedSecureEntry:true,noDatabaseConnection:true,fakeNative:true,noPlaintextSettings:true,phases:[first,second]};
+  fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify(report));console.log('PASS actual SecretStorage sign-on, masked password, restart reuse and Forget UI; fake native only, no database connection.');
+ });
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

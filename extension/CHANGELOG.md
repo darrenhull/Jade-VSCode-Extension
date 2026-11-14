@@ -1,3 +1,10 @@
+# 0.22.7 - Workspace setup and connection progress
+
+- Add configuration-only Initialise Workspace through the native CLI, preserving existing project files and reviewing missing local connection-profile creation.
+- Separate initial Working backup/verification/restore timeout from normal test execution, with a two-hour preparation default.
+- Show elapsed preparation progress while native stages are quiet and clarify installation, Git/source acquisition and Working startup steps.
+- Remember accepted Database Objects sign-in with VS Code SecretStorage across restarts for the same configured Source/Working; allow empty passwords, preserve saved values on cancelled replacement and offer explicit Forget Saved Inspection Sign-In.
+
 # 0.22.6 - Project-local Working database
 
 - Bundle Jade CLI 0.10.4 to support new Working databases under the selected project .jade/working directory while keeping Source separate.
