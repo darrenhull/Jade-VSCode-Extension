@@ -1,3 +1,9 @@
+# 0.22.10 - Scratch Pad and test operation feedback
+
+- Show queued, connection/ownership and latest native progress in Scratch Pad cells and editor notifications. Confirm execution only when JADE reports it, and include preparation in elapsed time.
+- Preserve cancellation arriving during native request handoff and coalesce progress so rapid output cannot flood notebook edits.
+- Report local tests as not started when another Jade operation owns Working, preserving the real cause in Test Explorer and Jade Tests output.
+- These reporting fixes do not claim to resolve the separately investigated native operations that remain pending indefinitely.
 # 0.22.9 - Definition navigation and development inspection
 
 - Bundle official Jade CLI 0.10.6 so eligible development inspection follows JADE's native policy; configured sign-on/task denials and deployed application filters remain enforced.
