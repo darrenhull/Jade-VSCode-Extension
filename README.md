@@ -15,6 +15,16 @@ The extension includes a verified native C++ CLI and our native helpers. VS Code
 
 GitHub releases require manual VSIX installation. A new CLI release opens a reviewed dependency update; it does not silently update an installed extension. Error Lens is an optional install-alongside companion for inline diagnostics.
 
+## Working database location
+
+Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.
+
+To choose a location explicitly, set `jadeNative.workingDatabaseDirectory` to a project-relative path such as `.jade/working` or an absolute external path. Relative paths use the selected workspace folder for builds, tests, Scratch Pad, debugging and Working inspection. Source remains the separately configured database.
+
+VS Code settings stay in `.vscode/settings.json`. `.jade/source-index` is a regenerable cache; `.jade/working` is a real database containing persistent unpublished state. Managed `.jade` files are excluded from source indexing, tests and publication scans. Do not delete the Working database as cache cleanup.
+
+Moving an existing Working folder does not update its absolute INI paths or ownership records. Moved or unmanaged copies are preserved and refused rather than silently rewritten or replaced. Keep that copy intact; selecting a different new empty Working directory creates a fresh copy from Source and does not migrate unpublished state from the moved database.
+
 ## Available features
 
 | Area | Current behaviour |
