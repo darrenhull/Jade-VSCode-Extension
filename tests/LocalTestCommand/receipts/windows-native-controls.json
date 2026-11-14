@@ -1,0 +1,94 @@
+{
+  "officialExecutableSha256": "b1e6c54afe0803d8c27f19be32ced0cdb8e0fe006989282f1497b7b8187c866b",
+  "caseCancellationSettlementMilliseconds": 10000,
+  "runtime": "JADE 25.0.01 ANSI",
+  "userInstallation": false,
+  "cases": [
+    {
+      "milliseconds": 15924,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": null,
+      "name": "prepare-owned-working",
+      "executed": null
+    },
+    {
+      "milliseconds": 15001,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": true,
+      "name": "baseline-test",
+      "executed": null
+    },
+    {
+      "milliseconds": 76,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": null,
+      "name": "before-unchanged-target",
+      "executed": null
+    },
+    {
+      "milliseconds": 1185,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": true,
+      "name": "inspection-held-unchanged-test",
+      "executed": null
+    },
+    {
+      "milliseconds": 1717,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": true,
+      "name": "inspection-held-incremental-test",
+      "executed": null
+    },
+    {
+      "milliseconds": 5277,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": null,
+      "name": "baseline-scratch",
+      "executed": true
+    },
+    {
+      "milliseconds": 159,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": null,
+      "name": "before-scratch-target",
+      "executed": null
+    },
+    {
+      "milliseconds": 4993,
+      "code": 0,
+      "passed": true,
+      "testsCompleted": null,
+      "name": "inspection-held-scratch",
+      "executed": true
+    }
+  ],
+  "customerHangReproduced": false,
+  "limitations": [
+    "One small authored fixture; no customer code/database or 40k-file workload.",
+    "No SharedInspection message-pump/reset change is justified by these passing cases.",
+    "No benchmark or claim to fix the independently reported customer hang."
+  ],
+  "checkedAt": "2026-11-14T20:30:17.0277269+00:00",
+  "falseAssertion": {
+    "status": "failed",
+    "failures": 1,
+    "milliseconds": 2868,
+    "testsCompleted": true
+  },
+  "cleanup": {
+    "allOwnedNativeProcessesExited": true,
+    "ownedDatabasesBackupAndAssemblyRemoved": true,
+    "deletedBytes": 274867616.0
+  },
+  "fixture": "Authored ExecutionHangProbe with assertion-only HangProbeTest.check",
+  "caseDeadlineMilliseconds": 30000,
+  "platform": "Windows x64",
+  "cliVersion": "0.10.6"
+}
