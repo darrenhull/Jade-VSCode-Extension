@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const { sourcePosition } = require('./source_symbols');
 const {classSections}=require('./class-view-model');
+const {SCHEME,nativeDeclaration,declarationContent}=require('./native-declaration');
 
 function registerNavigation(context,language) {
   const selector = { language: 'jade-nz', scheme: 'file' };
@@ -17,6 +18,7 @@ function registerNavigation(context,language) {
   }
   function cachedSelection(source,item){const start=sourcePosition(source,item.selection),end=sourcePosition(source,item.selection+item.name.length);return new vscode.Range(start.line,start.character,end.line,end.character);}
   context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(SCHEME,{provideTextDocumentContent:declarationContent}),
     vscode.languages.registerDocumentSymbolProvider(selector, {
       provideDocumentSymbols(document) {
         return classSections(document.getText(),document.uri.toString()).map(cls => {
@@ -36,8 +38,11 @@ function registerNavigation(context,language) {
         if (!wordRange) return undefined;
         if(!await language.ready(document,token))return;
         const current=model(document),reference=language.index.project.referenceAt(current,document.offsetAt(position));
-        const target=reference?.symbol;if(!target?.model||token?.isCancellationRequested)return;
-        return new vscode.Location(vscode.Uri.parse(target.model.uri),cachedSelection(target.model,target));
+        const target=reference?.symbol;if(!target||token?.isCancellationRequested)return;
+        if(target.model&&Number.isSafeInteger(target.selection))return new vscode.Location(vscode.Uri.parse(target.model.uri),cachedSelection(target.model,target));
+        const metadata=nativeDeclaration(target);if(!metadata)return;
+        const uri=vscode.Uri.from({scheme:metadata.scheme,path:metadata.path,query:metadata.query});
+        return new vscode.Location(uri,new vscode.Range(metadata.line,metadata.character,metadata.line,metadata.character+target.name.length));
       }
     }),
     vscode.languages.registerWorkspaceSymbolProvider({

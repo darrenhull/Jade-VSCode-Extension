@@ -17,6 +17,8 @@ The extension includes a verified native C++ CLI and our native helpers. VS Code
 
 Database Objects keeps the selected inspection workspace when you edit connection settings. **Forget Saved Inspection Sign-In** uses that workspace’s current connection settings, even before reconnecting, and preserves saved sign-ins for other connections. Choosing **Browse Instances** for the same project and database joins an existing connection attempt; changing the project or database waits for the previous attempt to stop safely.
 
+Ctrl+click or **Go to Definition** opens a local or parameter declaration, or the matching workspace member source. When a native RootSchema member has only cached type information, navigation opens a labelled read-only declaration view; it contains metadata, not method bodies. A valid runtime-matched system cache is required, and real source takes precedence.
+
 VS Code SecretStorage protects durable extension sign-in. Active native jobs currently also use access-restricted temporary configuration that can contain credentials, protected by the standard Windows current-user/SYSTEM ACL and cleaned after owned process exit. Removing credentials from that native disk handoff is separately tracked in [CLI #52](https://github.com/darrenhull/Jade-CLI/issues/52); it is not part of this update.
 
 Before preparing Working or making a Git commit, add `.jade/` to the project `.gitignore`, preserving existing rules. Check Source Control or `git status --short` before committing: ignore rules do not untrack files already in Git. Keep databases, cache and logs out of commits; do not delete Working files to clear Git status.

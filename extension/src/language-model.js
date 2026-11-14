@@ -52,8 +52,9 @@ class LanguageModel{
   }
   context(model,offset){const raw=model.classes.find(cls=>cls.regions.some(([start,end])=>start<=offset&&offset<=end))||model.classes[0];
     const owner=model.workspace?this.type('JadeScript',model.schema):raw&&this.type(raw.name,model.schema),method=model.workspace?{bodyStart:0,signatureEnd:0,end:model.code.length,parameters:[]}:raw?.members.find(member=>member.kind==='method'&&member.bodyStart!==undefined&&member.bodyStart<=offset&&offset<=member.end);
-    const variables=new Map();for(const parameter of method?.parameters||[])variables.set(parameter.name,{...parameter,kind:'variable',parameter:true});
-    if(method){const body=model.code.slice(method.signatureEnd||method.bodyStart,offset);const vars=/\bvars\b([\s\S]*?)(?=\bbegin\b|$)/.exec(body)?.[1];if(vars)for(const variable of parseParameters(vars))variables.set(variable.name,{...variable,kind:'variable'});}
+    const parameterLocations=new Map(method?.bodyStart===undefined?[]:parseParameters(model.code.slice(method.bodyStart,method.signatureEnd),method.bodyStart).map(parameter=>[parameter.name,parameter.selection]));
+    const variables=new Map();for(const parameter of method?.parameters||[])variables.set(parameter.name,{...parameter,kind:'variable',parameter:true,model,selection:parameterLocations.get(parameter.name)});
+    if(method){const start=method.signatureEnd||method.bodyStart,body=model.code.slice(start,offset),vars=/\bvars\b([\s\S]*?)(?=\bbegin\b|$)/.exec(body);if(vars)for(const variable of parseParameters(vars[1],start+vars.index+'vars'.length))variables.set(variable.name,{...variable,kind:'variable',model});}
     return {model,offset,raw,owner,method,variables,schema:model.schema};
   }
   subtype(type,ancestor){const seen=new Set();while(type&&!seen.has(key(type.schema,type.name))){if(type.name===ancestor.name&&type.schema===ancestor.schema)return true;seen.add(key(type.schema,type.name));type=this.type(type.parent,type.schema);}return false;}
