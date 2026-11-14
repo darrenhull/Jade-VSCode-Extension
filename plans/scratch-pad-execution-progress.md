@@ -1,0 +1,13 @@
+# Scratch Pad execution progress
+
+Issue: https://github.com/darrenhull/Jade-VSCode-Extension/issues/94
+
+The notebook execution timer starts before project/connection resolution, IDE ownership and native preparation. The cell was cleared until the final native response; progress went only to the separate Scratch Pad output channel. The timer therefore could not distinguish queued/preparation work from actual scratch execution. The native CLI also buffers ANSI user output until native exit. Its source scan before schema filtering is a performance lead, not a measurement proving the reported indefinite wait.
+
+The extension now reports queued, configuration, ownership and native-request wait stages; shows bounded latest native progress in the notebook cell and editor notification; and retains the full Scratch Pad output channel. A 250ms cooldown coalesces both synchronous and spaced output bursts. Closing/settling progress prevents late renders overwriting final results. Render errors are reported separately without replacing the native execution outcome. Overall elapsed time includes preparation and queueing.
+
+Only a positive native executed marker confirms scratch execution. False and missing markers remain unconfirmed because an incomplete native result can follow partial execution. Explicit failed workspace preparation retains its existing not-executed diagnostic. A cancellation arriving between request creation and listener attachment now targets the owned request once. Closing the editor alone is not an automatic cancellation mechanism.
+
+Four isolated regressions were RED before implementation: missing runner stages, request/listener cancellation race, empty pending notebook output, and missing execution confirmation. Root review then found a spaced-chunk redraw gap; its controlled-scheduler test failed with 26 renders before the cooldown fix. All 33 focused runner/controller/output/diagnostic/failure/progress controls now pass. No native database or customer code was executed for this proof.
+
+This is a partial reporting/cancellation improvement. The user also reports independent test and scratch operations that never finish; common native preparation/session/deadline investigation continues in CLI issue58 and extension issue95. These UI changes do not establish or fix that backend hang. One combined 0.22.10 extension update will integrate the separately verified busy-test result fix, followed by final default tests, package/portable checks, actual packaged UI capture and manager review. No installation/publication is included.
