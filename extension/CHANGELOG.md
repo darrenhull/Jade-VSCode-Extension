@@ -1,3 +1,10 @@
+# 0.22.6 - Project-local Working database
+
+- Bundle Jade CLI 0.10.4 to support new Working databases under the selected project .jade/working directory while keeping Source separate.
+- Resolve relative Working overrides consistently for builds, tests, Scratch Pad, debugging and Database Objects.
+- Preserve ready legacy bases and previous automatic generations. Moved or unmanaged databases are retained and refused; this update does not migrate their unpublished state.
+- Exclude managed .jade files from source, test and publication discovery, and clarify the Working location in Settings.
+
 # 0.22.5 - Responsive source indexing
 
 - Avoid repeated scans of comment and blank lines when indexing native class sources.

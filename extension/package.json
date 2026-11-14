@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.5",
+  "version": "0.22.6",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -711,7 +711,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "External directory dedicated to this workspace working database. Must not overlap the target database or source workspace. Empty uses extension global storage, with a separate base per workspace and target."
+          "description": "Dedicated Working database directory. Leave empty for automatic selection: new bases use .jade/working in the selected project; existing ready legacy bases are retained. Relative paths resolve from that project. Absolute external paths are supported. Working contains persistent unpublished state; moving its folder does not migrate its INI or ownership records."
         },
         "jadeNative.testDependencyScope": {
           "type": "string",
@@ -828,6 +828,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.10.2"
+    "minimumCliVersion": "0.10.4"
   }
 }
