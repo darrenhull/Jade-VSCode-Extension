@@ -1,0 +1,70 @@
+{
+  "formatVersion": 1,
+  "checkedAt": "2026-11-14T20:41:41.5547928Z",
+  "status": "Local reporting/cancellation package verified; customer native hang unresolved; manager-owned review/CI/release pending",
+  "issues": [
+    "https://github.com/darrenhull/Jade-VSCode-Extension/issues/94",
+    "https://github.com/darrenhull/Jade-VSCode-Extension/issues/95"
+  ],
+  "testedSourceHead": "24755b407f50622c3f69a415ff9451dfc537029e",
+  "extensionVersion": "0.22.10",
+  "nativeVersion": "0.10.6",
+  "nativePinPayloadUnchanged": true,
+  "tests": {
+    "regularTotal": 1350,
+    "regularPassed": 1303,
+    "explicitNativeOptInSkipped": 47,
+    "isolatedPowerShellPassed": 18,
+    "failed": 0,
+    "defaultDatabaseOpened": false
+  },
+  "behavioralRegressions": [
+    "Missing queued/configuration/ownership/native progress",
+    "Cancellation between request handoff and listener attachment",
+    "Empty pending notebook cell and missing confirmed-execution result",
+    "Spaced native chunks bypassing renderer cooldown",
+    "Missing existing-channel stage/elapsed/completion logs",
+    "Native response received while UI ownership cleanup remains pending",
+    "Busy local tests returning no result and hiding their real cause",
+    "Test source/discovery/native/cleanup waits not forwarded to Testing output"
+  ],
+  "package": {
+    "file": "dist/jade-native-runner-cpp-preview-0.22.10.vsix",
+    "bytes": 5244391,
+    "sha256": "669fbf4a0bea2a819448b37dcff8f10928832ac517a5e916f63c0000b18a58d6",
+    "officialNativePinAndAllHashesPassed": true,
+    "packagedJavaScriptModulesVerified": 116,
+    "packagedManifestReadmeChangelogBytesVerified": true,
+    "changedModuleHashes": {
+      "extension/src/extension.js": "c7b991c84ae96e2f490f00de87ef9fb9618460a5672f5c3bc4aaf01b978bdbaf",
+      "extension/src/jade-workspaces.js": "0036ea8308ff41b560646560370c532bcf2214a1b78216d6348f98d3ee78b856",
+      "extension/src/JadeWorkspaceRunner.js": "389fb65e986196d00adb24371eaa77ffb23f7e35391c0d3dab4762a7166d8fd4",
+      "extension/src/ScratchPadProgress.js": "771296e263ec62044b1483a8551c204f806584e8fb3f0bf823f5d4ecdb9a21aa"
+    },
+    "portableOutsideCheckoutNoNodeDiscoveryPassed": true,
+    "testCompanionNotPackaged": true
+  },
+  "ui": {
+    "receipt": "docs/test-evidence/scratch-pad-progress-ui-0.22.10.json",
+    "unmodifiedPackagedExtension": true,
+    "separateControlledCompanion": true,
+    "nativeRuntimeExecuted": false,
+    "databaseOpened": false,
+    "actualScreenshotsVisuallyInspected": true,
+    "screenshots": {
+      "docs/screenshots/scratch-pad-progress/preparation.png": "8b7961a2902331326e97e428cfa0b9ad7dcd1226f3060ae53ebace17f6922ee2",
+      "docs/screenshots/scratch-pad-progress/busy-test.png": "b4f5f00d5d5b1363ba50d32c77bb0b7c567601906762823e48fa4ffaf2cfbdfe",
+      "docs/screenshots/scratch-pad-progress/completed.png": "beb7b8691e251eb401283b5420c448f846f4f0fe2a832c944245d119f7f6dd8b"
+    },
+    "ownedHostExitedAndPrivateProfileRemoved": true
+  },
+  "separateNativeControls": "tests/LocalTestCommand/receipts/windows-native-controls.json",
+  "limitations": [
+    "The reported customer Scratch Pad/test hang remains unreproduced and unresolved.",
+    "Controlled UI responses prove presentation and protocol routing, not real native execution speed.",
+    "The separate small ANSI native control passed; it is not a large customer-database benchmark."
+  ],
+  "customerCodeOrDatabaseUsed": false,
+  "userInstallation": false,
+  "publication": false
+}
