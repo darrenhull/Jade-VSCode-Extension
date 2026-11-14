@@ -1,0 +1,45 @@
+{
+  "passed": true,
+  "artifact": "unmodified packaged VSIX with separate companion",
+  "extensionVersion": "0.22.9",
+  "provider": "vscode.executeDefinitionProvider",
+  "syntheticRuntimeMatchedCache": true,
+  "cacheChecksumValidated": true,
+  "nativeRuntimeExecuted": false,
+  "nativeCalls": 0,
+  "noDatabaseConnection": true,
+  "noUserInstallation": true,
+  "readOnlyMetadataProvider": true,
+  "results": [
+    {
+      "name": "local-declaration",
+      "scheme": "file",
+      "selected": "localLog",
+      "metadataOnly": false
+    },
+    {
+      "name": "native-property",
+      "scheme": "jade-native-declaration",
+      "selected": "fileName",
+      "metadataOnly": true
+    },
+    {
+      "name": "native-method",
+      "scheme": "jade-native-declaration",
+      "selected": "log",
+      "metadataOnly": true
+    },
+    {
+      "name": "user-method",
+      "scheme": "file",
+      "selected": "ownCall",
+      "metadataOnly": false
+    },
+    {
+      "name": "real-source-preferred",
+      "scheme": "file",
+      "selected": "fileName",
+      "metadataOnly": false
+    }
+  ]
+}
