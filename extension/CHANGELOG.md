@@ -1,5 +1,6 @@
-# 0.22.9 - Definition navigation
+# 0.22.9 - Definition navigation and development inspection
 
+- Bundle official Jade CLI 0.10.6 so eligible development inspection follows JADE's native policy; configured sign-on/task denials and deployed application filters remain enforced.
 - Open local and parameter declarations from typed receiver references.
 - Show clearly labelled read-only RootSchema declaration metadata when a cached native member has no source document; real workspace sources retain precedence.
 
