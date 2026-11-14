@@ -14,6 +14,8 @@ The next focused provider checkpoint passes 57 tests: the previous adapter/persi
 
 Selected method/class/file runs no longer wait for global advisory discovery. Explicit class/file requests use the existing native all-class selection (methods undefined), and complete native result metadata adds inherited/split-file methods missing from the advisory UI. Individual/excluded selections retain their selected methods. All-project discovery and debug-class discovery remain separate. No Scratch snapshot or save behavior changes.
 
+Review follow-up: two location regressions reproduced RED (known method line10 versus native-only method in another file at line77, and native-only outcome with no source location). Both now pass: native locations are retained and absent locations remain absent, without borrowing a known method's range or constructing an undefined Location. An already-cancelled explicit selection also reaches no native callback. The focused provider/selected-run/local-command group passes19tests; the separate discovery/batching controls passed5tests. Save-false and native-incomplete-result controls remain intact.
+
 Remaining consumer-wiring gates after real native core/API proof:
 
 - Connect the existing raw-read digest path and optional proof callback to the native current inventory without another prepare/hash/discovery; do not fake stamps.

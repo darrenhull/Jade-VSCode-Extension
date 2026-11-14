@@ -135,10 +135,11 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
         } catch (error) { result = { passed: false, error: error.message }; }
         lastResult = result;
         const results = new Map((result?.report?.results || []).map(entry => [entry.method, entry]));
+        const nativeRange=outcome=>typeof outcome.source==='string'&&Number.isSafeInteger(outcome.line)&&outcome.line>0?new vscode.Range(outcome.line-1,Number.isSafeInteger(outcome.column)&&outcome.column>0?outcome.column-1:0,outcome.line-1,Number.isSafeInteger(outcome.column)&&outcome.column>0?outcome.column-1:0):undefined;
         if(wholeClasses.has(data.classKey)&&result?.report?.tests_completed){
           const file=controller.items.get(data.uri.toString()),selected=new Set(names);
           for(const method of results.keys())if(typeof method==='string'&&!selected.has(method)){
-            const item=controller.createTestItem(data.uri.toString()+'#'+method,method,data.uri);item.range=items[0].range;
+            const outcome=results.get(method),range=nativeRange(outcome),item=controller.createTestItem(data.uri.toString()+'#'+method,method,range?vscode.Uri.file(outcome.source):data.uri);if(range)item.range=range;
             details.set(item,{...data,method});file?.children.add(item);items.push(item);run.enqueued(item);run.started(item);
           }
         }
@@ -152,8 +153,9 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
           else if (outcome.status === 'skipped') run.skipped(item);
           else {
             const message = new vscode.TestMessage(outcome.message || 'Native Jade test failed.');
-            message.location = outcome.source ? new vscode.Location(vscode.Uri.file(outcome.source),
-              new vscode.Range(Math.max(0, outcome.line - 1), Math.max(0, (outcome.column || 1) - 1), Math.max(0, outcome.line - 1), Math.max(0, (outcome.column || 1) - 1))) : new vscode.Location(item.uri, item.range);
+            const range=nativeRange(outcome);
+            if(range)message.location=new vscode.Location(vscode.Uri.file(outcome.source),range);
+            else if(item.range)message.location=new vscode.Location(item.uri,item.range);
             run.failed(item, message);
           }
         }
