@@ -1,0 +1,105 @@
+{
+  "formatVersion": 1,
+  "issue": "https://github.com/darrenhull/Jade-VSCode-Extension/issues/90",
+  "status": "Local patch tests, independent review, actual package/portable and UI passed; hosted checks and review remain pending",
+  "baseOfficialMerge": "20e12f169a175326483dc62854054c70466c1d68",
+  "extensionVersion": "0.22.8",
+  "reviewFindings": [
+    "https://github.com/darrenhull/Jade-VSCode-Extension/pull/89#discussion_r4573672365",
+    "https://github.com/darrenhull/Jade-VSCode-Extension/pull/89#discussion_r4573672368"
+  ],
+  "tdd": {
+    "initialScenarios": 10,
+    "initialExpectedFailures": 7,
+    "initialNegativeControlsPassed": 3,
+    "finalOwnershipCasesPassed": 12,
+    "removedPinnedWorkspaceConnectSeparatelyFailedFirst": true,
+    "affectedPassed": 186,
+    "affectedNativeOptInSkipped": 1
+  },
+  "independentReview": "Selected workspace retained while current settings are re-resolved; builtin membership check protects removed folders without filesystem checks. Connection operation/generation/target/abort owns readiness; browse freshness stays separate. Nested selected scope retains its own identity under an open parent.",
+  "regularChecks": {
+    "tests": 1313,
+    "passed": 1267,
+    "explicitNativeOptInSkipped": 46,
+    "failed": 0,
+    "connectedDatabaseOptInsCleared": true,
+    "unchangedPowerShellAndCppNotRepeated": true,
+    "log": "C:/Git/Jade-VScode/artifacts/inspection-ownership-regular-js.log"
+  },
+  "native": {
+    "version": "0.10.5",
+    "pinAndPayloadUnchanged": true,
+    "minimumCliVersion": "0.10.5",
+    "manifestSha256": "aba9fd884e3d78f4ed66160d0e4616c0ae7941e8ee5856746b0d3230551fdbf5",
+    "allRuntimeHashesPassed": true
+  },
+  "package": {
+    "file": "dist/jade-native-runner-cpp-preview-0.22.8.vsix",
+    "sha256": "44911443b734e1a690c6a7a18167ffca9814c972820c207b6cfea6fe306360c5",
+    "bytes": 5218033,
+    "sourceBytesVerified": {
+      "extension/src/object-explorer.js": "7e5445074edfdef8984ab78819ceec16d8f43c2399cb077dec57076fc63cd5cb",
+      "extension/src/inspection-credentials.js": "e2ab66d6bc79c76d81727a6efa6b7d652baee4591fb2cecaaa74ae25e701e82f",
+      "extension/src/workspace-initialization.js": "320e13a93d9578108c9d2e0499c5d82dd19468ece4d963ccc8565e908585ee44",
+      "extension/package.json": "7836192535f75ba62823dc3cd0a3d531e7959f7cc91de45d1b2bc6b375310e32",
+      "extension/README.md": "e0f621785fa0d549964a1f876c3dadf1446c0661a1f31852f3f3b2cb03e9085a",
+      "extension/CHANGELOG.md": "589e15bb421848facf26f95abcfafdfe63f48c92fb84c3fde15901687f9af415"
+    },
+    "extractedOutsideCheckoutNoNodeDiscoveryPassed": true,
+    "noDatabaseOpened": true,
+    "log": "C:/Git/Jade-VScode/artifacts/inspection-ownership-package.log"
+  },
+  "actualUi": {
+    "receipt": "docs/test-evidence/inspection-ownership-ui-0.22.8.json",
+    "artifact": "unmodified packaged VSIX with separate fake-native companion",
+    "standardSecretStorage": true,
+    "currentADeletedOtherBPreserved": true,
+    "connectionClosedAfterForget": true,
+    "sameWorkingBrowseUsesOnePreparation": true,
+    "preparationReadyWhileActualChooserOpen": true,
+    "classAndInstanceVisible": true,
+    "nativeRuntimeExecuted": false,
+    "applicationAuthorizationTested": false,
+    "allFourScreensVisuallyInspected": true,
+    "managerVisuallyReviewed": true,
+    "ownedHostExitedAndPrivateProfileCleaned": true,
+    "screenshots": [
+      {
+        "file": "docs/screenshots/inspection-ownership/current-connection-forgotten.png",
+        "sha256": "e92be7eef3435faab89a1e5a0f8a358feba4848abeea3146f7cafa2c447e219f"
+      },
+      {
+        "file": "docs/screenshots/inspection-ownership/joining-working-preparation.png",
+        "sha256": "09ee71c30e774b72029658b49294f4bc0ea0f7e562a5b2e1edee64014db05e65"
+      },
+      {
+        "file": "docs/screenshots/inspection-ownership/same-target-browse-picker.png",
+        "sha256": "f1a87bb13966e094c109515f2fa4244281d774ab11b46d958b9bdcb68a1cfac8"
+      },
+      {
+        "file": "docs/screenshots/inspection-ownership/joined-class-instances.png",
+        "sha256": "82969aef1c64b7eda86242e6110c68d83958d01b0e2f6309893b13867e0103e0"
+      }
+    ]
+  },
+  "carryForward": {
+    "initialization": "Configuration-only initializer source and official runtime unchanged; prior0.22.7 initialization proof retained as historical evidence, not rerun on0.22.8",
+    "nativeLoginHashing": "Separate investigation; this patch does not prove customer application authorization",
+    "nativeCredentialHandoff": "Current standard SID/SYSTEM ACL-protected transient configuration may contain credentials; no-disk hardening remains CLI52"
+  },
+  "platform": {
+    "os": "Windows",
+    "node": "v24.22.1",
+    "vscode": "1.146.0",
+    "architecture": "x64"
+  },
+  "userInstallationPerformed": false,
+  "customerDatabaseChanged": false,
+  "pending": [
+    "Current-head hosted CI",
+    "Fresh automated review",
+    "Required owner approval and protected merge",
+    "Separate official0.22.8 release verification"
+  ]
+}

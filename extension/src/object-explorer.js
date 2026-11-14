@@ -79,8 +79,14 @@ function registerObjectExplorer(vscode, context, services) {
     }
   }
   const setupInformation = (message, ...actions) => setupStep(() => vscode.window.showInformationMessage(message, ...actions));
+  function selectedInspectionFolder(scope) {
+    const uri = vscode.Uri.file(scope);
+    if (!vscode.workspace.getWorkspaceFolder(uri))
+      throw Error('The selected inspection workspace is no longer open. Open it before using this inspection connection.');
+    return { name: path.basename(scope), uri };
+  }
   async function configuration() {
-    if (inspectionScope) return configured(undefined, { name: path.basename(inspectionScope), uri: vscode.Uri.file(inspectionScope) });
+    if (inspectionScope) return configured(undefined, selectedInspectionFolder(inspectionScope));
     const folders = vscode.workspace.workspaceFolders || [];
     if (!folders.length) {
       const selected = await setupInformation(
@@ -127,12 +133,13 @@ function registerObjectExplorer(vscode, context, services) {
   }
   const session = new InspectionSession({
     connect: async (selection) => {
-      const generation = session.generation, version = browseVersion, owner = {};
+      const generation = session.generation, operation = connectionOperation, owner = {};
+      const ownsSignOn = () => generation === session.generation && selection === session.target &&
+        operation === connectionOperation && !disposed && !operation?.controller.signal.aborted;
       if (services.isBusy()) throw Error('Another Jade operation is running. Wait for it to finish before connecting Object Explorer.');
       const config = await configuration();
-      if (generation !== session.generation || version !== browseVersion || disposed) throw Error('Inspection connection was cancelled.');
+      if (!ownsSignOn()) throw Error('Inspection connection was cancelled.');
       if (services.isBusy()) throw Error('Another Jade operation started while selecting database settings.');
-      const operation = connectionOperation;
       if (operation) operation.config = config;
       const identity = inspectionIdentity(config);
       let authentication = operation?.forceSignIn ? undefined : await readInspectionCredentials(context.secrets, identity.secretKey);
@@ -142,7 +149,6 @@ function registerObjectExplorer(vscode, context, services) {
         operation?.report('Inspection sign-on — enter application inspection credentials or leave the user name empty…');
         authentication = await inspectionCredentials(generation, selection);
       }
-      const ownsSignOn = () => generation === session.generation && version === browseVersion && selection === session.target && !disposed && !operation?.controller.signal.aborted;
       if (!ownsSignOn()) throw Error('Inspection sign-on cancelled.');
       if (services.isBusy()) throw Error('Another Jade operation started during inspection sign-on.');
       const connectionConfig = { ...config };
@@ -158,14 +164,14 @@ function registerObjectExplorer(vscode, context, services) {
           operation?.report(text);
         },
       );
-      if (generation !== session.generation) throw Error('Inspection connection was cancelled.');
+      if (!ownsSignOn()) throw Error('Inspection connection was cancelled.');
       if (services.isBusy()) throw Error('Another Jade operation started while resolving the database target.');
       operation?.report('Connecting the native read-only session and loading classes…');
       lockOwner = owner;
       await setLock(true);
       let client;
       try {
-        if (generation !== session.generation || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
+        if (!ownsSignOn() || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
         currentConfig = { ...config };
         delete currentConfig.user;
         delete currentConfig.password;
@@ -939,10 +945,13 @@ function registerObjectExplorer(vscode, context, services) {
     const pending = action(() => serializeInspectionTransition(async () => {
       if (!owns()) return { cancelled: true };
       if (services.isBusy()) throw Error('Wait for the current Jade operation before forgetting inspection credentials.');
-      const config = connectionOperation?.config || currentConfig || await configuration();
+      const scope = inspectionScope || connectionOperation?.config?.workspaceRoots?.[0] || currentConfig?.workspaceRoots?.[0];
+      const folder = scope && selectedInspectionFolder(scope);
+      const config = folder ? await configured(undefined, folder) : await configuration();
       if (!owns()) return { cancelled: true };
       if (connectionOperation) await cancelConnection();
       if (!owns()) return { cancelled: true };
+      selectedInspectionFolder(scope || config.workspaceRoots[0]);
       await deleteInspectionCredentials(context.secrets, inspectionIdentity(config).secretKey);
       if (!owns()) return { forgotten: true, cancelled: true };
       await session.disconnect({ disconnect: true });
@@ -1302,6 +1311,8 @@ function registerObjectExplorer(vscode, context, services) {
   }
   async function configurationChanged() {
     ++browseVersion;
+    inspectionScope ||= connectionOperation?.config?.workspaceRoots?.[0] || currentConfig?.workspaceRoots?.[0];
+    currentConfig = undefined;
     currentTarget = undefined;
     await cancelConnection();
     refreshDescription();
