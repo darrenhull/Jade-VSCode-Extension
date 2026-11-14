@@ -1,3 +1,8 @@
+# 0.22.8 - Inspection connection ownership
+
+- Forget saved sign-in for the currently configured inspection workspace after settings change, preserving other connections.
+- Keep same-project, same-target Browse Instances attached to a pending connection while preserving cancellation when the project, target or configuration changes.
+
 # 0.22.7 - Workspace setup and connection progress
 
 - Bundle official Jade CLI 0.10.5 for the separate Working preparation timeout and native stage diagnostics.

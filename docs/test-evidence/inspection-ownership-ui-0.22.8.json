@@ -1,0 +1,50 @@
+{
+  "passed": true,
+  "artifact": "unmodified packaged VSIX with separate fake-native companion",
+  "extensionVersion": "0.22.8",
+  "nativeDistributionVersion": "0.10.5",
+  "nativeRuntimeExecuted": false,
+  "applicationAuthorizationTested": false,
+  "standardSecretStorage": true,
+  "settingsForget": {
+    "currentADeleted": true,
+    "otherBPreserved": true,
+    "inspectionClosed": true
+  },
+  "sameTargetBrowse": {
+    "preparations": 1,
+    "connectionReady": true,
+    "classAvailable": true,
+    "preparationCompletedWhileChooserOpen": true
+  },
+  "noDatabaseConnection": true,
+  "noUserInstallation": true,
+  "calls": [
+    {
+      "command": "inspect.catalog"
+    },
+    {
+      "command": "inspect.close"
+    },
+    {
+      "command": "inspect.catalog"
+    },
+    {
+      "command": "inspect.close"
+    },
+    {
+      "command": "inspect.catalog"
+    },
+    {
+      "command": "inspect.instances"
+    }
+  ],
+  "noPlaintextSettings": true,
+  "promptCount": 6,
+  "screenshots": [
+    "current-connection-forgotten",
+    "joining-working-preparation",
+    "same-target-browse-picker",
+    "joined-class-instances"
+  ]
+}
