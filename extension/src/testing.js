@@ -106,7 +106,11 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
     return [...selected.values()];
   }
   async function runRequest(request, token, debugging = false) {
-    await discover();
+    const known=item=>{if(details.has(item))return true;let valid=item.children.size>0;item.children.forEach(child=>{if(!known(child))valid=false;});return valid;};
+    if(!request.include||!request.include.every(known))await discover();
+    // Explicit class/file runs let JADE select the complete class. Browser rows
+    // may still be loading, or omit inherited/split-file tests.
+    const wholeClasses=new Set(!debugging&&!request.exclude?.length?(request.include||[]).filter(item=>!details.has(item)).map(item=>classes.get(item.id)):[]);
     const run = controller.createTestRun(request);
     token ||= run.token;
     const queue = leaves(request);
@@ -127,10 +131,17 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
         let result;
         try {
           const runner=debugging?debugExecute:execute;
-          result = await runner(data.uri, debugging?names[0]:names, token || run.token, text => run.appendOutput(text.replace(/\r?\n/g, '\r\n')));
+          result = await runner(data.uri, debugging?names[0]:wholeClasses.has(data.classKey)?undefined:names, token || run.token, text => run.appendOutput(text.replace(/\r?\n/g, '\r\n')));
         } catch (error) { result = { passed: false, error: error.message }; }
         lastResult = result;
         const results = new Map((result?.report?.results || []).map(entry => [entry.method, entry]));
+        if(wholeClasses.has(data.classKey)&&result?.report?.tests_completed){
+          const file=controller.items.get(data.uri.toString()),selected=new Set(names);
+          for(const method of results.keys())if(typeof method==='string'&&!selected.has(method)){
+            const item=controller.createTestItem(data.uri.toString()+'#'+method,method,data.uri);item.range=items[0].range;
+            details.set(item,{...data,method});file?.children.add(item);items.push(item);run.enqueued(item);run.started(item);
+          }
+        }
         for (const item of items) {
           if (result?.cancelled || token?.isCancellationRequested) { run.skipped(item); continue; }
           const outcome = results.get(details.get(item).method);
@@ -154,7 +165,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   if(debugExecute)controller.createRunProfile('Debug Jade tests locally',vscode.TestRunProfileKind.Debug,(request,token)=>runRequest(request,token,true),true);
   async function runFile(uri, methods, debugging = false) {
     if (!uri) throw new Error('Open a CLS test class first.');
-    await discover();
+    if(debugging&&!methods)await discover();
     let file = update(await vscode.workspace.openTextDocument(uri));
     if (!file && !methods) controller.items.forEach(item => { if (classes.get(item.id) === classes.get(uri.toString())) file ||= item; });
     if (!file) throw new Error('No runnable Jade tests were found in this file.');

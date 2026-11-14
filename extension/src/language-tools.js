@@ -2,7 +2,6 @@
 const path=require('node:path'),os=require('node:os');
 const {SourceIndex}=require('./workspace-index');
 const {SourceIndexCache}=require('./SourceIndexCache');
-const {decodeSourceBytes}=require('./source-file-text');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
@@ -21,7 +20,7 @@ function registerLanguageTools(vscode,context){
   const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),onError:reportIndexError});
   const index=new SourceIndex({
     list:async()=>filterScan(await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git,.jade}/**')).map(uri=>uri.toString()),
-    read:async uri=>decodeSourceBytes(await vscode.workspace.fs.readFile(vscode.Uri.parse(uri))),
+    read:async uri=>vscode.workspace.fs.readFile(vscode.Uri.parse(uri)),
     stat:async uri=>{const value=await vscode.workspace.fs.stat(vscode.Uri.parse(uri));return {mtime:value.mtime,size:value.size};},
     cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError,onTiming:timing=>{if(timing.totalMs>=1000)output.appendLine('Slow workspace source: '+JSON.stringify(timing));}
   });
