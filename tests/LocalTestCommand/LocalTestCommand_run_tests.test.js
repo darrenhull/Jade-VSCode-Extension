@@ -48,3 +48,18 @@ test('completed assertion results need no user-code output to become individual 
  assert.ok(!f.h.runs[0].states.some(state=>state.status==='errored'));
  assert.equal(f.sandbox.publishing,false);
 });
+test('a native assertion failure without user writes remains a failed method with its original message',async()=>{
+ const f=fixture({busy:false,result:{passed:false,code:1,report:{tests_completed:true,cleanup_complete:true,tests_selected:1,failures:1,results:[{method:'check',status:'failed',message:'Synthetic native assertion failed'}]}}});
+ await f.manager.runFile(f.document.uri,'check');
+ const failed=f.h.runs[0].states.find(state=>state.status==='failed');
+ assert.equal(failed?.message.message,'Synthetic native assertion failed');
+ assert.ok(!f.h.runs[0].states.some(state=>state.status==='errored'));
+ assert.equal(f.calls.native,1);assert.equal(f.sandbox.publishing,false);
+});
+test('native incomplete-run diagnostics retain their actual cause instead of a busy result',async()=>{
+ const f=fixture({busy:false,result:{passed:false,code:2,report:{tests_completed:false,cleanup_complete:false,results:[],error:'Synthetic native helper stopped during teardown'}}});
+ await f.manager.runFile(f.document.uri,'check');
+ const error=f.h.runs[0].states.find(state=>state.status==='errored');
+ assert.equal(error?.message.message,'Synthetic native helper stopped during teardown');
+ assert.equal(f.calls.native,1);assert.equal(f.sandbox.publishing,false);
+});

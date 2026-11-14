@@ -316,7 +316,12 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('jadeNative.executeLocalTests', async (uri, method, testCancellation, outputObserver) => {
       const document = await resolveSource(uri);
-      if (publishing) { void vscode.window.showErrorMessage('A Jade operation is already running.'); return; }
+      if (publishing) {
+        const message = 'Local tests were not started. Wait for the current Jade operation or cancel it first.';
+        testOutput.appendLine(message); testOutput.show(true); outputObserver?.(message + '\n');
+        void vscode.window.showErrorMessage(message);
+        return { passed: false, code: 2, report: { source: document?.uri.fsPath, tests_completed: false, cleanup_complete: false, results: [], error: message } };
+      }
       publishing = true;
       try {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
