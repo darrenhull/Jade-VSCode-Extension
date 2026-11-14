@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget } = {}) {
+function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget, secretStorage } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -20,7 +20,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     targetDisconnections = [],
     progressOperations = [],
     contexts = new Map(),
-    prompts = [];
+    prompts = [], outputLines = [];
   let busy = false,
     allowBusy, configurationListener, saveListener;
   const uri = (file) => ({
@@ -83,7 +83,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
         },
         createOutputChannel: () => ({
           append() {},
-          appendLine() {},
+          appendLine(text) { outputLines.push(text); },
           dispose() {},
         }),
         createStatusBarItem: () => { const status={show(){},dispose(){}};statuses.push(status);return status; },
@@ -151,7 +151,14 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     storagePath: path.join(root, "storage"),
     workspaceRoots: [folder.uri.fsPath],
   };
+  const secretValues = new Map(), secretCalls = [];
+  const secrets = secretStorage === undefined ? {
+    get: async key => { secretCalls.push({ operation: "get", key }); return secretValues.get(key); },
+    store: async (key, value) => { secretCalls.push({ operation: "store", key }); secretValues.set(key, value); },
+    delete: async key => { secretCalls.push({ operation: "delete", key }); secretValues.delete(key); },
+  } : secretStorage;
   const context = {
+    secrets,
     subscriptions: [],
     globalStorageUri: uri(path.join(root, "global")),
     extensionPath: root,
@@ -172,7 +179,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     createTransport: options => {
       sessionData.push({ ...options.config, target: options.target });
       const c = new EventEmitter();
-      const denied = authentication && clients.length === 0;
+      const denied = typeof authentication === "function" ? authentication(options.config, clients.length) : authentication && !options.config.user;
       c.ready = denied
         ? Promise.reject(Object.assign(Error("Access denied"), { code: 1713 }))
         : Promise.resolve();
@@ -236,6 +243,10 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     controller,
     commands,
     configCalls,
+    config,
+    secrets,
+    secretValues,
+    secretCalls,
     statuses,
     panels,
     clients,
@@ -246,6 +257,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     sessionData,
     targetDisconnections,
     prompts,
+    outputLines,
     progressOperations,
     contexts,
     root,

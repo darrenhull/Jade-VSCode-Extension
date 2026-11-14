@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "packagedVersion": "0.22.7",
+  "nativeVersion": "0.10.5",
+  "actualPackagedUi": true,
+  "dialogStyle": "custom in owned private profile",
+  "configurationOnly": true,
+  "missingProfileAction": true,
+  "reviewedCreation": true,
+  "existingProjectPreserved": true,
+  "databaseOpened": false,
+  "screenshots": [
+    "missing-profile.png",
+    "review-machine-profile.png",
+    "configuration-complete.png"
+  ]
+}

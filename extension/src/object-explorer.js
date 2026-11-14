@@ -1,5 +1,6 @@
 "use strict";
 const path = require("node:path"),
+  fs = require("node:fs"),
   crypto = require("node:crypto");
 const { InspectionSession } = require("./object-session"),
   { CliInspectionTransport } = require("./CliInspectionTransport");
@@ -9,6 +10,7 @@ const { fieldText } = require("../media/object-page");
 const { ClassBrowserModel } = require("./class-browser-model");
 const { pickClass } = require("./class-browser-ui");
 const { registerClassCatalogue } = require("./class-catalogue");
+const { readInspectionCredentials, storeInspectionCredentials, deleteInspectionCredentials } = require("./inspection-credentials");
 function registerObjectExplorer(vscode, context, services) {
   const events = new vscode.EventEmitter(),
     output = vscode.window.createOutputChannel("Jade Objects"),
@@ -35,7 +37,8 @@ function registerObjectExplorer(vscode, context, services) {
     catalogVersion = 0,
     catalogRequest,
     pageVersion = 0,
-    credentials,
+    signInPromise,
+    forgetSignInPromise,
     pendingUnpinnedRead,
     inspectionScope,
     connectionOperation,
@@ -124,15 +127,31 @@ function registerObjectExplorer(vscode, context, services) {
   }
   const session = new InspectionSession({
     connect: async (selection) => {
-      const generation = session.generation, owner = {};
+      const generation = session.generation, version = browseVersion, owner = {};
       if (services.isBusy()) throw Error('Another Jade operation is running. Wait for it to finish before connecting Object Explorer.');
       const config = await configuration();
-      if (generation !== session.generation) throw Error('Inspection connection was cancelled.');
+      if (generation !== session.generation || version !== browseVersion || disposed) throw Error('Inspection connection was cancelled.');
       if (services.isBusy()) throw Error('Another Jade operation started while selecting database settings.');
       const operation = connectionOperation;
       if (operation) operation.config = config;
+      const identity = inspectionIdentity(config);
+      let authentication = operation?.forceSignIn ? undefined : await readInspectionCredentials(context.secrets, identity.secretKey);
+      const enteredCredentials = authentication === undefined;
+      if (operation) operation.usedSavedSignIn = !enteredCredentials;
+      if (authentication === undefined) {
+        operation?.report('Inspection sign-on — enter application inspection credentials or leave the user name empty…');
+        authentication = await inspectionCredentials(generation, selection);
+      }
+      const ownsSignOn = () => generation === session.generation && version === browseVersion && selection === session.target && !disposed && !operation?.controller.signal.aborted;
+      if (!ownsSignOn()) throw Error('Inspection sign-on cancelled.');
+      if (services.isBusy()) throw Error('Another Jade operation started during inspection sign-on.');
+      const connectionConfig = { ...config };
+      delete connectionConfig.user;
+      delete connectionConfig.password;
+      Object.assign(connectionConfig, authentication);
+      operation?.report(selection === 'working' ? 'Preparing Working…' : 'Opening Source…');
       const target = await services.inspectionTarget(
-        { ...config, ...(operation ? { signal: operation.controller.signal } : {}) },
+        { ...connectionConfig, ...(operation ? { signal: operation.controller.signal } : {}) },
         selection,
         text => {
           if (!disposed) output.append(text);
@@ -147,19 +166,28 @@ function registerObjectExplorer(vscode, context, services) {
       let client;
       try {
         if (generation !== session.generation || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
-        currentConfig = config;
+        currentConfig = { ...config };
+        delete currentConfig.user;
+        delete currentConfig.password;
         currentTarget = { ...target, selection };
+        delete currentTarget.user;
+        delete currentTarget.password;
         refreshDescription();
-        const authentication = credentials;
-        credentials = undefined;
         const options = {
-          config: { ...config, ...(authentication || {}), readOnly: true },
+          config: { ...connectionConfig, readOnly: true },
           target: selection,
           catalogArgs: { includeSystem: showSystem },
         };
         client = services.createTransport
           ? services.createTransport(options)
           : new CliInspectionTransport(services.client, options);
+        const nativeReady = client.ready;
+        client.ready = Promise.resolve(nativeReady).then(async body => {
+          if (!ownsSignOn()) throw Error('Inspection sign-on cancelled.');
+          if (enteredCredentials) await storeInspectionCredentials(context.secrets, identity.secretKey, authentication);
+          if (!ownsSignOn()) throw Error('Inspection sign-on cancelled.');
+          return body;
+        });
         client.on('output', text => { if (!disposed) output.append(text); operation?.report(text); });
         client.on('failure', error => { if (!disposed) output.appendLine(error.message); });
         client.once('close', () => {
@@ -347,13 +375,14 @@ function registerObjectExplorer(vscode, context, services) {
     }
   });
   session.on("invalidated", invalidate);
-  function connect() {
+  function connect({ forceSignIn = false } = {}) {
     if (connectionOperation) return connectionOperation.promise;
     const operation = {
       controller: new AbortController(),
       cancellation: new vscode.CancellationTokenSource(),
       target: session.target,
       report: () => {},
+      forceSignIn,
     };
     connectionOperation = operation;
     operation.promise = (async () => {
@@ -365,16 +394,29 @@ function registerObjectExplorer(vscode, context, services) {
         title: 'Connecting to ' + (session.target === 'working' ? 'Working' : 'Source') + ' database',
         cancellable: true,
       }, async (progress, cancellation) => {
+        const started = Date.now();
+        const elapsed = () => Math.floor((Date.now() - started) / 1000);
         operation.report = text => {
           if (disposed || connectionOperation !== operation || operation.controller.signal.aborted) return;
           const message = String(text).split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1);
           if (message) {
             operation.message = message.slice(0, 200);
-            progress.report({ message: operation.message });
+            progress.report({ message: operation.message + " · elapsed " + elapsed() + " s" });
             refreshDescription();
             events.fire();
           }
         };
+        let lastLogged = 0;
+        const heartbeat = setInterval(() => {
+          if (disposed || connectionOperation !== operation) return;
+          const seconds = elapsed();
+          progress.report({ message: (operation.message || 'Waiting for native connection…') + ' · elapsed ' + seconds + ' s' });
+          if (seconds - lastLogged >= 15) {
+            lastLogged = seconds;
+            output.appendLine((operation.message || 'Waiting for native connection…') + ' · elapsed ' + seconds + ' s (still waiting; completion is not confirmed).');
+          }
+        }, 1000);
+        heartbeat.unref?.();
         const subscription = cancellation.onCancellationRequested(() => {
           void cancelConnection().catch(error => { if (!disposed) output.appendLine(error.message); });
         });
@@ -388,7 +430,7 @@ function registerObjectExplorer(vscode, context, services) {
           if (!operation.controller.signal.aborted) throw error;
           if (!disposed) output.appendLine('Inspection cancelled after the native operation finished: ' + error.message);
           return { cancelled: true };
-        } finally { subscription.dispose(); }
+        } finally { clearInterval(heartbeat); subscription.dispose(); }
       });
     })().finally(async () => {
       operation.cancellation.dispose();
@@ -409,40 +451,49 @@ function registerObjectExplorer(vscode, context, services) {
     await session.disconnect();
     if (operation) await operation.promise;
   }
-  async function connectOnce() {
+  function inspectionIdentity(config) {
+    // Credential reuse/Forget must not depend on database or INI filesystem availability.
+    const configuredPath = value => {
+      const absolute = path.resolve(value);
+      return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+    };
+    const scope = configuredPath(config.workspaceRoots[0]);
+    const key = JSON.stringify([scope, configuredPath(config.installPath), configuredPath(config.databasePath),
+      configuredPath(config.iniPath), config.server || 'singleUser', config.schema || 'RootSchema',
+      config.application || 'RootSchemaApp', config.characterSet || 'auto']);
+    return { scope, secretKey: 'jadeNative.inspectionSignIn.' + crypto.createHash('sha256').update(key).digest('hex') };
+  }
+  async function inspectionCredentials(generation, target) {
     const cancellationToken = connectionOperation?.cancellation.token;
-    try {
-      await session.connect();
-    } catch (error) {
-      if (Number(error.code) !== 1713) throw error;
-      const generation = session.generation,
-        target = session.target;
-      const user = await vscode.window.showInputBox({
-        title: "Jade inspection sign-on",
-        prompt:
-          "Your development security library requires a user name. Credentials are used only for this connection.",
-        ignoreFocusOut: true,
-      }, cancellationToken);
-      if (user === undefined || cancellationToken?.isCancellationRequested || generation !== session.generation || target !== session.target)
-        throw Error("Inspection sign-on cancelled.");
-      const password = await vscode.window.showInputBox({
-        title: "Jade inspection password",
-        prompt: "Password for " + user,
-        password: true,
-        ignoreFocusOut: true,
-      }, cancellationToken);
-      if (
-        password === undefined || cancellationToken?.isCancellationRequested ||
-        generation !== session.generation ||
-        target !== session.target
-      )
-        throw Error("Inspection sign-on cancelled.");
-      credentials = { user, password };
-      try {
-        await session.connect();
-      } finally {
-        credentials = undefined;
+    const changed = () => disposed || cancellationToken?.isCancellationRequested || generation !== session.generation || target !== session.target;
+    const user = await setupStep(() => vscode.window.showInputBox({
+      title: 'Jade inspection sign-on · ' + (target === 'working' ? 'Working' : 'Source'),
+      prompt: 'Inspection user name. Leave blank for anonymous access.',
+      placeHolder: 'Inspection user name (optional)',
+      ignoreFocusOut: true,
+    }, cancellationToken));
+    if (user === undefined || changed()) throw Error('Inspection sign-on cancelled.');
+    if (user === '') return {};
+    const password = await setupStep(() => vscode.window.showInputBox({
+      title: 'Jade inspection password · ' + (target === 'working' ? 'Working' : 'Source'),
+      prompt: 'Password for ' + user + '. Leave blank if no password.',
+      password: true,
+      ignoreFocusOut: true,
+    }, cancellationToken));
+    if (password === undefined || changed()) throw Error('Inspection sign-on cancelled.');
+    return { user, password };
+  }
+  async function connectOnce() {
+    try { await session.connect(); }
+    catch (error) {
+      if (Number(error.code) === 1713 && connectionOperation?.usedSavedSignIn) {
+        const config = connectionOperation?.config || currentConfig;
+        if (config) {
+          try { await deleteInspectionCredentials(context.secrets, inspectionIdentity(config).secretKey); }
+          catch (storageError) { throw Object.assign(Error(error.message + ' ' + storageError.message), { code: error.code }); }
+        }
       }
+      throw error;
     }
     const loaded = await loadCatalog();
     if (!loaded) throw Error("Inspection connection was cancelled.");
@@ -736,8 +787,12 @@ function registerObjectExplorer(vscode, context, services) {
         return [
           {
             kind: "error",
-            name: diagnostic(error),
-            command: "jadeNative.refreshObjects",
+            name: policyDenied(error) ? "Sign in to retry inspection" : diagnostic(error),
+            description: policyDenied(error) ? "Access denied" : undefined,
+            command: policyDenied(error) ? "jadeNative.signInObjects" : "jadeNative.refreshObjects",
+            id: JSON.stringify([session.generation, session.target, "inspection-error", row?.kind, row?.oid || row?.name || "catalogue"]),
+            args: policyDenied(error) ? [inspectionActionContext()] : undefined,
+            tooltip: policyDenied(error) ? String(error.message || error) + " Sign in with application inspection credentials to retry. The application may still deny access." : undefined,
           },
         ];
       }
@@ -819,8 +874,18 @@ function registerObjectExplorer(vscode, context, services) {
   status.text = "$(database) Jade Inspect: Working · Read-only";
   status.tooltip = "Choose database for read-only Object Explorer";
   status.show();
+  function inspectionActionContext() {
+    return { target: session.target, generation: session.generation, version: browseVersion, scope: inspectionScope };
+  }
+  function matchesInspectionAction(context) {
+    return !disposed && context.target === session.target && context.generation === session.generation && context.version === browseVersion && context.scope === inspectionScope;
+  }
+  function policyDenied(error) {
+    return Number(error?.code) === 1713 || /Application inspection policy denied this object\.|Production or runtime-only inspection requires allowedToInspect/.test(String(error?.message || error));
+  }
   function diagnostic(error) {
     const text = String(error.message || error);
+    if (policyDenied(error)) return text + " — Use Jade: Sign In to Database Objects with the application inspection credentials. Access remains controlled by the application.";
     if (
       /\bin use\b|\balready\b.*\bopen\b|\bexclusive\b|(?:\bOpen database\b.*\block(?:ed|ing)?\b)/i.test(
         text,
@@ -838,9 +903,54 @@ function registerObjectExplorer(vscode, context, services) {
     } catch (error) {
       if (/Database changed|cancelled/i.test(error.message)) return;
       output.appendLine(error.message);
-      void vscode.window.showErrorMessage(diagnostic(error));
+      if (policyDenied(error)) {
+        const origin = inspectionActionContext();
+        void vscode.window.showErrorMessage(diagnostic(error), 'Sign In…').then(choice => {
+          if (choice === 'Sign In…' && matchesInspectionAction(origin)) void signIn(origin);
+        });
+      } else void vscode.window.showErrorMessage(diagnostic(error));
       return { error: error.message };
     }
+  }
+  function signIn(origin) {
+    if (origin && !matchesInspectionAction(origin)) return Promise.resolve({ cancelled: true });
+    if (signInPromise) return signInPromise;
+    const version = ++browseVersion, target = session.target;
+    const owns = () => !disposed && version === browseVersion && target === session.target;
+    const pending = action(async () => {
+      await serializeInspectionTransition(async () => {
+        if (!owns()) return;
+        if (services.isBusy()) throw Error('Wait for the current Jade operation before changing inspection credentials.');
+        if (connectionOperation) await cancelConnection();
+        if (owns()) await session.disconnect({ disconnect: true });
+      });
+      if (!owns()) return { cancelled: true };
+      // Do not hold the transition lane while a user enters credentials. A target
+      // change must be able to cancel this prompt and supersede the reconnect.
+      return connect({ forceSignIn: true });
+    });
+    signInPromise = pending.finally(() => { signInPromise = undefined; });
+    return signInPromise;
+  }
+  function forgetSavedSignIn() {
+    if (forgetSignInPromise) return forgetSignInPromise;
+    const version = ++browseVersion, target = session.target;
+    const owns = () => !disposed && version === browseVersion && target === session.target;
+    const pending = action(() => serializeInspectionTransition(async () => {
+      if (!owns()) return { cancelled: true };
+      if (services.isBusy()) throw Error('Wait for the current Jade operation before forgetting inspection credentials.');
+      const config = connectionOperation?.config || currentConfig || await configuration();
+      if (!owns()) return { cancelled: true };
+      if (connectionOperation) await cancelConnection();
+      if (!owns()) return { cancelled: true };
+      await deleteInspectionCredentials(context.secrets, inspectionIdentity(config).secretKey);
+      if (!owns()) return { forgotten: true, cancelled: true };
+      await session.disconnect({ disconnect: true });
+      if (owns()) void vscode.window.showInformationMessage?.('Saved inspection sign-in forgotten for this connection. Connect again to sign in.');
+      return { forgotten: true };
+    }));
+    forgetSignInPromise = pending.finally(() => { forgetSignInPromise = undefined; });
+    return forgetSignInPromise;
   }
   async function releaseCursor(record) {
     if (record.cursor && session.client && record.generation === session.generation) {
@@ -1192,7 +1302,6 @@ function registerObjectExplorer(vscode, context, services) {
   }
   async function configurationChanged() {
     ++browseVersion;
-    credentials = undefined;
     currentTarget = undefined;
     await cancelConnection();
     refreshDescription();
@@ -1268,8 +1377,12 @@ function registerObjectExplorer(vscode, context, services) {
 
       }),
     ),
+    vscode.commands.registerCommand("jadeNative.signInObjects", signIn),
+    vscode.commands.registerCommand("jadeNative.forgetInspectionSignIn", forgetSavedSignIn),
     vscode.commands.registerCommand("jadeNative.connectObjects", () =>
       {
+        if (forgetSignInPromise) return forgetSignInPromise;
+        if (signInPromise) return signInPromise;
         if (connectionOperation?.actionPromise) return connectionOperation.actionPromise;
         const pending = action(connect);
         if (connectionOperation) connectionOperation.actionPromise = pending;

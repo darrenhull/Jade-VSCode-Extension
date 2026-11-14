@@ -363,15 +363,15 @@ test("shared inspection passes configuration in memory without temporary files",
     await s.cleanup();
   }
 });
-test("native security sign-on retries once with a masked password and in-memory credentials", async () => {
+test("native security sign-on supplies a masked password before connection with in-memory credentials", async () => {
   const s = setup({ authentication: true });
   try {
     await s.connect();
-    assert.equal(s.clients.length, 2);
+    assert.equal(s.clients.length, 1);
     assert.equal(s.prompts.length, 2);
     assert.equal(s.prompts[1].password, true);
-    assert.equal(s.sessionData[1].user, "developer");
-    assert.equal(s.sessionData[1].password, "private-password");
+    assert.equal(s.sessionData[0].user, "developer");
+    assert.equal(s.sessionData[0].password, "private-password");
     assert.ok(s.configFiles.every((file) => !fs.existsSync(file)));
     assert.equal(s.errors.length, 0);
   } finally {
