@@ -27,7 +27,8 @@ class SourceIndex{
   try{
    if(reuse&&this.cache?.nativeVersion!==undefined&&this.proof){const current=await this.proof(uri);if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;if(old?.rawSha256&&current?.rawSha256===old.rawSha256){old.cached=false;return old.model;}}
    if(this.stat&&this.cache&&this.cache.nativeVersion===undefined){stamp=await this.stat(uri);afterStat=performance.now();if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;if(reuse&&same(old?.stamp,stamp)){old.cached=false;return old.model;}}
-   const value=await this.read(uri);if(typeof value==='string')text=value;else{const bytes=Buffer.from(value);rawSha256=crypto.createHash('sha256').update(bytes).digest('hex');text=decodeSourceBytes(bytes);}
+   const value=await this.read(uri);if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;
+   if(typeof value==='string')text=value;else{const bytes=Buffer.from(value);rawSha256=crypto.createHash('sha256').update(bytes).digest('hex');if(this.cache?.nativeVersion!==undefined&&old?.rawSha256===rawSha256){old.cached=false;return old.model;}text=decodeSourceBytes(bytes);}
   }catch(error){if(this.serial.get(uri)===sequence)this.remove(uri);return;}
   if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;
   const beforeParse=performance.now(),model=metadata(parseSource(text,uri)),record={model,stamp,rawSha256,open:false};

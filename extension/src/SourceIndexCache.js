@@ -133,7 +133,7 @@ class SourceIndexCache{
    if(!this.sharedPending.size)return;await this.loadShared();
    if(typeof this.request!=='function'){this.report(Error('Native browsing-cache writer is unavailable; no shared files were written.'));return;}
    while(this.sharedPending.size){
-    let batch=[],root,bytes=0;
+    let batch=[],root,batchShard,bytes=0;
     const send=async()=>{
      if(!batch.length)return;const sending=batch;batch=[];bytes=0;
      try{
@@ -144,15 +144,17 @@ class SourceIndexCache{
      }catch(error){this.report(error);}
      finally{for(const item of sending)if(this.sharedPending.get(item.uri)===item.pending)this.sharedPending.delete(item.uri);}
     };
-    for(const [uri,pending] of [...this.sharedPending]){
+    const groups=new Map();
+    for(const [uri,pending]of this.sharedPending){const binding=this.sharedBindings.get(key(pending.root)),relative=path.relative(binding?.repository||pending.root,fileURLToPath(uri)).split(path.sep).join('/'),shard=crypto.createHash('sha256').update(relative).digest()[0]%SHARDS,id=JSON.stringify([key(pending.root),shard]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push([uri,pending,shard]);}
+    for(const [uri,pending,shard] of [...groups.values()].flat()){
      try{
       const binding=this.sharedBindings.get(key(pending.root));if(!binding)throw Error('Initialise or refresh the workspace source cache before saving browsing metadata.');
       const file=fileURLToPath(uri),relative=path.relative(binding.repository,file).split(path.sep).join('/');if(!relativePath(relative)||!within(binding.root,file))throw Error('Advisory source path escapes its owning workspace.');
       const model=pending.model===null?null:browserModel(pending.model);if(model!==null&&Buffer.byteLength(JSON.stringify(model))>SHARED_MODEL_BYTES)throw Error('Advisory browsing model exceeds its 2 MiB size limit; refresh guidance is required.');
       const update={path:relative,rawSha256:pending.rawSha256,model},size=Buffer.byteLength(JSON.stringify(update));
       const overhead=Buffer.byteLength(JSON.stringify({root:binding.root,parser:this.parserId,updates:[]}))+1024;
-      if(batch.length&&(root!==binding.root||batch.length>=SHARED_BATCH||bytes+size+batch.length+overhead>SHARED_PACKET_BYTES))await send();
-      root=binding.root;bytes+=size;batch.push({uri,pending,update});
+      if(batch.length&&(root!==binding.root||batchShard!==shard||batch.length>=SHARED_BATCH||bytes+size+batch.length+overhead>SHARED_PACKET_BYTES))await send();
+      root=binding.root;batchShard=shard;bytes+=size;batch.push({uri,pending,update});
      }catch(error){this.report(error);if(this.sharedPending.get(uri)===pending)this.sharedPending.delete(uri);}
     }await send();
    }

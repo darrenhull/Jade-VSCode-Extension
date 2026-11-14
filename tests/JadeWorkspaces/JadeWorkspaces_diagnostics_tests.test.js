@@ -58,3 +58,7 @@ test('a stale result cannot replace Problems owned by a newer source snapshot',a
  const oldText=document.getText;document.getText=()=>{const text=oldText();queueMicrotask(()=>document.version++);return text;};
  const result=await h.run();assert.equal(result.stale,true);assert.deepEqual(h.entries.get('file:C:/project/first.jade'),before);
 });
+test('unavailable native source context does not invent a Scratch Pad position',async()=>{
+ const h=harness();h.select('first');h.state.result={code:6281,passed:false,report:{compiled:false,diagnostics:[{compiler_error:6281,message:'Synthetic native parser error',diagnostic_context_unavailable:true}]}};
+ const result=await h.run();assert.equal(result.code,6281);assert.equal(h.entries.size,0);
+});

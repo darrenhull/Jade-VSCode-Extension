@@ -15,6 +15,8 @@ async function fixture(t){
  return {temporary,repository,root,directory,relative,uri,rawSha256,model,row,file,header};
 }
 function cache(f,extra={}){return new SourceIndexCache({roots:()=>[f.root],nativeVersion:version,parserId:parser,...extra});}
+const shardOf=relative=>crypto.createHash('sha256').update(relative).digest()[0]%32;
+function sameShardPaths(prefix,count){const result=[];for(let i=0;result.length<count;i++){const value=prefix+i+'.cls';if(shardOf(value)===0)result.push(value);}return result;}
 
 test('v2 reader uses digest-bound advisory model from the owning repository subdirectory without source bodies',async t=>{
  const f=await fixture(t);f.row.browser.model={...f.model,text:'DO_NOT_PERSIST',code:'DO_NOT_PERSIST',classes:[{...f.model.classes[0],members:[{name:'run',kind:'method',selection:1,start:1,end:4,body:'DO_NOT_PERSIST',parameters:[{name:'arg',type:'String',sourceText:'DO_NOT_PERSIST'}]}]}]};await fs.writeFile(f.file,JSON.stringify(f.header));
@@ -65,7 +67,7 @@ test('a newer saved advisory update survives an older in-flight acknowledgement'
 
 test('saved advisory deltas are batched below the count/payload limits and never include source bodies',async t=>{
  const f=await fixture(t),packets=[],current=cache(f,{request:(command,body)=>{packets.push(body);return {id:packets.length,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(value=>value.path),stale:[]})};}});
- await current.load();for(let i=0;i<129;i++){const uri=pathToFileURL(path.join(f.root,'Fish'+i+'.cls')).href;current.set(uri,{model:{...f.model,uri},rawSha256:f.rawSha256});}await current.flush();
+ await current.load();for(const relative of sameShardPaths('project/Fish',129)){const uri=pathToFileURL(path.join(f.repository,relative)).href;current.set(uri,{model:{...f.model,uri},rawSha256:f.rawSha256});}await current.flush();
  assert.equal(packets.length,2);assert.deepEqual(packets.map(packet=>packet.updates.length),[128,1]);assert.ok(packets.every(packet=>Buffer.byteLength(JSON.stringify(packet))<=4*1024*1024));
 });
 
@@ -86,7 +88,7 @@ test('large COM-style advisory models near 2 MiB remain complete and split befor
  const model={schema:'AutomationSchema',parentSchema:'RootSchema',lineStarts:[0,100,200],classes:[{name:'AutomationComponent',kind:'class',start:0,end:5200*180,selection:0,regions:[[0,5200*180]],members}]};
  const expectedBytes=Buffer.byteLength(JSON.stringify(model));assert.ok(expectedBytes>1.9*1024*1024&&expectedBytes<2*1024*1024,'Fixture must stay near the real per-model protocol boundary');
  const current=cache(f,{onError:error=>errors.push(error),request:(command,body)=>{packets.push(body);return {id:packets.length,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(value=>value.path),stale:[]})};}});await current.load();
- for(let i=0;i<3;i++){const uri=pathToFileURL(path.join(f.root,'Automation'+i+'.cls')).href;current.set(uri,{rawSha256:f.rawSha256,model:{...model,uri,text:'SOURCE_BODY_MUST_NOT_TRAVEL'.repeat(300000),code:'SOURCE_BODY_MUST_NOT_TRAVEL'}});}
+ for(const relative of sameShardPaths('project/Automation',3)){const uri=pathToFileURL(path.join(f.repository,relative)).href;current.set(uri,{rawSha256:f.rawSha256,model:{...model,uri,text:'SOURCE_BODY_MUST_NOT_TRAVEL'.repeat(300000),code:'SOURCE_BODY_MUST_NOT_TRAVEL'}});}
  await current.flush();assert.deepEqual(errors,[]);assert.deepEqual(packets.map(packet=>packet.updates.length),[2,1]);
  for(const packet of packets){const text=JSON.stringify(packet);assert.ok(Buffer.byteLength(text)<=4*1024*1024);assert.ok(!text.includes('SOURCE_BODY_MUST_NOT_TRAVEL'));for(const update of packet.updates){assert.equal(update.model.classes[0].members.length,5200);assert.deepEqual(update.model.classes[0].members.at(-1),members.at(-1));}}
 });
@@ -137,4 +139,18 @@ test('real parser navigation/type metadata roundtrips while raw UTF16 proof and 
 });
 test('shared headers require an absolute owning-root identity rather than a cwd-relative alias',async t=>{
  const f=await fixture(t),errors=[];f.header.root=path.relative(process.cwd(),f.root);await fs.writeFile(f.file,JSON.stringify(f.header));assert.deepEqual(await cache(f,{onError:error=>errors.push(error)}).load(),[]);assert.ok(errors.some(error=>/initiali[sz]e|refresh/i.test(error.message)));
+});
+test('advisory packets group by owning root and existing shard while retaining every saved record',async t=>{
+ const f=await fixture(t),other=path.join(f.repository,'other'),directory=path.join(other,'.jade/source-index');await fs.mkdir(directory,{recursive:true});
+ const relative='other/Fish.cls',row={...f.row,path:relative};await fs.writeFile(path.join(directory,'v2-'+shardOf(relative)+'.json'),JSON.stringify({...f.header,root:other,entries:[row]}));
+ const original=await fs.readFile(f.file),packets=[],expected=[];
+ const current=cache(f,{roots:()=>[f.root,other],request:(command,body)=>{packets.push(body);return{id:packets.length,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(row=>row.path),stale:[]})};}});await current.load();
+ for(let i=0;i<96;i++){const relative=(i%2?'project':'other')+'/Class'+i+'.cls',uri=pathToFileURL(path.join(f.repository,relative)).href;expected.push(relative);current.set(uri,{model:f.model,rawSha256:f.rawSha256});}
+ await current.flush();assert.deepEqual(packets.flatMap(packet=>packet.updates.map(row=>row.path)).sort(),expected.sort());
+ for(const packet of packets){assert.equal(new Set(packet.updates.map(row=>shardOf(row.path))).size,1,'Each batch must touch only its existing native shard');assert.ok(packet.updates.every(row=>row.path.startsWith(packet.root===other?'other/':'project/')));}
+ assert.equal(packets.length,new Set(expected.map(relative=>(relative.startsWith('other/')?other:f.root)+':'+shardOf(relative))).size);assert.deepEqual(await fs.readFile(f.file),original);
+});
+test('a new saved raw digest is submitted for native target validation without an old-hash gate',async t=>{
+ const f=await fixture(t),packets=[],current=cache(f,{request:(command,body)=>{packets.push(body);return{id:1,promise:Promise.resolve({code:0,passed:true,accepted:[f.relative],stale:[]})};}});await current.load();
+ const changed=hash('new saved file bytes');current.set(f.uri,{model:{...f.model,classes:[{...f.model.classes[0],name:'ChangedFish'}]},rawSha256:changed});await current.flush();assert.equal(packets.length,1);assert.equal(packets[0].updates[0].rawSha256,changed);assert.equal(packets[0].updates[0].model.classes[0].name,'ChangedFish');
 });

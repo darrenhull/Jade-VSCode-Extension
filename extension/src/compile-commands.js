@@ -1,6 +1,7 @@
 'use strict';
 const path=require('node:path');
 const {resolveJadeSource}=require('./active-jade-source');
+const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 function registerCompileCommands(vscode,context,services){
  async function compile(projectBuild,uri){
   const output=services.output;
@@ -24,7 +25,7 @@ function registerCompileCommands(vscode,context,services){
     try{return await operation.completion;}finally{subscription.dispose();}
    });
    if(result.report?.error)output.appendLine(result.report.error);
-   for(const error of result.report?.diagnostics||[]){output.appendLine(`Jade ${error.compiler_error} (${error.owner}::${error.method}): ${error.message}`);output.appendLine(`${error.source}:${error.line}:${error.column}`);}
+   for(const error of result.report?.diagnostics||[])for(const line of diagnosticLines(error))output.appendLine(line);
    if(result.passed)output.appendLine(result.report.native_project?`Native project compile complete; synchronised ${result.report.loaded_files} source/resource file(s).`:`Native compile complete; synchronised ${result.report.loaded_files} changed CLS file(s).`);
    output.appendLine(`CompilerExitCode=${result.code}`);return result;
   }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}

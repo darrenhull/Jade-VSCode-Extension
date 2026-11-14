@@ -16,7 +16,7 @@ function fixture({busy=true,result,sourceReady,inputsReady,uiReady,dirty=false,s
  const document={uri:h.api.Uri.file('C:/synthetic/Probe.cls'),isDirty:dirty,save,getText:()=>sourceText,positionAt:offset=>({line:sourceText.slice(0,offset).split('\n').length-1,character:0})};
  const disposable=()=>({dispose(){}});
  const vscode={...h.api,ProgressLocation:{Notification:1},commands:{registerCommand(name,handler){assert.equal(name,'jadeNative.executeLocalTests');command=handler;return disposable();},async executeCommand(name,key,value){calls.context.push(value);if(name==='setContext'&&value===false)await uiReady;}},window:{showErrorMessage(message){calls.messages.push(message);},showInformationMessage(){},async withProgress(options,task){return task({}, {onCancellationRequested:disposable});}},workspace:{textDocuments:[document],findFiles:async()=>[document.uri],createFileSystemWatcher:()=>({dispose(){},onDidCreate:disposable,onDidChange:disposable,onDidDelete:disposable}),onDidOpenTextDocument:disposable,onDidChangeTextDocument:disposable,async openTextDocument(){return document;}}};
- const sandbox={vscode,nativeTests:{},publishing:busy,resolveSource:async()=>{await sourceReady;return document;},path,classConfig:()=>({program:document.uri.fsPath}),diagnostics:{delete(){}},reportDiagnostic(){},testOutput:{clear(){},show(){},append(text){calls.output.push(text);},appendLine(text){calls.output.push(text+'\n');}},workingFiles:async()=>{calls.prepare++;await inputsReady;},startWorking(config,operation,onOutput){calls.native++;return{stop(){},completion:Promise.resolve(result)}}};
+ const sandbox={vscode,diagnosticLines:require('../../extension/src/compiler-diagnostic-presentation').diagnosticLines,nativeTests:{},publishing:busy,resolveSource:async()=>{await sourceReady;return document;},path,classConfig:()=>({program:document.uri.fsPath}),diagnostics:{delete(){}},reportDiagnostic(){},testOutput:{clear(){},show(){},append(text){calls.output.push(text);},appendLine(text){calls.output.push(text+'\n');}},workingFiles:async()=>{calls.prepare++;await inputsReady;},startWorking(config,operation,onOutput){calls.native++;return{stop(){},completion:Promise.resolve(result)}}};
  vm.runInNewContext(expression,sandbox,{filename:'registered-executeLocalTests.js'});
  const manager=registerTesting(vscode,{subscriptions:[]},(...args)=>command(...args));
  return{calls,h,document,command,manager,sandbox};
@@ -67,6 +67,12 @@ test('a failed selected-source save stops before native preparation or execution
  let saves=0;const f=fixture({busy:false,dirty:true,save:async()=>{saves++;return false;}});
  const result=await f.manager.runFile(f.document.uri,'check');
  assert.equal(saves,1);assert.equal(result.passed,false);assert.match(result.error,/Save the test file/);assert.equal(f.calls.prepare,0);assert.equal(f.calls.native,0);assert.equal(f.sandbox.publishing,false);
+});
+test('context-free native 6281 remains visible in Test Explorer and output without a fabricated source',async()=>{
+ const result={passed:false,code:6281,report:{compiled:false,tests_completed:false,cleanup_complete:false,results:[],diagnostics:[{compiler_error:6281,message:'Synthetic native parser error',diagnostic_context_unavailable:true}]}},f=fixture({busy:false,result});
+ await f.manager.runFile(f.document.uri,'check');
+ assert.match(f.calls.output.join(''),/Jade 6281.*Synthetic native parser error/);assert.doesNotMatch(f.calls.output.join(''),/undefined/);
+ const error=f.h.runs[0].states.find(state=>state.status==='errored');assert.match(error.message.message,/Jade 6281.*Synthetic native parser error/);assert.equal(error.message.location,undefined);assert.equal(f.calls.native,1);
 });
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};}
 const completedResult=()=>({passed:true,code:0,report:{tests_completed:true,cleanup_complete:true,tests_selected:1,failures:0,results:[{method:'check',status:'passed'}]}});

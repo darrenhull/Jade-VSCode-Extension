@@ -11,6 +11,7 @@ const { CliWorkingSession } = require('./cli-client');
 const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
 const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
+const {diagnosticLocation,diagnosticLines}=require('./compiler-diagnostic-presentation');
 
 let activeNativeService;
 
@@ -188,30 +189,19 @@ function activate(context) {
   }
   const workingFiles = config => require('./compile-inputs').prepareCompileInputs(vscode, config);
   function reportDiagnostic(report) {
-    if (report.diagnostics?.some(entry => entry.source && entry.source !== report.source)) {
-      const grouped = new Map();
-      for (const entry of report.diagnostics) {
-        const source = entry.source || report.source;
-        if (!grouped.has(source)) grouped.set(source, []);
-        grouped.get(source).push(entry);
-      }
-      for (const [source, entries] of grouped) reportDiagnostic({ ...report, source, diagnostics: entries });
-      return;
-    }
-    const uri = vscode.Uri.file(report.source);
-    diagnostics.delete(uri);
+    if(report.source)diagnostics.delete(vscode.Uri.file(report.source));
     if (report.compiled !== false) return;
-    const entries = report.diagnostics || [report];
-    diagnostics.set(uri, entries.map(entry => {
-      const line = Math.max(0, (entry.line || 1) - 1);
-      const column = Math.max(0, (entry.column || 1) - 1);
+    const grouped=new Map();
+    for(const entry of report.diagnostics||[report]){const location=diagnosticLocation(entry,report.source);if(!location)continue;if(!grouped.has(location.source))grouped.set(location.source,[]);grouped.get(location.source).push({entry,location});}
+    for(const [source,entries]of grouped){const uri=vscode.Uri.file(source);diagnostics.set(uri,entries.map(({entry,location})=>{
+      const line=location.line-1,column=location.column-1;
       const document = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
       const end = document && line < document.lineCount ? Math.min(document.lineAt(line).text.length, column + Math.max(1, entry.error_length || 1)) : column + 1;
       const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, Math.max(column, end)), entry.message || 'Jade compilation failed.', vscode.DiagnosticSeverity.Error);
       diagnostic.code = entry.compiler_error;
       diagnostic.source = 'Jade';
       return diagnostic;
-    }));
+    }));}
   }
   const debugTests=require('./test-debug').registerTestDebugging(vscode,context);
   const testing = require('./testing').registerTesting(vscode, context, (...args) =>
@@ -247,7 +237,7 @@ function activate(context) {
   });
   require('./application-debug-ui').registerApplicationDebug(vscode,context);
   require('./debugger').registerDebugger(vscode,context,{
-    beforeOperation,config:classConfig,workingFiles,startWorking,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
+    beforeOperation,config:classConfig,workingFiles,startWorking,reportDiagnostic,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);}
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{
@@ -361,10 +351,7 @@ function activate(context) {
             grouped.get(source).push(entry);
           }
           for (const [source, entries] of grouped) reportDiagnostic({ source, compiled: false, diagnostics: entries });
-          for (const diagnostic of result.report.diagnostics) {
-            testOutput.appendLine(`Jade ${diagnostic.compiler_error} (${diagnostic.owner}::${diagnostic.method}): ${diagnostic.message}`);
-            testOutput.appendLine(`${diagnostic.source}:${diagnostic.line}:${diagnostic.column}`);
-          }
+          for(const diagnostic of result.report.diagnostics)for(const line of diagnosticLines(diagnostic))testOutput.appendLine(line);
         }
         if (result.cancelled) testOutput.appendLine('Test run cancelled; results are incomplete.');
         else if (result.timedOut) testOutput.appendLine('Test run timed out; results are incomplete. Adjust jadeNative.testTimeoutSeconds if needed.');

@@ -4,6 +4,7 @@ const {isManagedProjectPath}=require('./source-index-scope');
 const { testLenses } = require('./local-tests');
 const { isNestedSnapshot } = require('./source-snapshots');
 const { sourcePosition } = require('./source_symbols');
+const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 
 function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   // Allows the command transport to be exercised outside the extension host.
@@ -147,7 +148,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
           if (result?.cancelled || token?.isCancellationRequested) { run.skipped(item); continue; }
           const outcome = results.get(details.get(item).method);
           if (!result?.report?.tests_completed || !result?.report?.cleanup_complete || !outcome) {
-            const message = result?.report?.error || result?.error || (result?.timedOut ? 'Native test run timed out.' : 'Native test run did not produce a complete method result.');
+            const message = result?.report?.error || result?.error || (result?.report?.diagnostics||[]).flatMap(diagnosticLines).join('\n') || (result?.timedOut ? 'Native test run timed out.' : 'Native test run did not produce a complete method result.');
             run.errored(item, new vscode.TestMessage(message));
           } else if (outcome.status === 'passed') run.passed(item);
           else if (outcome.status === 'skipped') run.skipped(item);

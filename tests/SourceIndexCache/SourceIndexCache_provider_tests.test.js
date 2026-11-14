@@ -31,3 +31,13 @@ test('cache version repair reloads saved rows while dirty models survive without
  const other='file:///synthetic/Bird.cls';f.setRows([{uri,rawSha256:'a'.repeat(64),model:parseSource(source('SavedFish'),uri)},{uri:other,rawSha256:'b'.repeat(64),model:parseSource(source('Bird'),other)}]);
  await f.index.reloadSavedCache();assert.equal(f.loads(),2);assert.equal(f.lists(),0);assert.equal(f.index.records.get(uri).model.classes[0].name,'UnsavedFish');assert.equal(f.index.records.get(other).model.classes[0].name,'Bird');assert.equal(f.saved.length,0);f.index.dispose();
 });
+test('identical saved bytes reuse the exact shared browsing model without native preparation or reparsing',async()=>{
+ const bytes=Buffer.from(source('Fish')),model=parseSource(source('Fish'),uri),f=fixture({rows:[{uri,rawSha256:hash(bytes),model}],read:async()=>bytes});
+ await f.index.ready();assert.equal(f.reads(),1);assert.equal(f.index.records.get(uri).model,model,'Identical raw bytes must return before decode/parse');assert.equal(f.saved.length,0);
+ f.index.schedule(uri);await f.index.flush();assert.equal(f.index.records.get(uri).model,model);assert.equal(f.saved.length,0);f.index.dispose();
+});
+test('same-size same-stamp saved edits compare actual bytes before reusing shared metadata',async()=>{
+ const before=Buffer.from(source('Fish')),after=Buffer.from(source('Bird')),model=parseSource(source('Fish'),uri);assert.equal(before.length,after.length);
+ const f=fixture({rows:[{uri,rawSha256:hash(before),model,stamp:{mtime:1,size:before.length}}],read:async()=>after});f.index.stat=async()=>({mtime:1,size:after.length});
+ await f.index.ready();assert.notEqual(f.index.records.get(uri).model,model);assert.equal(f.index.records.get(uri).model.classes[0].name,'Bird');assert.equal(f.saved[0].rawSha256,hash(after));f.index.dispose();
+});
