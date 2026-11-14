@@ -1,5 +1,7 @@
 # 0.22.7 - Workspace setup and connection progress
 
+- Bundle official Jade CLI 0.10.5 for the separate Working preparation timeout and native stage diagnostics.
+
 - Add configuration-only Initialise Workspace through the native CLI, preserving existing project files and reviewing missing local connection-profile creation.
 - Separate initial Working backup/verification/restore timeout from normal test execution, with a two-hour preparation default.
 - Show elapsed preparation progress while native stages are quiet and clarify installation, Git/source acquisition and Working startup steps.

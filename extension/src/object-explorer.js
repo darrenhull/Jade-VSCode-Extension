@@ -473,15 +473,15 @@ function registerObjectExplorer(vscode, context, services) {
     const changed = () => disposed || cancellationToken?.isCancellationRequested || generation !== session.generation || target !== session.target;
     const user = await setupStep(() => vscode.window.showInputBox({
       title: 'Jade inspection sign-on · ' + (target === 'working' ? 'Working' : 'Source'),
-      prompt: 'Enter application inspection credentials for this connection. Saved securely by VS Code for this connection. Leave the user name empty for anonymous access; the application may deny it.',
+      prompt: 'Inspection user name. Leave blank for anonymous access.',
       placeHolder: 'Inspection user name (optional)',
       ignoreFocusOut: true,
     }, cancellationToken));
     if (user === undefined || changed()) throw Error('Inspection sign-on cancelled.');
     if (user === '') return {};
     const password = await setupStep(() => vscode.window.showInputBox({
-      title: 'Jade inspection password',
-      prompt: 'Application inspection password for ' + user + '. It may be empty. Saved in VS Code secure storage; never in settings. Use Forget Saved Inspection Sign-In to remove it.',
+      title: 'Jade inspection password · ' + (target === 'working' ? 'Working' : 'Source'),
+      prompt: 'Password for ' + user + '. Leave blank if no password.',
       password: true,
       ignoreFocusOut: true,
     }, cancellationToken));

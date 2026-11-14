@@ -9,7 +9,7 @@ test('Connect offers inspection sign-on before an otherwise anonymous catalogue 
 });
 test('explicit empty inspection user connects anonymously without asking for a password',async()=>{
  const s=setup();s.vscode.window.showInputBox=async options=>{s.prompts.push(options);return '';};
- try{await s.commands.get('jadeNative.connectObjects')();assert.equal(s.prompts.length,1);assert.match(s.prompts[0].prompt,/leave.*empty/i);assert.equal(s.sessionData[0].user,undefined);assert.equal(s.sessionData[0].password,undefined);}finally{await s.cleanup();}
+ try{await s.commands.get('jadeNative.connectObjects')();assert.equal(s.prompts.length,1);assert.match(s.prompts[0].prompt,/leave blank.*anonymous/i);assert.equal(s.sessionData[0].user,undefined);assert.equal(s.sessionData[0].password,undefined);}finally{await s.cleanup();}
 });
 test('cancelled startup sign-on never starts database preparation or opens a native session',async()=>{
  let prepares=0;const s=setup({resolveInspectionTarget:async config=>{prepares++;return config;}});s.vscode.window.showInputBox=async()=>undefined;
@@ -113,4 +113,9 @@ for(const step of ['username','password'])test('cancelling replacement at '+step
 test('native rejection of newly entered replacement preserves the earlier saved sign-in',async()=>{
  const s=setup({authentication:config=>config.user==='replacement-user'});let pending;
  try{await s.connect();const saved=[...s.secretValues.entries()],first=s.clients[0];s.vscode.window.showInputBox=async options=>options.password?'wrong-replacement-password':'replacement-user';pending=s.commands.get('jadeNative.signInObjects')();await turn();first.finishClose();await pending;assert.deepEqual([...s.secretValues.entries()],saved);assert.equal(s.secretCalls.filter(row=>row.operation==='delete').length,0);assert.match(s.errors.at(-1),/Access denied/);}finally{await pending;await s.cleanup();}
+});
+
+for(const target of ['working','source'])test('sign-on fields stay concise and normal while identifying '+target+' and allowing a blank password',async()=>{
+ const s=setup();
+ try{if(target==='source')await s.commands.get('jadeNative.selectInspectionDatabase')();await s.commands.get('jadeNative.connectObjects')();const [user,password]=s.prompts;const label=target==='working'?'Working':'Source';for(const field of [user,password]){assert.doesNotMatch(field.prompt,/secure|storage|settings|forget/i,'Storage implementation details belong in documentation, not the input prompt.');assert.ok(field.prompt.length<100,'A sign-on input should contain one short instruction.');}assert.match(user.title,new RegExp(label));assert.match(password.title,new RegExp(label));assert.match(user.prompt,/anonymous/i);assert.match(password.prompt,/leave blank if no password/i);assert.equal(password.password,true);}finally{await s.cleanup();}
 });

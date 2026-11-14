@@ -7,7 +7,7 @@ const {connectPrivateDebugger}=require('./creation-ui-capture.cjs');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function main(){
  if(!process.env.JADE_TEST_CODE)throw Error('Set JADE_TEST_CODE to a local VS Code executable.');
- const root=path.resolve(__dirname,'..'),artifacts=new HostTestArtifacts({evidencePath:path.join(root,'evidence/inspection-sign-on-ui.json')});
+ const root=path.resolve(__dirname,'..'),promptsOnly=process.argv.includes('--prompts-only'),artifacts=new HostTestArtifacts({evidencePath:path.join(root,promptsOnly?'evidence/inspection-sign-on-prompts-ui.json':'evidence/inspection-sign-on-ui.json')});
  await artifacts.run(async stage=>{
   const extension=path.join(stage,'extension'),workspace=path.join(stage,'workspace');
   fs.cpSync(path.join(root,'extension'),extension,{recursive:true});fs.mkdirSync(path.join(workspace,'.vscode'),{recursive:true});
@@ -33,10 +33,10 @@ async function main(){
     async function capture(name){await pause(250);const {data}=await client.request('Page.captureScreenshot',{format:'png'},session);const file=path.join(root,'docs/screenshots/inspection-sign-on',name+'.png');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,Buffer.from(data,'base64'));}
     async function accept(){await client.request('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13},session);await client.request('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13},session);}
     if(phase==='first'){
-     await waitText('Jade inspection sign-on');await capture('username');await client.request('Input.insertText',{text:'demo-inspector'},session);await accept();
-     await waitText('Jade inspection password');await client.request('Input.insertText',{text:'fixture-password'},session);assert.equal(await evaluate("document.querySelector('.quick-input-widget input.input')?.type"),'password');await capture('password');await accept();
+     await waitText('Jade inspection sign-on');if(promptsOnly)assert.ok(String(await evaluate('document.body.innerText')).includes('Inspection user name. Leave blank for anonymous access.'));await capture('username');await client.request('Input.insertText',{text:'demo-inspector'},session);await accept();
+     await waitText('Jade inspection password');if(promptsOnly)assert.ok(String(await evaluate('document.body.innerText')).includes('Leave blank if no password.'));await client.request('Input.insertText',{text:'fixture-password'},session);assert.equal(await evaluate("document.querySelector('.quick-input-widget input.input')?.type"),'password');await capture('password');await accept();
     }
-    await waitText('Sign in to retry inspection');await capture(phase==='first'?'policy-denial':'reused-sign-in');
+    await waitText('Sign in to retry inspection');if(!promptsOnly)await capture(phase==='first'?'policy-denial':'reused-sign-in');
     for(let i=0;i<100&&!fs.existsSync(path.join(stage,'host-report.json'));i++)await pause(50);const report=JSON.parse(fs.readFileSync(path.join(stage,'host-report.json')));assert.equal(report.passed,true,JSON.stringify(report));assert.equal(report.usedSavedCredentials,phase==='second');
     if(phase==='second'){
      fs.writeFileSync(path.join(stage,'forget'),'forget');await waitText('Saved inspection sign-in forgotten for this connection.');await capture('forgotten');
@@ -48,7 +48,12 @@ async function main(){
     const owner=JSON.parse(fs.readFileSync(path.join(stage,'host-process.json')));assert.equal(owner.nonce,artifacts.nonce);await artifacts.waitClosed([owner.pid]);
    }
   }
-  const first=await runPhase('first'),second=await runPhase('second');
+  const first=await runPhase('first');
+  if(promptsOnly){
+   fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify({passed:true,scope:'username-password-presentation-only',artifact:'isolated-development-host/source-modules (not packaged VSIX)',extensionVersion:manifest.version,nativeDistributionVersion:nativeVersion,nativeRuntimeExecuted:false,applicationAuthorizationTested:false,maskedPassword:true,concisePrompts:true,standardSecretStorage:true,noDatabaseConnection:true,fakeNative:true,noPlaintextSettings:true,screenshots:['username.png','password.png'],phase:first}));
+   console.log('PASS concise username/password UI and masked input; secure/native behavior unchanged, fake native only.');return;
+  }
+  const second=await runPhase('second');
   const report={passed:true,artifact:'isolated-development-host/source-modules (not packaged VSIX)',extensionVersion:manifest.version,nativeDistributionVersion:nativeVersion,nativeRuntimeExecuted:false,applicationAuthorizationTested:false,standardSecretStorage:true,reusedAcrossRestart:true,forgotSelectedSecureEntry:true,noDatabaseConnection:true,fakeNative:true,noPlaintextSettings:true,phases:[first,second]};
   fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify(report));console.log('PASS actual SecretStorage sign-on, masked password, restart reuse and Forget UI; fake native only, no database connection.');
  });

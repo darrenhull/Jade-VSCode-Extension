@@ -31,6 +31,7 @@ async function main(){
    "}catch(error){fs.writeFileSync(process.env.JADE_INIT_REPORT,JSON.stringify({error:error.message}));}};",
   ].join('\n'));
   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
+  const user=path.join(stage,'vscode-data','User');fs.mkdirSync(user,{recursive:true});fs.writeFileSync(path.join(user,'settings.json'),JSON.stringify({'window.dialogStyle':'custom','workbench.startupEditor':'none','chat.disableAIFeatures':true}));
   const stop=path.join(stage,'stop'),report=path.join(stage,'initialization-result.json'),env={...process.env,JADE_HOST_PROCESS_FILE:path.join(stage,'host-process.json'),JADE_HOST_OWNER:artifacts.nonce,JADE_INIT_REPORT:report,JADE_INIT_STOP:stop,JADE_TOOLS_STATE_DIRECTORY:path.join(stage,'broker'),JADE_TOOLS_CONNECTIONS_FILE:path.join(stage,'connections.json'),JADE_INSTALL:'',JADE_HOME:''};delete env.ELECTRON_RUN_AS_NODE;
   const child=spawn(process.env.JADE_TEST_CODE,['--new-window','--remote-debugging-port='+port,'--user-data-dir',path.join(stage,'vscode-data'),'--extensions-dir',extensions,'--extensionDevelopmentPath='+harness,'--disable-workspace-trust','--skip-welcome','--skip-release-notes',workspace],{env,windowsHide:true,stdio:'ignore'});artifacts.track(child);
   let client,session;
@@ -53,7 +54,7 @@ async function main(){
    await until('Jade workspace configuration is ready');await capture('configuration-complete');
    assert.equal(fs.readFileSync(project,'utf8'),original);assert.equal(fs.existsSync(config.databasePath),false);assert.equal(fs.existsSync(path.join(workspace,'.jade/working')),false);
    const profiles=JSON.parse(fs.readFileSync(path.join(stage,'connections.json')));assert.deepEqual(profiles.profiles['cloned-ui-project'],config);
-   const receipt={passed:true,packagedVersion:manifest.version,nativeVersion:native.packageVersion,actualPackagedUi:true,configurationOnly:true,missingProfileAction:true,reviewedCreation:true,existingProjectPreserved:true,databaseOpened:false,screenshots:['missing-profile.png','review-machine-profile.png','configuration-complete.png']};
+   const receipt={passed:true,packagedVersion:manifest.version,nativeVersion:native.packageVersion,actualPackagedUi:true,dialogStyle:'custom in owned private profile',configurationOnly:true,missingProfileAction:true,reviewedCreation:true,existingProjectPreserved:true,databaseOpened:false,screenshots:['missing-profile.png','review-machine-profile.png','configuration-complete.png']};
    fs.writeFileSync(path.join(stage,'host-report.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt));
   }finally{
    client?.close();fs.writeFileSync(stop,'stop');
