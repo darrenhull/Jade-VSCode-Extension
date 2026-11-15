@@ -138,10 +138,14 @@ class SourceIndexCache{
     const send=async()=>{
      if(!batch.length)return;const sending=batch;batch=[];bytes=0;
      try{
+      const binding=this.sharedBindings.get(key(root));
       const result=await this.request('source.index.browser.update',{root,parser:this.parserId,updates:sending.map(item=>item.update)}).promise;
       const paths=new Set(sending.map(item=>item.update.path)),accepted=result?.accepted,stale=result?.stale;
       if(result?.passed!==true||result.code!==0||!Array.isArray(accepted)||!Array.isArray(stale)||accepted.length+stale.length!==paths.size||new Set([...accepted,...stale]).size!==paths.size||[...accepted,...stale].some(value=>!paths.has(value)))throw Error(result?.report?.error||'Invalid native browsing-cache acknowledgement.');
-      for(const item of sending)if(accepted.includes(item.update.path)&&this.sharedPending.get(item.id)===item.pending)this.sharedProofs.set(item.id,{root:item.pending.root,rawSha256:item.pending.rawSha256,path:item.update.path});
+      const canonical=result.canonicalPaths===undefined?{}:result.canonicalPaths;
+      if(!canonical||typeof canonical!=='object'||Array.isArray(canonical)||Object.keys(canonical).length>SHARED_BATCH)throw Error('Invalid native canonical-path acknowledgement.');
+      for(const [requested,value]of Object.entries(canonical))if(!binding||!accepted.includes(requested)||!relativePath(value)||!within(binding.root,path.resolve(binding.repository,...value.split('/')))||key(path.resolve(binding.repository,...requested.split('/')))!==key(path.resolve(binding.repository,...value.split('/'))))throw Error('Invalid native canonical-path acknowledgement.');
+      for(const item of sending)if(accepted.includes(item.update.path)&&this.sharedPending.get(item.id)===item.pending)this.sharedProofs.set(item.id,{root:item.pending.root,rawSha256:item.pending.rawSha256,path:Object.hasOwn(canonical,item.update.path)?canonical[item.update.path]:item.update.path});
       if(stale.length)this.report(Error('Saved source changed; stale browsing metadata was not cached.'));
      }catch(error){this.report(error);}
      finally{for(const item of sending)if(this.sharedPending.get(item.id)===item.pending)this.sharedPending.delete(item.id);}

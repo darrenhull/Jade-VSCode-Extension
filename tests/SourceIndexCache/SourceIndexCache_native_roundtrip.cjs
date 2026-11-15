@@ -29,6 +29,7 @@ async function runNativeBrowserRoundtrip({entry,refresh}){
   assert.ifError(alias.error);assert.equal(alias.status,0,alias.stderr||alias.stdout);const aliasResult=JSON.parse(alias.stdout);assert.equal(aliasResult.passed,true,alias.stdout);assert.equal(aliasResult.cache?.format,2);
   assert.equal((await session.request('status').promise).brokerPID,brokerPID,'Terminal alias must use the same isolated broker');
   const directory=path.join(root,'.jade/source-index'),before=await diskRows(directory),nativeBefore=before.rows.map(({browser,...row})=>row);
+  assert.equal(before.nativeVersion,capability.capabilities.sourceIndex.nativeVersion);
   assert.equal(before.rows.find(row=>row.path===relative)?.native?.hash,rawSha256);
   const errors=[],packets=[],request=(command,body)=>{const pending=session.request(command,body);packets.push({command,body});return pending;};
   const cache=new SourceIndexCache({roots:()=>[root],nativeVersion:before.nativeVersion,request,onError:error=>errors.push(error)});
@@ -46,7 +47,12 @@ async function runNativeBrowserRoundtrip({entry,refresh}){
   assert.equal(direct.passed,true,JSON.stringify(direct));assert.equal(direct.stale.length,0);assert.equal((await diskRows(directory)).rows.length,changedDisk.rows.length,'Direct native case-alias packet must not create a duplicate row');
   const variant=pathToFileURL(path.join(root,'BROWSERMETADATA.CLS')).href;cache.set(variant,{model:changedModel,rawSha256:newHash});await cache.flush();assert.equal(errors.length,previousErrors,'Windows URI case variants must not be rejected as stale');
   const variantDisk=await diskRows(directory);assert.equal(variantDisk.rows.length,changedDisk.rows.length,'Windows URI case must not create a duplicate cache row');assert.equal(variantDisk.rows.filter(row=>row.path.toLowerCase()===relative.toLowerCase()).length,1);
-  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,matchingSavedEditAccepted:true,windowsUriCaseStable:true,sourceBodiesPersisted:false,terminalAlias:true,sameIsolatedBroker:true};
+  const newText=source.replace(/\bFish\b/g,'NewFish'),newBytes=Buffer.from(newText),newRelative='project/NewFish.cls',newUri=pathToFileURL(path.join(root,'NEWFISH.CLS')).href;
+  await fs.writeFile(path.join(root,'NewFish.cls'),newBytes);cache.set(newUri,{model:parseSource(newText,newUri),rawSha256:hash(newBytes)});await cache.flush();assert.equal(errors.length,previousErrors);assert.equal(cache.sharedProofs.get(newUri.toLowerCase()).path,newRelative,'New alias must retain native canonical spelling from its accepted ACK');
+  const newDisk=await diskRows(directory);assert.equal(newDisk.rows.length,variantDisk.rows.length+1);assert.ok(newDisk.rows.find(row=>row.path===newRelative)?.browser);
+  cache.delete(newUri);await cache.flush();assert.equal(errors.length,previousErrors);assert.equal(packets.at(-1).body.updates[0].path,newRelative);assert.equal(packets.at(-1).body.updates[0].model,null);
+  const cleared=await diskRows(directory),clearedRow=cleared.rows.find(row=>row.path===newRelative);assert.ok(clearedRow?.native);assert.equal(clearedRow.browser,undefined,'Unknown-alias save/delete must not strand advisory metadata');assert.equal(cleared.rows.length,newDisk.rows.length);
+  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,matchingSavedEditAccepted:true,windowsUriCaseStable:true,newAliasConditionalClear:true,sourceBodiesPersisted:false,terminalAlias:true,sameIsolatedBroker:true};
  });
  assert.equal(await fs.stat(stage).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;}),false,'Owned fixture directory remains after shutdown');
  assert.throws(()=>process.kill(brokerPID,0),error=>error.code==='ESRCH','Owned broker must actually exit before cleanup');

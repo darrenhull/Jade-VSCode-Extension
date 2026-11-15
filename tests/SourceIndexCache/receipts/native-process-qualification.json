@@ -1,0 +1,42 @@
+{
+  "observedUtc": "2026-11-15T00:22:26Z",
+  "qualification": "Private database-free native candidate; product defaults remain unactivated",
+  "nativeSourceCommit": "dacb970a5da01eba22387f25d6373b644faf66e6",
+  "candidateSha256": "3a92a60d75e02d99d5449ac9d63611a1fd1f128ce145bdeca44eb98c1c05d097",
+  "nativeVersion": "jade-cli/0.10.6/source-index/2",
+  "consumerBaseCommit": "57af9676acb5926bf44b4f8c13e2ce7c5691ae5a",
+  "verifiedFiles": {
+    "extension/src/SourceIndexCache.js": "86e95ce40a51e14822cf63d9e9f845022edb63810d22a94ff00e8c4310edc230",
+    "tests/SourceIndexCache/SourceIndexCache_native_roundtrip.cjs": "0ac97686df110c27ce0bde23bb54ff747ce001d1acb9825591e7c9de7e42e038",
+    "tests/SourceIndexCache/SourceIndexCache_native_roundtrip_tests.test.js": "ba891ca4b81ef9fd613bb9613194872653403b0b3369e89ea773f2ebfc6f0919",
+    "tests/SourceIndexCache/fixtures/BrowserMetadata.cls": "89b5beb8833b40bdb7ddd1d62dd462a01653ecbf01763cf8751d02871c73cf9e"
+  },
+  "actualProcessTest": {
+    "passed": 1,
+    "failed": 0,
+    "elapsedMilliseconds": 5347,
+    "unbornGitRepository": true,
+    "subdirectoryWorkspace": true,
+    "rawUtf16Identity": true,
+    "exactJsNativeDiskJsMetadataRoundtrip": true,
+    "typeMethodAndUpdatingRetained": true,
+    "nativeRowsUnchangedByUnchangedAdvisoryUpdate": true,
+    "staleSavedProofRejected": true,
+    "matchingNewSavedBytesAccepted": true,
+    "directNativeUppercasePacketDoesNotDuplicate": true,
+    "knownUriAliasesStable": true,
+    "unknownUppercaseSaveThenConditionalClear": true,
+    "canonicalAckRetained": true,
+    "nativeMetadataRetainedAfterBrowserClear": true,
+    "sourceBodiesPersisted": false,
+    "doctorCapabilityVerified": true,
+    "terminalSourceRefreshAlias": true,
+    "sameIsolatedBroker": true,
+    "ownedBrokerActuallyExited": true,
+    "ownedFixtureRemoved": true,
+    "databaseOpened": false
+  },
+  "focusedProtocolProviderContextTests": { "passed": 57, "failed": 0 },
+  "redBeforeCorrection": { "nativeCaseAliasesCreatedTwoRows": true, "clientCanonicalAckCases": 6 },
+  "remainingGates": ["large-workspace performance", "consumer activation and command wiring", "full defaults", "coherent distribution and package checks", "changed running UI evidence"]
+}
