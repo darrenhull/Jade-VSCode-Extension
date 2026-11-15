@@ -1,0 +1,19 @@
+{
+  "sourceHead": "3358321",
+  "base": "67602f9",
+  "packageVersion": "0.22.13",
+  "baselineOnly": true,
+  "releaseReady": false,
+  "vsixSha256": "0b25825d14604280063174677a514fdc021e0ba9fed9ebf34dfe2e79670ffaa9",
+  "vsixBytes": 5382333,
+  "sourceModulesByteIdentical": 118,
+  "baselineOfficialCliVersion": "0.10.8",
+  "nativeDistributionPinAndAllRuntimeHashes": true,
+  "portableExtractedNoNode": true,
+  "nativeTestDiscovery": true,
+  "targetedLocalTests": 28,
+  "fullLocalSuiteRun": false,
+  "databaseOpened": false,
+  "finalDependency": "Official published CLI0.10.9 generic empty-fragment repair; then update pin, manifest and full payload atomically and qualify final package/current-head CI/review.",
+  "limitations": "This is a baseline debugger-draft package only. It does not contain or claim the pending native empty-fragment repair. No new UI layout."
+}
