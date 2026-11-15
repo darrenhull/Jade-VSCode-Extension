@@ -368,7 +368,7 @@ function activate(context) {
       } catch (error) {
         testOutput.appendLine(error.message); testOutput.show(true);
         void vscode.window.showErrorMessage(error.message);
-        return { passed: false, error: error.message };
+        return error.result||{ passed: false, error: error.message };
       } finally {
         publishing = false;
         stage('Releasing local test UI state');

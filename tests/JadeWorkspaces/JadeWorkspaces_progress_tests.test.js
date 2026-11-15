@@ -15,8 +15,8 @@ test('pending notebook run shows preparation progress before native completion i
  try{assert.match(outputs.join('\n'),/Waiting for JADE|Scanning saved sources/);assert.doesNotMatch(outputs.join('\n'),/Executing scratch code/);assert.ok(channel.join('').includes('Scanning saved sources'));}
  finally{finish({code:0,passed:true,report:{compiled:true,executed:true,output:'42'}});await run;}
  assert.match(outputs.at(-1),/Scratch code executed/);assert.match(outputs.at(-1),/42/);
- const loggedStages=channel.filter(line=>/ms elapsed/.test(line));assert.equal(loggedStages.length,6,'Existing Scratch Pad log must retain each configuration/native/release transition once');
- for(const phrase of ['Queued','Resolving','Acquiring','Waiting for JADE','JADE response received','Releasing'])assert.equal(loggedStages.filter(line=>line.includes(phrase)).length,1);
+ const loggedStages=channel.filter(line=>/ms elapsed/.test(line));assert.equal(loggedStages.length,7,'Scratch Pad log must retain every configuration/source-preparation/native/release transition once');
+ for(const phrase of ['Queued','Resolving','Acquiring','Preparing saved Git source inputs','Waiting for JADE','JADE response received','Releasing'])assert.equal(loggedStages.filter(line=>line.includes(phrase)).length,1);
  assert.ok(channel.some(line=>line.includes('Completed')&&line.includes('Scratch code executed')),'Notebook completion must be retained in the existing output channel');
 });
 

@@ -1,0 +1,29 @@
+{
+  "failedHead": "3b6f66d",
+  "run": 43756166793,
+  "job": 132940618116,
+  "ciFailures": 7,
+  "redLocal": {
+    "files": [
+      "tests/LocalTestCommand/LocalTestCommand_run_tests.test.js",
+      "tests/JadeWorkspaces/JadeWorkspaces_progress_tests.test.js"
+    ],
+    "pass": 5,
+    "fail": 7
+  },
+  "cause": [
+    "VM fixture omitted the actual handler new language.ensureSourceIndex dependency",
+    "Scratch progress now has a legitimate seventh source-preparation transition"
+  ],
+  "repair": [
+    "Explicit recording source-index preparation in VM fixture; native dispatch asserts successful preparation and ordering",
+    "Exact seven named progress stages retained once each",
+    "Additional cancellation/timeout regressions exposed native result flags dropped by test/compile catch boundaries; preserve original native result"
+  ],
+  "newControls": {
+    "localTestCancellationAndTimeout": "RED then GREEN, no native test dispatch, UI lease released",
+    "compileCancellation": "RED then GREEN, no native compile dispatch, UI lease released"
+  },
+  "fullLocalSuiteRun": false,
+  "nativeBundleChanged": false
+}

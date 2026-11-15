@@ -30,7 +30,7 @@ function registerCompileCommands(vscode,context,services){
    for(const error of result.report?.diagnostics||[])for(const line of diagnosticLines(error))output.appendLine(line);
    if(result.passed)output.appendLine(result.report.native_project?`Native project compile complete; synchronised ${result.report.loaded_files} source/resource file(s).`:`Native compile complete; synchronised ${result.report.loaded_files} changed CLS file(s).`);
    output.appendLine(`CompilerExitCode=${result.code}`);return result;
-  }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
+  }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return error.result||{passed:false,error:error.message};}
   finally{await services.setBusy(false);}
  }
  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.buildWorkspace',uri=>compile(true,uri)),vscode.commands.registerCommand('jadeNative.compileClass',uri=>compile(false,uri)));
