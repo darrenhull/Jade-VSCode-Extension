@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{pathToFileURL,fileURLToPath}=require('node:url');
 const {registerLanguageTools}=require('../../extension/src/language-tools'),{parseSource}=require('../../extension/src/source_symbols');
-const version='jade-cli/0.10.9/source-index/2',hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+const version='jade-cli/0.10.10/source-index/2',hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 async function fixture(t,{mode='empty',oldVersion=false,name='Byte'}={}){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'jade-empty-consumer-')),directory=path.join(root,'.jade/source-index'),source=await fs.readFile(path.join(__dirname,'fixtures',mode,'ByteExportProbe/types/Byte.cls')),ordinary=await fs.readFile(path.join(__dirname,'../SourceIndexCache/fixtures/BrowserMetadata.cls'));let language;t.after(async()=>{if(language){await language.index.persist();language.index.dispose();}await fs.rm(root,{recursive:true,force:true});});await fs.mkdir(directory,{recursive:true});
  const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href}),folder={uri:uri(root)},captured='ByteExportProbe/types/'+name+'.cls',other='Pets/types/Fish.cls',inputs=new Map([[captured,source],[other,ordinary]]);for(const [relative,bytes]of inputs){const file=path.join(root,...relative.split('/'));await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,bytes);}

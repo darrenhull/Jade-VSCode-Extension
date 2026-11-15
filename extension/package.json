@@ -871,6 +871,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.10.8"
+    "minimumCliVersion": "0.10.10"
   }
 }

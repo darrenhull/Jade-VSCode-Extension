@@ -1,7 +1,9 @@
-# 0.22.13 - Debug source draft preparation
+# 0.22.13 - Native empty source fragments and debugger drafts
 
+- Bundle [official Jade CLI 0.10.10](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.10), preserving valid empty native type fragments without inventing declarations and retaining real primitive methods. The native migration guard handles empty fragments when JCF migrations are pending.
 - Apply pending class-workspace method drafts through the existing shared source preparation before debug save, method selection and compilation. Abort unresolved or conflicted drafts.
 - Preserve ordinary CLS launch behavior and refusal of Output documents as debug source files.
+- Retain 0.22.12's configurable source-index timeout, progress notification, ownership-aware cancellation and Windows extraction-root repair. The updated native cache version requires one index rebuild; ordinary prepared runs continue to reuse the index.
 
 # 0.22.12 - Source index startup and F5 repair
 

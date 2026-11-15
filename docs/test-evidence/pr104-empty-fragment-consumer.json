@@ -70,5 +70,32 @@
     "databaseOpened": false,
     "receipt": "tests/NativeEmptyFragment/receipts/private-native-candidate-0.10.10.json",
     "artifactStatus": "corrected coherent PRIVATE build; not an official release or tracked pin"
+  },
+  "finalReleasePreparation": {
+    "extensionVersion": "0.22.13",
+    "minimumCliVersion": "0.10.10",
+    "includedChanges": [
+      "Merged extension102 source-index startup, timeout, progress and cancellation repairs",
+      "Issue103 debugger draft-resolution boundary",
+      "Native empty-type fragment and pending-JCF migration repairs from CLI69/72"
+    ],
+    "officialPublicationVerified": false,
+    "trackedPrivatePinAdded": false,
+    "remainingGates": [
+      "Genuine official CLI0.10.10 publication and asset verification",
+      "Atomic official full SDK payload, manifest and pin update",
+      "Official native consumer probe and final VSIX exact-source, pin and portable verification",
+      "Final-head hosted CI and automated/owner review before merge/release"
+    ],
+    "targetedChecks": {
+      "passed": 21,
+      "fullLocalSuiteRun": false,
+      "groups": [
+        "Current-version release notes",
+        "Native empty-fragment consumer/browser/search and warm gate",
+        "Scratch/test producer and joiner cancellation",
+        "Actual registered debug draft launch"
+      ]
+    }
   }
 }
