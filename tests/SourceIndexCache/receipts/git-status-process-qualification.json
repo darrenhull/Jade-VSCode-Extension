@@ -1,0 +1,53 @@
+{
+  "format": 1,
+  "artifact": "coherent local 0.10.8 candidate; not an official release",
+  "nativeSource": "ba42a77e51fc5fc5072968b6496826d9d6418e1e",
+  "nativePayload": "3cb3ca938da9b7c6a88d97244bab14cadf21a510",
+  "nativeVersion": "jade-cli/0.10.8/source-index/2",
+  "executableSha256": "b38c5a2d337b7f2887bd713f32014195b416f80a8af8c9bdbcca2ef86804daf8",
+  "manifestSha256": "f100febecef67900ea5aa6f15e707d8e0755da7955a40e13b88157849a6b84fe",
+  "runtimeFilesVerified": 15,
+  "clientRuntimeCheckpoint": "bf1d9a4fbef598b347851705b0dc306ebcbb5989",
+  "cacheProcess": {
+    "passed": true,
+    "elapsedMs": 13592.2184,
+    "startupGitPreparationRequests": 1,
+    "unchangedSavedFileReads": 0,
+    "deliberatelyUncachedSavedFileReads": 1,
+    "roundtripMetadata": true,
+    "matchingSavedEditAccepted": true,
+    "staleProofRejected": true,
+    "windowsAliasAndConditionalClear": true,
+    "terminalAliasSameBroker": true,
+    "explicitRefreshOnce": true,
+    "dirtyEditorRetained": true,
+    "sourceBodiesPersisted": false,
+    "ownedBrokerExited": true,
+    "ownedArtifactsRemoved": true
+  },
+  "initializationProcess": {
+    "passed": true,
+    "elapsedMs": 11015.2413,
+    "newGitInitialized": true,
+    "existingGitReused": true,
+    "externalIgnoreEditPrefixPreserved": true,
+    "managedStateEffectivelyIgnored": true,
+    "unchangedThirdRunByteIdentical": true,
+    "projectAndSourceBytesPreserved": true,
+    "sourceAndJadeJsonTrackable": true,
+    "initializations": 3,
+    "explicitRefreshes": 3,
+    "automaticCommit": false,
+    "ownedBrokerExited": true,
+    "ownedArtifactsRemoved": true
+  },
+  "databaseOpened": false,
+  "userInstallation": false,
+  "timingScope": "Whole small-fixture process durations; not warm native latency",
+  "remainingGates": [
+    "Actual JADE tests/Scratch and performance on 40000 saved-source workspace",
+    "Final full current-source checks",
+    "Final official CLI pin/minimum and extension version",
+    "Final current candidate package/portable/running UI and hosted review"
+  ]
+}

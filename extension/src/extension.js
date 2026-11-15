@@ -11,6 +11,7 @@ const { CliWorkingSession } = require('./cli-client');
 const { resolvePublishConfig, startPublish } = require('./publish');
 const { testLenses } = require('./local-tests');
 const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
+const {diagnosticLocation,diagnosticLines}=require('./compiler-diagnostic-presentation');
 
 let activeNativeService;
 
@@ -114,7 +115,8 @@ async function detectSettingsCommand(resource, cancellationToken) {
 }
 function activate(context) {
   void require('./legacy-member-tabs').retireLegacyMemberTabs(vscode,context);
-  const language=require('./language-tools').registerLanguageTools(vscode,context);
+  const nativeTests = new CliWorkingSession({entry:path.join(context.extensionPath,'vendor','jade-tools-cli','jade-cli.exe')});
+  const language=require('./language-tools').registerLanguageTools(vscode,context,{client:nativeTests});
   for(const name of ['jade-language','mermaid','drawio'])new (require('./ProjectSkillInstaller').ProjectSkillInstaller)({name,bundle:path.join(context.extensionPath,'skills',name),state:context.workspaceState,isTrusted:()=>vscode.workspace.isTrusted===true}).start(vscode,context,language.index);
   require('./navigation').registerNavigation(context,language);
   require('./impact-navigation').registerImpactNavigation(vscode,context,language);
@@ -124,7 +126,6 @@ function activate(context) {
   const publishOutput = vscode.window.createOutputChannel('Jade Publish');
   const compileOutput = vscode.window.createOutputChannel('Jade Compile');
   const testOutput = vscode.window.createOutputChannel('Jade Tests');
-  const nativeTests = new CliWorkingSession({entry:path.join(context.extensionPath,'vendor','jade-tools-cli','jade-cli.exe')});
   activeNativeService = nativeTests;
   const startWorking=(...args)=>nativeTests.startWorking(...args);
   require('./cli-gateway').configure(nativeTests);
@@ -177,7 +178,7 @@ function activate(context) {
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
   }
-  require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings});
+  require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings,refreshSourceIndex:language.refreshSourceIndex});
   async function refreshCache(config, output = compileOutput, fromDatabase = true) {
     if (!fromDatabase && !config.systemSnapshotPath) throw new Error('Run Jade: Refresh Type Cache to read system metadata from the configured database.');
     output.appendLine(fromDatabase ? 'Refreshing RootSchema system definitions in a read-only database session ...' : 'Importing RootSchema system definitions into external C++ cache ...');
@@ -186,32 +187,21 @@ function activate(context) {
     output.appendLine(fromDatabase ? 'Database disconnected. System cache refreshed for IntelliSense; compile and test use the native working database.' : 'System cache imported. Workspace source supplies application definitions.');
     return result;
   }
-  const workingFiles = config => require('./compile-inputs').prepareCompileInputs(vscode, config);
+  const workingFiles = (config,options) => require('./compile-inputs').prepareCompileInputs(vscode, config,options);
   function reportDiagnostic(report) {
-    if (report.diagnostics?.some(entry => entry.source && entry.source !== report.source)) {
-      const grouped = new Map();
-      for (const entry of report.diagnostics) {
-        const source = entry.source || report.source;
-        if (!grouped.has(source)) grouped.set(source, []);
-        grouped.get(source).push(entry);
-      }
-      for (const [source, entries] of grouped) reportDiagnostic({ ...report, source, diagnostics: entries });
-      return;
-    }
-    const uri = vscode.Uri.file(report.source);
-    diagnostics.delete(uri);
+    if(report.source)diagnostics.delete(vscode.Uri.file(report.source));
     if (report.compiled !== false) return;
-    const entries = report.diagnostics || [report];
-    diagnostics.set(uri, entries.map(entry => {
-      const line = Math.max(0, (entry.line || 1) - 1);
-      const column = Math.max(0, (entry.column || 1) - 1);
+    const grouped=new Map();
+    for(const entry of report.diagnostics||[report]){const location=diagnosticLocation(entry,report.source);if(!location)continue;if(!grouped.has(location.source))grouped.set(location.source,[]);grouped.get(location.source).push({entry,location});}
+    for(const [source,entries]of grouped){const uri=vscode.Uri.file(source);diagnostics.set(uri,entries.map(({entry,location})=>{
+      const line=location.line-1,column=location.column-1;
       const document = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
       const end = document && line < document.lineCount ? Math.min(document.lineAt(line).text.length, column + Math.max(1, entry.error_length || 1)) : column + 1;
       const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, Math.max(column, end)), entry.message || 'Jade compilation failed.', vscode.DiagnosticSeverity.Error);
       diagnostic.code = entry.compiler_error;
       diagnostic.source = 'Jade';
       return diagnostic;
-    }));
+    }));}
   }
   const debugTests=require('./test-debug').registerTestDebugging(vscode,context);
   const testing = require('./testing').registerTesting(vscode, context, (...args) =>
@@ -247,7 +237,7 @@ function activate(context) {
   });
   require('./application-debug-ui').registerApplicationDebug(vscode,context);
   require('./debugger').registerDebugger(vscode,context,{
-    beforeOperation,config:classConfig,workingFiles,startWorking,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
+    beforeOperation,config:classConfig,workingFiles,startWorking,reportDiagnostic,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);}
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{
@@ -289,7 +279,7 @@ function activate(context) {
     beforeOperation: async () => {},
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
-    resolveSource,classConfig, workingFiles, startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
+    resolveSource,classConfig, workingFiles:config=>workingFiles(config,{discover:false}), startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
   });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
@@ -340,8 +330,8 @@ function activate(context) {
         diagnostics.delete(document.uri);
         testOutput.appendLine(`Running local tests from ${path.basename(config.program)} (no publish).`);
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
-        stage('Saving and discovering local test sources');
-        await workingFiles(config);
+        stage('Saving local test sources');
+        await workingFiles(config,{discover:false});
         stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
@@ -361,10 +351,7 @@ function activate(context) {
             grouped.get(source).push(entry);
           }
           for (const [source, entries] of grouped) reportDiagnostic({ source, compiled: false, diagnostics: entries });
-          for (const diagnostic of result.report.diagnostics) {
-            testOutput.appendLine(`Jade ${diagnostic.compiler_error} (${diagnostic.owner}::${diagnostic.method}): ${diagnostic.message}`);
-            testOutput.appendLine(`${diagnostic.source}:${diagnostic.line}:${diagnostic.column}`);
-          }
+          for(const diagnostic of result.report.diagnostics)for(const line of diagnosticLines(diagnostic))testOutput.appendLine(line);
         }
         if (result.cancelled) testOutput.appendLine('Test run cancelled; results are incomplete.');
         else if (result.timedOut) testOutput.appendLine('Test run timed out; results are incomplete. Adjust jadeNative.testTimeoutSeconds if needed.');

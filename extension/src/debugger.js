@@ -3,6 +3,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
 const { NativeDebugger } = require("./debug-transport");
+const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 const {
   debugMethods,
   nativeLocation,
@@ -196,11 +197,14 @@ function registerDebugger(vscode, context, services) {
               config,
               "compile",
               (text) => output.append(text),
+              services.reportDiagnostic,
             );
             const compiled = await this.operation.completion;
+            const compilerLines=(compiled.report?.diagnostics||[]).flatMap(diagnosticLines);
+            for(const line of compilerLines)output.appendLine(line);
             if (!compiled.passed)
               throw Error(
-                compiled.report?.error || "Native compilation failed.",
+                compiled.report?.error || compilerLines.join('\n') || "Native compilation failed.",
               );
             this.assertActive();
             this.preparing =

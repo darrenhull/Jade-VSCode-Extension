@@ -1,0 +1,23 @@
+{
+  "scope": "Minimal isolated-worktree activation; private database-free native candidate and minimal VS Code API host, not a packaged running-UI claim",
+  "nativeSourceCommit": "dacb970a5da01eba22387f25d6373b644faf66e6",
+  "candidateSha256": "3a92a60d75e02d99d5449ac9d63611a1fd1f128ce145bdeca44eb98c1c05d097",
+  "nativeVersion": "jade-cli/0.10.6/source-index/2",
+  "consumerSourceCommit": "787bf50eb1e9e6d06ebecf8bb2c4e6660f69ce9a",
+  "coherentLocalCandidate": {"sourceCommit":"bbf396812f0ad634eb193bf12d6ed03fe32a5bd1","version":"0.10.7","executableSha256":"6de39456dd09b4151569213ad06908c4825fd6bdd7d95b5aedb197fb5cc95ca6","manifestSha256":"e3946d0e43951181b853353b914a961b104da2c014d2ccc92b136ff856153942","actualProcessPassed":1,"actualProcessFailed":0,"elapsedMilliseconds":6831,"nativeVersion":"jade-cli/0.10.7/source-index/2","sameActivationCaseMetadataTerminalAndCleanupChecks":true,"databaseOpened":false,"officialRelease":false},
+  "actualProcess": {"passed":1,"failed":0,"elapsedMilliseconds":6318,"realLanguageRegistration":true,"lazyDatabaseFreeCapability":true,"legacyWrites":false,"frontendFileDiscovery":false,"separateNativePrepare":false,"explicitRefreshes":1,"dirtyEditorRetained":true,"savedSourceBytesUnchanged":true,"metadataRoundtrip":true,"canonicalAliasSaveAndClear":true,"terminalAlias":true,"sameOwnedBroker":true,"ownedBrokerExited":true,"ownedFixtureRemoved":true,"databaseOpened":false},
+  "focusedChecks": {"passed":146,"failed":0,"postCapabilityGuardChecks":5},
+  "runtimeHashes": {
+    "extension/src/SourceIndexCache.js":"431b12581081ae71cef656062281f6d471587ae24f341dca4f17d6c84c7cb14a",
+    "extension/src/language-tools.js":"a3a8963347cf616f61564988ea21572f8c22e6bfa3e9cff2e9a3e41c7a588083",
+    "extension/src/extension.js":"9205b91122786929240bf7ac6680bc8304a53616a2234e9ee3f6b41810fd548e",
+    "extension/src/compile-inputs.js":"4da8c0387b3f9b40f086d25e86237d4ded54c8c52188b22795905360917c19ec",
+    "extension/src/compile-commands.js":"1e49b8abcb0c25ef12710972f5c7c2ce297cc5e38f15dfd7167fe34dd9f4e666",
+    "extension/src/class-view.js":"489e722f1fec2ed65cb4f69fff0fef31ded1f519ecfc9b284d52823a28e20008",
+    "extension/src/workspace-initialization.js":"477ef304c1c08268acd9000131381d33ed4f56b951ec0200a790770b326f1c98",
+    "tests/SourceIndexCache/SourceIndexCache_native_roundtrip.cjs":"0570738693f948c504fe92d7e2bf3f1f643a8f294fe09b2ea73d0d46f668f2d1"
+  },
+  "largeAdvisoryControl": {"realParserMetadataOver2MiB":true,"nativeRequests":0,"nativeShardBytesUnchanged":true,"unhandledRejections":0,"unchangedWatcherParses":0,"reparseOnNextColdSession":true},
+  "preservedBoundaries": ["selected and owned-source save failures stop before native execution","Scratch Pad exact unsaved snapshot and saved dependencies unchanged","selected tests do not await global browsing discovery","debug retains existing file discovery and source maps","publish snapshot/target protections unchanged"],
+  "remainingGates": ["coherent native distribution pin","native-valid actual 40k tests and Scratch Pad","representative real browser population","full default/PowerShell checks","portable/VSIX integrity","actual running UI evidence"]
+}

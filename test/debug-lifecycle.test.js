@@ -7,7 +7,7 @@ function setup(open, overrides = {}) {
   let factory,
     busy = false;
   const changes = [],
-    messages = [];
+    messages = [], lines=[];
   class Emitter {
     constructor() {
       this.e = new EventEmitter();
@@ -38,7 +38,7 @@ function setup(open, overrides = {}) {
         clear() {},
         show() {},
         append() {},
-        appendLine() {},
+        appendLine(text) {lines.push(text);},
         dispose() {},
       }),
     },
@@ -67,19 +67,20 @@ function setup(open, overrides = {}) {
   );
   const adapter = factory.createDebugAdapterDescriptor().adapter;
   adapter.onDidSendMessage((m) => messages.push(m));
-  return { adapter, messages, changes, busy: () => busy };
+  return { adapter, messages, changes, lines, busy: () => busy };
 }
 
-test('debug compilation delegates to the injected native CLI session without opening a legacy working base',async t=>{
+for(const unknownContext of [false,true])test('debug compilation retains '+(unknownContext?'context-free 6281':'native errors')+' without opening a legacy working base',async t=>{
  const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-debug-native-gateway-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const text=fs.readFileSync(path.join(__dirname,'fixtures/DebugDemo.cls'),'utf8'),file=path.join(root,'DebugDemo.cls');fs.writeFileSync(file,text);
  const abi=path.join(root,'vendor/jade-tools-cli/native');fs.mkdirSync(abi,{recursive:true});fs.writeFileSync(path.join(abi,'debugger-abi.json'),JSON.stringify({libraries:{}}));
  const method=require('../extension/src/debug-source').debugMethods(text,file)[0];let compiled=0;
  const document={isDirty:false,uri:{fsPath:file,toString:()=>file},getText:()=>text};
- const s=setup(async()=>document,{context:{extensionPath:root},services:{config:()=>({installPath:root,databasePath:path.join(root,'absent-source'),iniPath:path.join(root,'absent.ini'),storagePath:path.join(root,'storage'),workspaceRoots:[root],program:file,files:[file]}),workingFiles:async()=>{},startWorking:()=>{compiled++;return {completion:Promise.resolve({passed:false,code:6026,report:{error:'Native CLI rejected the test fixture'}}),stop(){}};},prepareWorking:()=>{throw Error('Do not prepare after a compiler failure');}}});
+ const report=unknownContext?{compiled:false,diagnostics:[{compiler_error:6281,message:'Synthetic native parser error',diagnostic_context_unavailable:true}]}:{error:'Native CLI rejected the test fixture'};
+ const s=setup(async()=>document,{context:{extensionPath:root},services:{config:()=>({installPath:root,databasePath:path.join(root,'absent-source'),iniPath:path.join(root,'absent.ini'),storagePath:path.join(root,'storage'),workspaceRoots:[root],program:file,files:[file]}),workingFiles:async()=>{},startWorking:()=>{compiled++;return {completion:Promise.resolve({passed:false,code:unknownContext?6281:6026,report}),stop(){}};},prepareWorking:()=>{throw Error('Do not prepare after a compiler failure');}}});
  await s.adapter.handleMessage({seq:1,command:'launch',arguments:{program:file,method:method.name}});
- assert.equal(compiled,1);assert.match(s.messages.find(message=>message.request_seq===1).message,/Native CLI rejected/);s.adapter.dispose();
+ assert.equal(compiled,1);assert.match(s.messages.find(message=>message.request_seq===1).message,unknownContext?/Jade 6281.*Synthetic native parser error/:/Native CLI rejected/);if(unknownContext){assert.match(s.lines.join('\n'),/Jade 6281/);assert.doesNotMatch(s.lines.join('\n'),/undefined/);}s.adapter.dispose();
 });
 test("disconnect while a launch awaits a document cancels before save, compile or database work", async () => {
   let resolve,

@@ -1,3 +1,12 @@
+# 0.22.11 - Shared native source preparation
+
+- Bundle [official Jade CLI 0.10.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.8), including preserved migration ordering and literal Git source-root handling.
+
+- Reuse the native Git source index for saved editor metadata. A fresh per-root Git proof reuses unchanged models; changed saved files are read again while unsaved editor models remain private.
+- Let native build and test preparation discover saved inputs after the extension preserves its existing save checks. Selected tests can reach native execution while browser discovery is pending.
+- Show native Git, managed-ignore and source-index stages during Initialise Workspace; preserve existing configuration and source files.
+- Preserve context-free native errors and exact reported generated-source locations in Problems and test output.
+
 # 0.22.10 - Scratch Pad and test operation feedback
 
 - Show queued, connection/ownership and latest native progress in Scratch Pad cells and editor notifications. Confirm execution only when JADE reports it, and include preparation in elapsed time.

@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
 function fixture(t,mode){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-smoke-boundary-'));t.after(()=>{assert.equal(path.dirname(root),os.tmpdir());fs.rmSync(root,{recursive:true,force:true});});
+ const temporaryRoot=fs.realpathSync(os.tmpdir()),root=fs.realpathSync(fs.mkdtempSync(path.join(temporaryRoot,'jade-smoke-boundary-')));t.after(()=>{assert.equal(path.dirname(root),temporaryRoot);assert.match(path.basename(root),/^jade-smoke-boundary-/);assert.equal(fs.lstatSync(root).isSymbolicLink(),false);fs.rmSync(root,{recursive:true,force:true});});
  const archive=path.join(root,'archive'),vendor=path.join(archive,'extension/vendor/jade-tools-cli');fs.mkdirSync(path.join(vendor,'native'),{recursive:true});
  const names=['jade-cli.exe',...['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'].map(name=>'native/'+name)];for(const name of names)fs.writeFileSync(path.join(vendor,name),'inert fixture: never execute '+name);
  const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex'),manifest={formatVersion:2,runtime:'native-cpp',platform:'win32',arch:'x64',executable:'jade-cli.exe',packageVersion:'0.3.1',executableSha256:hash(fs.readFileSync(path.join(vendor,'jade-cli.exe'))),runtimeFiles:Object.fromEntries(names.slice(1).map(name=>[name,hash(fs.readFileSync(path.join(vendor,name)))]))};
@@ -10,7 +10,7 @@ function fixture(t,mode){
  const original=fs.readFileSync(path.resolve(__dirname,'../../scripts/smoke-vsix.ps1'),'utf8');
  // Instrument only the external process boundary, never launch fixture binaries.
  // Refuse to run if any CLI invocation was not replaced by the recording fake.
- const nativeCalls=original.match(/&\s+\$cli\b/g)||[];assert.equal(nativeCalls.length,3);assert.doesNotMatch(original,/Start-Process|ProcessStartInfo/);
+ const nativeCalls=[...original.matchAll(/&\s+\$cli\b([^\r\n]*)/g)].map(match=>match[1].trim());assert.deepEqual(nativeCalls,['source refresh --workspace $workspace --json','tests list --json','status --json|ConvertFrom-Json','shutdown --json|Out-Null']);assert.doesNotMatch(original,/Start-Process|ProcessStartInfo/);
  let script=original.replace(/&\s+\$cli\b/g,'Invoke-TestNative');assert.equal(/&\s*\$cli\b/.test(script),false);
  if(mode==='setup'){const marker=" $workspace=Join-Path $temporary 'workspace';";assert.ok(script.includes(marker));script=script.replace(marker," throw 'fixture setup failed'\n"+marker);}
  const smoke=path.join(root,'smoke.ps1');fs.writeFileSync(smoke,script);fs.copyFileSync(path.resolve(__dirname,'../../scripts/VerifyNativeDistribution.ps1'),path.join(root,'VerifyNativeDistribution.ps1'));
@@ -25,6 +25,13 @@ function Invoke-TestNative {
  $global:LASTEXITCODE=0
  $event=@{arguments=@($args);state=$env:JADE_TOOLS_STATE_DIRECTORY;connections=$env:JADE_TOOLS_CONNECTIONS_FILE}
  [IO.File]::AppendAllText($fixture.calls,($event|ConvertTo-Json -Compress)+[Environment]::NewLine)
+ if($args[0] -eq 'source'){
+  $workspace=Join-Path ([IO.Path]::GetDirectoryName($env:JADE_TOOLS_STATE_DIRECTORY)) 'workspace'
+  if($args.Count -ne 5 -or $args[1] -cne 'refresh' -or $args[2] -cne '--workspace' -or $args[3] -cne $workspace -or $args[4] -cne '--json'){throw 'Unexpected fake source-refresh arguments'}
+  if($fixture.mode -eq 'refresh-failed'){return '{"passed":false,"cache":{"format":2}}'}
+  if($fixture.mode -eq 'refresh-format'){return '{"passed":true,"cache":{"format":1}}'}
+  return '{"passed":true,"cache":{"format":2}}'
+ }
  if($args[0] -eq 'tests'){if($fixture.mode -eq 'timeout'){$env:JADE_TOOLS_STATE_DIRECTORY=$fixture.sharedState;$env:JADE_TOOLS_CONNECTIONS_FILE=$fixture.sharedConnections;throw 'fixture native timeout'};return '{"passed":true,"rows":[{"owner":"PortableTests","method":"portableProbe"}]}'}
  if($args[0] -eq 'status'){return '{"brokerPID":12345}'}
  if($args[0] -eq 'shutdown'){if($env:JADE_TOOLS_STATE_DIRECTORY -eq $fixture.sharedState){[IO.File]::WriteAllText($fixture.sentinel,'stopped')};return '{}'}
@@ -40,4 +47,4 @@ exit $exitStatus
  return {root,run,sharedState,sharedConnections,sentinel:fs.readFileSync(sentinel,'utf8'),connections:fs.readFileSync(sharedConnections,'utf8'),after:JSON.parse(fs.readFileSync(after,'utf8')),calls:fs.existsSync(calls)?fs.readFileSync(calls,'utf8').trim().split(/\r?\n/).map(JSON.parse):[]};
 }
 for(const mode of ['manifest','helper','setup'])test('rejected or uninitialized '+mode+' smoke never executes a payload or touches inherited broker state',{skip:process.platform!=='win32'},t=>{const f=fixture(t,mode);assert.notEqual(f.run.status,0,f.run.stdout);assert.equal(f.calls.length,0,JSON.stringify(f.calls));assert.equal(f.sentinel,'running');assert.equal(f.connections,'unchanged');assert.equal(f.after.state,f.sharedState);assert.equal(f.after.connections,f.sharedConnections);assert.equal(f.after.electron,'original-electron');});
-for(const mode of ['success','timeout'])test(mode+' smoke cleans up only its verified private broker and restores caller context',{skip:process.platform!=='win32'},t=>{const f=fixture(t,mode);assert.equal(f.run.status,mode==='success'?0:1,f.run.stdout+f.run.stderr);assert.deepEqual(f.calls.map(call=>call.arguments[0]),['tests','status','shutdown']);assert.ok(f.calls.every(call=>call.state!==f.sharedState&&call.state.includes('jade-vsix-portable-')&&call.state.endsWith(path.sep+'broker')));assert.equal(new Set(f.calls.map(call=>call.state)).size,1);assert.ok(f.calls.every(call=>call.connections!==f.sharedConnections&&path.dirname(call.connections)===path.dirname(call.state)));assert.equal(f.sentinel,'running');assert.equal(f.after.state,f.sharedState);assert.equal(f.after.connections,f.sharedConnections);assert.equal(f.after.electron,'original-electron');});
+for(const mode of ['success','timeout','refresh-failed','refresh-format'])test(mode+' smoke cleans up only its verified private broker and restores caller context',{skip:process.platform!=='win32'},t=>{const f=fixture(t,mode);assert.equal(f.run.status,mode==='success'?0:1,f.run.stdout+f.run.stderr);assert.deepEqual(f.calls.map(call=>call.arguments[0]),mode.startsWith('refresh-')?['source','status','shutdown']:['source','tests','status','shutdown']);assert.deepEqual(f.calls[0].arguments,['source','refresh','--workspace',path.join(path.dirname(f.calls[0].state),'workspace'),'--json']);assert.ok(f.calls.every(call=>call.state!==f.sharedState&&call.state.includes('jade-vsix-portable-')&&call.state.endsWith(path.sep+'broker')));assert.equal(new Set(f.calls.map(call=>call.state)).size,1);assert.ok(f.calls.every(call=>call.connections!==f.sharedConnections&&path.dirname(call.connections)===path.dirname(call.state)));assert.equal(f.sentinel,'running');assert.equal(f.after.state,f.sharedState);assert.equal(f.after.connections,f.sharedConnections);assert.equal(f.after.electron,'original-electron');});

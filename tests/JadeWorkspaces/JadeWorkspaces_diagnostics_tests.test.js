@@ -58,3 +58,11 @@ test('a stale result cannot replace Problems owned by a newer source snapshot',a
  const oldText=document.getText;document.getText=()=>{const text=oldText();queueMicrotask(()=>document.version++);return text;};
  const result=await h.run();assert.equal(result.stale,true);assert.deepEqual(h.entries.get('file:C:/project/first.jade'),before);
 });
+test('unavailable native source context does not invent a Scratch Pad position',async()=>{
+ const h=harness();h.select('first');h.state.result={code:6281,passed:false,report:{compiled:false,diagnostics:[{compiler_error:6281,message:'Synthetic native parser error',diagnostic_context_unavailable:true}]}};
+ const result=await h.run();assert.equal(result.code,6281);assert.equal(h.entries.size,0);
+});
+test('an explicit generated join-file position survives unavailable original-source context',async()=>{
+ const h=harness();h.select('first');h.state.result={code:6281,passed:false,report:{compiled:false,diagnostics:[{compiler_error:6281,message:'Synthetic join-file error',source:'C:/generated/join.cls',line:77,column:3,generated_source:true,diagnostic_context_unavailable:true}]}};
+ await h.run();const items=h.entries.get('file:C:/generated/join.cls');assert.equal(items?.length,1);assert.deepEqual(items[0].range.args,[76,2,76,3]);assert.equal(h.entries.has('file:C:/project/first.jade'),false);
+});

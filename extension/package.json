@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.10",
+  "version": "0.22.11",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -700,7 +700,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "External C++ system cache and source-index storage. Empty uses extension global storage. A workspace location is rejected."
+          "description": "External native system-type cache storage. Empty uses extension global storage; a workspace location is rejected. Shared source metadata uses .jade/source-index in the project."
         },
         "jadeNative.schema": {
           "type": "string",
@@ -863,6 +863,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.10.6"
+    "minimumCliVersion": "0.10.8"
   }
 }

@@ -1,10 +1,12 @@
 'use strict';
 const {parseSource}=require('./source_symbols');
 const {LanguageModel}=require('./language-model');
+const {decodeSourceBytes}=require('./source-file-text');
+const crypto=require('node:crypto');
 const metadata=model=>({...model,text:'',code:'',excluded:[]});
 const same=(a,b)=>a&&b&&a.mtime===b.mtime&&a.size===b.size;
 class SourceIndex{
- constructor({list,read,stat,cache,filterCached=entries=>entries,onError=()=>{},onTiming=()=>{}}){this.list=list;this.read=read;this.stat=stat;this.cache=cache;this.filterCached=filterCached;this.onError=onError;this.onTiming=onTiming;this.records=new Map();this.serial=new Map();this.project=new LanguageModel();this.scan=0;this.disposed=false;this.pending=new Set();this.bulkDepth=0;this.bulkGeneration=0;this.listeners=new Set();this.status={phase:'idle',completed:0,total:0};}
+ constructor({list,read,stat,proof,cache,filterCached=entries=>entries,onError=()=>{},onTiming=()=>{}}){this.list=list;this.read=read;this.stat=stat;this.proof=proof;this.cache=cache;this.filterCached=filterCached;this.onError=onError;this.onTiming=onTiming;this.records=new Map();this.serial=new Map();this.project=new LanguageModel();this.scan=0;this.disposed=false;this.pending=new Set();this.bulkDepth=0;this.bulkGeneration=0;this.listeners=new Set();this.status={phase:'idle',completed:0,total:0};}
  report(error){if(!this.disposed)try{this.onError(error);}catch{}}
  onDidChange(listener){this.listeners.add(listener);return {dispose:()=>this.listeners.delete(listener)};}
  announce(state,force=false){this.status=state;const now=Date.now();if(!force&&now-(this.lastNotification||0)<100)return;this.lastNotification=now;for(const listener of this.listeners)try{listener(state);}catch{}}
@@ -14,20 +16,22 @@ class SourceIndex{
  async restore(){
   if(!this.restoring){const scan=this.scan;this.restoring=(async()=>{
    if(!this.cache)return;const entries=this.filterCached(await this.cache.load());
-   for(let i=0;i<entries.length;i++){if(this.disposed||scan!==this.scan)return;const entry=entries[i];if(!this.records.has(entry.uri)){this.records.set(entry.uri,{model:entry.model,stamp:entry.stamp,cached:true,open:false});this.project.update(entry.model);}if(i&&i%256===0)await new Promise(setImmediate);}
+   for(let i=0;i<entries.length;i++){if(this.disposed||scan!==this.scan)return;const entry=entries[i];if(!this.records.has(entry.uri)){this.records.set(entry.uri,{model:entry.model,stamp:entry.stamp,rawSha256:entry.rawSha256,cached:true,open:false});this.project.update(entry.model);}if(i&&i%256===0)await new Promise(setImmediate);}
    if(entries.length)this.announce({phase:'cached',completed:0,total:entries.length},true);
   })().catch(error=>this.report(error));}return this.restoring;
  }
  async browserReady(){await this.restore();if(this.disposed)return;const cached=this.records.size>0;const ready=this.ready();if(cached){void ready.catch(error=>this.report(error));return;}await ready;}
  async refresh(uri,scan=this.scan,reuse=false){
   if(this.disposed||scan!==this.scan)return;const old=this.records.get(uri);if(old?.open&&(!this.cache||old.document?.isDirty!==false))return old.model;
-  const sequence=(this.serial.get(uri)||0)+1;this.serial.set(uri,sequence);let text,stamp;const started=performance.now();let afterStat=started;
+  const sequence=(this.serial.get(uri)||0)+1;this.serial.set(uri,sequence);let text,stamp,rawSha256;const started=performance.now();let afterStat=started;
   try{
-   if(this.stat&&this.cache){stamp=await this.stat(uri);afterStat=performance.now();if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;if(reuse&&same(old?.stamp,stamp)){old.cached=false;return old.model;}}
-   text=await this.read(uri);
+   if(reuse&&this.cache?.nativeVersion!==undefined&&this.proof){const current=await this.proof(uri);if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;if(old?.rawSha256&&current?.rawSha256===old.rawSha256){old.cached=false;return old.model;}}
+   if(this.stat&&this.cache&&this.cache.nativeVersion===undefined){stamp=await this.stat(uri);afterStat=performance.now();if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;if(reuse&&same(old?.stamp,stamp)){old.cached=false;return old.model;}}
+   const value=await this.read(uri);if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;
+   if(typeof value==='string')text=value;else{const bytes=Buffer.from(value);rawSha256=crypto.createHash('sha256').update(bytes).digest('hex');if(this.cache?.nativeVersion!==undefined&&old?.rawSha256===rawSha256){old.cached=false;return old.model;}text=decodeSourceBytes(bytes);}
   }catch(error){if(this.serial.get(uri)===sequence)this.remove(uri);return;}
   if(this.disposed||scan!==this.scan||this.serial.get(uri)!==sequence)return;
-  const beforeParse=performance.now(),model=metadata(parseSource(text,uri)),record={model,stamp,open:false};
+  const beforeParse=performance.now(),model=metadata(parseSource(text,uri)),record={model,stamp,rawSha256,open:false};
   try{const ended=performance.now();this.onTiming({uri,statMs:afterStat-started,readMs:beforeParse-afterStat,parseMs:ended-beforeParse,totalMs:ended-started});}catch{}if(old?.open){this.cache?.set(uri,record);return old.model;}this.records.set(uri,record);this.project.update(model);this.cache?.set(uri,record);return model;
  }
  close(uri){const record=this.records.get(uri);if(!record)return;record.model=metadata(record.model);record.open=false;record.version=undefined;record.document=undefined;this.project.update(record.model);}
@@ -74,7 +78,8 @@ class SourceIndex{
   try{if(this.warmup)await this.warmup;if(this.flushing)await this.flushing;}catch(error){this.bulkDepth--;throw error;}
   let released=false;return async()=>{if(released)return;released=true;this.bulkDepth--;if(this.bulkDepth||this.disposed)return;if(this.bulkRescanRequested){this.bulkRescanRequested=false;await this.rescan();}else await this.flush();};
  }
- invalidate(){clearInterval(this.progressTimer);this.progressTimer=undefined;clearTimeout(this.cacheTimer);this.cacheTimer=undefined;this.scan++;this.warmup=undefined;this.restoring=undefined;this.records.clear();this.serial.clear();this.pending.clear();this.cache?.invalidate();this.project=new LanguageModel();}
+ invalidate(){clearInterval(this.progressTimer);this.progressTimer=undefined;clearTimeout(this.cacheTimer);this.cacheTimer=undefined;this.scan++;this.warmup=undefined;this.restoring=undefined;for(const [uri,record]of this.records)if(!record.open){this.records.delete(uri);this.project.remove(uri);}this.serial.clear();this.pending.clear();this.cache?.invalidate();}
+ async reloadSavedCache(){this.invalidate();await this.restore();}
  dispose(){clearInterval(this.progressTimer);this.progressTimer=undefined;clearTimeout(this.cacheTimer);void this.persist();this.disposed=true;this.scan++;clearTimeout(this.timer);this.pending.clear();this.records.clear();this.serial.clear();this.listeners.clear();}
 }
 module.exports={SourceIndex};

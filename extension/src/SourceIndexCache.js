@@ -4,9 +4,32 @@ const SHARDS=32,MAX_BYTES=32*1024*1024,FORMAT=1;
 const PARSER=crypto.createHash('sha256');for(const name of ['source_symbols.js','source-lex.js','source-context.js'])PARSER.update(require('node:fs').readFileSync(path.join(__dirname,name)));const PARSER_ID=PARSER.digest('hex');
 const key=value=>process.platform==='win32'?value.toLowerCase():value;
 const within=(root,file)=>{const relative=path.relative(root,file);return relative!==''&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);};
+const SHARED_PACKET_BYTES=4*1024*1024,SHARED_MODEL_BYTES=2*1024*1024,SHARED_BATCH=128;
+const gitState=value=>value?.policy==='git-status'&&value.ready===true&&typeof value.generation==='string'&&value.generation.length>0&&value.generation.length<=4096&&(value.head===null||typeof value.head==='string'&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(value.head));
+const sameGitState=(a,b)=>gitState(a)&&gitState(b)&&a.generation===b.generation&&a.head===b.head;
+const digest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/i.test(value);
+const relativePath=value=>typeof value==='string'&&value.length<=32768&&!/[\\\x00-\x1f\x7f:]/.test(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+function browserModel(model){
+ if(!model||!Array.isArray(model.classes))throw Error('Invalid advisory browsing metadata.');
+ const copy=(value,fields)=>Object.fromEntries(fields.filter(field=>value[field]!==undefined).map(field=>{
+  const item=value[field];if(!['string','number','boolean'].includes(typeof item)||typeof item==='number'&&(!Number.isSafeInteger(item)||item<0))throw Error('Invalid advisory metadata scalar.');return [field,item];
+ }));
+ const positions=value=>{if(!Array.isArray(value)||value.some(item=>!Number.isSafeInteger(item)||item<0))throw Error('Invalid advisory source positions.');return [...value];};
+ const result=copy(model,['schema','parentSchema']);if(model.lineStarts!==undefined)result.lineStarts=positions(model.lineStarts);
+ result.classes=model.classes.map(cls=>{
+  if(!cls||typeof cls.name!=='string'||!Array.isArray(cls.members)||!Array.isArray(cls.regions))throw Error('Invalid advisory class metadata.');
+  const value=copy(cls,['name','parent','kind','partial','start','end','selection']);
+  value.regions=cls.regions.map(region=>{const pair=positions(region);if(pair.length!==2)throw Error('Invalid advisory class region.');return pair;});
+  value.members=cls.members.map(member=>{
+   if(!member||typeof member.name!=='string'||typeof member.kind!=='string')throw Error('Invalid advisory member metadata.');
+   const value=copy(member,['name','kind','type','length','precision','scale','access','subaccess','start','end','selection','declaration','bodyStart','signatureEnd','returnType','flags','typeMethod','updating']);
+   if(member.parameters!==undefined){if(!Array.isArray(member.parameters))throw Error('Invalid advisory parameters.');value.parameters=member.parameters.map(parameter=>copy(parameter,['name','type','length','usage','selection']));}return value;
+  });return value;
+ });return result;
+}
 /** Disposable browsing metadata. Never a source/build/publish authority. */
 class SourceIndexCache{
- constructor({roots,onError=()=>{}}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.changed=new Set();this.writing=Promise.resolve();this.reported=new Set();}
+ constructor({roots,onError=()=>{},nativeVersion,request,prepare,parserId=PARSER_ID}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.changed=new Set();this.writing=Promise.resolve();this.reported=new Set();this.nativeVersion=nativeVersion;this.request=request;this.prepare=prepare;this.parserId=parserId;this.sharedBindings=new Map();this.sharedProofs=new Map();this.sharedPending=new Map();this.sharedGeneration=0;}
  report(error){if(!this.reported.has(error.message)){this.reported.add(error.message);try{this.onError(error);}catch{}}}
  location(uri){
   try{
@@ -34,6 +57,7 @@ class SourceIndexCache{
   return current;
  }
  async load(){
+  if(this.nativeVersion!==undefined)return this.loadShared();
   const result=[];
   for(const root of this.roots().map(value=>path.resolve(value))){
    let directory;try{directory=await this.directory(root,false);}catch(error){this.report(error);continue;}if(!directory)continue;
@@ -48,9 +72,10 @@ class SourceIndexCache{
   }
   return result;
  }
- set(uri,record){const location=this.location(uri),entry={uri,model:record.model,stamp:record.stamp};if(!location||!this.valid(entry))return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.set(uri,entry);this.changed.add(uri);this.dirty.add(id);}
- delete(uri){const location=this.location(uri);if(!location)return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.delete(uri);this.changed.add(uri);this.dirty.add(id);}
+ set(uri,record){if(this.nativeVersion!==undefined)return this.setShared(uri,record);const location=this.location(uri),entry={uri,model:record.model,stamp:record.stamp};if(!location||!this.valid(entry))return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.set(uri,entry);this.changed.add(uri);this.dirty.add(id);}
+ delete(uri){if(this.nativeVersion!==undefined)return this.deleteShared(uri);const location=this.location(uri);if(!location)return;const [id,bucket]=this.bucket(location.root,location.shard);bucket.entries.delete(uri);this.changed.add(uri);this.dirty.add(id);}
  flush(){
+  if(this.nativeVersion!==undefined)return this.flushShared();
   this.writing=this.writing.then(async()=>{
    while(this.dirty.size){const ids=[...this.dirty];this.dirty.clear();
     for(const id of ids){const bucket=this.buckets.get(id);if(!bucket)continue;let temporary;
@@ -63,6 +88,94 @@ class SourceIndexCache{
    }
   }).catch(error=>this.report(error));return this.writing;
  }
- invalidate(){this.buckets.clear();this.dirty.clear();this.changed.clear();}
+ async loadShared(){
+  if(this.sharedReading)return this.sharedReading;
+  const generation=this.sharedGeneration;
+  this.sharedReading=(async()=>{
+   try{if(typeof this.nativeVersion==='function'){const version=await this.nativeVersion();if(typeof version!=='string'||!version)throw Error('Update the Jade CLI bundle: shared source index capability is unavailable.');this.nativeVersion=version;}}catch(error){this.report(error);return[];}
+   const result=[];
+   for(const root of this.roots().map(value=>path.resolve(value))){
+    const rows=[],proofs=new Map();let binding,invalid=false,found=false,next=0;
+    try{
+     const prepared=this.prepare?await this.prepare(root):undefined;
+     if(this.prepare&&(!prepared||prepared.format!==2||prepared.nativeVersion!==this.nativeVersion||typeof prepared.repository!=='string'||!path.isAbsolute(prepared.repository)||!['sha1','sha256'].includes(prepared.objectFormat)||!prepared.roots?.some(value=>typeof value.root==='string'&&key(path.resolve(value.root))===key(root)&&sameGitState(value.gitState||prepared.gitState,prepared.gitState))))throw Error('Native Git source proof has an incompatible workspace binding.');
+     const directory=await this.directory(root,false);if(!directory)throw Error('Shared source index is missing.');
+     const readHeader=async()=>{const file=path.join(directory,'v2-0.json'),stat=await fs.lstat(file);if(stat.isSymbolicLink()||!stat.isFile()||stat.size>MAX_BYTES)throw Error('Shared Git source proof header is invalid.');const header=JSON.parse(await fs.readFile(file,'utf8'));if(header.format!==2||typeof header.root!=='string'||key(path.resolve(header.root))!==key(root)||header.nativeVersion!==this.nativeVersion||key(path.resolve(header.repository||''))!==key(path.resolve(prepared.repository))||header.objectFormat!==prepared.objectFormat||!sameGitState(header.gitState,prepared.gitState))throw Error('Shared Git source proof generation changed; refresh the workspace source index.');};
+     if(prepared)await readHeader();
+     await Promise.all(Array.from({length:4},async()=>{while(next<SHARDS){const shard=next++,file=path.join(directory,'v2-'+shard+'.json');try{
+      const stat=await fs.lstat(file);if(stat.isSymbolicLink()||!stat.isFile()||stat.size>MAX_BYTES)throw Error('Shared source index shard is invalid.');
+      const data=JSON.parse(await fs.readFile(file,'utf8'));
+      if(data.format!==2||typeof data.root!=='string'||!path.isAbsolute(data.root)||key(path.resolve(data.root))!==key(root)||typeof data.repository!=='string'||!path.isAbsolute(data.repository)||!(key(path.resolve(data.repository))===key(root)||within(path.resolve(data.repository),root))||!['sha1','sha256'].includes(data.objectFormat)||data.nativeVersion!==this.nativeVersion||!Array.isArray(data.entries)||data.entries.length>20000)throw Error('Shared source index binding/version is invalid.');
+      const current={root,repository:path.resolve(data.repository),objectFormat:data.objectFormat};
+      if(binding&&(key(binding.repository)!==key(current.repository)||binding.objectFormat!==current.objectFormat))throw Error('Shared source index shards disagree.');binding=current;found=true;
+      for(const row of data.entries){
+       if(!relativePath(row?.path)||crypto.createHash('sha256').update(row.path).digest()[0]%SHARDS!==shard||typeof row.blobId!=='string'||!(data.objectFormat==='sha1'?/^[a-f0-9]{40}$/i:/^[a-f0-9]{64}$/i).test(row.blobId))continue;
+       const rawSha256=row.native===undefined&&/\.jade$/i.test(row.path)?row.rawSha256:row.native?.hash;if(!digest(rawSha256))continue;
+       const file=path.resolve(current.repository,...row.path.split('/'));if(!within(root,file))continue;const uri=require('node:url').pathToFileURL(file).href,location=this.location(uri);if(!location||key(location.root)!==key(root))continue;
+       proofs.set(key(uri),{root,rawSha256,path:row.path});
+       if(this.changed.has(key(uri))||row.browser?.parser!==this.parserId||row.browser.rawSha256!==rawSha256)continue;
+       try{const model=browserModel(row.browser.model);rows.push({uri,rawSha256,model:{...model,uri,text:'',code:'',excluded:[]}});}catch(error){this.report(Error('Invalid optional advisory metadata was ignored: '+error.message));}
+      }
+     }catch(error){if(error.code!=='ENOENT')invalid=true;}}}));
+     if(invalid||!found||!binding)throw Error('Shared source index is missing, corrupt or incompatible.');
+     if(prepared){if(key(binding.repository)!==key(path.resolve(prepared.repository))||binding.objectFormat!==prepared.objectFormat)throw Error('Shared Git source proof repository binding changed.');await readHeader();binding.gitState=prepared.gitState;}
+     if(generation!==this.sharedGeneration)return [];
+     this.sharedBindings.set(key(root),binding);for(const [uri,proof]of proofs)this.sharedProofs.set(uri,proof);result.push(...rows);
+    }catch(error){this.report(Error('Initialise or refresh the workspace source cache: '+error.message));}
+   }return generation===this.sharedGeneration?result:[];
+  })();return this.sharedReading;
+ }
+ async proof(uri){await this.loadShared();const row=this.sharedProofs.get(key(uri)),binding=row&&this.sharedBindings.get(key(row.root));if(this.prepare&&binding&&gitState(binding.gitState))return{rawSha256:row.rawSha256};}
+ async savedUris(){await this.load();const result=[];for(const proof of this.sharedProofs.values()){const binding=this.sharedBindings.get(key(proof.root));if(binding)result.push(require('node:url').pathToFileURL(path.resolve(binding.repository,...proof.path.split('/'))).href);}return result;}
+ setShared(uri,record){
+  const location=this.location(uri);if(!location)return;
+  if(!digest(record?.rawSha256)){this.report(Error('Saved browsing metadata requires the original raw byte digest proof.'));return;}
+  if(!record.model||!Array.isArray(record.model.classes)){this.report(Error('Invalid advisory browsing metadata.'));return;}
+  const id=key(uri),previous=this.sharedPending.get(id)||this.sharedProofs.get(id);
+  this.changed.add(id);this.sharedPending.set(id,{uri,root:location.root,rawSha256:record.rawSha256,model:record.model,path:previous?.path});
+ }
+ deleteShared(uri){
+  const location=this.location(uri);if(!location)return;const id=key(uri);this.changed.add(id);
+  const previous=this.sharedPending.get(id)||this.sharedProofs.get(id);if(!previous){this.sharedPending.delete(id);return;}
+  this.sharedPending.set(id,{uri,root:location.root,rawSha256:previous.rawSha256,model:null,path:previous.path});
+ }
+ flushShared(){
+  this.writing=this.writing.then(async()=>{
+   if(!this.sharedPending.size)return;await this.loadShared();
+   if(typeof this.request!=='function'){this.report(Error('Native browsing-cache writer is unavailable; no shared files were written.'));return;}
+   while(this.sharedPending.size){
+    let batch=[],root,batchShard,bytes=0;
+    const send=async()=>{
+     if(!batch.length)return;const sending=batch;batch=[];bytes=0;
+     try{
+      const binding=this.sharedBindings.get(key(root));
+      const result=await this.request('source.index.browser.update',{root,parser:this.parserId,updates:sending.map(item=>item.update)}).promise;
+      const paths=new Set(sending.map(item=>item.update.path)),accepted=result?.accepted,stale=result?.stale;
+      if(result?.passed!==true||result.code!==0||!Array.isArray(accepted)||!Array.isArray(stale)||accepted.length+stale.length!==paths.size||new Set([...accepted,...stale]).size!==paths.size||[...accepted,...stale].some(value=>!paths.has(value)))throw Error(result?.report?.error||'Invalid native browsing-cache acknowledgement.');
+      const canonical=result.canonicalPaths===undefined?{}:result.canonicalPaths;
+      if(!canonical||typeof canonical!=='object'||Array.isArray(canonical)||Object.keys(canonical).length>SHARED_BATCH)throw Error('Invalid native canonical-path acknowledgement.');
+      for(const [requested,value]of Object.entries(canonical))if(!binding||!accepted.includes(requested)||!relativePath(value)||!within(binding.root,path.resolve(binding.repository,...value.split('/')))||key(path.resolve(binding.repository,...requested.split('/')))!==key(path.resolve(binding.repository,...value.split('/'))))throw Error('Invalid native canonical-path acknowledgement.');
+      for(const item of sending)if(accepted.includes(item.update.path)&&this.sharedPending.get(item.id)===item.pending)this.sharedProofs.set(item.id,{root:item.pending.root,rawSha256:item.pending.rawSha256,path:Object.hasOwn(canonical,item.update.path)?canonical[item.update.path]:item.update.path});
+      if(stale.length)this.report(Error('Saved source changed; stale browsing metadata was not cached.'));
+     }catch(error){this.report(error);}
+     finally{for(const item of sending)if(this.sharedPending.get(item.id)===item.pending)this.sharedPending.delete(item.id);}
+    };
+    const groups=new Map();
+    for(const [identity,pending]of this.sharedPending){const binding=this.sharedBindings.get(key(pending.root)),relative=pending.path||this.sharedProofs.get(identity)?.path||path.relative(binding?.repository||pending.root,fileURLToPath(pending.uri)).split(path.sep).join('/'),shard=crypto.createHash('sha256').update(relative).digest()[0]%SHARDS,id=JSON.stringify([key(pending.root),shard]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push([identity,pending,shard]);}
+    for(const [id,pending,shard] of [...groups.values()].flat()){
+     try{
+      const binding=this.sharedBindings.get(key(pending.root));if(!binding)throw Error('Initialise or refresh the workspace source cache before saving browsing metadata.');
+      const file=fileURLToPath(pending.uri),relative=pending.path||this.sharedProofs.get(id)?.path||path.relative(binding.repository,file).split(path.sep).join('/');if(!relativePath(relative)||!within(binding.root,file)||key(path.resolve(binding.repository,...relative.split('/')))!==key(file))throw Error('Advisory source path escapes its owning workspace.');
+      const model=pending.model===null?null:browserModel(pending.model);if(model!==null&&Buffer.byteLength(JSON.stringify(model))>SHARED_MODEL_BYTES)throw Error('Advisory browsing model exceeds its 2 MiB size limit; refresh guidance is required.');
+      const update={path:relative,rawSha256:pending.rawSha256,model},size=Buffer.byteLength(JSON.stringify(update));
+      const overhead=Buffer.byteLength(JSON.stringify({root:binding.root,parser:this.parserId,updates:[]}))+1024;
+      if(batch.length&&(root!==binding.root||batchShard!==shard||batch.length>=SHARED_BATCH||bytes+size+batch.length+overhead>SHARED_PACKET_BYTES))await send();
+      root=binding.root;batchShard=shard;bytes+=size;batch.push({id,pending,update});
+     }catch(error){this.report(error);if(this.sharedPending.get(id)===pending)this.sharedPending.delete(id);}
+    }await send();
+   }
+  }).catch(error=>this.report(error));return this.writing;
+ }
+ invalidate(){this.buckets.clear();this.dirty.clear();this.changed.clear();this.sharedBindings.clear();this.sharedProofs.clear();this.sharedPending.clear();this.sharedReading=undefined;this.sharedGeneration++;}
 }
-module.exports={SourceIndexCache};
+module.exports={SourceIndexCache,browserModel};

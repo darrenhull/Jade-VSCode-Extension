@@ -1,0 +1,30 @@
+{
+  "baselineHead": "26781dbc3be0297078a7113c8a11d224d73a4f50",
+  "failedWorkflowRun": 43750070113,
+  "failedJob": 132921851975,
+  "hostedFailures": 40,
+  "repairScope": "test fixtures only",
+  "red": {
+    "realWindowsShortTempAlias": true,
+    "tests": 40,
+    "failed": 40,
+    "passed": 0,
+    "logSha256": "43365b3497512e7bf2454797b8a2e377fbb7eb3f3682f95e32ace268f2ea9562"
+  },
+  "green": {
+    "passed": 42,
+    "tests": 42,
+    "invalidRefreshResultControls": 2,
+    "logSha256": "95033572988c0b9da57c667d8b6f6f96419762dd0c975cfd93e971d5af6ed4ae",
+    "skipped": 0,
+    "realWindowsShortTempAlias": true,
+    "failed": 0
+  },
+  "crossDriveCause": "Windows path.relative from D: checkout to C: TEMP returns an absolute C: path; the test now explicitly supplies and asserts a relative header.",
+  "ownedCleanupGuards": "Canonical parent equality, expected fixture basename and no symlink before removal.",
+  "smokeBoundary": "Explicit source refresh arguments and format-2 result, test discovery, status and owned shutdown are recorded; rejected refreshes never discover tests.",
+  "productPayloadChanged": false,
+  "nativePayloadChanged": false,
+  "packageUiEvidenceRemainsApplicable": true,
+  "fullSuiteRun": false
+}

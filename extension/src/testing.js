@@ -4,6 +4,7 @@ const {isManagedProjectPath}=require('./source-index-scope');
 const { testLenses } = require('./local-tests');
 const { isNestedSnapshot } = require('./source-snapshots');
 const { sourcePosition } = require('./source_symbols');
+const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 
 function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   // Allows the command transport to be exercised outside the extension host.
@@ -106,7 +107,11 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
     return [...selected.values()];
   }
   async function runRequest(request, token, debugging = false) {
-    await discover();
+    const known=item=>{if(details.has(item))return true;let valid=item.children.size>0;item.children.forEach(child=>{if(!known(child))valid=false;});return valid;};
+    if(!request.include||!request.include.every(known))await discover();
+    // Explicit class/file runs let JADE select the complete class. Browser rows
+    // may still be loading, or omit inherited/split-file tests.
+    const wholeClasses=new Set(!debugging&&!request.exclude?.length?(request.include||[]).filter(item=>!details.has(item)).map(item=>classes.get(item.id)):[]);
     const run = controller.createTestRun(request);
     token ||= run.token;
     const queue = leaves(request);
@@ -127,22 +132,31 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
         let result;
         try {
           const runner=debugging?debugExecute:execute;
-          result = await runner(data.uri, debugging?names[0]:names, token || run.token, text => run.appendOutput(text.replace(/\r?\n/g, '\r\n')));
+          result = await runner(data.uri, debugging?names[0]:wholeClasses.has(data.classKey)?undefined:names, token || run.token, text => run.appendOutput(text.replace(/\r?\n/g, '\r\n')));
         } catch (error) { result = { passed: false, error: error.message }; }
         lastResult = result;
         const results = new Map((result?.report?.results || []).map(entry => [entry.method, entry]));
+        const nativeRange=outcome=>typeof outcome.source==='string'&&Number.isSafeInteger(outcome.line)&&outcome.line>0?new vscode.Range(outcome.line-1,Number.isSafeInteger(outcome.column)&&outcome.column>0?outcome.column-1:0,outcome.line-1,Number.isSafeInteger(outcome.column)&&outcome.column>0?outcome.column-1:0):undefined;
+        if(wholeClasses.has(data.classKey)&&result?.report?.tests_completed){
+          const file=controller.items.get(data.uri.toString()),selected=new Set(names);
+          for(const method of results.keys())if(typeof method==='string'&&!selected.has(method)){
+            const outcome=results.get(method),range=nativeRange(outcome),item=controller.createTestItem(data.uri.toString()+'#'+method,method,range?vscode.Uri.file(outcome.source):data.uri);if(range)item.range=range;
+            details.set(item,{...data,method});file?.children.add(item);items.push(item);run.enqueued(item);run.started(item);
+          }
+        }
         for (const item of items) {
           if (result?.cancelled || token?.isCancellationRequested) { run.skipped(item); continue; }
           const outcome = results.get(details.get(item).method);
           if (!result?.report?.tests_completed || !result?.report?.cleanup_complete || !outcome) {
-            const message = result?.report?.error || result?.error || (result?.timedOut ? 'Native test run timed out.' : 'Native test run did not produce a complete method result.');
+            const message = result?.report?.error || result?.error || (result?.report?.diagnostics||[]).flatMap(diagnosticLines).join('\n') || (result?.timedOut ? 'Native test run timed out.' : 'Native test run did not produce a complete method result.');
             run.errored(item, new vscode.TestMessage(message));
           } else if (outcome.status === 'passed') run.passed(item);
           else if (outcome.status === 'skipped') run.skipped(item);
           else {
             const message = new vscode.TestMessage(outcome.message || 'Native Jade test failed.');
-            message.location = outcome.source ? new vscode.Location(vscode.Uri.file(outcome.source),
-              new vscode.Range(Math.max(0, outcome.line - 1), Math.max(0, (outcome.column || 1) - 1), Math.max(0, outcome.line - 1), Math.max(0, (outcome.column || 1) - 1))) : new vscode.Location(item.uri, item.range);
+            const range=nativeRange(outcome);
+            if(range)message.location=new vscode.Location(vscode.Uri.file(outcome.source),range);
+            else if(item.range)message.location=new vscode.Location(item.uri,item.range);
             run.failed(item, message);
           }
         }
@@ -154,7 +168,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   if(debugExecute)controller.createRunProfile('Debug Jade tests locally',vscode.TestRunProfileKind.Debug,(request,token)=>runRequest(request,token,true),true);
   async function runFile(uri, methods, debugging = false) {
     if (!uri) throw new Error('Open a CLS test class first.');
-    await discover();
+    if(debugging&&!methods)await discover();
     let file = update(await vscode.workspace.openTextDocument(uri));
     if (!file && !methods) controller.items.forEach(item => { if (classes.get(item.id) === classes.get(uri.toString())) file ||= item; });
     if (!file) throw new Error('No runnable Jade tests were found in this file.');
