@@ -5,6 +5,8 @@ const PARSER=crypto.createHash('sha256');for(const name of ['source_symbols.js',
 const key=value=>process.platform==='win32'?value.toLowerCase():value;
 const within=(root,file)=>{const relative=path.relative(root,file);return relative!==''&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);};
 const SHARED_PACKET_BYTES=4*1024*1024,SHARED_MODEL_BYTES=2*1024*1024,SHARED_BATCH=128;
+const gitState=value=>value?.policy==='git-status'&&value.ready===true&&typeof value.generation==='string'&&value.generation.length>0&&value.generation.length<=4096&&(value.head===null||typeof value.head==='string'&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(value.head));
+const sameGitState=(a,b)=>gitState(a)&&gitState(b)&&a.generation===b.generation&&a.head===b.head;
 const digest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/i.test(value);
 const relativePath=value=>typeof value==='string'&&value.length<=32768&&!/[\\\x00-\x1f\x7f:]/.test(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
 function browserModel(model){
@@ -27,7 +29,7 @@ function browserModel(model){
 }
 /** Disposable browsing metadata. Never a source/build/publish authority. */
 class SourceIndexCache{
- constructor({roots,onError=()=>{},nativeVersion,request,parserId=PARSER_ID}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.changed=new Set();this.writing=Promise.resolve();this.reported=new Set();this.nativeVersion=nativeVersion;this.request=request;this.parserId=parserId;this.sharedBindings=new Map();this.sharedProofs=new Map();this.sharedPending=new Map();this.sharedGeneration=0;}
+ constructor({roots,onError=()=>{},nativeVersion,request,prepare,parserId=PARSER_ID}){this.roots=roots;this.onError=onError;this.buckets=new Map();this.dirty=new Set();this.changed=new Set();this.writing=Promise.resolve();this.reported=new Set();this.nativeVersion=nativeVersion;this.request=request;this.prepare=prepare;this.parserId=parserId;this.sharedBindings=new Map();this.sharedProofs=new Map();this.sharedPending=new Map();this.sharedGeneration=0;}
  report(error){if(!this.reported.has(error.message)){this.reported.add(error.message);try{this.onError(error);}catch{}}}
  location(uri){
   try{
@@ -95,7 +97,11 @@ class SourceIndexCache{
    for(const root of this.roots().map(value=>path.resolve(value))){
     const rows=[],proofs=new Map();let binding,invalid=false,found=false,next=0;
     try{
+     const prepared=this.prepare?await this.prepare(root):undefined;
+     if(this.prepare&&(!prepared||prepared.format!==2||prepared.nativeVersion!==this.nativeVersion||typeof prepared.repository!=='string'||!path.isAbsolute(prepared.repository)||!['sha1','sha256'].includes(prepared.objectFormat)||!prepared.roots?.some(value=>typeof value.root==='string'&&key(path.resolve(value.root))===key(root)&&sameGitState(value.gitState||prepared.gitState,prepared.gitState))))throw Error('Native Git source proof has an incompatible workspace binding.');
      const directory=await this.directory(root,false);if(!directory)throw Error('Shared source index is missing.');
+     const readHeader=async()=>{const file=path.join(directory,'v2-0.json'),stat=await fs.lstat(file);if(stat.isSymbolicLink()||!stat.isFile()||stat.size>MAX_BYTES)throw Error('Shared Git source proof header is invalid.');const header=JSON.parse(await fs.readFile(file,'utf8'));if(header.format!==2||typeof header.root!=='string'||key(path.resolve(header.root))!==key(root)||header.nativeVersion!==this.nativeVersion||key(path.resolve(header.repository||''))!==key(path.resolve(prepared.repository))||header.objectFormat!==prepared.objectFormat||!sameGitState(header.gitState,prepared.gitState))throw Error('Shared Git source proof generation changed; refresh the workspace source index.');};
+     if(prepared)await readHeader();
      await Promise.all(Array.from({length:4},async()=>{while(next<SHARDS){const shard=next++,file=path.join(directory,'v2-'+shard+'.json');try{
       const stat=await fs.lstat(file);if(stat.isSymbolicLink()||!stat.isFile()||stat.size>MAX_BYTES)throw Error('Shared source index shard is invalid.');
       const data=JSON.parse(await fs.readFile(file,'utf8'));
@@ -112,12 +118,14 @@ class SourceIndexCache{
       }
      }catch(error){if(error.code!=='ENOENT')invalid=true;}}}));
      if(invalid||!found||!binding)throw Error('Shared source index is missing, corrupt or incompatible.');
+     if(prepared){if(key(binding.repository)!==key(path.resolve(prepared.repository))||binding.objectFormat!==prepared.objectFormat)throw Error('Shared Git source proof repository binding changed.');await readHeader();binding.gitState=prepared.gitState;}
      if(generation!==this.sharedGeneration)return [];
      this.sharedBindings.set(key(root),binding);for(const [uri,proof]of proofs)this.sharedProofs.set(uri,proof);result.push(...rows);
     }catch(error){this.report(Error('Initialise or refresh the workspace source cache: '+error.message));}
    }return generation===this.sharedGeneration?result:[];
   })();return this.sharedReading;
  }
+ async proof(uri){await this.loadShared();const row=this.sharedProofs.get(key(uri)),binding=row&&this.sharedBindings.get(key(row.root));if(this.prepare&&binding&&gitState(binding.gitState))return{rawSha256:row.rawSha256};}
  async savedUris(){await this.load();const result=[];for(const proof of this.sharedProofs.values()){const binding=this.sharedBindings.get(key(proof.root));if(binding)result.push(require('node:url').pathToFileURL(path.resolve(binding.repository,...proof.path.split('/'))).href);}return result;}
  setShared(uri,record){
   const location=this.location(uri);if(!location)return;

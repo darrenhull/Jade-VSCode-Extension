@@ -22,9 +22,16 @@ function registerLanguageTools(vscode,context,services={}){
     try{const capability=(await services.client?.sourceCapabilities({}))?.sourceIndex;if(capability?.format!==2||capability.databaseRequired!==false||typeof capability.nativeVersion!=='string'||!capability.nativeVersion||!Array.isArray(capability.commands)||!['source.index.refresh','source.index.prepare','source.index.browser.update'].every(command=>capability.commands.includes(command)))throw Error('Update the Jade CLI bundle: shared source index format 2 is unavailable.');return capability.nativeVersion;}
     catch(error){capabilityPromise=undefined;throw error;}
   })();
-  const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),nativeVersion,request:(...args)=>services.client.request(...args),onError:reportIndexError});
+  const preparedReceipts=new Map();
+  async function prepareSourceIndex(root){
+    const identity=path.resolve(root).toLowerCase(),available=preparedReceipts.get(identity);preparedReceipts.delete(identity);if(available)return available;
+    const result=await services.client.request('source.index.prepare',{config:{workspaceRoots:[root]}},text=>output.appendLine(text.trimEnd())).promise;
+    if(result?.passed!==true||result.code!==0)throw Error(result?.report?.error||'Native Git source preparation failed. Run Initialise Workspace.');return result.cache;
+  }
+  const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),nativeVersion,prepare:prepareSourceIndex,request:(...args)=>services.client.request(...args),onError:reportIndexError});
   const index=new SourceIndex({
     list:async()=>filterScan((await cache.savedUris()).map(uri=>vscode.Uri.parse(uri))).map(uri=>uri.toString()),
+    proof:uri=>cache.proof(uri),
     read:async uri=>vscode.workspace.fs.readFile(vscode.Uri.parse(uri)),
     stat:async uri=>{const value=await vscode.workspace.fs.stat(vscode.Uri.parse(uri));return {mtime:value.mtime,size:value.size};},
     cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError,onTiming:timing=>{if(timing.totalMs>=1000)output.appendLine('Slow workspace source: '+JSON.stringify(timing));}
@@ -36,6 +43,7 @@ function registerLanguageTools(vscode,context,services={}){
       const result=await services.client.request('source.index.refresh',{config:{workspaceRoots:[root]}},text=>output.appendLine(text.trimEnd())).promise;
       if(result?.passed!==true||result.code!==0)throw Error(result?.report?.error||'Native source index refresh failed. Run Initialise Workspace.');
       if(result.cache?.format!==2||result.cache.nativeVersion!==version||!result.cache.roots?.some(value=>path.resolve(value.root).toLowerCase()===path.resolve(root).toLowerCase()))throw Error('Native source index refresh returned an incompatible workspace binding. Update the Jade CLI bundle.');
+      preparedReceipts.set(path.resolve(root).toLowerCase(),result.cache);
     }
     await index.reloadSavedCache();output.appendLine('Shared source index refreshed.');return{passed:true};
   }
@@ -111,7 +119,7 @@ function registerLanguageTools(vscode,context,services={}){
     vscode.workspace.onDidOpenTextDocument(document=>{if(accepted(document.uri))index.document(document);}),
     vscode.workspace.onDidChangeTextDocument(event=>{if(accepted(event.document.uri))index.document(event.document);}),
     vscode.workspace.onDidCloseTextDocument(document=>{const uri=document.uri.toString();if(document.uri.scheme==='untitled')index.remove(uri);else if(accepted(document.uri)){index.close(uri);index.schedule(uri);}}),
-    vscode.workspace.onDidChangeWorkspaceFolders(()=>index.invalidate()),
+    vscode.workspace.onDidChangeWorkspaceFolders(()=>{preparedReceipts.clear();index.invalidate();}),
     vscode.workspace.onDidChangeConfiguration(event=>{if(event.affectsConfiguration('jadeNative')){lastCache=undefined;lastProject=undefined;}})
   );
   const watcher=vscode.workspace.createFileSystemWatcher('**/*.{cls,jade,sec}');
