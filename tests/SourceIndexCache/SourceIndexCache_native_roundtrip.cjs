@@ -5,6 +5,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 const {OwnedCliFixture}=require('../../test/OwnedCliFixture');
 const {SourceIndexCache}=require('../../extension/src/SourceIndexCache');
 const {parseSource}=require('../../extension/src/source_symbols');
+const {registerLanguageTools}=require('../../extension/src/language-tools');
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 async function diskRows(directory){
  const files=(await fs.readdir(directory)).filter(name=>/^v2-\d+\.json$/.test(name)),rows=[];let nativeVersion;
@@ -52,7 +53,13 @@ async function runNativeBrowserRoundtrip({entry,refresh}){
   const newDisk=await diskRows(directory);assert.equal(newDisk.rows.length,variantDisk.rows.length+1);assert.ok(newDisk.rows.find(row=>row.path===newRelative)?.browser);
   cache.delete(newUri);await cache.flush();assert.equal(errors.length,previousErrors);assert.equal(packets.at(-1).body.updates[0].path,newRelative);assert.equal(packets.at(-1).body.updates[0].model,null);
   const cleared=await diskRows(directory),clearedRow=cleared.rows.find(row=>row.path===newRelative);assert.ok(clearedRow?.native);assert.equal(clearedRow.browser,undefined,'Unknown-alias save/delete must not strand advisory metadata');assert.equal(cleared.rows.length,newDisk.rows.length);
-  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,matchingSavedEditAccepted:true,windowsUriCaseStable:true,newAliasConditionalClear:true,sourceBodiesPersisted:false,terminalAlias:true,sameIsolatedBroker:true};
+  const commands=[],originalRequest=session.request.bind(session);session.request=(...args)=>{commands.push(args[0]);return originalRequest(...args);};
+  const noop=()=>({dispose(){}}),resource=value=>({scheme:'file',fsPath:value,toString:()=>pathToFileURL(value).href}),folder={uri:resource(root)},messages=[];
+  const vscode={CompletionItemKind:{Class:1,Property:2,Method:3,Variable:4,Keyword:5},languages:new Proxy({},{get:()=>noop}),window:{createOutputChannel:()=>({appendLine:line=>messages.push(line),dispose(){}})},Uri:{file:resource,parse:value=>resource(require('node:url').fileURLToPath(value))},workspace:{workspaceFolders:[folder],textDocuments:[],getWorkspaceFolder:()=>folder,findFiles:async()=>assert.fail('Activated shared mode must not rediscover sources through VS Code'),fs:{readFile:uri=>fs.readFile(uri.fsPath)},createFileSystemWatcher:()=>({dispose(){},onDidCreate:noop,onDidChange:noop,onDidDelete:noop}),onDidOpenTextDocument:noop,onDidChangeTextDocument:noop,onDidCloseTextDocument:noop,onDidChangeWorkspaceFolders:noop,onDidChangeConfiguration:noop}};
+  const language=registerLanguageTools(vscode,{subscriptions:[]},{client:session});
+  try{await language.index.ready();await language.index.persist();assert.equal(commands.filter(value=>value==='doctor').length,1);assert.equal(language.index.records.size,2);language.index.document({uri:resource(file),version:2,isDirty:true,getText:()=>source.replace(/\bFish\b/g,'UnsavedFish')});await language.refreshSourceIndex(folder);assert.equal(language.index.records.get(uri).model.classes[0].name,'UnsavedFish');assert.equal(hash(await fs.readFile(file)),newHash);assert.equal(commands.filter(value=>value==='source.index.refresh').length,1);assert.equal(commands.includes('source.index.prepare'),false);assert.ok((await fs.readdir(directory)).every(name=>!name.startsWith('v1-')));assert.ok(messages.some(line=>/Shared source index refreshed/.test(line)));}
+  finally{await language.index.persist();language.index.dispose();}
+  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,matchingSavedEditAccepted:true,windowsUriCaseStable:true,newAliasConditionalClear:true,sourceBodiesPersisted:false,terminalAlias:true,sameIsolatedBroker:true,realLanguageActivation:true,lazyCapabilityWithoutLegacyWrites:true,noFrontendDiscovery:true,noSeparateNativePrepare:true,explicitRefreshOnce:true,dirtyEditorRetained:true};
  });
  assert.equal(await fs.stat(stage).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;}),false,'Owned fixture directory remains after shutdown');
  assert.throws(()=>process.kill(brokerPID,0),error=>error.code==='ESRCH','Owned broker must actually exit before cleanup');

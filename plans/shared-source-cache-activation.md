@@ -1,6 +1,6 @@
 # Shared source-cache activation proposal
 
-Status: read-only design for manager approval. No product activation, package or release is authorized by this document. The matched adapter and actual database-free process matrix are frozen at consumer commit160067e. Large-workspace performance remains a separate gate.
+Status: manager approved minimal steps1–7, now wired in the isolated consumer checkout. The actual database-free CLI/language-host gate passes; the coherent native pin, native-valid40k test/Scratch gates, full checks/package and running-UI evidence remain outstanding. The bundled runtime must be updated before delivery; unsupported capability discovery stays actionable. Debug keeps its existing proven discovery/maps for this delivery, with no new descriptor requirement.
 
 ## Existing native contract
 
@@ -22,6 +22,8 @@ Status: read-only design for manager approval. No product activation, package or
 ## Debug inventory gate
 
 Debug currently calls workingFiles and then config.files.flatMap(readFile) for source maps. An advisory browsing list is insufficient. No existing successful-native-input descriptor API is present. Do not remove debug discovery or substitute an empty/browsing-only list without a reviewed replacement.
+
+Manager decision for this delivery: retain that existing proven debug path. The descriptor proposal below is deferred and is not an implementation or release dependency unless a concrete compatibility failure appears.
 
 Smallest native extension proposed for manager approval: successful compile report includes a compact descriptor of the EXISTING Working native-inputs-v1.json: exact owned path, raw SHA256 and current nativeInputsProof/Working identity. No second index, full source graph frame or extra source prepare is required. The consumer verifies descriptor containment/identity/hash, filters entries to owning roots and existing class source, reads original bytes and requires each hash to match the successful native inventory before making source maps. A changed ledger/file fails or retries explicitly. The ledger can contain prior inputs outside the current selected scope and deleted paths, so those must not be treated as current mapping inputs blindly. Source text encoding must use the existing raw-byte decoder. Native owner confirmed this descriptor is not already available; no implementation is requested until the manager approves it. Without that contract, debug activation is a stated remaining gate.
 

@@ -64,6 +64,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    }
    if(result?.passed!==true||result.code!==0)throw Error(failure(result));
    output.appendLine((result.created?'Created ':'Preserved existing ')+configFile+'. Configuration step complete.');
+   if(services.refreshSourceIndex){progress.report({message:'Initialising the shared Git source index…'});await services.refreshSourceIndex(folder);output.appendLine('Shared source index is ready.');}
    if(sameFolder())void vscode.window.showInformationMessage('Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
    return result;
   }).finally(()=>{if(pending.get(key)===run)pending.delete(key);});

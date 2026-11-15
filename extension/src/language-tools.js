@@ -9,7 +9,7 @@ const {isIndexableSourcePath}=require('./source-index-scope');
 const {registerFormatting}=require('./jade-formatter');
 const {parseSource}=require('./source_symbols');
 
-function registerLanguageTools(vscode,context){
+function registerLanguageTools(vscode,context,services={}){
   const selector=[{language:'jade-nz',scheme:'file',pattern:'**/*.{cls,jade}'},{language:'jade-nz',scheme:'untitled'},{language:'jade-nz',scheme:'vscode-notebook-cell'}];
   registerFormatting(vscode,context,selector);
   const output=vscode.window.createOutputChannel('Jade Language Tools');let lastError,lastCache,lastProject;
@@ -17,13 +17,28 @@ function registerLanguageTools(vscode,context){
   const accepted=uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace);
   const filterScan=uris=>{const markers=new Map();return uris.filter(uri=>supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers));};
   const reportIndexError=error=>output.appendLine('Workspace index: '+error.message);
-  const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),onError:reportIndexError});
+  let capabilityPromise;
+  const nativeVersion=()=>capabilityPromise||=(async()=>{
+    try{const capability=(await services.client?.sourceCapabilities({}))?.sourceIndex;if(capability?.format!==2||capability.databaseRequired!==false||typeof capability.nativeVersion!=='string'||!capability.nativeVersion||!Array.isArray(capability.commands)||!['source.index.refresh','source.index.prepare','source.index.browser.update'].every(command=>capability.commands.includes(command)))throw Error('Update the Jade CLI bundle: shared source index format 2 is unavailable.');return capability.nativeVersion;}
+    catch(error){capabilityPromise=undefined;throw error;}
+  })();
+  const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),nativeVersion,request:(...args)=>services.client.request(...args),onError:reportIndexError});
   const index=new SourceIndex({
-    list:async()=>filterScan(await vscode.workspace.findFiles('**/{*.cls,*.jade,schemaDefinitions.sec}','**/{node_modules,.git,.jade}/**')).map(uri=>uri.toString()),
+    list:async()=>filterScan((await cache.savedUris()).map(uri=>vscode.Uri.parse(uri))).map(uri=>uri.toString()),
     read:async uri=>vscode.workspace.fs.readFile(vscode.Uri.parse(uri)),
     stat:async uri=>{const value=await vscode.workspace.fs.stat(vscode.Uri.parse(uri));return {mtime:value.mtime,size:value.size};},
     cache,filterCached:entries=>{const markers=new Map();return entries.filter(entry=>{const uri=vscode.Uri.parse(entry.uri);return supported(uri)&&!isNestedSnapshot(uri,vscode.workspace,markers);});},onError:reportIndexError,onTiming:timing=>{if(timing.totalMs>=1000)output.appendLine('Slow workspace source: '+JSON.stringify(timing));}
   });
+  async function refreshSourceIndex(folder){
+    const version=await nativeVersion(),folders=folder?[folder]:(vscode.workspace.workspaceFolders||[]).filter(value=>value.uri.scheme==='file');
+    await index.persist();
+    for(const selected of folders){const root=selected.uri.fsPath;if(!(vscode.workspace.workspaceFolders||[]).some(value=>path.resolve(value.uri.fsPath).toLowerCase()===path.resolve(root).toLowerCase()))throw Error('Workspace changed before source index refresh.');output.appendLine('Refreshing Git source index: '+root);
+      const result=await services.client.request('source.index.refresh',{config:{workspaceRoots:[root]}},text=>output.appendLine(text.trimEnd())).promise;
+      if(result?.passed!==true||result.code!==0)throw Error(result?.report?.error||'Native source index refresh failed. Run Initialise Workspace.');
+      if(result.cache?.format!==2||result.cache.nativeVersion!==version||!result.cache.roots?.some(value=>path.resolve(value.root).toLowerCase()===path.resolve(root).toLowerCase()))throw Error('Native source index refresh returned an incompatible workspace binding. Update the Jade CLI bundle.');
+    }
+    await index.reloadSavedCache();output.appendLine('Shared source index refreshed.');return{passed:true};
+  }
   context.subscriptions.push(index);
   let bulkMarkers;
   const acceptedDisk=uri=>{
@@ -101,6 +116,6 @@ function registerLanguageTools(vscode,context){
   );
   const watcher=vscode.workspace.createFileSystemWatcher('**/*.{cls,jade,sec}');
   context.subscriptions.push(watcher,watcher.onDidCreate(uri=>{if(acceptedDisk(uri))index.schedule(uri.toString());}),watcher.onDidChange(uri=>{if(acceptedDisk(uri))index.schedule(uri.toString());}),watcher.onDidDelete(uri=>{if(acceptedDisk(uri))index.removeSaved(uri.toString());}));
-  return {index,model,ready,setWorkspaceSchemaResolver:resolver=>{workspaceSchema=resolver;},setWorkspaceResourceResolver:resolver=>{workspaceResource=resolver;}};
+  return {index,model,ready,refreshSourceIndex,setWorkspaceSchemaResolver:resolver=>{workspaceSchema=resolver;},setWorkspaceResourceResolver:resolver=>{workspaceResource=resolver;}};
 }
 module.exports={registerLanguageTools};

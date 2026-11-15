@@ -1,0 +1,16 @@
+{
+  "scope": "Read-only actual JS decoder/parser/serializer on retained synthetic stress corpus; not a native-load-qualified workload",
+  "corpusFiles": 40000,
+  "sourceWrites": false,
+  "cacheWrites": false,
+  "nativeProcessesStarted": false,
+  "limits": {"modelBytes":2097152,"packetBytes":4194304,"shardBytes":33554432},
+  "measurements": [
+    {"file":"Scale1C1.cls","encoding":"utf8","rawBytes":7179,"rawSha256":"57580b43acf7a03c1e2f07042209e8821a13b961ca356927b077b07611784359","metadataBytes":4425,"parseMs":4.061,"classes":1,"members":8,"peakRssBytes":55054336},
+    {"file":"Scale1C0.cls","encoding":"utf16le-bom","rawBytes":14340,"rawSha256":"048822ae7d8eaeea8b3c47d12bfd7f8208fe49bc349bcc7cea3699bbe5c1981e","metadataBytes":4423,"parseMs":1.606,"classes":1,"members":8,"peakRssBytes":55578624},
+    {"file":"Scale0C1.cls","encoding":"utf8","rawBytes":37442433,"rawSha256":"dba4e80b8499a8c94ba5faaa513e95b43dc0a17af3f1cc21b9c2c4065b4b9315","metadataBytes":16266597,"readHashMs":92.737,"decodeMs":26.460,"parseMs":3171.393,"serializeMs":77.576,"classes":1,"members":512,"lineStarts":1850381,"peakRssBytes":1053282304,"heapUsedBytes":718177552,"over2MiBModelLimit":true},
+    {"file":"One__IDispatchText.cls","encoding":"utf16le-bom","rawBytes":396,"rawSha256":"e0ea45c76d789da5c363262d41e21cc48fcbb91a12aa36223860a72cfd7ab1c2","metadataBytes":83,"parseMs":1.145,"classes":0,"lineStarts":15},
+    {"file":"Two__IDispatchText.cls","encoding":"utf8","rawBytes":197,"rawSha256":"e81b3dced113529d4280cd3180525c0675a19a07fe8b2f709f16f4fe3840a0e6","metadataBytes":83,"parseMs":0.285,"classes":0,"lineStarts":15}
+  ],
+  "coverageLimits": ["37 MB CLS advisory model exceeds existing 2 MiB bound; no truncation performed", "Existing JS parser emits no class model for these imported-alias samples; native alias metadata stays authoritative", "Representative 128-file browser population is a separate pending native-valid integration gate, not full 40k browser coverage"]
+}

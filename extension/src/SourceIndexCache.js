@@ -90,6 +90,7 @@ class SourceIndexCache{
   if(this.sharedReading)return this.sharedReading;
   const generation=this.sharedGeneration;
   this.sharedReading=(async()=>{
+   try{if(typeof this.nativeVersion==='function'){const version=await this.nativeVersion();if(typeof version!=='string'||!version)throw Error('Update the Jade CLI bundle: shared source index capability is unavailable.');this.nativeVersion=version;}}catch(error){this.report(error);return[];}
    const result=[];
    for(const root of this.roots().map(value=>path.resolve(value))){
     const rows=[],proofs=new Map();let binding,invalid=false,found=false,next=0;
@@ -117,6 +118,7 @@ class SourceIndexCache{
    }return generation===this.sharedGeneration?result:[];
   })();return this.sharedReading;
  }
+ async savedUris(){await this.load();const result=[];for(const proof of this.sharedProofs.values()){const binding=this.sharedBindings.get(key(proof.root));if(binding)result.push(require('node:url').pathToFileURL(path.resolve(binding.repository,...proof.path.split('/'))).href);}return result;}
  setShared(uri,record){
   const location=this.location(uri);if(!location)return;
   if(!digest(record?.rawSha256)){this.report(Error('Saved browsing metadata requires the original raw byte digest proof.'));return;}
@@ -168,4 +170,4 @@ class SourceIndexCache{
  }
  invalidate(){this.buckets.clear();this.dirty.clear();this.changed.clear();this.sharedBindings.clear();this.sharedProofs.clear();this.sharedPending.clear();this.sharedReading=undefined;this.sharedGeneration++;}
 }
-module.exports={SourceIndexCache};
+module.exports={SourceIndexCache,browserModel};

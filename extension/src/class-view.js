@@ -337,7 +337,7 @@ function registerClassView(vscode, context, language, options={}) {
   };
   async function refresh({rescan=true}={}){
     resources=undefined;systemReadyProjects.clear();
-    if(rescan)await language.index.rescan();
+    if(rescan){await language.refreshSourceIndex?.();await language.index.rescan();}
     if(catalogue.panel)await catalogue.refresh();
     if(pendingFiles.size)await previewController.refresh([...pendingFiles]).catch(()=>{});
     pendingFiles.clear();events.fire();

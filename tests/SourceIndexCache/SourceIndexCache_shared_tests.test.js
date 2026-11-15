@@ -188,3 +188,20 @@ test('canonical spelling from an older alias ACK is not published over a newer s
  try{await waitFor(1);current.set(uri,{model:f.model,rawSha256:newest});gates[0]({code:0,passed:true,accepted:[requested],stale:[],canonicalPaths:{[requested]:canonical}});await waitFor(2);assert.equal(current.sharedProofs.has(uri.toLowerCase()),false);gates[1]({code:0,passed:true,accepted:[canonical],stale:[]});await running;current.delete(variant);await current.flush();assert.deepEqual(packets[2].updates,[{path:canonical,rawSha256:newest,model:null}]);}
  finally{gates.forEach((done,i)=>done({code:0,passed:true,accepted:[i?canonical:requested],stale:[]}));await running;}
 });
+test('lazy native capability resolution selects shared mode before it settles and exposes same-shard saved candidates',async t=>{
+ const f=await fixture(t),before=await fs.readFile(f.file),packets=[];let done,calls=0;
+ const current=cache(f,{nativeVersion:()=>{calls++;return new Promise(resolve=>{done=resolve;});},request:(command,body)=>{packets.push(body);return{id:1,promise:Promise.resolve({code:0,passed:true,accepted:[f.relative],stale:[]})};}});
+ const loading=current.load();current.set(f.uri,{model:f.model,rawSha256:f.rawSha256});const flushing=current.flush();await new Promise(setImmediate);assert.equal(calls,1);assert.equal(packets.length,0);assert.deepEqual(await fs.readFile(f.file),before);assert.ok((await fs.readdir(f.directory)).every(name=>!name.startsWith('v1-')));
+ done(version);await loading;await flushing;assert.deepEqual(await current.savedUris(),[f.uri]);assert.equal(packets.length,1);assert.equal(calls,1);
+});
+test('failed or unsupported capability resolution cannot fall back to a legacy disk writer',async t=>{
+ const f=await fixture(t),errors=[],before=await fs.readFile(f.file),current=cache(f,{nativeVersion:async()=>{throw Error('Update the Jade CLI bundle: shared source index capability is unavailable.');},onError:error=>errors.push(error),request:()=>assert.fail('Unsupported capability must not issue browser writes')});
+ current.set(f.uri,{model:f.model,rawSha256:f.rawSha256});await current.flush();assert.deepEqual(await current.savedUris(),[]);assert.ok(errors.some(error=>/Update the Jade CLI bundle/.test(error.message)));assert.deepEqual(await fs.readFile(f.file),before);assert.ok((await fs.readdir(f.directory)).every(name=>!name.startsWith('v1-')));
+});
+test('oversized real browsing metadata stays nonfatal, leaves native rows intact and does not reparse unchanged bytes',async t=>{
+ const {SourceIndex}=require('../../extension/src/workspace-index'),f=await fixture(t),bytes=Buffer.from('schemaDefinition\nPets subschemaOf RootSchema partialDefinition;\ntypeHeaders\nFish subclassOf Object;\ntypeDefinitions\nFish completeDefinition ()\ntypeSources\n'+'\n'.repeat(400000)),errors=[],unhandled=[];let requests=0,parses=0;
+ f.row.native.hash=hash(bytes);delete f.row.browser;await fs.writeFile(f.file,JSON.stringify(f.header));const original=await fs.readFile(f.file),cacheValue=cache(f,{onError:error=>errors.push(error),request:()=>{requests++;assert.fail('Oversized metadata must never reach native transport');}}),index=new SourceIndex({cache:cacheValue,list:()=>cacheValue.savedUris(),read:async()=>bytes,onTiming:()=>{parses++;}});
+ const rejection=error=>unhandled.push(error);process.on('unhandledRejection',rejection);t.after(()=>{index.dispose();process.removeListener('unhandledRejection',rejection);});
+ await index.ready();await index.persist();const model=index.records.get(f.uri).model;assert.equal(model.classes[0].name,'Fish');assert.ok(errors.some(error=>/2 MiB/.test(error.message)));assert.equal(requests,0);assert.deepEqual(await fs.readFile(f.file),original);
+ index.schedule(f.uri);await index.flush();await index.persist();await new Promise(setImmediate);assert.equal(index.records.get(f.uri).model,model);assert.equal(parses,1);assert.equal(requests,0);assert.equal(errors.length,1);assert.deepEqual(unhandled,[]);
+});

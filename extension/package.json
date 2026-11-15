@@ -700,7 +700,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "External C++ system cache and source-index storage. Empty uses extension global storage. A workspace location is rejected."
+          "description": "External native system-type cache storage. Empty uses extension global storage; a workspace location is rejected. Shared source metadata uses .jade/source-index in the project."
         },
         "jadeNative.schema": {
           "type": "string",

@@ -85,7 +85,7 @@ test('Testing output identifies source-resolution and input-discovery waits befo
   assert.match(observed.join(''),/Resolving selected test source.*\d+ ms elapsed/i);
   assert.equal(f.calls.native,0);
   source.resolve();await new Promise(resolve=>setImmediate(resolve));
-  assert.match(observed.join(''),/Saving and discovering local test sources.*\d+ ms elapsed/i);
+  assert.match(observed.join(''),/Saving local test sources.*\d+ ms elapsed/i);
   assert.equal(f.calls.native,0);
  }finally{source.resolve();inputs.resolve();await running;}
 });
