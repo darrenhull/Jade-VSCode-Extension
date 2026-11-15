@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { resolveConfig, inspectInstall, schemaFromSource } = require('./config');
+const {resolveWorkingDirectory}=require('./working-directory');
+const {isManagedProjectPath}=require('./source-index-scope');
 const { startCpp } = require('./cpp-runner');
 const { CliWorkingSession } = require('./cli-client');
 const { resolvePublishConfig, startPublish } = require('./publish');
@@ -12,7 +14,7 @@ const {resolveJadeSource,jadeSourceUri}=require('./active-jade-source');
 
 let activeNativeService;
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
+const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));
@@ -144,6 +146,7 @@ function activate(context) {
     resolveSource,publishNativeProject: uri => projectTools.publish(false,uri)
   });
   function classConfig(document) {
+    if(isManagedProjectPath(document.uri.fsPath))throw Error('Managed .jade files are not workspace source.');
     const folder = vscode.workspace.getWorkspaceFolder(document.uri);
     const settings = Object.fromEntries(Object.entries(defaults(document.uri)).map(([key, value]) => [key, expand(value, folder, document.uri)]));
     let schema = schemaFromSource(document.getText()) || /\bRename\s+Class\s+(\w+)::/i.exec(document.getText())?.[1] || (document.uri.fsPath.toLowerCase().endsWith('.ddx') ? /<schema\b[^>]*\bname="([^"]+)"/.exec(document.getText())?.[1] : undefined);
@@ -161,7 +164,7 @@ function activate(context) {
     config.helperPath = settings.cppHelperPath || path.join(context.extensionPath, 'vendor', 'jade-tools-cli', 'native', 'jade-native-helper.exe');
     config.systemSnapshotPath = settings.systemSnapshotPath;
     config.testDependencyScope = settings.testDependencyScope || 'auto';
-    config.workingDatabaseDirectory = settings.workingDatabaseDirectory || undefined;
+    config.workingDatabaseDirectory = resolveWorkingDirectory(settings.workingDatabaseDirectory,workspaceRoots[0]);
     config.workingDatabaseGeneration = context.workspaceState.get('jadeNative.workingDatabaseGeneration', 'initial');
     return config;
   }
@@ -170,10 +173,11 @@ function activate(context) {
     if(!folder)throw Error('Open a workspace folder and configure its Jade connection.');
     const settings=Object.fromEntries(Object.entries(defaults(document?.uri||folder.uri)).map(([key,value])=>[key,expand(value,folder,document?.uri||folder.uri)]));
     const installPath=settings.installPath||process.env.JADE_INSTALL;if(!installPath)throw Object.assign(Error('Set jadeNative.installPath or use Detect Runtime Settings.'),{code:'JADE_RUNTIME_NOT_CONFIGURED'});
-    return {...settings,installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
+    return {...settings,workingDatabaseDirectory:resolveWorkingDirectory(settings.workingDatabaseDirectory,folder.uri.fsPath),installPath,databasePath:settings.databasePath||path.join(installPath,'system'),iniPath:settings.iniPath||path.join(settings.databasePath||path.join(installPath,'system'),'jade.ini'),server:settings.server||'singleUser',schema:'RootSchema',
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
   }
+  require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings});
   async function refreshCache(config, output = compileOutput, fromDatabase = true) {
     if (!fromDatabase && !config.systemSnapshotPath) throw new Error('Run Jade: Refresh Type Cache to read system metadata from the configured database.');
     output.appendLine(fromDatabase ? 'Refreshing RootSchema system definitions in a read-only database session ...' : 'Importing RootSchema system definitions into external C++ cache ...');
@@ -230,7 +234,8 @@ function activate(context) {
     settings:folder=>Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder)]))
   });
   const projectTools=require('./project-tools').registerProjectTools(vscode,context,{
-    beforeOperation,resolveSource,
+    service:nativeTests,beforeOperation,resolveSource,
+    hasPendingSource:file=>classView.previewController.hasPendingSource(vscode.Uri.file(file)),
     prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),
     config:classConfig,output:publishOutput,isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);},
@@ -310,19 +315,34 @@ function activate(context) {
       }
     }),
     vscode.commands.registerCommand('jadeNative.executeLocalTests', async (uri, method, testCancellation, outputObserver) => {
+      const started = Date.now();
+      const stage = message => {
+        const text = message + ' (' + (Date.now() - started) + ' ms elapsed).';
+        testOutput.appendLine(text); outputObserver?.(text + '\n');
+      };
+      if (!publishing) testOutput.clear();
+      testOutput.show(true);
+      stage('Resolving selected test source');
       const document = await resolveSource(uri);
-      if (publishing) { void vscode.window.showErrorMessage('A Jade operation is already running.'); return; }
+      if (publishing) {
+        const message = 'Local tests were not started. Wait for the current Jade operation or cancel it first.';
+        testOutput.appendLine(message); testOutput.show(true); outputObserver?.(message + '\n');
+        void vscode.window.showErrorMessage(message);
+        return { passed: false, code: 2, report: { source: document?.uri.fsPath, tests_completed: false, cleanup_complete: false, results: [], error: message } };
+      }
       publishing = true;
       try {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
         if (!document || document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) throw new Error('Open a saved CLS test class.');
         if (document.isDirty && !await document.save()) throw new Error('Save the test file before running.');
+        stage('Preparing local test configuration');
         const config = classConfig(document);
-        testOutput.clear(); testOutput.show(true);
         diagnostics.delete(document.uri);
         testOutput.appendLine(`Running local tests from ${path.basename(config.program)} (no publish).`);
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
+        stage('Saving and discovering local test sources');
         await workingFiles(config);
+        stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
         });
@@ -332,6 +352,7 @@ function activate(context) {
           if (testCancellation?.isCancellationRequested) operation.stop();
           try { return await operation.completion; } finally { subscription.dispose(); testingSubscription?.dispose(); }
         });
+        stage('Native test operation returned');
         if (result.report?.diagnostics) {
           const grouped = new Map();
           for (const entry of result.report.diagnostics) {
@@ -362,7 +383,9 @@ function activate(context) {
         return { passed: false, error: error.message };
       } finally {
         publishing = false;
+        stage('Releasing local test UI state');
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
+        stage('Local test UI state released');
       }
     }),
     vscode.commands.registerCommand('jadeNative.refreshTypeCache', async uri => {

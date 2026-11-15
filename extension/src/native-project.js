@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {parseSource}=require('./source_symbols');
+const {isManagedProjectPath}=require('./source-index-scope');
 const {schemaFromSource}=require('./config');
 const {xmlTree,canonicalNode}=require('./native-source-filter');
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -34,10 +35,10 @@ async function scaffoldSchema(root,name,parent,version,bases){
  return {...planned,files:saved.files};
 }
 async function scanProject(root){
- root=path.resolve(root);const paths=[];
+ root=path.resolve(root);if(isManagedProjectPath(root))throw Error('Managed .jade files are not workspace source.');const paths=[];
  async function visit(directory){for(const entry of await fs.promises.readdir(directory,{withFileTypes:true})){
   const file=path.join(directory,entry.name);
-  if(entry.isDirectory()&&!['.git','node_modules','dist'].includes(entry.name)&&!fs.existsSync(path.join(file,'.jade-extraction')))await visit(file);
+  if(entry.isDirectory()&&!isManagedProjectPath(file)&&!['.git','node_modules','dist'].includes(entry.name)&&!fs.existsSync(path.join(file,'.jade-extraction')))await visit(file);
   else if(entry.isFile()&&/\.(cls|scm|sec|ddx|ddb|jcf)$/i.test(file))paths.push(file);
  }}await visit(root);
  const entries=[];let next=0;

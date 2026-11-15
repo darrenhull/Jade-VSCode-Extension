@@ -1,0 +1,54 @@
+{
+  "issue": 85,
+  "extensionVersion": "0.22.6",
+  "minimumCliVersion": "0.10.4",
+  "officialCli": {
+    "tag": "v0.10.4",
+    "commit": "2baf58280888dac7b65134049ab7b369b9c06bac",
+    "release": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.4",
+    "archiveSha256": "cb046bd6b2d498bc1d73f2834d8536674ed2aba17c6ed499d4387104c91dbf2a",
+    "distributionSha256": "df6952f5d58b171cd113ada3195ecba9ee8e569812b397650fa3e435f29536a7",
+    "executableSha256": "7f69ebede455b7d0a7f001c5cb2824fed3ec86d15d0853246bc73144565c2759"
+  },
+  "regressions": {
+    "javascriptPassed": 1187,
+    "connectedSkipped": 45,
+    "powershellPassed": 18,
+    "failures": 0
+  },
+  "vsix": {
+    "name": "jade-native-runner-cpp-preview-0.22.6.vsix",
+    "sha256": "d9b027b098f36a9c27a5bdd29051eda4fa6c2ef6232413cf67d6614878112565",
+    "portableOutsideCheckoutPassed": true,
+    "noNodeOnPath": true,
+    "workspaceDiscoveryPassed": true,
+    "databaseConnectionOpened": false
+  },
+  "settingsUi": {
+    "script": "scripts/project-working-settings-ui-smoke.cjs",
+    "unmodifiedPackagedExtension": true,
+    "separateTestCompanion": true,
+    "ownedPrivateProfile": true,
+    "defaultDelegatedWithoutWritingSettings": true,
+    "relativeOverrideSavedAndDisplayed": true,
+    "nativeBrokerStarted": false,
+    "visuallyInspected": true,
+    "screenshots": [
+      {
+        "file": "docs/screenshots/project-working/automatic-location.png",
+        "sha256": "456e4cdb35ee7fad3f677d7048238cf56ed283af07ec5594ec96ecd6fc2d873f"
+      },
+      {
+        "file": "docs/screenshots/project-working/relative-location.png",
+        "sha256": "cf2d77a7c6e14b721e9f3d03950ea11986c457355bb33cd825d901fbf49e9a42"
+      }
+    ]
+  },
+  "oldPayloadPackagingRejected": true,
+  "userEnvironmentInstalled": false,
+  "customerDatabaseModified": false,
+  "limitations": [
+    "Connected native database tests were not run by the extension proof.",
+    "Moved or unmanaged Working databases are preserved and refused; no relocation or unpublished-data migration is implemented."
+  ]
+}

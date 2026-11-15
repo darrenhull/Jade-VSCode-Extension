@@ -1,5 +1,6 @@
 'use strict';
 const path = require('node:path');
+const {isManagedProjectPath}=require('./source-index-scope');
 const { testLenses } = require('./local-tests');
 const { isNestedSnapshot } = require('./source-snapshots');
 const { sourcePosition } = require('./source_symbols');
@@ -13,7 +14,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
   const classes = new Map();
   let discovering;
   function update(document) {
-    if (document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) return;
+    if (isManagedProjectPath(document.uri.fsPath)||document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) return;
     if (sourceIndex?.bulkUpdating && !document.isDirty) return;
     if (isNestedSnapshot(document.uri, vscode.workspace)) return;
     const entries = testLenses(document.getText());
@@ -23,6 +24,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
     return updateFile(document.uri, schema, owner, entries, offset => document.positionAt(offset));
   }
   function updateModel(model) {
+    if(isManagedProjectPath(model?.uri))return;
     const uri = vscode.Uri.parse(model.uri);
     if (uri.scheme !== 'file' || !/\.cls$/i.test(uri.fsPath) || isNestedSnapshot(uri, vscode.workspace)) return;
     const cls = model.classes[0];
@@ -61,7 +63,7 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
         for (const model of sourceIndex.project.models.values()) updateModel(model);
         return;
       }
-      const uris = await vscode.workspace.findFiles('**/*.cls', '**/{node_modules,.git}/**');
+      const uris = await vscode.workspace.findFiles('**/*.cls', '**/{node_modules,.git,.jade}/**');
       for (const uri of uris) {
         try { update(await vscode.workspace.openTextDocument(uri)); }
         catch (error) { const item = controller.items.get(uri.toString()); if (item) item.error = error.message; }

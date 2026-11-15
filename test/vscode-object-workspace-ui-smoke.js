@@ -10,13 +10,15 @@ async function run() {
   const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const report = path.resolve(workspace, "../host-report.json"), commands = new Map(), subscriptions = [];
   const captures = process.env.JADE_OBJECT_WORKSPACE_SCREENSHOTS;
-  const context = { extensionPath: path.resolve(__dirname, ".."), globalStorageUri: vscode.Uri.file(path.resolve(workspace, "../inspection-private")), subscriptions };
+  const secretValues = new Map();
+  const context = { extensionPath: path.resolve(__dirname, ".."), globalStorageUri: vscode.Uri.file(path.resolve(workspace, "../inspection-private")), subscriptions, secrets: { get: async key => secretValues.get(key), store: async (key, value) => secretValues.set(key, value), delete: async key => secretValues.delete(key) } };
   const config = { installPath: "C:/NotOpened", databasePath: path.resolve(workspace, "../fixture-source"), iniPath: path.resolve(workspace, "../fixture.ini"), server: "singleUser", schema: "Pets", workspaceRoots: [workspace] };
   const requests = [], transports = [];
   let holdNextRelease=false,finishCursorRelease,failNextCollection=false;
   const host = { ...vscode, window: Object.assign(Object.create(vscode.window), {
     createTreeView: (_name, options) => vscode.window.createTreeView("jade.testInspectionInstances", options),
     showQuickPick: async choices => choices.find(choice => choice.target === "source"),
+    showInputBox: async () => "", // Explicit anonymous access in this fake-native UI fixture.
   }), commands: { ...vscode.commands,
     registerCommand(name, callback) { commands.set(name, callback); const registration=vscode.commands.registerCommand(name,callback); return { dispose() { registration.dispose(); commands.delete(name); } }; },
     executeCommand(name, ...args) { return commands.has(name) ? Promise.resolve(commands.get(name)(...args)) : vscode.commands.executeCommand(name === "jadeNative.objects.focus" ? "jade.testInspectionInstances.focus" : name, ...args); },

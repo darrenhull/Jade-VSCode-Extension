@@ -1,0 +1,112 @@
+{
+  "formatVersion": 1,
+  "issue": "https://github.com/darrenhull/Jade-VSCode-Extension/issues/92",
+  "extensionVersion": "0.22.9",
+  "status": "Local stacked patch verified; parent PR91 merge, hosted CI and fresh review remain pending",
+  "approvedParent": {
+    "pr": "https://github.com/darrenhull/Jade-VSCode-Extension/pull/91",
+    "head": "8dc17865005dbd4b7d43a03a83d3a39e320961f6",
+    "liveStateAtStack": "OPEN/unmerged",
+    "originalBase": "20e12f169a175326483dc62854054c70466c1d68",
+    "stackedWithoutEditingParentBranch": true
+  },
+  "tdd": {
+    "localDeclarationExpectedFailures": 3,
+    "nativeMetadataExpectedFailures": 2,
+    "providerCasesPassed": 20,
+    "affectedLanguageIndexCasesPassed": 54,
+    "ordinaryUserMethodControlsAlreadyPassed": true
+  },
+  "independentReview": "Source-backed definitions retain precedence; only verified source-less RootSchema symbols create bounded read-only metadata. Local/parameter exact selections preserve shadowing/schema context. No native execution, new registry or type-system replacement.",
+  "finalRegular": {
+    "total": 1333,
+    "passed": 1287,
+    "explicitNativeOptInSkipped": 46,
+    "failed": 0,
+    "unchangedPowerShellAndCppNotRepeated": true,
+    "log": "C:/Git/Jade-VScode/artifacts/definition-navigation-regular-js.log"
+  },
+  "native": {
+    "version": "0.10.5",
+    "minimumCliVersion": "0.10.5",
+    "pinAndPayloadUnchanged": true,
+    "manifestSha256": "aba9fd884e3d78f4ed66160d0e4616c0ae7941e8ee5856746b0d3230551fdbf5",
+    "allRuntimeHashesPassed": true
+  },
+  "package": {
+    "file": "dist/jade-native-runner-cpp-preview-0.22.9.vsix",
+    "sha256": "50d8ac174c4bff08f549454bf3143e21d7f436013e474c059540081af9e6abab",
+    "bytes": 5219535,
+    "currentPackagedSourceBytes": {
+      "extension/src/navigation.js": "a1cbbca81366c499b04af822845ed4c5936e3b417b137098a9b455ddf362435e",
+      "extension/src/native-declaration.js": "21ecf8b90bedd144e44d310fd8a0c662fd7ea992c487235ad396dc4944f29439",
+      "extension/src/language-model.js": "17badfd2263065239f5e97a3aa8f37127f2d51ea582590ef155a083ca2e1092d",
+      "extension/src/source-lex.js": "4a2cd50035f19e237fc0d344539f5e1aee8178191be92120c4c38f93ebba580a",
+      "extension/src/object-explorer.js": "7e5445074edfdef8984ab78819ceec16d8f43c2399cb077dec57076fc63cd5cb",
+      "extension/src/workspace-initialization.js": "320e13a93d9578108c9d2e0499c5d82dd19468ece4d963ccc8565e908585ee44",
+      "extension/package.json": "ab02f0e661188f5ccf5524e5420041c82edb17ade7f359537117e425d45dfabe",
+      "extension/README.md": "eb893ee893ac99fca070686e83bf0887a7b8b43fd5618f0ee10909b53ce28815",
+      "extension/CHANGELOG.md": "250095c62001a7462c1b1d7f0ad80e4f344f70ca91e6e5ebbcf854564e9930de"
+    },
+    "extractedOutsideCheckoutNoNodeDiscoveryPassed": true,
+    "noDatabaseOpened": true,
+    "log": "C:/Git/Jade-VScode/artifacts/definition-navigation-package.log"
+  },
+  "actualUi": {
+    "receipt": "docs/test-evidence/definition-navigation-ui-0.22.9.json",
+    "artifact": "unmodified packaged VSIX with separate companion",
+    "realDefinitionProvider": "vscode.executeDefinitionProvider",
+    "realChecksumValidatedSyntheticCache": true,
+    "nativeRuntimeExecuted": false,
+    "nativeCalls": 0,
+    "localDeclarationSelected": true,
+    "nativePropertyAndMethodMetadataSelected": true,
+    "userSourceMethodSelected": true,
+    "realSourcePrecedence": true,
+    "readOnlyContentProvider": true,
+    "allFiveScreensVisuallyInspected": true,
+    "ownedHostExitedAndPrivateProfileCleaned": true,
+    "screenshots": [
+      {
+        "file": "docs/screenshots/definition-navigation/local-declaration.png",
+        "sha256": "df6cfafbf3f803c30d760cfff6867812f57b2310583aacd4b2935cc7fa465207"
+      },
+      {
+        "file": "docs/screenshots/definition-navigation/native-property.png",
+        "sha256": "c0976efa51351f0d6a1333ee56f3e6e8e29939b4d84d9757194f3c4e4d98a312"
+      },
+      {
+        "file": "docs/screenshots/definition-navigation/native-method.png",
+        "sha256": "c7f3ca1abeb65365ebba08ebb724899c696e06134b0e6b8490a864ded29a3b9b"
+      },
+      {
+        "file": "docs/screenshots/definition-navigation/user-method.png",
+        "sha256": "455965888497a96ab8d15afc7e2682f91d86172861642a5acd96226d96481f7c"
+      },
+      {
+        "file": "docs/screenshots/definition-navigation/real-source-preferred.png",
+        "sha256": "66ff3b759abdc1e95721779d098e3e802ebee9c4124670c3e5e5295807d88ad2"
+      }
+    ]
+  },
+  "limitations": [
+    "Synthetic runtime/cache fixture validates editor/cache routing, not a licensed native cache extraction or database benchmark",
+    "Native declarations are metadata, not method bodies or exportable JADE source",
+    "Earlier initializer and PR91 inspection UI proofs are historical unchanged-module evidence, not rerun here",
+    "Native authentication-policy investigation is separate"
+  ],
+  "platform": {
+    "os": "Windows",
+    "node": "v24.22.1",
+    "vscode": "1.146.0",
+    "architecture": "x64"
+  },
+  "userInstallationPerformed": false,
+  "customerDatabaseChanged": false,
+  "pending": [
+    "Parent PR91 protected merge/actual-base reconciliation",
+    "Current-head hosted CI",
+    "Fresh automated review and required owner approval",
+    "Protected merge and separate official0.22.9 release verification"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "passed": true,
+  "scope": "username-password-presentation-only",
+  "artifact": "isolated-development-host/source-modules (not packaged VSIX)",
+  "extensionVersion": "0.22.7",
+  "nativeDistributionVersion": "0.10.4",
+  "nativeRuntimeExecuted": false,
+  "applicationAuthorizationTested": false,
+  "maskedPassword": true,
+  "concisePrompts": true,
+  "standardSecretStorage": true,
+  "noDatabaseConnection": true,
+  "fakeNative": true,
+  "noPlaintextSettings": true,
+  "screenshots": [
+    "username.png",
+    "password.png"
+  ],
+  "phase": {
+    "phase": "first",
+    "passed": true,
+    "usedSavedCredentials": false,
+    "standardSecretStorage": true,
+    "fakeNative": true,
+    "noDatabaseConnection": true,
+    "calls": [
+      {
+        "command": "inspect.target",
+        "hasUser": true,
+        "hasPassword": true
+      },
+      {
+        "command": "inspect.catalog",
+        "hasUser": true,
+        "hasPassword": true
+      },
+      {
+        "command": "inspect.instances",
+        "hasUser": true,
+        "hasPassword": true
+      },
+      {
+        "command": "inspect.instances",
+        "hasUser": true,
+        "hasPassword": true
+      }
+    ]
+  }
+}

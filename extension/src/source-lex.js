@@ -11,8 +11,8 @@ function lexSource(text){
   }return {code:code.join(''),excluded};
 }
 function excludedAt(model,offset){return (model.excluded||[]).find(range=>range.start<=offset&&(offset<range.end||(!range.closed&&offset===range.end)));}
-function parseParameters(text){const parameters=[];const expression=/((?:\b[A-Za-z_]\w*\s*,\s*)*\b[A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)\])?(?:\s+(input|output|io|constant))?/g;
-  for(const match of text.matchAll(expression))for(const name of match[1].split(',').map(value=>value.trim()))parameters.push({name,type:match[2],length:match[3]?Number(match[3]):undefined,usage:match[4]||'constant'});return parameters;
+function parseParameters(text,offset){const parameters=[];const expression=/((?:\b[A-Za-z_]\w*\s*,\s*)*\b[A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)(?:\[(\d+)\])?(?:\s+(input|output|io|constant))?/g;
+  for(const match of text.matchAll(expression)){let cursor=0;for(const part of match[1].split(',')){const name=part.trim(),selection=match.index+cursor+part.indexOf(name);cursor+=part.length+1;parameters.push({name,type:match[2],length:match[3]?Number(match[3]):undefined,usage:match[4]||'constant',...(offset===undefined?{}:{selection:offset+selection})});}}return parameters;
 }
 function signature(text){const match=/^\s*([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?::\s*([A-Za-z_]\w*)(?:\[(\d+)\])?)?\s*([^;]*)(?:;|$)/.exec(text);if(!match)return;
   const flags=match[5].replace(/\bnumber\s*=[\s\S]*$/,'').trim(),has=word=>new RegExp('\\b'+word+'\\b','i').test(flags);

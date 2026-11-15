@@ -6,6 +6,7 @@ const {WorkspaceDiagnostics}=require('./WorkspaceDiagnostics');
 const {WorkspaceContext}=require('./WorkspaceContext');
 const {ScratchPadMarkdown}=require('./ScratchPadMarkdown');
 const {ScratchPadFailures}=require('./ScratchPadFailures');
+const {ScratchPadProgress}=require('./ScratchPadProgress');
 const {NotebookCopilotSetup}=require('./NotebookCopilotSetup');
 const notebookType='jade-workspace';
 
@@ -15,7 +16,8 @@ async function runSequential(cells,execute) {
 function summary(result,schema,elapsed) {
   const status=result.cancelled?'Cancelled':result.timedOut?'Timed out':result.passed?'Completed':'Failed';
   const duration=elapsed>=1000?(elapsed/1000).toFixed(2)+'s':Math.round(elapsed)+'ms';
-  return `${status} · Working · ${schema} · ${duration}`;
+  const execution=result.report?.executed===true?'Scratch code executed':'Scratch code execution was not confirmed';
+  return `${status} · Working · ${schema} · ${duration}\n${execution}`;
 }
 function resultText(result) {
   const report=result.report||{},message=report.output||'';
@@ -48,6 +50,15 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
   const changes=new vscode.EventEmitter(),history=new WorkspaceRunHistory(),diagnosticState=new WorkspaceDiagnostics(),failures=new ScratchPadFailures();
   const sourceContext=new WorkspaceContext({workspace:vscode.workspace,pickFolder:()=>vscode.window.showWorkspaceFolderPick({placeHolder:'Choose the project and Jade connection for this Scratch Pad'})});
   const runner=new JadeWorkspaceRunner({client,configFor:async document=>configFor(document,await sourceContext.resolve(document.uri)),beforeOperation,afterOperation}),plainSchemas=new Map();
+  function progressReporter(progress,started){
+    let stage;
+    return value=>{
+      progress.update(value.message);
+      if(stage===value.stage)return;
+      stage=value.stage;
+      output.appendLine('[Scratch Pad] '+value.message+' · '+Math.max(0,Date.now()-started)+'ms elapsed');
+    };
+  }
   let order=0;
   const controller=vscode.notebooks.createNotebookController('jade-working-workspaces',notebookType,'Jade · Working database');
   controller.supportedLanguages=['jade-nz'];controller.supportsExecutionOrder=true;
@@ -104,10 +115,13 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     const version=cell.document.version;failures.clear(cell.document.uri.toString());changes.fire();
     const execution=controller.createNotebookCellExecution(cell);execution.executionOrder=++order;execution.start(Date.now());
     await execution.clearOutput();const started=Date.now();let result;
+    const progress=new ScratchPadProgress(message=>execution.replaceOutput([new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.text(message,'text/plain')])]));
     try {
-      result=await runner.run({document:cell.document,schema,token:execution.token,onOutput:text=>output.append(text)});
+      result=await runner.run({document:cell.document,schema,token:execution.token,onProgress:progressReporter(progress,started),onOutput:text=>{output.append(text);progress.native(text);}});
+      const progressError=await progress.stop();if(progressError)output.appendLine('Scratch Pad progress display failed: '+progressError.message);
       failures.record(cell.document,result,schema,version);
-      const elapsed=result.report?.elapsedMilliseconds??Date.now()-started,text=resultText(result);
+      const elapsed=Date.now()-started,text=resultText(result);
+      output.appendLine(summary(result,schema,elapsed));
       if(result.report?.outputCharacterLossPossible)output.appendLine('Native output encoding: '+result.report.outputEncoding+'. Characters outside that encoding may be replaced by Jade.');
       if(result.snapshot) {
         history.record(cell.document.uri.toString(),{sourceText:result.snapshot.text,output:text,schema,workingDatabase:result.report?.workingDatabase,status:result.passed?'Completed':result.cancelled?'Cancelled':result.timedOut?'Timed out':'Failed',duration:elapsed});
@@ -116,7 +130,7 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
       await execution.replaceOutput(notebookOutputs(vscode,result,schema,elapsed));changes.fire();
     } catch(error) {
       result={passed:false};await execution.replaceOutput([new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.error({name:'Scratch Pad',message:error.message,stack:''})])]);
-    } finally {execution.end(result?.passed===true,Date.now());}
+    } finally {await progress.stop();execution.end(result?.passed===true,Date.now());}
     return result;
   }
   controller.executeHandler=async(cells,notebook)=>{
@@ -145,10 +159,13 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     const document=editor.document,schema=selectedSchema||plainSchemas.get(document.uri.toString())||await selectSchema(undefined,document.uri);if(!schema)return;
     plainSchemas.set(document.uri.toString(),schema);
     const selection=selectionOnly?{start:document.offsetAt(editor.selection.start),end:document.offsetAt(editor.selection.end)}:undefined;
-    return vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Scratch Pad · Working · '+schema,cancellable:true},async(_progress,token)=>{
-      output.show(true);output.appendLine('\nRunning '+(selection?'selection':'Scratch Pad')+' in '+schema+' · Working database');const started=Date.now();
-      const result=await runner.run({document,schema,selection,token,onOutput:text=>output.append(text)});
-      const text=resultText(result),elapsed=result.report?.elapsedMilliseconds??Date.now()-started;
+    return vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Scratch Pad · Working · '+schema,cancellable:true},async(notification,token)=>{
+      output.show(true);output.appendLine('\nPreparing '+(selection?'selection':'Scratch Pad')+' in '+schema+' · Working database');const started=Date.now();
+      const progress=new ScratchPadProgress(message=>notification.report?.({message}));
+      let result;
+      try{result=await runner.run({document,schema,selection,token,onProgress:progressReporter(progress,started),onOutput:text=>{output.append(text);progress.native(text);}});}
+      finally{const progressError=await progress.stop();if(progressError)output.appendLine('Scratch Pad progress display failed: '+progressError.message);}
+      const text=resultText(result),elapsed=Date.now()-started;
       output.appendLine(summary(result,schema,elapsed));if(text)output.appendLine(text);
       if(result.snapshot){history.record(document.uri.toString(),{sourceText:result.snapshot.text,output:text,schema,workingDatabase:result.report?.workingDatabase,status:result.passed?'Completed':result.cancelled?'Cancelled':result.timedOut?'Timed out':'Failed',duration:elapsed});updateDiagnostics(document,result.snapshot,result,result.stale,schema);}
       if(result.stale)output.appendLine('Source changed during execution; output belongs to the executed snapshot.');return result;

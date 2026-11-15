@@ -8,13 +8,42 @@ A compatible **Windows Jade runtime** is required. The **Jade IDE is not require
 
 ## Get started
 
-1. Install the `.vsix` from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest) using **Extensions: Install from VSIX…**. Reload VS Code when prompted.
-2. Create a new folder for your Jade source, or use **File: Open Folder** to open an existing source folder. It can be empty before your first pull.
-3. Run **Jade: Detect Runtime Settings**. Choose a detected installation or **Browse to another installation folder…** and select the installation root containing `bin/jom.dll`, for example `C:\Jade2025`. This is separate from your source folder. Then select the Source database, INI and server mode when prompted. Settings belong to that workspace folder; Connect identifies folders by name and path in a multi-folder workspace.
-4. Use **Jade: Extract All Sources** to pull source inside your workspace, or work with your existing native files.
-5. Open a class file and press **F5** to compile. Use **Testing** or **Run Local Test** above a test to run it.
+1. Install a compatible licensed Windows Jade runtime and Visual Studio Code. Use the runtime matching your database (ANSI or Unicode); the extension normally detects it automatically.
+2. If your source is in Git, install [Git for Windows](https://gitforwindows.org/) (or your organisation's approved installer), then use **Git: Clone** and open the cloned folder. Otherwise create an empty source directory and use **File: Open Folder**. Git is optional for Jade extraction; preserve existing folders and local edits.
+3. Download the VSIX from the [latest GitHub release](https://github.com/darrenhull/Jade-VSCode-Extension/releases/latest), run **Extensions: Install from VSIX…**, then reload VS Code.
+4. Run **Jade: Detect Runtime Settings**. Select the installation root containing `bin/jom.dll`, then the original **Source** database, INI and server mode. These are separate from your source directory and private Working database. Settings are saved for the selected workspace folder.
+5. Run **Jade: Initialise Workspace**. It delegates configuration creation to the bundled native CLI. For a new project, a shareable `jade.json` refers to a private local connection profile. Existing project configuration is preserved. If a cloned project references a profile missing on this machine, choose **Configure This Machine**, review the selected runtime/Source paths, then confirm **Create Machine Profile**. A profile already pointing elsewhere is refused. This step does not extract sources, prepare a database, build or publish; the complete startup wizard remains planned.
+6. If the folder does not already contain native source, run **Jade: Extract All Sources**. Existing local edits remain protected. Cloning existing source and extracting from a database are separate routes.
+7. Run **Jade: Connect Database Objects** with **Working** selected to prepare the private database at `.jade/working`. First use takes a native Source backup and restores it separately; subsequent valid connections reuse Working. When no saved sign-in exists for the configured Source, the connection asks for an optional user name; leave it empty to connect anonymously, or enter the application credentials required by your development-security policy. The password is masked and may be empty. VS Code SecretStorage remembers the choice securely across restarts and reuses it for the same configured Source and its Working database. Credentials are not saved in settings or extension logs. The notification and **Jade Objects** output identify stages and elapsed time. Wait for completion before starting a build or test. Use **Jade: Sign In to Database Objects** to enter replacement credentials. They replace saved values only after a successful native connection; Cancel preserves the prior saved sign-in. **Jade: Forget Saved Inspection Sign-In** removes only the saved sign-in for the selected connection and closes its owned inspection; connect again to sign in. JADE remains responsible for allowing access.
+8. Open a class and use **F5** to build or **Testing** to run tests. Publish controls are separate actions that update Source after review.
+
+The bundled CLI uses JADE's native development-inspection eligibility for Source and Working. Eligible development browsing follows that policy without running the application's deployed inspection filter; configured native sign-on and task denials still apply. When eligibility is false or the installed SDK does not expose the supported method shape, application inspection rules remain in force. This uses the unpublished RootSchema.SchemaInspector.getDefaultInspectAllowed method on qualified JADE 2025 runtimes; native call failures are reported rather than treated as permission. It does not replace the development-security library or bypass runtime/production inspection rules.
+
+Database Objects keeps the selected inspection workspace when you edit connection settings. **Forget Saved Inspection Sign-In** uses that workspace’s current connection settings, even before reconnecting, and preserves saved sign-ins for other connections. Choosing **Browse Instances** for the same project and database joins an existing connection attempt; changing the project or database waits for the previous attempt to stop safely.
+
+Ctrl+click or **Go to Definition** opens a local or parameter declaration, or the matching workspace member source. When a native RootSchema member has only cached type information, navigation opens a labelled read-only declaration view; it contains metadata, not method bodies. A valid runtime-matched system cache is required, and real source takes precedence.
+
+VS Code SecretStorage protects durable extension sign-in. Active native jobs currently also use access-restricted temporary configuration that can contain credentials, protected by the standard Windows current-user/SYSTEM ACL and cleaned after owned process exit. Removing credentials from that native disk handoff is separately tracked in [CLI #52](https://github.com/darrenhull/Jade-CLI/issues/52); it is not part of this update.
+
+Before preparing Working or making a Git commit, add `.jade/` to the project `.gitignore`, preserving existing rules. Check Source Control or `git status --short` before committing: ignore rules do not untrack files already in Git. Keep databases, cache and logs out of commits; do not delete Working files to clear Git status.
 
 GitHub VSIX updates are installed manually. Installing a newer VSIX updates the same extension; there is no need to uninstall it first.
+
+## Initial preparation timeout and progress
+
+**Jade Native: Working Database Timeout Seconds** (`jadeNative.workingDatabaseTimeoutSeconds`) defaults to 7200 seconds per backup, retained-backup verification or restore utility. It is independent of **Test Timeout Seconds**, which remains 120 by default. If you raised the test timeout only for initial backup, restore your normal test limit after updating to this version. Explicit CLI API `timeoutMilliseconds` limits take precedence.
+
+A map/file reporting `backup complete` does not mean the whole database backup has finished. Wait for whole-stage completion and Working connection readiness. Quiet native stages show elapsed time and periodic log messages; no completion percentage is invented. Cancellation can wait for the Source backup's safe boundary before skipping restore. Timeout/failure output retains the stage, native error and relevant paths.
+
+## Working database location
+
+Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.
+
+To choose a location explicitly, set `jadeNative.workingDatabaseDirectory` to a project-relative path such as `.jade/working` or an absolute external path. Relative paths use the selected workspace folder for builds, tests, Scratch Pad, debugging and Working inspection. Source remains the separately configured database.
+
+VS Code settings stay in `.vscode/settings.json`. `.jade/source-index` is a regenerable cache; `.jade/working` is a real database containing persistent unpublished state. Managed `.jade` files are excluded from source indexing, tests and publication scans. Do not delete the Working database as cache cleanup.
+
+Moving an existing Working folder does not update its absolute INI paths or ownership records. Moved or unmanaged copies are preserved and refused rather than silently rewritten or replaced. Keep that copy intact; selecting a different new empty Working directory creates a fresh copy from Source and does not migrate unpublished state from the moved database.
 
 ## Develop in the editor
 
@@ -36,6 +65,8 @@ For a wrapped statement or declaration, include its first line in the selection 
 ## Scratch Pad
 
 Choose **New Scratch Pad** under Tools, select a schema, type Jade code and press **Run**. Save the page to keep its code and optional notes in source control; run output is not saved with it. After two runs, use **Compare Previous Scratch Pad Run** to compare the code and results.
+
+While a run is pending, the cell shows preparation/waiting stages and the latest native progress. The Scratch Pad output channel keeps each stage transition with elapsed time and the final execution confirmation. The timer includes preparation and does not prove the scratch code has started. Native user output can remain buffered until JADE exits. The final result confirms execution only when JADE reports it. Use Stop/Cancel before retrying; closing a Scratch Pad tab alone does not cancel its request. If tests are requested while another Jade operation owns Working, Jade Tests and Test Explorer explain that they were not started.
 
 Markdown cells have **Edit Markdown** and **Preview** actions. To show a diagram, put it in a fenced `mermaid` block, or use **Insert Mermaid Diagram** to wrap raw diagram text. Rendering uses the installed Markdown renderer; current VS Code has built-in Mermaid support. The native **Run Cells In Section** action is different: it executes code cells below a heading.
 
@@ -100,9 +131,9 @@ After updating, reload all VS Code windows and reconnect other clients. If an ol
 
 ## Source-pull progress
 
-**Extract All Sources** shows native extraction, file discovery and hashing, source organization, comparison, application and editor refresh as separate stages. **Jade Extract** output records elapsed stage durations. The native-stage class count only observes files written so far; it is not a completion percentage. Hashing uses the actual discovered file total. Native observation scans stop once the extractor exits.
+**Extract All Sources** distinguishes preparation, native inventory/writing, local snapshots, content hashing/comparison, guarded file updates and editor refresh. **Jade Source Pull** output records elapsed stages. Counts acknowledge processed native files; they are not an estimated completion percentage. Native serialization can still be running before file-completion counts advance.
 
-This progress reporting does not make a pull incremental: the current batch route still exports all source. Local-conflict review and unsaved-editor protection remain in effect.
+Complete pulls still serialize the selected scope each time; content comparison avoids rewriting unchanged workspace files. Local-conflict and unsaved-editor protection remain in effect. No large-database speed or memory guarantee is implied.
 
 ## Extract all source into a new folder
 
@@ -137,4 +168,6 @@ Debugger support requires a compatible runtime. GUI application hosting, arbitra
 
 Jade Tools is an independent third-party extension and is not affiliated with or endorsed by Jade Software Corporation Limited. Jade is a trademark of Jade Software Corporation Limited.
 
-Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. Whole-schema aggregate resources are not automatically attached to a single-class publish; unsupported resource publication is refused.
+Full streaming extraction requires the qualified `schema-ddx` resource layout. Individual Form DDX files from an older layout require a reviewed migration before full refresh; files are not automatically removed or replaced. For an existing aggregate schema, a selected Form pull offers **Refresh Schema Source**. For a complete extracted project, run **Jade: Publish Workspace Schemas and Resources**. The command validates a frozen native joined bundle in Working, captures the target for review, then loads those same joined bytes after approval. Source files added, deleted or changed during approval, and dirty/pending source editors, stop publication. Empty inherited reference files remain on disk without being advertised as local class additions/deletions. Whole-schema aggregate resources are not automatically attached to a single-class publish.
+
+Review is a point-in-time target snapshot, not an atomic lease against external database writers. Complete-schema loading is authoritative within the listed schemas, and earlier successful schema loads may remain if a later load fails.

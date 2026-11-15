@@ -1,0 +1,227 @@
+{
+  "formatVersion": 1,
+  "status": "Local final payload, package, portable and UI verified; hosted checks/reviews/release remain pending",
+  "extensionVersion": "0.22.7",
+  "baseNativeDistribution": {
+    "version": "0.10.4",
+    "executableSha256": "7f69ebede455b7d0a7f001c5cb2824fed3ec86d15d0853246bc73144565c2759"
+  },
+  "defaultChecks": {
+    "javascriptPassed": 1248,
+    "explicitNativeOptInSkipped": 46,
+    "isolatedPowerShellPassed": 18,
+    "failed": 0,
+    "note": "Initial default run found three obsolete scale-fixture prerequisites; fixture corrected, its three cases and full regular JS phase passed. Unchanged isolated PowerShell phase passed in the initial run.",
+    "frontendSnapshot": "b9732faa6688602f7eedaaea77650167ee6a83f0",
+    "scope": "Full suite predates presentation-only prompt copy and official payload update; subsequent targeted checks recorded separately."
+  },
+  "initialization": {
+    "focusedPassed": 23,
+    "failingFirstCases": 7,
+    "nativeServiceProofPassed": true,
+    "nativeVersion": "0.10.5",
+    "isolatedProfileAndBroker": true,
+    "nonexistentRuntimeAndSourcePaths": true,
+    "existingProjectBytesPreserved": true,
+    "missingClonedProfileBootstrap": true,
+    "noDatabaseOpened": true,
+    "ownedBrokerShutdownAndFixtureCleanup": true,
+    "packagedUiScriptPrepared": true,
+    "packagedUiExecuted": true,
+    "nativeServiceProofVersions": [
+      "0.10.4",
+      "0.10.5"
+    ],
+    "packagedUiReceipt": "docs/test-evidence/workspace-initialization-ui.json"
+  },
+  "inspection": {
+    "affectedPassed": 164,
+    "affectedNativeOptInSkipped": 1,
+    "independentReview": "Premature saved-entry deletion on cancelled or rejected Sign In replacement reproduced and fixed with regressions.",
+    "ui": {
+      "passed": true,
+      "artifact": "isolated-development-host/source-modules (not packaged VSIX)",
+      "extensionVersion": "0.22.7",
+      "nativeDistributionVersion": "0.10.5",
+      "nativeRuntimeExecuted": false,
+      "applicationAuthorizationTested": false,
+      "standardSecretStorage": true,
+      "reusedAcrossRestart": true,
+      "forgotSelectedSecureEntry": true,
+      "noDatabaseConnection": true,
+      "fakeNative": true,
+      "noPlaintextSettings": true,
+      "screenshotsVisuallyInspected": true,
+      "screenshots": [
+        {
+          "file": "docs/screenshots/inspection-sign-on/username.png",
+          "sha256": "de7829b048b4c5df6ee014a8326f33db505829f60d0e09bc19957ff0907a5e93"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/password.png",
+          "sha256": "c49cbef55128f7f3086e09d33454993daab2f4f58b5b868b896d7af6d42dde12"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/policy-denial.png",
+          "sha256": "a6f3fda44a767b699353b2fb84f2e6994743f464f6fdf31d6ba142ed1692f10f"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/reused-sign-in.png",
+          "sha256": "dce1fb636b8a9b4f536c648b3ee66b6674ae0a5d85456c7e5d9f93a9e09beef2"
+        },
+        {
+          "file": "docs/screenshots/inspection-sign-on/forgotten.png",
+          "sha256": "a141ac696866ff4aa33ff3c8f06ab3e3ea6bd1efaffc5eac446b93374b04d517"
+        }
+      ]
+    }
+  },
+  "securityBoundary": {
+    "durableCredentialStorage": "VS Code ExtensionContext.secrets SecretStorage",
+    "nativeHandoff": "Active native inspect/test configuration may contain plaintext credentials in standard current-user SID/SYSTEM ACL-protected transient files, cleaned after owned process exit.",
+    "noDiskHandoffHardeningQueued": "https://github.com/darrenhull/Jade-CLI/issues/52",
+    "noCustomCipherOrSecretRegistry": true
+  },
+  "pending": [
+    "Hosted current-head CI",
+    "Fresh automated review and required human owner approval",
+    "Separate consumer merge/release verification"
+  ],
+  "userEnvironmentChanged": false,
+  "verifiedOfficialNative": {
+    "version": "0.10.5",
+    "tag": "v0.10.5",
+    "approvedMerge": "5ce0a3adfd4f9bd4f31ec4af92a831fe32ffc41e",
+    "releaseRun": 43593948805,
+    "releaseUrl": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.5",
+    "archiveSha256": "e692266db0c377eff757e09d9ee0a3293cf70b1bd0992c2950201fdc70d8987c",
+    "distributionSha256": "aba9fd884e3d78f4ed66160d0e4616c0ae7941e8ee5856746b0d3230551fdbf5",
+    "executableSha256": "32efabf1a3fe28a4e24a5294c45df10f5ea631334394dcb489cb1e03eec08582",
+    "runtimeFileCount": 15
+  },
+  "promptCopyFollowUp": {
+    "presentationOnly": true,
+    "targetedPassed": 51,
+    "receipt": "docs/test-evidence/inspection-prompts-0.22.7.json",
+    "fullSuiteRepeated": false
+  },
+  "postOfficialPinChecks": {
+    "focusedPassed": 100,
+    "focusedFailed": 0,
+    "nativeInitPassed": true,
+    "nativeHashesAndManifestPassed": true,
+    "extractedPortableNoNodePassed": true,
+    "noDatabaseOpened": true
+  },
+  "packagedArtifact": {
+    "file": "dist/jade-native-runner-cpp-preview-0.22.7.vsix",
+    "sha256": "28c55d399b32f45292213f704ecbeeb3af92fa98b2c70531c355c3610ad122b8",
+    "bytes": 5217662,
+    "minimumCli": "0.10.5",
+    "sourceIdentityPassed": true,
+    "sourceHashes": {
+      "extension/src/workspace-initialization.js": "320e13a93d9578108c9d2e0499c5d82dd19468ece4d963ccc8565e908585ee44",
+      "extension/src/object-explorer.js": "6250a00744c4f15b2ec2560a34f08cbe7cd6d41e46b6bbd12d1c7fd992e71488",
+      "extension/src/inspection-credentials.js": "e2ab66d6bc79c76d81727a6efa6b7d652baee4591fb2cecaaa74ae25e701e82f",
+      "extension/package.json": "9d2d57bee188935ad0c027ab34170dbcbd7a5e4e596be0270292872530377d74",
+      "extension/README.md": "728d9181aba229bb8fb277fcb96e2e5c4c14324b07b1bd1251770ab49dd628c3"
+    },
+    "nodeVersion": "v24.22.1",
+    "platform": "win32",
+    "osRelease": "10.0.22631",
+    "architecture": "x64",
+    "vscodeVersion": "1.146.0"
+  },
+  "packagedInitializationUi": {
+    "passed": true,
+    "packagedVersion": "0.22.7",
+    "nativeVersion": "0.10.5",
+    "actualPackagedUi": true,
+    "dialogStyle": "custom in owned private profile",
+    "configurationOnly": true,
+    "missingProfileAction": true,
+    "reviewedCreation": true,
+    "existingProjectPreserved": true,
+    "databaseOpened": false,
+    "screenshots": [
+      "missing-profile.png",
+      "review-machine-profile.png",
+      "configuration-complete.png"
+    ],
+    "carryForwardFromVsixSha256": "22cf96b4813ceac9d141fca753a0d2ed00bfc89358e262aedd6c5ab71dc51551",
+    "carryForwardReason": "Initializer source, native runtime, manifest and README are byte-identical in the rebuilt VSIX. Initialization UI was not rerun for this Object Explorer identity-only fix."
+  },
+  "packagedConnectionUi": {
+    "passed": true,
+    "artifact": "unmodified packaged VSIX with separate gated-native companion",
+    "extensionVersion": "0.22.7",
+    "nativeDistributionVersion": "0.10.5",
+    "nativeRuntimeExecuted": false,
+    "fakeNativePreparation": true,
+    "noDatabaseConnection": true,
+    "joinedConnectClicks": 3,
+    "nativePreparations": 1,
+    "workingDatabaseTimeoutSeconds": 7200,
+    "quietElapsedProgressVisible": true,
+    "quietHeartbeatPersistedToOwnedLog": true,
+    "safeBoundaryCancellationWaited": true,
+    "screenshots": [
+      "packaged-backup.png",
+      "packaged-restore.png",
+      "packaged-cancelling.png"
+    ]
+  },
+  "finalUiScreenshotsVisuallyInspected": true,
+  "finalPackagedScreenshots": [
+    {
+      "file": "docs/screenshots/workspace-initialization/missing-profile.png",
+      "sha256": "e1f2253e4494558c6cdfd99c8a8eab84ee5f2039887c2e7df03106f2f8549315"
+    },
+    {
+      "file": "docs/screenshots/workspace-initialization/review-machine-profile.png",
+      "sha256": "41c2a15c7eb4f2137d23b117b611ed355b8148fdddeb0366ff01118bcbf573bc"
+    },
+    {
+      "file": "docs/screenshots/workspace-initialization/configuration-complete.png",
+      "sha256": "86e5a8ae5562d56e7c1e6495635f71f29e96c07109d0191b36a3dd4b3311db33"
+    },
+    {
+      "file": "docs/screenshots/connect-progress/packaged-backup.png",
+      "sha256": "bd54948da3655b3a8b9c3a9e00a47cc1ea826645aa951636352ccf44348a4d59"
+    },
+    {
+      "file": "docs/screenshots/connect-progress/packaged-restore.png",
+      "sha256": "3a664590fbe63069dd65e7e131b8f1c59d9fd0accb655c2a25e10e0bdba5a0b6"
+    },
+    {
+      "file": "docs/screenshots/connect-progress/packaged-cancelling.png",
+      "sha256": "c682dfd0d59d2dfbf46c5e6fb0743c4a08df5581a217ca32ab8d977c76a23163"
+    }
+  ],
+  "credentialIdentityFollowUp": {
+    "priorHead": "1300dde85dd1191ef7682afc92cfd296bd412759",
+    "failedRun": 43597355881,
+    "failedJob": 132454619160,
+    "failure": "Forget recomputed a realpath-dependent secret key after Source path availability changed; original scoped-deletion assertion failed.",
+    "failingFirstRegressions": 5,
+    "focusedPassed": 35,
+    "regularJavaScriptPassed": 1255,
+    "explicitNativeOptInSkipped": 46,
+    "failed": 0,
+    "nativeConfigurationOnlyProofPassed": true,
+    "nativeVersion": "0.10.5",
+    "nativeRuntimeAndPinUnchanged": true,
+    "configuredIdentity": "path.resolve plus Windows case folding; no filesystem access. Same configured Source/Working identity stays stable offline; different configured aliases have separate entries.",
+    "securityTradeoff": "Logical configured aliases retain identity if their physical target changes; no automatic rekey/migration or cross-alias sharing.",
+    "currentVsixRebuilt": true,
+    "currentPackagedSourceIdentityPassed": true,
+    "currentIntegrityAndPortableNoNodePassed": true,
+    "currentRealSecretStorageRestartForgetUiPassed": true,
+    "currentPackagedProgressUiPassed": true,
+    "currentUiScreenshotsVisuallyInspected": true,
+    "noDatabaseOpened": true,
+    "regularLog": "C:/Git/Jade-VScode/artifacts/startup-identity-regular-js.log",
+    "packageLog": "C:/Git/Jade-VScode/artifacts/startup-identity-package.log",
+    "unchangedPowerShellAndCppNotRepeated": true
+  }
+}

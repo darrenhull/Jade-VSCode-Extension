@@ -1,3 +1,73 @@
+# 0.22.10 - Scratch Pad and test operation feedback
+
+- Show queued, connection/ownership and latest native progress in Scratch Pad cells and editor notifications. Confirm execution only when JADE reports it, and include preparation in elapsed time.
+- Preserve cancellation arriving during native request handoff and coalesce progress so rapid output cannot flood notebook edits.
+- Report local tests as not started when another Jade operation owns Working, preserving the real cause in Test Explorer and Jade Tests output.
+- These reporting fixes do not claim to resolve the separately investigated native operations that remain pending indefinitely.
+# 0.22.9 - Definition navigation and development inspection
+
+- Bundle official Jade CLI 0.10.6 so eligible development inspection follows JADE's native policy; configured sign-on/task denials and deployed application filters remain enforced.
+- Open local and parameter declarations from typed receiver references.
+- Show clearly labelled read-only RootSchema declaration metadata when a cached native member has no source document; real workspace sources retain precedence.
+
+# 0.22.8 - Inspection connection ownership
+
+- Forget saved sign-in for the currently configured inspection workspace after settings change, preserving other connections.
+- Keep same-project, same-target Browse Instances attached to a pending connection while preserving cancellation when the project, target or configuration changes.
+
+# 0.22.7 - Workspace setup and connection progress
+
+- Bundle official Jade CLI 0.10.5 for the separate Working preparation timeout and native stage diagnostics.
+
+- Add configuration-only Initialise Workspace through the native CLI, preserving existing project files and reviewing missing local connection-profile creation.
+- Separate initial Working backup/verification/restore timeout from normal test execution, with a two-hour preparation default.
+- Show elapsed preparation progress while native stages are quiet and clarify installation, Git/source acquisition and Working startup steps.
+- Remember accepted Database Objects sign-in with VS Code SecretStorage across restarts for the same configured Source/Working; allow empty passwords, preserve saved values on cancelled replacement and offer explicit Forget Saved Inspection Sign-In.
+- Keep inspection credential identity stable when Source paths appear or go offline; Forget no longer depends on database filesystem availability.
+
+# 0.22.6 - Project-local Working database
+
+- Bundle Jade CLI 0.10.4 to support new Working databases under the selected project .jade/working directory while keeping Source separate.
+- Resolve relative Working overrides consistently for builds, tests, Scratch Pad, debugging and Database Objects.
+- Preserve ready legacy bases and previous automatic generations. Moved or unmanaged databases are retained and refused; this update does not migrate their unpublished state.
+- Exclude managed .jade files from source, test and publication discovery, and clarify the Working location in Settings.
+
+# 0.22.5 - Responsive source indexing
+
+- Avoid repeated scans of comment and blank lines when indexing native class sources.
+- Show the active file and elapsed time during indexing, keep partial class counts refreshed, and yield between parsing batches.
+- Preserve cached-source validation and dirty editor protection.
+
+# 0.22.4 - Large-workspace indexing and extraction
+
+- Allow Source extraction to run for two hours by default, including streaming extraction. Explicit workspace and user timeout overrides remain unchanged.
+- Clarify that cancellation retains files already applied.
+- Keep a disposable source index in each project .jade folder, reuse unchanged files on restart and update the index for saved-file adds, deletes and moves.
+- Show indexing progress and let Object Explorer use cached class metadata while checking files in the background.
+- Share directory-marker checks during large discoveries and read schema headers without opening editor documents or initialising native type metadata.
+
+# 0.22.3 - Case-distinct source extraction
+
+- Bundle released Jade CLI 0.10.3 so Extract All Sources preserves classes whose names differ only by case on Windows.
+- Keep native class identities and source bodies unchanged, retain stable native index references and protect local edits and deletions.
+- Report ambiguous legacy filename collisions before writing any files.
+
+# 0.22.2 - Imported interface extraction
+
+- Extract schemas containing imported interface references without stopping on a missing reflected schema owner.
+- Preserve both imported aliases and declared class names when checking whether source removals or renames require a complete schema header.
+
+# 0.22.1 - Source extraction diagnostics
+
+- Inspect recent native extraction steps, the active schema context and the failing operation directly in Jade Source Pull output.
+
+# 0.22.0 - Complete source workflow
+
+- Extract and refresh complete current schema source, including native interfaces and schema resources.
+- Review and publish complete workspaces after Working validation, using the same frozen source bundle for the target load.
+- Stop publication if files are added, removed, changed or left unsaved while you review; keep inherited reference files out of misleading class-change lists.
+- Distinguish source snapshots, native writing, content hashing/comparison and guarded file updates in progress reporting.
+
 # 0.21.0 - Native full source extraction
 
 - Extract complete current schema sources into a new empty project without selecting a class first.

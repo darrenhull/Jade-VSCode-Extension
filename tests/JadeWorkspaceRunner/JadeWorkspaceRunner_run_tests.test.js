@@ -34,3 +34,32 @@ test('releases exactly the acquired operation lease after native failure and nev
  assert.equal((await runner.run({document:document()})).passed,false);assert.deepEqual(released,[lease]);
  blocked=true;assert.match((await runner.run({document:document()})).report.error,/owns/);assert.deepEqual(released,[lease]);
 });
+
+test('reports queued, configuration, ownership and native wait without claiming execution started',async()=>{
+ const stages=[];let configure,acquire,finish;
+ const runner=new JadeWorkspaceRunner({configFor:()=>new Promise(resolve=>configure=resolve),beforeOperation:()=>new Promise(resolve=>acquire=resolve),client:{request(){return {id:17,promise:new Promise(resolve=>finish=resolve)};}}});
+ const operation=runner.run({document:document(),onProgress:progress=>stages.push(progress)});
+ assert.equal(stages.at(-1)?.stage,'queued');
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(stages.at(-1)?.stage,'configuring');
+ configure({schema:'Pets'});await new Promise(resolve=>setImmediate(resolve));assert.equal(stages.at(-1)?.stage,'acquiring');
+ acquire();await new Promise(resolve=>setImmediate(resolve));assert.equal(stages.at(-1)?.stage,'native');
+ assert.ok(stages.every(progress=>!progress.message.includes('Executing scratch code')),'Only native execution confirmation may claim scratch code started');
+ finish({code:0,passed:true,report:{compiled:true,executed:true}});assert.equal((await operation).report.executed,true);
+});
+
+test('cancellation between request handoff and subscription cancels the owned native request',async()=>{
+ const token=cancellation(),calls=[];let finish;
+ const runner=new JadeWorkspaceRunner({configFor:async()=>({schema:'Pets'}),client:{request(command,body){calls.push({command,body});if(command==='cancel')return {id:2,promise:Promise.resolve({passed:true})};token.cancel();return {id:23,promise:new Promise(resolve=>finish=resolve)};}}});
+ const operation=runner.run({document:document(),token});
+ while(!finish)await new Promise(resolve=>setImmediate(resolve));
+ try{assert.deepEqual(calls.map(call=>call.command),['workspace.run','cancel']);assert.equal(calls[1].body.operationId,23);}
+ finally{finish({code:130,passed:false,cancelled:true,report:{executed:false}});await operation;}
+});
+test('native response and pending ownership release remain distinct until cleanup settles',async()=>{
+ const stages=[];let release,settled=false;
+ const runner=new JadeWorkspaceRunner({configFor:async()=>({schema:'Pets'}),client:{request:()=>({id:31,promise:Promise.resolve({code:0,passed:true,report:{compiled:true,executed:true}})})},afterOperation:()=>new Promise(resolve=>release=resolve)});
+ const operation=runner.run({document:document(),onProgress:progress=>stages.push(progress.stage)}).then(result=>{settled=true;return result;});
+ while(!release)await new Promise(resolve=>setImmediate(resolve));
+ try{assert.equal(settled,false);assert.deepEqual(stages.slice(-2),['received','releasing'],'Native response must be visible before the still-pending UI ownership release');}
+ finally{release();assert.equal((await operation).passed,true);}
+});

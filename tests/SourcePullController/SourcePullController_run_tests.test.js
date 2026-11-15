@@ -432,3 +432,12 @@ test("native cancellation code is preserved while client validation explains why
   assert.equal(value.status, "cancelled");
   assert.match(f.logs.join("\n"), /Native resource layout did not match/);
 });
+
+test('failed Source Pull prints native error first followed by safe recent-operation context',async(t)=>{
+ const nativeError='Native isSystemSchema: Jade 1205: Method aborted';
+ const f=fixture(t,async()=>result({passed:false,status:'failed',code:1205,completedFiles:0,counts:{},report:{error:nativeError,executionSchema:'JadeSchema',recentOperations:[{stage:'inventory',targetSchema:'Pets',currentType:'Fish',operation:'isSystemSchema',receiverNull:false,receiverKind:'Schema',password:'DO-NOT-LOG'}]}}));
+ const value=await f.controller.run();assert.equal(value.code,1205);const native=f.logs.indexOf(nativeError),trace=f.logs.findIndex(line=>line.includes('operation="isSystemSchema"'));assert.ok(native>=0);assert.ok(trace>native);assert.doesNotMatch(f.logs.join('\n'),/DO-NOT-LOG/);assert.ok(f.errors.some(value=>value.includes(nativeError)));assert.equal(f.busy(),false);
+});
+test('successful Source Pull does not print stray failure-operation history',async(t)=>{
+ const f=fixture(t,async()=>result({report:{recentOperations:[{operation:'SHOULD-NOT-LOG'}]}}));await f.controller.run();assert.doesNotMatch(f.logs.join('\n'),/SHOULD-NOT-LOG/);
+});

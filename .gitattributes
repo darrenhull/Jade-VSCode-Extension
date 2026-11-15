@@ -14,3 +14,6 @@
 
 # Lifecycle native proof fixtures have canonical LF bytes.
 /test/fixtures/lifecycle/** text eol=lf
+
+# Native manifest and runtime files are authenticated as exact archive bytes.
+/packages/jade-cli-win-x64/** -text

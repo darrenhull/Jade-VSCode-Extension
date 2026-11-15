@@ -398,3 +398,9 @@ test("declared Form companion cannot disappear from a successful completion",asy
 test("an interface cannot authorize a same-stem DDX companion",async()=>{
  const f=fixture();let permits=0;const op=f.session.startSourceExtraction({}, {destination:"C:/workspace",selection:[{...selection[0],kind:"interface"}]},{onPermit:()=>{permits++;return true;}});const id=f.requests[0].id;started(f,id);f.emit({id,event:"source.permitRequired",lease:"owned",ticket:"ddx",path:selection[0].path.replace(/\.cls$/i,".ddx"),expiresInMs:30000});assert.equal(permits,0);assert.equal(f.requests.at(-1).command,"source.cancel");f.emit({id,event:"result",result:{passed:false,code:130,status:"cancelled",scope:"classes",version:"current",authoritative:false,partial:false,counts:{},completedFiles:0}});await op.completion;f.session.dispose();
 });
+
+test('native reconciliation progress stages preserve extraction ownership and completion',async()=>{
+ const f=fixture(),seen=[];const op=f.session.startSourceExtraction({}, {destination:'C:/workspace',selection},{onPermit:()=>true,onStage:event=>seen.push(event.stage)});const id=f.requests[0].id;started(f,id);
+ for(const stage of ['opening','git-baseline','inventory','local-snapshot','native-write','hash-and-compare','guarded-apply','closing'])f.emit({id,event:'source.stage',stage,completedFiles:0,totalFiles:1});
+ f.emit({id,event:'source.file',path:selection[0].path,outcome:'unchanged',sha256:sha,bytes:12});finish(f,id,'completed',{unchanged:1});const result=await op.completion;assert.equal(result.passed,true,JSON.stringify(result));assert.deepEqual(seen,['opening','git-baseline','inventory','local-snapshot','native-write','hash-and-compare','guarded-apply','closing']);await f.session.dispose();
+});

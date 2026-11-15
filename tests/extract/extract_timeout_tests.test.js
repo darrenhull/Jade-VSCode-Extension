@@ -5,18 +5,18 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const gateway=require('../../extension/src/cli-gateway');
 const {startExtract}=require('../../extension/src/extract');
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-extract-timeout-'));t.after(()=>{gateway.configure(undefined);fs.rmSync(root,{recursive:true,force:true});});return path.join(root,'output');}
-test('extraction explicitly allows an hour by default and preserves native timeout',async t=>{
+test('extraction explicitly allows two hours by default and preserves native timeout',async t=>{
  const destination=fixture(t);let options;
  gateway.configure({runNative:async(exe,args,value)=>{options=value;return {code:130,timedOut:true,cancelled:false};}});
  const result=await startExtract({executable:'jadclient.exe'},destination).completion;
- assert.equal(options.timeoutMilliseconds,3600000);
+ assert.equal(options.timeoutMilliseconds,7200000);
  assert.equal(result.timedOut,true);assert.equal(result.cancelled,false);assert.equal(result.success,false);
 });
 test('extraction forwards a dedicated timeout override',async t=>{
  const destination=fixture(t);let options;
  gateway.configure({runNative:async(exe,args,value)=>{options=value;return {code:130,timedOut:true};}});
- await startExtract({executable:'jadclient.exe',extractionTimeoutSeconds:7200},destination).completion;
- assert.equal(options.timeoutMilliseconds,7200000);
+ await startExtract({executable:'jadclient.exe',extractionTimeoutSeconds:3600},destination).completion;
+ assert.equal(options.timeoutMilliseconds,3600000);
 });
 test('Cancel aborts the native request and waits for its completion',async t=>{
  const destination=fixture(t);let options,finish;
@@ -42,4 +42,9 @@ test('native cancellation is retained without pressing the UI Cancel button',asy
  const destination=fixture(t);gateway.configure({runNative:async()=>({code:130,cancelled:true})});
  const result=await startExtract({executable:'jadclient.exe'},destination).completion;
  assert.equal(result.cancelled,true);assert.equal(result.success,false);
+});
+
+test('Settings default is two hours and explicit extraction overrides remain configurable',()=>{
+ const setting=require('../../extension/package.json').contributes.configuration.properties['jadeNative.extractionTimeoutSeconds'];
+ assert.equal(setting.default,7200);assert.equal(setting.minimum,1);assert.equal(setting.maximum,86400);
 });

@@ -1,9 +1,10 @@
 "use strict";
 const path = require("node:path"),
   { isNestedSnapshot } = require("./source-snapshots");
+function isManagedProjectPath(file){return typeof file==='string'&&/(?:^|[\\/])\.jade(?:[\\/]|$)/i.test(file);}
 function isIndexableSourcePath(file) {
   return (
-    typeof file === "string" &&
+    typeof file === "string" && !isManagedProjectPath(file) &&
     (/\.(cls|jade)$/i.test(file) ||
       /(?:^|[\\/])schemaDefinitions\.sec$/i.test(file))
   );
@@ -17,7 +18,7 @@ async function queueSourceIndexScope(vscode, index, destination) {
     );
   const uris = await vscode.workspace.findFiles(
     pattern,
-    "**/{node_modules,.git}/**",
+    "**/{node_modules,.git,.jade}/**",
   );
   let queued = 0;
   for (const uri of uris) {
@@ -35,4 +36,4 @@ async function queueSourceIndexScope(vscode, index, destination) {
   }
   return queued;
 }
-module.exports = { isIndexableSourcePath, queueSourceIndexScope };
+module.exports = { isManagedProjectPath, isIndexableSourcePath, queueSourceIndexScope };

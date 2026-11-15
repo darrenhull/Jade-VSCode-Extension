@@ -1,0 +1,61 @@
+{
+  "scope": "Actual registered full-workspace Publish on disposable owned fixtures",
+  "privateCandidate": true,
+  "candidate": {
+    "version": "0.10.0",
+    "sourceCommit": "a957bce",
+    "executableSha256": "72fc9d7bd7c5e2864ee8ebaa6c62bdc9f154be923dc1ccee68822213d1f676d7",
+    "manifestSha256": "8ae7b7b22efabfc1dad43ae3545357dde1f2a6e55a0e2ad8faa162621ef93bb0"
+  },
+  "nativeMode": "unicode",
+  "localSourceSnapshotSha256": "e3936dbb61e9b7b5a5f33718a69bfc97d72559d55870906b0eb2452d7e6a80ef",
+  "approved": true,
+  "schemaCount": 1,
+  "entryCount": 33,
+  "aggregateDdx": 1,
+  "nativeExposureSections": 1,
+  "targetLoads": 1,
+  "identicalFrozenBundle": true,
+  "nativeCalls": [
+    {
+      "application": "app=JadeJoinSchema",
+      "publishing": false
+    },
+    {
+      "application": "jadloadb",
+      "publishing": false,
+      "frozenBundleSha256": "33991377214318d9e2c746cf2f49c6dda5ad52a72a544fd9c1450058deb24c77"
+    },
+    {
+      "application": "jadloadb",
+      "publishing": true,
+      "frozenBundleSha256": "33991377214318d9e2c746cf2f49c6dda5ad52a72a544fd9c1450058deb24c77"
+    }
+  ],
+  "busyReleased": true,
+  "legacyEveryUsed": false,
+  "userDatabaseOpened": false,
+  "nativeReadback": {
+    "passed": true,
+    "originalSourceUnchanged": true,
+    "targetDescriptor": "String[51]",
+    "sourceDescriptor": "String[50]",
+    "exposurePreserved": true,
+    "aggregateDdxPreserved": true,
+    "native": {
+      "source": {
+        "ddx": "30AC0693996B5A59FEE2DF60194E62AC82F3172FF7E59D6F3C57DE65C382E273",
+        "string50": true,
+        "exposure": "94B983DB082ECE09297B1B497FD22C2E2E93BCDE2DCE7A9BF10DBF2E42A499E4",
+        "string51": false
+      },
+      "target": {
+        "ddx": "30AC0693996B5A59FEE2DF60194E62AC82F3172FF7E59D6F3C57DE65C382E273",
+        "string50": false,
+        "exposure": "94B983DB082ECE09297B1B497FD22C2E2E93BCDE2DCE7A9BF10DBF2E42A499E4",
+        "string51": true
+      }
+    }
+  },
+  "limitations": "Native registered publication proved on this small Unicode fixture; no 30000-class speed/memory claim, no atomic external-writer lease and no official release/install claim."
+}

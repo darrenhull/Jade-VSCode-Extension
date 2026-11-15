@@ -25,6 +25,7 @@ function fixture(t) {
       createOutputChannel: () => ({ append() {}, appendLine() {}, dispose() {} }),
       createStatusBarItem: () => ({ show() {}, dispose() {} }), createTreeView: () => view,
       showErrorMessage: async () => {},
+      showInputBox: async () => '',
       createQuickPick: () => { const picker = { value: '', selectedItems: [],
         onDidChangeValue(fn) { this.change = fn; return disposable; },
         onDidAccept(fn) { this.accept = fn; return disposable; },
@@ -39,12 +40,13 @@ function fixture(t) {
           receive: message => receive(message),
         }; panels.push(panel); return panel; },
     } };
-  const context = { subscriptions: [], globalStorageUri: uri(path.join(root, 'cache')), extensionPath: root };
+  const secretValues = new Map();
+  const context = { secrets: { get: async key => secretValues.get(key), store: async (key, value) => secretValues.set(key, value), delete: async key => secretValues.delete(key) }, subscriptions: [], globalStorageUri: uri(path.join(root, 'cache')), extensionPath: root };
   const rows = Array.from({ length: 30000 }, (_, i) => ({ name: 'Class' + String(i).padStart(5, '0'),
     schema: 'Large', oid: String(i + 1).padStart(44, '0') }));
   const controller = registerObjectExplorer(vscode, context, {
     config: () => ({ installPath: 'C:/Jade', databasePath: path.join(root, 'database'),
-      iniPath: path.join(root, 'jade.ini'), server: 'singleUser' }),
+      iniPath: path.join(root, 'jade.ini'), server: 'singleUser', workspaceRoots: [folder.uri.fsPath] }),
     isBusy: () => false, setBusy: async () => {},
     inspectionTarget: async (config,selection) => ({...config,readOnly:true,selection}),
     workingLocation: async () => ({databasePath:path.join(root,'native-working/system')}),

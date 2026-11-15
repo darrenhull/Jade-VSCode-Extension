@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const {hash}=require('./native-project');
 const {joinProject,loadProject}=require('./native-project-build');
+const {cleanupProjectStage}=require('./native-project-stage-lifecycle');
 const {targetKey,fileKey}=require('./publish-changes');
 const {parseSource}=require('./source_symbols');
 const {nativeProcess,runNativeTests,loadWorkingFiles}=require('./working-database');
@@ -56,6 +57,7 @@ async function runProject(config,working,project,operation,scopeFiles,output=()=
   }else{
   await applyRenames(working,project,output);
   bundle=await joinProject(working,selected,output);
+  try{
   if(full){
    for(const name of [...(state.schemas||[])].reverse().filter(name=>!project.schemas.some(s=>s.name===name))){
     output('Removing deleted workspace schema '+name+' from the working database ...\n');
@@ -64,6 +66,9 @@ async function runProject(config,working,project,operation,scopeFiles,output=()=
    }
   }
   loaded=await loadProject(working,bundle,output,{deleteIfAbsent:full});
+  }catch(error){await cleanupProjectStage(bundle,error);throw error;}
+  await cleanupProjectStage(bundle,loaded.success?undefined:loaded);
+  if(loaded.cleanupError)report.cleanupError=loaded.cleanupError;
   report.loaded_files=selected.entries.length;
   }
   report.diagnostics=loaded.diagnostics;

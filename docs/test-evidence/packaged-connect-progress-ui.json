@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "artifact": "unmodified packaged VSIX with separate gated-native companion",
+  "extensionVersion": "0.22.7",
+  "nativeDistributionVersion": "0.10.5",
+  "nativeRuntimeExecuted": false,
+  "fakeNativePreparation": true,
+  "noDatabaseConnection": true,
+  "joinedConnectClicks": 3,
+  "nativePreparations": 1,
+  "workingDatabaseTimeoutSeconds": 7200,
+  "quietElapsedProgressVisible": true,
+  "quietHeartbeatPersistedToOwnedLog": true,
+  "safeBoundaryCancellationWaited": true,
+  "screenshots": [
+    "packaged-backup.png",
+    "packaged-restore.png",
+    "packaged-cancelling.png"
+  ]
+}

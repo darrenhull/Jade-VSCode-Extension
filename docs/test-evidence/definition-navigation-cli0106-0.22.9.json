@@ -1,0 +1,69 @@
+{
+  "formatVersion": 1,
+  "checkedAt": "2026-11-14T19:30:46.4946958Z",
+  "status": "Final combined local gates passed; manager-owned current-head hosted checks/review/release pending",
+  "extensionVersion": "0.22.9",
+  "sourceBase": "a1d7f3f7220964995d8459266fdef7531802a0f8",
+  "native": {
+    "version": "0.10.6",
+    "release": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.6",
+    "releaseSource": "2e7702a36f93ac37c92d698fdf50f9aa6bf04a4f",
+    "mainRun": 43629321154,
+    "archiveSha256": "5ef0d956a2d59512b10ff4aaa23e5a29068773a69c0b914e4fabe3e28b36afa1",
+    "manifestSha256": "d957d9a40432b45c6fc83ad5872af0cf3771184e0f0fed8624651feeea486ec2",
+    "officialAtomicUpdater": true,
+    "allRuntimeHashesPassed": true
+  },
+  "tests": {
+    "regularPassed": 1287,
+    "regularExplicitNativeOptInSkipped": 47,
+    "isolatedPowerShellPassed": 18,
+    "failed": 0,
+    "connectedTransportPassed": 1,
+    "defaultDatabaseOpened": false
+  },
+  "package": {
+    "file": "dist/jade-native-runner-cpp-preview-0.22.9.vsix",
+    "sha256": "1ce1b0774d9e4352c2c2b711a2c18d173b40807daf048abd5631577bcf83572b",
+    "bytes": 5242421,
+    "portableOutsideCheckoutNoNodeDiscoveryPassed": true,
+    "packagedManifestReadmeChangelogBytesPassed": true,
+    "syntheticSeederAndSdkNotPackaged": true
+  },
+  "navigation": {
+    "historicalUiReceipt": "docs/test-evidence/definition-navigation-ui-0.22.9.json",
+    "screenshotsCarried": 5,
+    "packagedNavigationModuleByteIdentityPassed": true,
+    "realInstalledAnsiDllFingerprintCacheAccepted": true,
+    "syntheticCacheDefinitions": true,
+    "foreignRuntimeCacheRejected": true
+  },
+  "connected": {
+    "platform": "Windows x64",
+    "runtime": "JADE 25.0.01 ANSI",
+    "actualPackagedJavaScriptAndNativeCli": true,
+    "syntheticDisposableSourceOnly": true,
+    "ordinaryNativeWorkingPrepareAndOwnership": true,
+    "sourceAndWorkingTargets": [
+      "source",
+      "working"
+    ],
+    "readOnlyCatalogInstancesObjectStoredProperty": true,
+    "distinctTargetEpochs": true,
+    "blankPasswordInheritedPolicySeederDenied": true,
+    "seederFilterCalls": 1,
+    "transportFilterCalls": 0,
+    "isolatedBrokerShutdownObserved": true
+  },
+  "limitations": [
+    "Synthetic inherited inspection policy, not a customer development-security DLL.",
+    "No new native GUI comparison or new performance benchmark.",
+    "Navigation screenshots come from the earlier 0.22.9 artifact and carry only through exact unchanged packaged source bytes."
+  ],
+  "cleanup": {
+    "allOwnedProcessesExited": true,
+    "ownedSyntheticSourceWorkingAndExtractedPackageRemoved": true,
+    "customerDatabaseTouched": false,
+    "userInstallation": false
+  }
+}
