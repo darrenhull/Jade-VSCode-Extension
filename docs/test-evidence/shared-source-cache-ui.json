@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "artifact": "deployment VSIX; packaged product unmodified in isolated profile",
+  "version": "0.22.11",
+  "cliVersion": "0.10.8",
+  "nativeVersion": "jade-cli/0.10.8/source-index/2",
+  "sourceCacheInitialized": true,
+  "sourceClassesVisible": 1,
+  "settingsDescriptionVisible": true,
+  "noDatabaseConnection": true,
+  "noUserInstallation": true,
+  "brokerPID": 23876,
+  "officialCliPinVerified": true,
+  "minimumCliVersion": "0.10.8",
+  "sourceCommit": "011e7078e1ae74f7f506d260b548eb0e421a7f7f",
+  "vsixSha256": "d6dd8ad37c9a02e77eb663277e0c99e721b3e7992f549107526c9d3b7c6a8e6e",
+  "visuallyInspected": true,
+  "ownedHostAndBrokerExited": true,
+  "ownedFixtureRemoved": true,
+  "screenshots": [
+    "docs/screenshots/shared-source-cache/setup.png",
+    "docs/screenshots/shared-source-cache/classes.png",
+    "docs/screenshots/shared-source-cache/settings.png"
+  ]
+}
