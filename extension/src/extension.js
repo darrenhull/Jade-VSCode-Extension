@@ -263,7 +263,7 @@ function activate(context) {
     updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value)
   });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
-    client:nativeTests,
+    client:nativeTests,prepareSource:language.ensureSourceIndex,
     configFor:(_document,scope)=>inspectionConfig({uri:scope.configurationResource},scope.folder),
     schemaChoices:async scope=>{
       await language.index.ready();await language.index.flush();const schemas=new Map();

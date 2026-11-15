@@ -7,7 +7,7 @@ function registerCompileCommands(vscode,context,services){
   const output=services.output;
   let document;
   try{document=await (services.resolveSource?services.resolveSource(uri):resolveJadeSource(vscode,uri));}
-  catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
+  catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return error.result||{passed:false,error:error.message};}
   await services.beforeOperation();
   if(services.isBusy()){void vscode.window.showErrorMessage('A Jade compile or publish is already running.');return;}
   await services.setBusy(true);

@@ -175,3 +175,5 @@ Full streaming extraction requires the qualified `schema-ddx` resource layout. I
 Review is a point-in-time target snapshot, not an atomic lease against external database writers. Complete-schema loading is authoritative within the listed schemas, and earlier successful schema loads may remain if a later load fails.
 
 Source-index startup and **Jade: Refresh Object Explorer** use `jadeNative.sourceIndexTimeoutSeconds` (600 seconds by default, maximum 7200). A missing or incompatible cache is rebuilt once through the native CLI; ordinary prepared operations reuse it. Jade Language Tools logs the source folder, budget and native progress. A failed refresh keeps the existing browser data and reports the failure; it does not mean the full workspace was indexed.
+
+Source indexing displays a cancellable progress notification at the bottom right, including elapsed time and the latest native stage. Cancel waits for the owned native operation to stop. If refresh fails, Object Explorer labels its retained data as incomplete; increase Source Index Timeout Seconds or review Jade Language Tools output before retrying.

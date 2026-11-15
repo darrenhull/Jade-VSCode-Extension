@@ -39,7 +39,7 @@ class JadeWorkspaceRunner {
         onProgress({stage:'received',message:'JADE response received'});
         return {...result,snapshot,stale:document.version!==version};
       } catch(error) {
-        return {code:2,passed:false,report:{error:error.message},snapshot,stale:document.version!==version};
+        return {...(error.result||{code:2,passed:false,report:{error:error.message}}),snapshot,stale:document.version!==version};
       } finally {subscription?.dispose();if(acquired){onProgress({stage:'releasing',message:'Releasing the Working operation'});await this.afterOperation(lease);}}
     };
     const operation=this.tail.then(work,work);this.tail=operation.then(()=>{},()=>{});return operation;

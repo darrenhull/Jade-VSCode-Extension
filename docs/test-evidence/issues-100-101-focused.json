@@ -12,17 +12,27 @@
     "windowsRoot": "Case-variant workspace root marker incorrectly excludes canonical native source URI"
   },
   "green": {
-    "targetedChecks": 30,
+    "targetedChecks": 52,
     "sourceIndexTimeoutSeconds": {
       "default": 600,
       "minimum": 1,
       "maximum": 7200
     },
-    "warmGateAdditionalNativeCalls": 0
+    "warmGateAdditionalNativeCalls": 0,
+    "actualNativeCache": "tests/SourceIndexStartup/receipts/native-startup.json",
+    "actualActivationBefore": "tests/SourceIndexStartup/receipts/activation-before.json",
+    "actualActivationAfter": "tests/SourceIndexStartup/receipts/activation-after.json",
+    "notification": {
+      "standardVsCode": true,
+      "cancellable": true,
+      "elapsedTime": true,
+      "ownedRequestConnection": true,
+      "totalMonotonicBudget": true
+    }
   },
   "limits": [
     "Customer 40k refresh timeout not reproduced locally",
-    "Actual native cache process, package and UI evidence remain pending",
-    "No customer database opened or source published"
+    "Native cache uses actual official CLI; Scratch workspace.run response is controlled and no JADE database was opened",
+    "Progress screenshot intentionally holds the real native refresh response; screenshot elapsed time is not a cache benchmark"
   ]
 }

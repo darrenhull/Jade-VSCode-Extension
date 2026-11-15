@@ -2,6 +2,7 @@
 const path=require('node:path'),os=require('node:os');
 const {SourceIndex}=require('./workspace-index');
 const {SourceIndexCache}=require('./SourceIndexCache');
+const {SourceIndexProgress}=require('./SourceIndexProgress');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
@@ -34,16 +35,18 @@ function registerLanguageTools(vscode,context,services={}){
     const identity=rootKey(root),available=preparedReceipts.get(identity);preparedReceipts.delete(identity);if(available){preparedRoots.add(identity);return available;}
     if(preparingRoots.has(identity))return preparingRoots.get(identity);
     const generation=sourceGeneration,preparation=(async()=>{
-      const version=await nativeVersion(),config=sourceConfig(root),write=text=>{output.appendLine(text.trimEnd());onProgress(text.trimEnd());};
+      const version=await nativeVersion(),config=sourceConfig(root);
       output.appendLine('Preparing saved Git source index: '+root+' (timeout '+config.timeoutMilliseconds/1000+'s).');
-      let result=await services.client.request('source.index.prepare',{config},write).promise;
+      const result=await new SourceIndexProgress({vscode,client:services.client,root,config,output,onProgress}).run(async operation=>{
+      let result=await operation.request('source.index.prepare');
       // Only JADE's explicit cache-repair diagnosis permits a rebuild. Git,
       // transport, ownership and cancellation failures retain their cause.
       if(result?.passed===false&&result.code===2&&result.report?.error==='Refresh Workspace source cache using jade-cli source refresh or Initialise Workspace before preparing source inputs: cache is missing or incompatible.'){
-        const message='Initialising the shared Git source index: '+root;output.appendLine(message);onProgress(message);
-        result=await services.client.request('source.index.refresh',{config},write).promise;
+        const message='Initialising the shared Git source index: '+root;output.appendLine(message);operation.report(message);
+        result=await operation.request('source.index.refresh');
       }
-      if(result?.passed!==true||result.code!==0)throw Error(result?.report?.error||'Native Git source preparation failed. Run Initialise Workspace.');
+      return result;});
+      if(result?.passed!==true||result.code!==0)throw Object.assign(Error(result?.report?.error||'Native Git source preparation failed. Run Initialise Workspace.'),{result});
       const descriptor=result.cache;
       if(descriptor?.format!==2||descriptor.nativeVersion!==version||!descriptor.roots?.some(value=>typeof value.root==='string'&&rootKey(value.root)===identity))throw Error('Native source index returned an incompatible workspace binding. Update the Jade CLI bundle.');
       if(generation!==sourceGeneration)throw Error('Workspace changed during source index preparation; retry the operation.');
@@ -67,7 +70,7 @@ function registerLanguageTools(vscode,context,services={}){
     const version=await nativeVersion(),folders=folder?[folder]:(vscode.workspace.workspaceFolders||[]).filter(value=>value.uri.scheme==='file');
     await index.persist();
     for(const selected of folders){const root=selected.uri.fsPath;preparedRoots.delete(rootKey(root));preparedReceipts.delete(rootKey(root));if(!(vscode.workspace.workspaceFolders||[]).some(value=>path.resolve(value.uri.fsPath).toLowerCase()===path.resolve(root).toLowerCase()))throw Error('Workspace changed before source index refresh.');const config=sourceConfig(root);output.appendLine('Refreshing Git source index: '+root+' (timeout '+config.timeoutMilliseconds/1000+'s).');
-      const result=await services.client.request('source.index.refresh',{config},text=>output.appendLine(text.trimEnd())).promise;
+      const result=await new SourceIndexProgress({vscode,client:services.client,root,config,output}).run(operation=>operation.request('source.index.refresh'));
       if(result?.passed!==true||result.code!==0){const message=result?.report?.error||'Native source index refresh failed. Run Initialise Workspace.';output.appendLine('Source index refresh incomplete; existing browser data was retained. '+message);throw Error(message);}
       if(result.cache?.format!==2||result.cache.nativeVersion!==version||!result.cache.roots?.some(value=>path.resolve(value.root).toLowerCase()===path.resolve(root).toLowerCase()))throw Error('Native source index refresh returned an incompatible workspace binding. Update the Jade CLI bundle.');
       preparedReceipts.set(rootKey(root),result.cache);preparedRoots.add(rootKey(root));
