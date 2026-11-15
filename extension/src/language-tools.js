@@ -2,7 +2,7 @@
 const path=require('node:path'),os=require('node:os');
 const {SourceIndex}=require('./workspace-index');
 const {SourceIndexCache}=require('./SourceIndexCache');
-const {SourceIndexProgress}=require('./SourceIndexProgress');
+const {SourceIndexProgress,waitForSourceIndex,sourceIndexCancellationError}=require('./SourceIndexProgress');
 const {SystemTypeCache}=require('./system-type-cache');
 const {label}=require('./language-model');
 const {isNestedSnapshot}=require('./source-snapshots');
@@ -31,13 +31,14 @@ function registerLanguageTools(vscode,context,services={}){
     if(!Number.isInteger(seconds)||seconds<1||seconds>7200)throw Error('Set jadeNative.sourceIndexTimeoutSeconds to an integer between 1 and 7200.');
     return{workspaceRoots:[root],timeoutMilliseconds:seconds*1000};
   }
-  async function prepareSourceIndex(root,onProgress=()=>{}){
+  async function prepareSourceIndex(root,onProgress=()=>{},token){
+    if(token?.isCancellationRequested)throw sourceIndexCancellationError();
     const identity=rootKey(root),available=preparedReceipts.get(identity);preparedReceipts.delete(identity);if(available){preparedRoots.add(identity);return available;}
-    if(preparingRoots.has(identity))return preparingRoots.get(identity);
+    if(preparingRoots.has(identity))return waitForSourceIndex(preparingRoots.get(identity),token);
     const generation=sourceGeneration,preparation=(async()=>{
       const version=await nativeVersion(),config=sourceConfig(root);
       output.appendLine('Preparing saved Git source index: '+root+' (timeout '+config.timeoutMilliseconds/1000+'s).');
-      const result=await new SourceIndexProgress({vscode,client:services.client,root,config,output,onProgress}).run(async operation=>{
+      const result=await new SourceIndexProgress({vscode,client:services.client,root,config,output,onProgress,originToken:token}).run(async operation=>{
       let result=await operation.request('source.index.prepare');
       // Only JADE's explicit cache-repair diagnosis permits a rebuild. Git,
       // transport, ownership and cancellation failures retain their cause.
@@ -55,8 +56,9 @@ function registerLanguageTools(vscode,context,services={}){
     preparingRoots.set(identity,preparation);
     try{return await preparation;}finally{if(preparingRoots.get(identity)===preparation)preparingRoots.delete(identity);}
   }
-  async function ensureSourceIndex(config,onProgress){
-    for(const root of config.workspaceRoots||[])if(!preparedRoots.has(rootKey(root)))await prepareSourceIndex(root,onProgress);
+  async function ensureSourceIndex(config,onProgress,token){
+    if(token?.isCancellationRequested)throw sourceIndexCancellationError();
+    for(const root of config.workspaceRoots||[])if(!preparedRoots.has(rootKey(root)))await prepareSourceIndex(root,onProgress,token);
   }
   const cache=new SourceIndexCache({roots:()=> (vscode.workspace.workspaceFolders||[]).filter(folder=>folder.uri.scheme==='file').map(folder=>folder.uri.fsPath),nativeVersion,prepare:prepareSourceIndex,request:(...args)=>services.client.request(...args),onError:reportIndexError});
   const index=new SourceIndex({

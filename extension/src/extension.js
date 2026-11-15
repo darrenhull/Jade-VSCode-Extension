@@ -332,7 +332,8 @@ function activate(context) {
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
         stage('Saving local test sources');
         await workingFiles(config,{discover:false});
-        await language.ensureSourceIndex(config,stage);
+        await language.ensureSourceIndex(config,stage,testCancellation);
+        if(testCancellation?.isCancellationRequested)return{passed:false,code:130,cancelled:true,report:{error:'Local test run cancelled before native execution.',tests_completed:false,results:[]}};
         stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);

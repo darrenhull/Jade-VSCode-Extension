@@ -26,7 +26,7 @@ class JadeWorkspaceRunner {
         lease=await this.beforeOperation();acquired=true;
         if(token?.isCancellationRequested)return cancelled();
         onProgress({stage:'preparing',message:'Preparing saved Git source inputs'});
-        await this.prepareSource(config,message=>onProgress({stage:'preparing',message}));
+        await this.prepareSource(config,message=>onProgress({stage:'preparing',message}),token);
         if(token?.isCancellationRequested)return cancelled();
         onProgress({stage:'native',message:'Waiting for JADE preparation and execution result'});
         const request=this.client.request('workspace.run',{config:configDto(config),sourceText:snapshot.text,source,lineOffset:0,columnOffset:0},onOutput);
