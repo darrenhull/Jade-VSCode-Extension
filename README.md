@@ -176,6 +176,6 @@ Review is a point-in-time target snapshot, not an atomic lease against external 
 
 ### Workspace source index
 
-Jade Tools keeps disposable browsing metadata in `.jade/source-index` inside each local project. Cached classes can appear while files are checked in the background; first-time indexing reports progress. Saved-file additions, deletions and moves update the index. Open editor buffers take precedence and unsaved text is not persisted into the disk cache.
+Jade Tools shares regenerable saved-source metadata with the native CLI in `.jade/source-index` inside each local project. At startup, a fresh native Git proof validates saved cache rows before unchanged browsing models are reused. Changed saved files are read again; open editor buffers take precedence and unsaved text is not persisted into the cache.
 
-The cache is ignored by Git through its own `.gitignore` files. It can be deleted and is rebuilt automatically. File size/mtime is a browsing-cache reuse hint; **Refresh Object Explorer** forces a fresh source read. Native build, extraction comparison and publication still read authoritative saved source and do not trust this cache. It is not a database change tracker.
+Initialise Workspace ensures managed `.jade/` state is ignored by Git while preserving existing ignore rules. Use **Refresh Object Explorer** or **Initialise Workspace** to repair missing or incompatible source-index data. Browsing models are advisory; successful native input loading remains the authority for build and test reuse, and publication retains its reviewed saved-source snapshot. Source-index repair never deletes the separate Working database.
