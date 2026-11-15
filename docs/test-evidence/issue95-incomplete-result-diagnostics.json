@@ -15,7 +15,8 @@
     "affectedChecksPassed": 40,
     "finalFocusedChecksPassed": 5,
     "extraTimeoutAndCancellationControls": 2,
-    "fullLocalSuiteRun": false
+    "fullLocalSuiteRun": false,
+    "finalAffectedChecksPassed": 45
   },
   "change": "Distinguish unconfirmed method completion, unconfirmed cleanup and absent selected method in fallback diagnostics; record the same terminal error in Testing output. Preserve native error/diagnostic priority, timeout/cancelled flags and completed assertion semantics.",
   "trace": {
@@ -25,8 +26,36 @@
     "inspectionSeparate": "Database Objects uses native inspection commands; browsing success does not establish Scratch/test execution."
   },
   "sourceOrCustomerDatabaseOpened": false,
-  "uiEvidencePending": true,
-  "packagingPending": true,
-  "releaseMetadataPending": true,
-  "limitations": "Client response controls are synthetic. No actual customer program, database, Working migration or native framework execution was used. This improves incomplete-result evidence; it is not a native hang repair."
+  "uiEvidencePending": false,
+  "packagingPending": false,
+  "releaseMetadataPending": false,
+  "limitations": "Client response controls are synthetic. No actual customer program, database, Working migration or native framework execution was used. This improves incomplete-result evidence; it is not a native hang repair.",
+  "ui": {
+    "actualPackagedTestingModule": true,
+    "actualVSCodeTestController": true,
+    "controlledNativeResponses": true,
+    "visuallyInspected": true,
+    "screenshots": [
+      "docs/screenshots/incomplete-test-results/completion.png",
+      "docs/screenshots/incomplete-test-results/cleanup.png",
+      "docs/screenshots/incomplete-test-results/missingMethod.png"
+    ],
+    "receipt": "tests/LocalTestCommand/receipts/incomplete-ui.json",
+    "ownedHostExitedAndTemporaryStageRemoved": true
+  },
+  "package": {
+    "version": "0.22.14",
+    "sourceModulesByteIdentical": 118,
+    "officialCliVersion": "0.10.10",
+    "vsixSha256": "3e5eb8a37656ee3acffbfc62ea08e0341d2ad767d05230e02b3b92096548c856",
+    "vsixBytes": 5387072,
+    "nativePinAndAllRuntimeHashesVerified": true,
+    "portableExtractedNoNode": true,
+    "nativeTestDiscovery": true,
+    "databaseOpened": false
+  },
+  "remainingGates": [
+    "Root review and push of isolated diagnostic follow-up",
+    "Hosted CI and automated/owner review before merge/release"
+  ]
 }

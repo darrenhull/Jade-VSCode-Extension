@@ -1,3 +1,8 @@
+# 0.22.14 - Incomplete native test diagnostics
+
+- Distinguish unconfirmed test method completion, unconfirmed cleanup and a selected method absent from the native report. Repeat the original native cause or precise fallback in Test Results output; preserve assertion failures, cancellation and timeout outcomes.
+- This improves failure evidence and does not claim to resolve the separately investigated native Scratch Pad or test hang.
+
 # 0.22.13 - Native empty source fragments and debugger drafts
 
 - Bundle [official Jade CLI 0.10.10](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.10), preserving valid empty native type fragments without inventing declarations and retaining real primitive methods. The native migration guard handles empty fragments when JCF migrations are pending.
