@@ -1,8 +1,8 @@
 {
-  "sourceHead": "37b396c",
+  "sourceHead": "d15ec1a",
   "packageVersion": "0.22.12",
-  "vsixSha256": "3ab54e4f41c93d91bf561ed8920ccf7a1100a48d4707633ebe63097a2a604065",
-  "vsixBytes": 5381715,
+  "vsixSha256": "f6675b212271e933f209bdb7c485a568d1870a9e355e8e3b33389a4870316478",
+  "vsixBytes": 5382192,
   "sourceModulesByteIdentical": 118,
   "officialCliVersion": "0.10.8",
   "officialCliSha256": "3e5e71c85ae263dfe4e3d4a4c4a058dccc2f7d4f278d816d57bc03a135d4ff8d",
@@ -10,7 +10,7 @@
   "portableExtractedNoNode": true,
   "nativeTestDiscovery": true,
   "databaseOpened": false,
-  "targetedLocalTests": 32,
+  "targetedLocalTests": 52,
   "fullLocalSuiteRun": false,
   "uiScreenshots": [
     "docs/screenshots/source-index-startup/progress.png",
