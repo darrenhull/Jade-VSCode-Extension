@@ -1,0 +1,32 @@
+{
+  "issues": [
+    94,
+    95
+  ],
+  "base": "fcfdd3f93fa37c644057b314d8d554b9ed13cdf7",
+  "customerHangReproduced": false,
+  "customerHangClaimedFixed": false,
+  "red": {
+    "file": "tests/LocalTestCommand/LocalTestCommand_incompleteResult_tests.test.js",
+    "failed": 3,
+    "actualFallback": "Native test run did not produce a complete method result."
+  },
+  "green": {
+    "affectedChecksPassed": 40,
+    "finalFocusedChecksPassed": 5,
+    "extraTimeoutAndCancellationControls": 2,
+    "fullLocalSuiteRun": false
+  },
+  "change": "Distinguish unconfirmed method completion, unconfirmed cleanup and absent selected method in fallback diagnostics; record the same terminal error in Testing output. Preserve native error/diagnostic priority, timeout/cancelled flags and completed assertion semantics.",
+  "trace": {
+    "scratch": "JadeWorkspaceRunner: snapshot/configuration/Working lease -> ensureSourceIndex -> workspace.run -> native response -> owned lease release",
+    "test": "Registered executeLocalTests: resolve/save/configuration -> ensureSourceIndex -> startWorking test -> CliWorkingSession -> native WorkingEngine scope/load/session -> completed native method report -> Testing outcome",
+    "nativeCustomerLastLine": "Configured publish target is printed after Working preparation and before source dependency planning/load/tests. Historical output does not establish the current stall location.",
+    "inspectionSeparate": "Database Objects uses native inspection commands; browsing success does not establish Scratch/test execution."
+  },
+  "sourceOrCustomerDatabaseOpened": false,
+  "uiEvidencePending": true,
+  "packagingPending": true,
+  "releaseMetadataPending": true,
+  "limitations": "Client response controls are synthetic. No actual customer program, database, Working migration or native framework execution was used. This improves incomplete-result evidence; it is not a native hang repair."
+}
