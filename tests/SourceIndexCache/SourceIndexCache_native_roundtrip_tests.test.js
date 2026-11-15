@@ -9,5 +9,5 @@ test('real native shared-cache writer retains exact JS parser metadata and rejec
   const result=await session.request('source.index.refresh',{config:{workspaceRoots:[root]}}).promise;
   assert.equal(result.passed,true,JSON.stringify(result));assert.equal(result.code,0);assert.equal(result.cache?.format,2);assert.ok(result.cache.roots.some(row=>row.root.toLowerCase()===root.toLowerCase()));assert.equal(result.entries,undefined,'The native source graph must stay out of broker frames');
  }});
- assert.equal(receipt.passed,true);assert.equal(receipt.roundtripMetadata,true);assert.equal(receipt.staleProofRejected,true);
+ assert.equal(receipt.passed,true);assert.equal(receipt.roundtripMetadata,true);assert.equal(receipt.staleProofRejected,true);assert.equal(receipt.terminalAlias,true);assert.equal(receipt.ownedBrokerExited,true);console.log('Native shared-cache proof: '+JSON.stringify(receipt));
 });

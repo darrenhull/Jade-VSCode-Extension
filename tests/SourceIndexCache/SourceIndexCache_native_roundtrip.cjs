@@ -14,12 +14,20 @@ async function diskRows(directory){
 }
 async function runNativeBrowserRoundtrip({entry,refresh}){
  assert.ok(path.isAbsolute(entry)&&/\.exe$/i.test(entry),'An explicit candidate native CLI is required');assert.equal(typeof refresh,'function','Supply the reviewed real refresh endpoint');
- return new OwnedCliFixture({entry}).run(async({root:temporary,session})=>{
+ const fixture=new OwnedCliFixture({entry});let stage,brokerPID;
+ const receipt=await fixture.run(async({root:temporary,stateDirectory,session})=>{
+  stage=temporary;
   const repository=path.join(temporary,'repository'),root=path.join(repository,'project');await fs.mkdir(root,{recursive:true});
   const git=spawnSync('git',['init','--quiet',repository],{windowsHide:true,encoding:'utf8'});assert.equal(git.status,0,git.stderr);
   const source=await fs.readFile(path.join(__dirname,'fixtures/BrowserMetadata.cls'),'utf8'),bytes=Buffer.concat([Buffer.from([255,254]),Buffer.from(source,'utf16le')]);
   const file=path.join(root,'BrowserMetadata.cls'),uri=pathToFileURL(file).href,relative='project/BrowserMetadata.cls',rawSha256=hash(bytes);await fs.writeFile(file,bytes);
   await refresh(session,root);
+  const capability=await session.request('doctor',{config:{workspaceRoots:[root]}}).promise;
+  assert.equal(capability.capabilities?.sourceIndex?.format,2,JSON.stringify(capability));assert.equal(capability.capabilities.sourceIndex.databaseRequired,false);
+  const beforeStatus=await session.request('status').promise;brokerPID=beforeStatus.brokerPID;assert.ok(Number.isSafeInteger(brokerPID)&&brokerPID>0);
+  const alias=spawnSync(entry,['source','refresh','--workspace',root,'--json'],{windowsHide:true,encoding:'utf8',timeout:30000,env:{...process.env,JADE_TOOLS_STATE_DIRECTORY:stateDirectory,JADE_TOOLS_CONNECTIONS_FILE:path.join(temporary,'connections.json')}});
+  assert.ifError(alias.error);assert.equal(alias.status,0,alias.stderr||alias.stdout);const aliasResult=JSON.parse(alias.stdout);assert.equal(aliasResult.passed,true,alias.stdout);assert.equal(aliasResult.cache?.format,2);
+  assert.equal((await session.request('status').promise).brokerPID,brokerPID,'Terminal alias must use the same isolated broker');
   const directory=path.join(root,'.jade/source-index'),before=await diskRows(directory),nativeBefore=before.rows.map(({browser,...row})=>row);
   assert.equal(before.rows.find(row=>row.path===relative)?.native?.hash,rawSha256);
   const errors=[],packets=[],request=(command,body)=>{const pending=session.request(command,body);packets.push({command,body});return pending;};
@@ -31,8 +39,17 @@ async function runNativeBrowserRoundtrip({entry,refresh}){
   assert.ok(row);assert.equal(row.rawSha256,rawSha256);assert.deepEqual(row.model,JSON.parse(JSON.stringify({...parsed,text:'',code:'',excluded:[]})));
   const nativeBrowser=after.rows.find(row=>row.path===relative).browser;assert.ok(!JSON.stringify(nativeBrowser).includes('BODY_MUST_NOT_COPY'));
   assert.equal(row.model.classes[0].members.find(member=>member.name==='run').typeMethod,true);assert.equal(row.model.classes[0].members.find(member=>member.name==='run').updating,true);
-  await fs.writeFile(file,Buffer.concat([bytes,Buffer.from('\r\n','utf16le')]));cache.set(uri,{model:parsed,rawSha256});await cache.flush();assert.ok(errors.some(error=>/stale/i.test(error.message)),'Native writer must reject the old raw-byte proof');
-  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,sourceBodiesPersisted:false};
+  const changedBytes=Buffer.concat([bytes,Buffer.from('\r\n','utf16le')]),changedText=source+'\r\n';await fs.writeFile(file,changedBytes);cache.set(uri,{model:parsed,rawSha256});await cache.flush();assert.ok(errors.some(error=>/stale/i.test(error.message)),'Native writer must reject the old raw-byte proof');
+  const previousErrors=errors.length,newHash=hash(changedBytes),changedModel=parseSource(changedText,uri);cache.set(uri,{model:changedModel,rawSha256:newHash});await cache.flush();assert.equal(errors.length,previousErrors,'Matching new saved bytes must refresh only the target row and persist the browser update');
+  const changedDisk=await diskRows(directory);assert.equal(changedDisk.rows.find(row=>row.path===relative)?.native?.hash,newHash);
+  const direct=await session.request('source.index.browser.update',{root,parser:packets[0].body.parser,updates:[{...packets.at(-1).body.updates[0],path:'project/BROWSERMETADATA.CLS'}]}).promise;
+  assert.equal(direct.passed,true,JSON.stringify(direct));assert.equal(direct.stale.length,0);assert.equal((await diskRows(directory)).rows.length,changedDisk.rows.length,'Direct native case-alias packet must not create a duplicate row');
+  const variant=pathToFileURL(path.join(root,'BROWSERMETADATA.CLS')).href;cache.set(variant,{model:changedModel,rawSha256:newHash});await cache.flush();assert.equal(errors.length,previousErrors,'Windows URI case variants must not be rejected as stale');
+  const variantDisk=await diskRows(directory);assert.equal(variantDisk.rows.length,changedDisk.rows.length,'Windows URI case must not create a duplicate cache row');assert.equal(variantDisk.rows.filter(row=>row.path.toLowerCase()===relative.toLowerCase()).length,1);
+  return{passed:true,unbornRepository:true,workspaceSubdirectory:true,rawEncoding:'utf16le-bom',nativeVersion:before.nativeVersion,roundtripMetadata:true,nativeRowsUnchanged:true,staleProofRejected:true,matchingSavedEditAccepted:true,windowsUriCaseStable:true,sourceBodiesPersisted:false,terminalAlias:true,sameIsolatedBroker:true};
  });
+ assert.equal(await fs.stat(stage).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;}),false,'Owned fixture directory remains after shutdown');
+ assert.throws(()=>process.kill(brokerPID,0),error=>error.code==='ESRCH','Owned broker must actually exit before cleanup');
+ return{...receipt,ownedBrokerExited:true,ownedArtifactsRemoved:true};
 }
 module.exports={runNativeBrowserRoundtrip};

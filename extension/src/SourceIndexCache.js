@@ -105,8 +105,8 @@ class SourceIndexCache{
        if(!relativePath(row?.path)||crypto.createHash('sha256').update(row.path).digest()[0]%SHARDS!==shard||typeof row.blobId!=='string'||!(data.objectFormat==='sha1'?/^[a-f0-9]{40}$/i:/^[a-f0-9]{64}$/i).test(row.blobId))continue;
        const rawSha256=row.native===undefined&&/\.jade$/i.test(row.path)?row.rawSha256:row.native?.hash;if(!digest(rawSha256))continue;
        const file=path.resolve(current.repository,...row.path.split('/'));if(!within(root,file))continue;const uri=require('node:url').pathToFileURL(file).href,location=this.location(uri);if(!location||key(location.root)!==key(root))continue;
-       proofs.set(uri,{root,rawSha256});
-       if(this.changed.has(uri)||row.browser?.parser!==this.parserId||row.browser.rawSha256!==rawSha256)continue;
+       proofs.set(key(uri),{root,rawSha256,path:row.path});
+       if(this.changed.has(key(uri))||row.browser?.parser!==this.parserId||row.browser.rawSha256!==rawSha256)continue;
        try{const model=browserModel(row.browser.model);rows.push({uri,rawSha256,model:{...model,uri,text:'',code:'',excluded:[]}});}catch(error){this.report(Error('Invalid optional advisory metadata was ignored: '+error.message));}
       }
      }catch(error){if(error.code!=='ENOENT')invalid=true;}}}));
@@ -121,12 +121,13 @@ class SourceIndexCache{
   const location=this.location(uri);if(!location)return;
   if(!digest(record?.rawSha256)){this.report(Error('Saved browsing metadata requires the original raw byte digest proof.'));return;}
   if(!record.model||!Array.isArray(record.model.classes)){this.report(Error('Invalid advisory browsing metadata.'));return;}
-  this.changed.add(uri);this.sharedPending.set(uri,{root:location.root,rawSha256:record.rawSha256,model:record.model});
+  const id=key(uri),previous=this.sharedPending.get(id)||this.sharedProofs.get(id);
+  this.changed.add(id);this.sharedPending.set(id,{uri,root:location.root,rawSha256:record.rawSha256,model:record.model,path:previous?.path});
  }
  deleteShared(uri){
-  const location=this.location(uri);if(!location)return;this.changed.add(uri);
-  const previous=this.sharedPending.get(uri)||this.sharedProofs.get(uri);if(!previous){this.sharedPending.delete(uri);return;}
-  this.sharedPending.set(uri,{root:location.root,rawSha256:previous.rawSha256,model:null});
+  const location=this.location(uri);if(!location)return;const id=key(uri);this.changed.add(id);
+  const previous=this.sharedPending.get(id)||this.sharedProofs.get(id);if(!previous){this.sharedPending.delete(id);return;}
+  this.sharedPending.set(id,{uri,root:location.root,rawSha256:previous.rawSha256,model:null,path:previous.path});
  }
  flushShared(){
   this.writing=this.writing.then(async()=>{
@@ -140,22 +141,23 @@ class SourceIndexCache{
       const result=await this.request('source.index.browser.update',{root,parser:this.parserId,updates:sending.map(item=>item.update)}).promise;
       const paths=new Set(sending.map(item=>item.update.path)),accepted=result?.accepted,stale=result?.stale;
       if(result?.passed!==true||result.code!==0||!Array.isArray(accepted)||!Array.isArray(stale)||accepted.length+stale.length!==paths.size||new Set([...accepted,...stale]).size!==paths.size||[...accepted,...stale].some(value=>!paths.has(value)))throw Error(result?.report?.error||'Invalid native browsing-cache acknowledgement.');
+      for(const item of sending)if(accepted.includes(item.update.path)&&this.sharedPending.get(item.id)===item.pending)this.sharedProofs.set(item.id,{root:item.pending.root,rawSha256:item.pending.rawSha256,path:item.update.path});
       if(stale.length)this.report(Error('Saved source changed; stale browsing metadata was not cached.'));
      }catch(error){this.report(error);}
-     finally{for(const item of sending)if(this.sharedPending.get(item.uri)===item.pending)this.sharedPending.delete(item.uri);}
+     finally{for(const item of sending)if(this.sharedPending.get(item.id)===item.pending)this.sharedPending.delete(item.id);}
     };
     const groups=new Map();
-    for(const [uri,pending]of this.sharedPending){const binding=this.sharedBindings.get(key(pending.root)),relative=path.relative(binding?.repository||pending.root,fileURLToPath(uri)).split(path.sep).join('/'),shard=crypto.createHash('sha256').update(relative).digest()[0]%SHARDS,id=JSON.stringify([key(pending.root),shard]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push([uri,pending,shard]);}
-    for(const [uri,pending,shard] of [...groups.values()].flat()){
+    for(const [identity,pending]of this.sharedPending){const binding=this.sharedBindings.get(key(pending.root)),relative=pending.path||this.sharedProofs.get(identity)?.path||path.relative(binding?.repository||pending.root,fileURLToPath(pending.uri)).split(path.sep).join('/'),shard=crypto.createHash('sha256').update(relative).digest()[0]%SHARDS,id=JSON.stringify([key(pending.root),shard]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push([identity,pending,shard]);}
+    for(const [id,pending,shard] of [...groups.values()].flat()){
      try{
       const binding=this.sharedBindings.get(key(pending.root));if(!binding)throw Error('Initialise or refresh the workspace source cache before saving browsing metadata.');
-      const file=fileURLToPath(uri),relative=path.relative(binding.repository,file).split(path.sep).join('/');if(!relativePath(relative)||!within(binding.root,file))throw Error('Advisory source path escapes its owning workspace.');
+      const file=fileURLToPath(pending.uri),relative=pending.path||this.sharedProofs.get(id)?.path||path.relative(binding.repository,file).split(path.sep).join('/');if(!relativePath(relative)||!within(binding.root,file)||key(path.resolve(binding.repository,...relative.split('/')))!==key(file))throw Error('Advisory source path escapes its owning workspace.');
       const model=pending.model===null?null:browserModel(pending.model);if(model!==null&&Buffer.byteLength(JSON.stringify(model))>SHARED_MODEL_BYTES)throw Error('Advisory browsing model exceeds its 2 MiB size limit; refresh guidance is required.');
       const update={path:relative,rawSha256:pending.rawSha256,model},size=Buffer.byteLength(JSON.stringify(update));
       const overhead=Buffer.byteLength(JSON.stringify({root:binding.root,parser:this.parserId,updates:[]}))+1024;
       if(batch.length&&(root!==binding.root||batchShard!==shard||batch.length>=SHARED_BATCH||bytes+size+batch.length+overhead>SHARED_PACKET_BYTES))await send();
-      root=binding.root;batchShard=shard;bytes+=size;batch.push({uri,pending,update});
-     }catch(error){this.report(error);if(this.sharedPending.get(uri)===pending)this.sharedPending.delete(uri);}
+      root=binding.root;batchShard=shard;bytes+=size;batch.push({id,pending,update});
+     }catch(error){this.report(error);if(this.sharedPending.get(id)===pending)this.sharedPending.delete(id);}
     }await send();
    }
   }).catch(error=>this.report(error));return this.writing;

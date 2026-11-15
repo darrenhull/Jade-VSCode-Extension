@@ -154,3 +154,21 @@ test('a new saved raw digest is submitted for native target validation without a
  const f=await fixture(t),packets=[],current=cache(f,{request:(command,body)=>{packets.push(body);return{id:1,promise:Promise.resolve({code:0,passed:true,accepted:[f.relative],stale:[]})};}});await current.load();
  const changed=hash('new saved file bytes');current.set(f.uri,{model:{...f.model,classes:[{...f.model.classes[0],name:'ChangedFish'}]},rawSha256:changed});await current.flush();assert.equal(packets.length,1);assert.equal(packets[0].updates[0].rawSha256,changed);assert.equal(packets[0].updates[0].model.classes[0].name,'ChangedFish');
 });
+test('Windows URI aliases use one canonical Git path and the latest accepted saved proof', {skip:process.platform!=='win32'},async t=>{
+ const f=await fixture(t),packets=[],variant=pathToFileURL(path.join(f.root,'FISH.CLS')).href,newHash=hash('new saved bytes'),current=cache(f,{request:(command,body)=>{packets.push(body);return{id:packets.length,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(row=>row.path),stale:[]})};}});await current.load();
+ current.set(variant,{model:f.model,rawSha256:f.rawSha256});current.set(f.uri,{model:f.model,rawSha256:newHash});await current.flush();
+ assert.equal(packets.length,1);assert.equal(packets[0].updates.length,1,'URI case aliases must coalesce into one saved update');assert.equal(packets[0].updates[0].path,f.relative);assert.equal(packets[0].updates[0].rawSha256,newHash);
+ current.delete(variant);await current.flush();assert.deepEqual(packets[1].updates,[{path:f.relative,rawSha256:newHash,model:null}]);
+});
+test('an old alias acknowledgement cannot publish its raw proof over a newer pending generation',{skip:process.platform!=='win32'},async t=>{
+ const f=await fixture(t),packets=[],gates=[],variant=pathToFileURL(path.join(f.root,'FISH.CLS')).href,newest=hash('newest saved bytes');
+ const current=cache(f,{request:(command,body)=>{packets.push(body);if(packets.length>2)return{id:packets.length,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(row=>row.path),stale:[]})};return{id:packets.length,promise:new Promise(resolve=>gates.push(resolve))};}});await current.load();
+ const waitFor=async count=>{const deadline=Date.now()+1000;while(gates.length<count&&Date.now()<deadline)await new Promise(setImmediate);assert.equal(gates.length,count);};
+ current.set(variant,{model:f.model,rawSha256:hash('older saved bytes')});const running=current.flush();
+ try{await waitFor(1);current.set(f.uri,{model:f.model,rawSha256:newest});gates[0]({code:0,passed:true,accepted:[f.relative],stale:[]});await waitFor(2);assert.equal(current.sharedProofs.get(f.uri.toLowerCase()).rawSha256,f.rawSha256,'Old acknowledgement must not replace the proof for the newer queued save');gates[1]({code:0,passed:true,accepted:[f.relative],stale:[]});await running;current.delete(variant);await current.flush();assert.equal(packets[2].updates[0].rawSha256,newest);assert.equal(packets[2].updates[0].path,f.relative);}
+ finally{for(const done of gates)done({code:0,passed:true,accepted:[f.relative],stale:[]});await running;}
+});
+test('an alias save queued before lazy cache loading still uses the later validated canonical Git path',{skip:process.platform!=='win32'},async t=>{
+ const f=await fixture(t),packets=[],variant=pathToFileURL(path.join(f.root,'FISH.CLS')).href,current=cache(f,{request:(command,body)=>{packets.push(body);return{id:1,promise:Promise.resolve({code:0,passed:true,accepted:body.updates.map(row=>row.path),stale:[]})};}});
+ current.set(variant,{model:f.model,rawSha256:hash('new saved bytes')});await current.flush();assert.equal(packets[0].updates[0].path,f.relative);
+});

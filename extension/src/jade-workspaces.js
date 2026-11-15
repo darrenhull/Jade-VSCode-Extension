@@ -8,6 +8,7 @@ const {ScratchPadMarkdown}=require('./ScratchPadMarkdown');
 const {ScratchPadFailures}=require('./ScratchPadFailures');
 const {ScratchPadProgress}=require('./ScratchPadProgress');
 const {NotebookCopilotSetup}=require('./NotebookCopilotSetup');
+const {diagnosticLocation}=require('./compiler-diagnostic-presentation');
 const notebookType='jade-workspace';
 
 async function runSequential(cells,execute) {
@@ -94,9 +95,9 @@ function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,befor
     if(stale||!(result.passed===true||report?.compiled===true||report?.executed===true||(Array.isArray(report?.diagnostics)&&report.diagnostics.length)))return;
     const key=document.uri.toString(),groups=new Map();
     for(const item of report?.diagnostics||[]) {
-      if(item.diagnostic_context_unavailable)continue;
+      if(item.diagnostic_context_unavailable&&!diagnosticLocation(item))continue;
       let uri=document.uri,range;
-      if(!item.source||item.source===key) {
+      if(!item.generated_source&&(!item.source||item.source===key)) {
         const offsets=diagnosticOffsets(snapshot,item);range=new vscode.Range(document.positionAt(offsets.start),document.positionAt(offsets.end));
       } else {
         uri=/^[A-Za-z]:[\\/]/.test(item.source)?vscode.Uri.file(item.source):vscode.Uri.parse(item.source);
