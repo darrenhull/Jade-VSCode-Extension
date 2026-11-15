@@ -12,6 +12,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   update:
@@ -63,18 +64,25 @@ jobs:
             node scripts/bump-consumer-version.cjs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          $issue = node scripts/ConsumerUpdateIssue.cjs "$env:CLI_TAG"
+          if ($LASTEXITCODE -ne 0 -or $issue -notmatch '^[1-9][0-9]*$') { throw 'Could not prepare the dependency tracking issue.' }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$env:CLI_BRANCH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $paths = @('package.json','package-lock.json','extension/package.json','packages') | Where-Object { Test-Path -LiteralPath $_ }
+          $paths = @('package.json','package-lock.json','extension/package.json','extension/CHANGELOG.md','packages') | Where-Object { Test-Path -LiteralPath $_ }
           git add -- $paths
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git commit -m "Update Jade CLI to $env:CLI_TAG"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git push --set-upstream origin "$env:CLI_BRANCH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $bodyFile = Join-Path $env:RUNNER_TEMP ('cli-update-pr-' + [guid]::NewGuid().ToString('N') + '.md')
           @"
+          Prepared by Codex on behalf of @darrenhull.
+
+          Closes #$issue
+
           Update the committed native C++ CLI distribution and hash pin to $env:CLI_TAG.
 
           SHA-256: $env:CLI_SHA
