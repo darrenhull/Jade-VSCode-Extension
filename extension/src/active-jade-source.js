@@ -11,7 +11,7 @@ function jadeSourceUri(vscode,explicitUri){
 }
 async function resolveJadeSource(vscode,explicitUri,{prepare}={}){
   const uri=jadeSourceUri(vscode,explicitUri),native=vscode.window.activeTextEditor?.document,input=vscode.window.tabGroups?.activeTabGroup?.activeTab?.input;
-  if(!uri)return;
+  if(!uri||uri.scheme!=='file')return;
   if(prepare&&await prepare(uri)===false)throw Error('Resolve the method draft before running this Jade operation.');
   if(!explicitUri&&!input?.viewType&&native&&!native.isClosed&&(!input?.uri||native.uri.toString()===uri.toString()))return native;
   return vscode.workspace.openTextDocument(uri);

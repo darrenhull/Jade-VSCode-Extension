@@ -5,22 +5,8 @@ const {registerTesting}=require('../../extension/src/testing');
 
 // Execute the real registered callback, including its early guards. Keeping this
 // harness separate from activate() avoids launching native processes or views.
-function fixture({busy=true,result,sourceReady,inputsReady,uiReady,dirty=false,save=async()=>true}={}){
- const source=fs.readFileSync(path.join(__dirname,'../../extension/src/extension.js'),'utf8');
- const start=source.indexOf("vscode.commands.registerCommand('jadeNative.executeLocalTests',");
- const end=source.indexOf("vscode.commands.registerCommand('jadeNative.refreshTypeCache',",start);
- assert.ok(start>=0&&end>start,'Registered local-test command must remain discoverable');
- const expression=source.slice(start,end).trim().replace(/,$/,'');
- const calls={messages:[],output:[],native:0,prepare:0,context:[]},h=testingHarness();let command;
- const sourceText='schemaDefinition\nProbeTests subschemaOf RootSchema partialDefinition;\ntypeHeaders\nProbe subclassOf JadeTestCase transient;\ntypeDefinitions\nProbe completeDefinition ()\ntypeSources\nProbe (\njadeMethodSources\ncheck\n{\ncheck() unitTest;\nbegin\n assertTrue(true);\nend;\n}\n)\n';
- const document={uri:h.api.Uri.file('C:/synthetic/Probe.cls'),isDirty:dirty,save,getText:()=>sourceText,positionAt:offset=>({line:sourceText.slice(0,offset).split('\n').length-1,character:0})};
- const disposable=()=>({dispose(){}});
- const vscode={...h.api,ProgressLocation:{Notification:1},commands:{registerCommand(name,handler){assert.equal(name,'jadeNative.executeLocalTests');command=handler;return disposable();},async executeCommand(name,key,value){calls.context.push(value);if(name==='setContext'&&value===false)await uiReady;}},window:{showErrorMessage(message){calls.messages.push(message);},showInformationMessage(){},async withProgress(options,task){return task({}, {onCancellationRequested:disposable});}},workspace:{textDocuments:[document],findFiles:async()=>[document.uri],createFileSystemWatcher:()=>({dispose(){},onDidCreate:disposable,onDidChange:disposable,onDidDelete:disposable}),onDidOpenTextDocument:disposable,onDidChangeTextDocument:disposable,async openTextDocument(){return document;}}};
- const sandbox={vscode,diagnosticLines:require('../../extension/src/compiler-diagnostic-presentation').diagnosticLines,nativeTests:{},publishing:busy,resolveSource:async()=>{await sourceReady;return document;},path,classConfig:()=>({program:document.uri.fsPath}),diagnostics:{delete(){}},reportDiagnostic(){},testOutput:{clear(){},show(){},append(text){calls.output.push(text);},appendLine(text){calls.output.push(text+'\n');}},workingFiles:async()=>{calls.prepare++;await inputsReady;},startWorking(config,operation,onOutput){calls.native++;return{stop(){},completion:Promise.resolve(result)}}};
- vm.runInNewContext(expression,sandbox,{filename:'registered-executeLocalTests.js'});
- const manager=registerTesting(vscode,{subscriptions:[]},(...args)=>command(...args));
- return{calls,h,document,command,manager,sandbox};
-}
+const {fixture}=require('./LocalTestCommand_harness.cjs');
+
 test('busy local-test command returns a clear not-started result and records it in Testing output',async()=>{
  const f=fixture(),observed=[];
  const result=await f.command(f.document.uri,['check'],undefined,text=>observed.push(text));
@@ -112,3 +98,6 @@ test('a returned native result remains distinguishable from a pending UI-state r
  }finally{ui.resolve();await running;}
  assert.equal(observed.filter(text=>text.includes('Local test UI state released')).length,1);
 });
+
+test('source-index preparation completes before native test dispatch and retains original outcomes',async()=>{const index=deferred(),f=fixture({busy:false,indexReady:index.promise,result:completedResult()});const running=f.command(f.document.uri,['check']);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.calls.sourceIndex,1);assert.equal(f.calls.native,0);index.resolve();const result=await running;assert.equal(result.passed,true);assert.deepEqual(f.calls.order,['save','source-index','index-ready','native']);});
+for(const failure of [{passed:false,code:130,cancelled:true,report:{error:'Native source index cancelled'}},{passed:false,code:2,timedOut:true,report:{error:'Git workspace source preparation timed out'}}])test('source-index '+(failure.cancelled?'cancellation':'timeout')+' preserves its native outcome and prevents test execution',async()=>{const error=Object.assign(Error(failure.report.error),{result:failure}),f=fixture({busy:false,indexFailure:error,result:completedResult()});const result=await f.command(f.document.uri,['check']);assert.strictEqual(result,failure);assert.equal(f.calls.native,0);assert.equal(f.sandbox.publishing,false);assert.deepEqual(f.calls.context,[true,false]);});

@@ -12,3 +12,7 @@ test('one large discovery checks each ancestor marker once and a new scan sees c
  assert.equal(isNestedSnapshot({fsPath:path.join(folder,'C0.cls')},workspace,new Map()),true,'A later scan ignored a new marker');
  assert.equal(isNestedSnapshot({fsPath:path.join(root,'C0.cls')},workspace,new Map()),false,'Opening a snapshot as its own workspace stopped working');
 });
+test('native canonical path casing does not turn the opened extraction root into a nested snapshot',{skip:process.platform!=='win32'},t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-snapshot-case-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.writeFileSync(path.join(root,'.jade-extraction'),'owned root');const types=path.join(root,'schemas','Pets','types');fs.mkdirSync(types,{recursive:true});
+ const workspace={getWorkspaceFolder:()=>({uri:{fsPath:root.toLowerCase()}})};assert.equal(isNestedSnapshot({fsPath:path.join(types,'Fish.cls')},workspace,new Map()),false);
+});

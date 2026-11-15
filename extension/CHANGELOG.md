@@ -1,3 +1,10 @@
+# 0.22.12 - Source index startup and F5 repair
+
+- Initialise a missing or incompatible native source index once before browsing, builds, tests or Scratch Pad execution. Reuse the prepared index on ordinary runs.
+- Add Source Index Timeout Seconds (600 seconds by default, maximum 7200) and log the source folder, budget and native progress. Preserve existing browser data when refresh fails.
+- Preserve classes under an opened extraction root when Windows path casing differs.
+- Refuse Output channels as debugger launch files and preserve explicit source selections.
+
 # 0.22.11 - Shared native source preparation
 
 - Bundle [official Jade CLI 0.10.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.8), including preserved migration ordering and literal Git source-root handling.

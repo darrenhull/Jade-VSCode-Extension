@@ -1,0 +1,21 @@
+{
+  "sourceHead": "d15ec1a",
+  "packageVersion": "0.22.12",
+  "vsixSha256": "f6675b212271e933f209bdb7c485a568d1870a9e355e8e3b33389a4870316478",
+  "vsixBytes": 5382192,
+  "sourceModulesByteIdentical": 118,
+  "officialCliVersion": "0.10.8",
+  "officialCliSha256": "3e5e71c85ae263dfe4e3d4a4c4a058dccc2f7d4f278d816d57bc03a135d4ff8d",
+  "nativeDistributionPinAndAllRuntimeHashes": true,
+  "portableExtractedNoNode": true,
+  "nativeTestDiscovery": true,
+  "databaseOpened": false,
+  "targetedLocalTests": 52,
+  "fullLocalSuiteRun": false,
+  "uiScreenshots": [
+    "docs/screenshots/source-index-startup/progress.png",
+    "docs/screenshots/source-index-startup/classes.png",
+    "docs/screenshots/source-index-startup/failed.png"
+  ],
+  "uiLimit": "Native cache and actual VS Code commands are real; Workspace execution response is controlled. Progress response hold is not a performance measurement."
+}

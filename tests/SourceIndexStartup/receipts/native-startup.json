@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "invalid": "missing",
+      "classes": 16,
+      "schemas": 4,
+      "searchMatches": 16,
+      "nativeRefreshes": 1,
+      "executionGateSourceReads": 0,
+      "warmGateRequests": 0
+    },
+    {
+      "invalid": "old-version",
+      "classes": 16,
+      "schemas": 4,
+      "searchMatches": 16,
+      "nativeRefreshes": 1,
+      "executionGateSourceReads": 0,
+      "warmGateRequests": 0
+    }
+  ],
+  "expiredDeadlinePreservedShards": true,
+  "sourceFilesUntouched": true,
+  "databaseOpened": false,
+  "nativeExecutableSha256": "3e5e71c85ae263dfe4e3d4a4c4a058dccc2f7d4f278d816d57bc03a135d4ff8d",
+  "ownedBrokerExited": true
+}

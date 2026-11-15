@@ -1,0 +1,15 @@
+{
+  "scratchPassed": false,
+  "actualRegisteredCommand": true,
+  "actualExtensionActivation": true,
+  "coldBrowserBlocked": true,
+  "nativeCacheReal": true,
+  "nativeScratchExecuted": false,
+  "controlledWorkspaceRunResponse": true,
+  "commands": [
+    "workspace.run"
+  ],
+  "beforeSource": "6726f8c extension.js activation binding",
+  "databaseOpened": false,
+  "progressScreenshotResponseHeld": false
+}

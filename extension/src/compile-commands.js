@@ -7,7 +7,7 @@ function registerCompileCommands(vscode,context,services){
   const output=services.output;
   let document;
   try{document=await (services.resolveSource?services.resolveSource(uri):resolveJadeSource(vscode,uri));}
-  catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
+  catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return error.result||{passed:false,error:error.message};}
   await services.beforeOperation();
   if(services.isBusy()){void vscode.window.showErrorMessage('A Jade compile or publish is already running.');return;}
   await services.setBusy(true);
@@ -18,6 +18,7 @@ function registerCompileCommands(vscode,context,services){
    output.clear();output.show(true);
    output.appendLine(projectBuild?`Building new and changed Jade sources in ${config.workspaceRoots[0]} (Working; no publish) ...`:`Checking class methods in ${path.basename(config.program)} (no publish) ...`);
    await services.workingFiles(config);
+   await services.ensureSourceIndex?.(config,message=>output.appendLine(message));
    if(config.files)for(const file of config.files)services.diagnostics.delete(vscode.Uri.file(file));
    else{services.diagnostics.forEach?.(uri=>{if(config.workspaceRoots.some(root=>{const relative=path.relative(root,uri.fsPath);return relative!== '..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);}))services.diagnostics.delete(uri);});services.diagnostics.delete(vscode.Uri.file(config.program));}
    const operation=services.startWorking({...config,testSession:services.nativeTests},'compile',text=>output.append(text),services.reportDiagnostic);
@@ -29,7 +30,7 @@ function registerCompileCommands(vscode,context,services){
    for(const error of result.report?.diagnostics||[])for(const line of diagnosticLines(error))output.appendLine(line);
    if(result.passed)output.appendLine(result.report.native_project?`Native project compile complete; synchronised ${result.report.loaded_files} source/resource file(s).`:`Native compile complete; synchronised ${result.report.loaded_files} changed CLS file(s).`);
    output.appendLine(`CompilerExitCode=${result.code}`);return result;
-  }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return {passed:false,error:error.message};}
+  }catch(error){output.appendLine(`Compile check failed: ${error.message}`);output.show(true);void vscode.window.showErrorMessage(error.message);return error.result||{passed:false,error:error.message};}
   finally{await services.setBusy(false);}
  }
  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.buildWorkspace',uri=>compile(true,uri)),vscode.commands.registerCommand('jadeNative.compileClass',uri=>compile(false,uri)));

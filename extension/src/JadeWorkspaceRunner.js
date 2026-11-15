@@ -4,8 +4,8 @@ const {workspaceSnapshot}=require('./jade-workspace-document');
 
 /** Serializes owned Workspace requests; Jade owns compilation and execution. */
 class JadeWorkspaceRunner {
-  constructor({client,configFor,beforeOperation=async()=>{},afterOperation=async()=>{}}) {
-    this.client=client;this.configFor=configFor;this.beforeOperation=beforeOperation;this.afterOperation=afterOperation;this.tail=Promise.resolve();
+  constructor({client,configFor,beforeOperation=async()=>{},afterOperation=async()=>{},prepareSource=async()=>{}}) {
+    this.client=client;this.configFor=configFor;this.beforeOperation=beforeOperation;this.afterOperation=afterOperation;this.prepareSource=prepareSource;this.tail=Promise.resolve();
   }
   run({document,schema,selection,token,onOutput=()=>{},onProgress=()=>{}}) {
     let snapshot;
@@ -25,6 +25,9 @@ class JadeWorkspaceRunner {
         onProgress({stage:'acquiring',message:'Acquiring the Working operation'});
         lease=await this.beforeOperation();acquired=true;
         if(token?.isCancellationRequested)return cancelled();
+        onProgress({stage:'preparing',message:'Preparing saved Git source inputs'});
+        await this.prepareSource(config,message=>onProgress({stage:'preparing',message}),token);
+        if(token?.isCancellationRequested)return cancelled();
         onProgress({stage:'native',message:'Waiting for JADE preparation and execution result'});
         const request=this.client.request('workspace.run',{config:configDto(config),sourceText:snapshot.text,source,lineOffset:0,columnOffset:0},onOutput);
         let cancelSent=false;
@@ -36,7 +39,7 @@ class JadeWorkspaceRunner {
         onProgress({stage:'received',message:'JADE response received'});
         return {...result,snapshot,stale:document.version!==version};
       } catch(error) {
-        return {code:2,passed:false,report:{error:error.message},snapshot,stale:document.version!==version};
+        return {...(error.result||{code:2,passed:false,report:{error:error.message}}),snapshot,stale:document.version!==version};
       } finally {subscription?.dispose();if(acquired){onProgress({stage:'releasing',message:'Releasing the Working operation'});await this.afterOperation(lease);}}
     };
     const operation=this.tail.then(work,work);this.tail=operation.then(()=>{},()=>{});return operation;

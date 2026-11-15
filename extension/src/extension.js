@@ -263,7 +263,7 @@ function activate(context) {
     updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value)
   });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
-    client:nativeTests,
+    client:nativeTests,prepareSource:language.ensureSourceIndex,
     configFor:(_document,scope)=>inspectionConfig({uri:scope.configurationResource},scope.folder),
     schemaChoices:async scope=>{
       await language.index.ready();await language.index.flush();const schemas=new Map();
@@ -279,7 +279,7 @@ function activate(context) {
     beforeOperation: async () => {},
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
-    resolveSource,classConfig, workingFiles:config=>workingFiles(config,{discover:false}), startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
+    resolveSource,classConfig,ensureSourceIndex:language.ensureSourceIndex, workingFiles:config=>workingFiles(config,{discover:false}), startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
   });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
@@ -332,6 +332,8 @@ function activate(context) {
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
         stage('Saving local test sources');
         await workingFiles(config,{discover:false});
+        await language.ensureSourceIndex(config,stage,testCancellation);
+        if(testCancellation?.isCancellationRequested)return{passed:false,code:130,cancelled:true,report:{error:'Local test run cancelled before native execution.',tests_completed:false,results:[]}};
         stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
@@ -367,7 +369,7 @@ function activate(context) {
       } catch (error) {
         testOutput.appendLine(error.message); testOutput.show(true);
         void vscode.window.showErrorMessage(error.message);
-        return { passed: false, error: error.message };
+        return error.result||{ passed: false, error: error.message };
       } finally {
         publishing = false;
         stage('Releasing local test UI state');

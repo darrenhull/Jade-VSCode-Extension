@@ -29,3 +29,5 @@ test('an explicit original URI can compile without a native editor and does not 
  h.services.classConfig=document=>({program:document.uri.fsPath,workspaceRoots:[root]});h.services.workingFiles=async config=>{config.files=[uri.fsPath];};h.vscode.window.activeTextEditor=undefined;
  try{assert.equal((await h.commands.get('jadeNative.compileClass')(uri)).passed,true);assert.equal(h.requests[0].config.program,uri.fsPath);assert.equal(h.requests[0].config.projectBuild,false);}finally{h.session.dispose();}
 });
+
+test('cancelled source-index preparation preserves its native outcome and prevents compilation',async()=>{const h=harness(),cancelled={passed:false,code:130,cancelled:true,report:{error:'Native source index cancelled'}};h.services.ensureSourceIndex=async()=>{throw Object.assign(Error(cancelled.report.error),{result:cancelled});};try{assert.strictEqual(await h.commands.get('jadeNative.buildWorkspace')(),cancelled);assert.equal(h.requests.length,0);assert.deepEqual(h.busy,[true,false]);}finally{h.session.dispose();}});

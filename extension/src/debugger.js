@@ -2,6 +2,7 @@
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
+const {jadeSourceUri}=require('./active-jade-source');
 const { NativeDebugger } = require("./debug-transport");
 const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 const {
@@ -127,11 +128,11 @@ function registerDebugger(vscode, context, services) {
               throw Error("Another Jade operation is already running.");
             this.busy = true;
             await services.setBusy(true);
+            const selected=a.program||jadeSourceUri(vscode);
+            if(!a.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||'')))throw Error('Open a Jade CLS source file before starting the debugger.');
+            const document = await vscode.workspace.openTextDocument(selected);
             output.clear();
             output.show(true);
-            const document = await vscode.workspace.openTextDocument(
-              a.program || vscode.window.activeTextEditor?.document.uri,
-            );
             this.assertActive();
             if (document.isDirty && !(await document.save()))
               throw Error("Save the CLS before debugging.");
@@ -682,6 +683,10 @@ function registerDebugger(vscode, context, services) {
       "jade-native-experimental",
       {
         resolveDebugConfiguration(folder, config) {
+          const selected=jadeSourceUri(vscode);
+          if(!config.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||''))){
+            void vscode.window.showErrorMessage('Open a Jade CLS source file before starting the debugger.');return;
+          }
           return {
             ...config,
             type: "jade-native-experimental",
@@ -689,7 +694,7 @@ function registerDebugger(vscode, context, services) {
             name: config.name || "Jade: Debug Current Method (Experimental)",
             program:
               config.program ||
-              vscode.window.activeTextEditor?.document.uri.fsPath,
+              selected.fsPath,
           };
         },
       },

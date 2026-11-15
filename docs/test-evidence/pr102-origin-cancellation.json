@@ -1,0 +1,32 @@
+{
+  "reviewThread": "PRRT_kwDOVlO0pc63tgLS",
+  "reviewComment": 4580076952,
+  "base": "67573be",
+  "red": {
+    "cases": 7,
+    "passed": 1,
+    "failed": 6,
+    "failures": [
+      "Notebook and test origins send no owned cache cancellation",
+      "Browser-owned joiners retain cancelled waiters",
+      "Late success publishes readiness after origin cancellation",
+      "Already-cancelled test still prepares"
+    ]
+  },
+  "green": {
+    "targetedChecks": 52,
+    "creatorCancelsExactRequestAndConnection": true,
+    "creatorWaitsForNativeCleanupBeforeWorkingLeaseRelease": true,
+    "joinerDetachesWithoutCancellingBrowser": true,
+    "oneSharedProgressNotification": true,
+    "originalNative130AndReason": true,
+    "lateSuccessCannotPublishReady": true,
+    "alreadyCancelledDispatchesNoPrepareOrExecution": true,
+    "testCompletionCancellationRaceGuard": true,
+    "originAndPopupListenersDisposed": true,
+    "progressTimerCleared": true
+  },
+  "method": "Real registered notebook controller and actual registered local-test callback with the real language preparation gate and deterministic controlled native pending requests; no JADE database or real native test body execution.",
+  "fullLocalSuiteRun": false,
+  "nativeBundleChanged": false
+}
