@@ -315,19 +315,34 @@ function activate(context) {
       }
     }),
     vscode.commands.registerCommand('jadeNative.executeLocalTests', async (uri, method, testCancellation, outputObserver) => {
+      const started = Date.now();
+      const stage = message => {
+        const text = message + ' (' + (Date.now() - started) + ' ms elapsed).';
+        testOutput.appendLine(text); outputObserver?.(text + '\n');
+      };
+      if (!publishing) testOutput.clear();
+      testOutput.show(true);
+      stage('Resolving selected test source');
       const document = await resolveSource(uri);
-      if (publishing) { void vscode.window.showErrorMessage('A Jade operation is already running.'); return; }
+      if (publishing) {
+        const message = 'Local tests were not started. Wait for the current Jade operation or cancel it first.';
+        testOutput.appendLine(message); testOutput.show(true); outputObserver?.(message + '\n');
+        void vscode.window.showErrorMessage(message);
+        return { passed: false, code: 2, report: { source: document?.uri.fsPath, tests_completed: false, cleanup_complete: false, results: [], error: message } };
+      }
       publishing = true;
       try {
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', true);
         if (!document || document.uri.scheme !== 'file' || !/\.cls$/i.test(document.uri.fsPath)) throw new Error('Open a saved CLS test class.');
         if (document.isDirty && !await document.save()) throw new Error('Save the test file before running.');
+        stage('Preparing local test configuration');
         const config = classConfig(document);
-        testOutput.clear(); testOutput.show(true);
         diagnostics.delete(document.uri);
         testOutput.appendLine(`Running local tests from ${path.basename(config.program)} (no publish).`);
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
+        stage('Saving and discovering local test sources');
         await workingFiles(config);
+        stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
         });
@@ -337,6 +352,7 @@ function activate(context) {
           if (testCancellation?.isCancellationRequested) operation.stop();
           try { return await operation.completion; } finally { subscription.dispose(); testingSubscription?.dispose(); }
         });
+        stage('Native test operation returned');
         if (result.report?.diagnostics) {
           const grouped = new Map();
           for (const entry of result.report.diagnostics) {
@@ -367,7 +383,9 @@ function activate(context) {
         return { passed: false, error: error.message };
       } finally {
         publishing = false;
+        stage('Releasing local test UI state');
         await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', false);
+        stage('Local test UI state released');
       }
     }),
     vscode.commands.registerCommand('jadeNative.refreshTypeCache', async uri => {
