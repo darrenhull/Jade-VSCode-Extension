@@ -3,6 +3,8 @@
   "nativeSourceCommit": "dacb970a5da01eba22387f25d6373b644faf66e6",
   "candidateSha256": "3a92a60d75e02d99d5449ac9d63611a1fd1f128ce145bdeca44eb98c1c05d097",
   "nativeVersion": "jade-cli/0.10.6/source-index/2",
+  "consumerSourceCommit": "787bf50eb1e9e6d06ebecf8bb2c4e6660f69ce9a",
+  "coherentLocalCandidate": {"sourceCommit":"bbf396812f0ad634eb193bf12d6ed03fe32a5bd1","version":"0.10.7","executableSha256":"6de39456dd09b4151569213ad06908c4825fd6bdd7d95b5aedb197fb5cc95ca6","manifestSha256":"e3946d0e43951181b853353b914a961b104da2c014d2ccc92b136ff856153942","actualProcessPassed":1,"actualProcessFailed":0,"elapsedMilliseconds":6831,"nativeVersion":"jade-cli/0.10.7/source-index/2","sameActivationCaseMetadataTerminalAndCleanupChecks":true,"databaseOpened":false,"officialRelease":false},
   "actualProcess": {"passed":1,"failed":0,"elapsedMilliseconds":6318,"realLanguageRegistration":true,"lazyDatabaseFreeCapability":true,"legacyWrites":false,"frontendFileDiscovery":false,"separateNativePrepare":false,"explicitRefreshes":1,"dirtyEditorRetained":true,"savedSourceBytesUnchanged":true,"metadataRoundtrip":true,"canonicalAliasSaveAndClear":true,"terminalAlias":true,"sameOwnedBroker":true,"ownedBrokerExited":true,"ownedFixtureRemoved":true,"databaseOpened":false},
   "focusedChecks": {"passed":146,"failed":0,"postCapabilityGuardChecks":5},
   "runtimeHashes": {
