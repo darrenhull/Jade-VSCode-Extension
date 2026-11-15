@@ -1,8 +1,8 @@
 {
-  "sourceHead": "fbc552f",
+  "sourceHead": "3af0a66",
   "packageVersion": "0.22.12",
-  "vsixSha256": "00b38bb417cefcd7388adaa418a72530ee18bd5af70f71a974e6e77d32b2efb0",
-  "vsixBytes": 5381698,
+  "vsixSha256": "97998bfbab218d0dd36b22ea656ec56eb43cf4dee817766d463413e83b59647a",
+  "vsixBytes": 5381708,
   "sourceModulesByteIdentical": 118,
   "officialCliVersion": "0.10.8",
   "officialCliSha256": "3e5e71c85ae263dfe4e3d4a4c4a058dccc2f7d4f278d816d57bc03a135d4ff8d",
