@@ -1,7 +1,7 @@
 {
   "sourceBase": "c2d5dd6",
-  "pendingNativeRelease": "0.10.10",
-  "trackedPinUnchanged": "0.10.8",
+  "pendingNativeRelease": null,
+  "trackedPinUnchanged": false,
   "compatibility": {
     "focusedPassed": 18,
     "nativeCandidateProbeSkippedUntilArtifact": false,
@@ -30,7 +30,7 @@
   "limits": [
     "Corrected0.10.10 private native cache/browser probe passed; prior0.10.9 private proof remains historical only and does not qualify the migration guard",
     "Scratch/test outcome and origin/joiner controls use deterministic native requests; consumer task opens no JADE database or Source",
-    "Final tracked pin/manifest/full payload and package await genuine official0.10.10 publication; no Ready claim"
+    "Final official0.10.10 SDK/pin and VSIX locally verified; hosted CI/review remain pending"
   ],
   "fullLocalSuiteRun": false,
   "privateNativeQualification": {
@@ -79,13 +79,11 @@
       "Issue103 debugger draft-resolution boundary",
       "Native empty-type fragment and pending-JCF migration repairs from CLI69/72"
     ],
-    "officialPublicationVerified": false,
+    "officialPublicationVerified": true,
     "trackedPrivatePinAdded": false,
     "remainingGates": [
-      "Genuine official CLI0.10.10 publication and asset verification",
-      "Atomic official full SDK payload, manifest and pin update",
-      "Official native consumer probe and final VSIX exact-source, pin and portable verification",
-      "Final-head hosted CI and automated/owner review before merge/release"
+      "Root final-head push and hosted CI",
+      "Automated and owner review before merge/release"
     ],
     "targetedChecks": {
       "passed": 21,
@@ -96,6 +94,8 @@
         "Scratch/test producer and joiner cancellation",
         "Actual registered debug draft launch"
       ]
-    }
-  }
+    },
+    "finalPackageReceipt": "docs/test-evidence/pr104-final-package.json"
+  },
+  "trackedOfficialCliVersion": "0.10.10"
 }
