@@ -1,0 +1,60 @@
+{
+  "origin": "Native JADE25.0.01 per-file and complete-section oracle on a disposable ByteExportProbe schema",
+  "forms": [
+    "143-byte inherited empty CLS",
+    "421-byte primitive-method CLS"
+  ],
+  "files": [
+    {
+      "path": "empty/ByteExportProbe/types/Byte.cls",
+      "bytes": 143,
+      "sha256": "917d8ebe52769960892215a7cfa30f1abd8960c413ae24242c09708554eaf736"
+    },
+    {
+      "path": "empty/ByteExportProbe/schemaDefinitions.sec",
+      "bytes": 178,
+      "sha256": "e9c3e0e8a200d0f9e8f620d0abf0d40d4f1d42b3e8cb71dd447c8ee1ce8298d5"
+    },
+    {
+      "path": "empty/ByteExportProbe/typeDefinitions.sec",
+      "bytes": 170,
+      "sha256": "618b473ca91c17e520d9eb1dd6e8528abf9d0e00b2bbb1827ad4c411d43f4e20"
+    },
+    {
+      "path": "empty/ByteExportProbe/typeSources.sec",
+      "bytes": 170,
+      "sha256": "618b473ca91c17e520d9eb1dd6e8528abf9d0e00b2bbb1827ad4c411d43f4e20"
+    },
+    {
+      "path": "empty/ByteExportProbe/typeHeaders.sec",
+      "bytes": 71,
+      "sha256": "5276acf0dfc9bf522471930a82335092359e7b321c470b8da9ca74ad65210fde"
+    },
+    {
+      "path": "primitive/ByteExportProbe/types/Byte.cls",
+      "bytes": 421,
+      "sha256": "08c6f7ce0ea82e885ee8f4b42236d6668f62b16977c6dae3d69d6acb4d9dd6ef"
+    },
+    {
+      "path": "primitive/ByteExportProbe/schemaDefinitions.sec",
+      "bytes": 178,
+      "sha256": "e9c3e0e8a200d0f9e8f620d0abf0d40d4f1d42b3e8cb71dd447c8ee1ce8298d5"
+    },
+    {
+      "path": "primitive/ByteExportProbe/typeDefinitions.sec",
+      "bytes": 170,
+      "sha256": "618b473ca91c17e520d9eb1dd6e8528abf9d0e00b2bbb1827ad4c411d43f4e20"
+    },
+    {
+      "path": "primitive/ByteExportProbe/typeSources.sec",
+      "bytes": 170,
+      "sha256": "618b473ca91c17e520d9eb1dd6e8528abf9d0e00b2bbb1827ad4c411d43f4e20"
+    },
+    {
+      "path": "primitive/ByteExportProbe/typeHeaders.sec",
+      "bytes": 71,
+      "sha256": "5276acf0dfc9bf522471930a82335092359e7b321c470b8da9ca74ad65210fde"
+    }
+  ],
+  "limits": "Only these captured forms are independently qualified by the native owner. No global/application/locale format is inferred from them."
+}

@@ -17,3 +17,6 @@
 
 # Native manifest and runtime files are authenticated as exact archive bytes.
 /packages/jade-cli-win-x64/** -text
+
+# Native empty/primitive oracle fixtures retain exact extracted bytes.
+/tests/NativeEmptyFragment/fixtures/** -text

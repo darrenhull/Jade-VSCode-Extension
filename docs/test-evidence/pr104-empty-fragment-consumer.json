@@ -1,0 +1,36 @@
+{
+  "sourceBase": "c2d5dd6",
+  "pendingNativeRelease": "0.10.9",
+  "trackedPinUnchanged": "0.10.8",
+  "compatibility": {
+    "focusedPassed": 18,
+    "nativeCandidateProbeSkippedUntilArtifact": true,
+    "newRequiredNativeField": "emptyTypeEnvelope:boolean",
+    "clientNativeModelAdded": false,
+    "byteNamedExceptionAdded": false,
+    "capturedSourceFormsOnly": [
+      {
+        "bytes": 143,
+        "sha256": "917d8ebe52769960892215a7cfa30f1abd8960c413ae24242c09708554eaf736",
+        "classification": "captured empty envelope"
+      },
+      {
+        "bytes": 421,
+        "sha256": "08c6f7ce0ea82e885ee8f4b42236d6668f62b16977c6dae3d69d6acb4d9dd6ef",
+        "classification": "captured nonempty primitive method"
+      }
+    ],
+    "browserAndSearch": true,
+    "primitiveMethodRetained": "ByteExportProbe::Byte.byteExportProbe",
+    "ordinaryFishRetained": true,
+    "oneTimeNativeVersionUpgrade": 1,
+    "warmScratchAndTestIndexRequests": 0,
+    "originJoinerCancellation": true
+  },
+  "limits": [
+    "Consumer metadata/service responses are controlled in current compatibility checks; real candidate native probe is prepared but not run",
+    "No JADE database or native test body executed by this consumer task",
+    "Final tracked pin/manifest/full payload awaits official0.10.9 publication; no final package or Ready claim"
+  ],
+  "fullLocalSuiteRun": false
+}
