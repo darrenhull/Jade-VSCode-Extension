@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{randomUUID}=require('node:crypto');
 
-// Configuration only. Native CLI owns project/profile creation and existing-file preservation.
+// Native CLI owns Git/ignore and project/profile setup; this command presents progress.
 function registerWorkspaceInitialization(vscode,context,services){
  const output=vscode.window.createOutputChannel('Jade Setup'),pending=new Map();
  async function initialize(resource){
@@ -41,12 +41,16 @@ function registerWorkspaceInitialization(vscode,context,services){
     // Unique native profile avoids replacing another project's shared profile.
     argv.push('--profile','vscode-'+randomUUID(),...argumentsFor(config));
    }
-   output.show(true);output.appendLine('Initialising configuration in '+key+'. This does not extract, back up, build or publish.');
+   output.show(true);output.appendLine('Initialising Git and configuration in '+key+'. This does not extract, back up, build or publish.');
    async function invoke(args,expectedConfig=initialConfig){
     requireUnchanged();
     if(expectedConfig){const current=services.configFor(folder);if(['installPath','databasePath','iniPath','server'].some(key=>current[key]!==expectedConfig[key]))throw Error('Jade runtime settings changed during setup. Run Initialise Workspace again.');}
-    progress.report({message:'Writing native project configuration; existing files are preserved…'});
-    return services.client.request('cli',{operation:'init',argv:args,cwd:key},text=>output.append(text)).promise;
+    progress.report({message:'Initialising Git and native project configuration; existing files are preserved…'});
+    let pendingOutput='';
+    return services.client.request('cli',{operation:'init',argv:args,cwd:key},text=>{
+     output.append(text);const lines=(pendingOutput+text).split(/\r?\n/);pendingOutput=lines.pop().slice(-4096);
+     for(const line of lines)if(/^\[Setup\] Git ignore(?:\s|$)/.test(line))progress.report({message:'Ensuring managed .jade state is ignored by Git…'});else if(/^\[Setup\] Git(?:\s|$)/.test(line))progress.report({message:'Preparing the Git repository…'});
+    }).promise;
    }
    let result=await invoke(argv);
    const failure=value=>value?.report?.error||'Native workspace initialisation failed.';
@@ -63,6 +67,10 @@ function registerWorkspaceInitialization(vscode,context,services){
     result=await invoke(['--config',configFile,...argumentsFor(config)],config);
    }
    if(result?.passed!==true||result.code!==0)throw Error(failure(result));
+   const git=result.git,relative=typeof git?.root==='string'&&path.isAbsolute(git.root)?path.relative(git.root,key):undefined;
+   if(!git||typeof git.initialized!=='boolean'||typeof git.reused!=='boolean'||git.initialized===git.reused||git.ignoreEnsured!==true||relative===undefined||relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative))throw Error('Native workspace initialization did not confirm Git setup. Update the Jade CLI bundle and run Initialise Workspace again.');
+   output.appendLine((git.initialized?'Initialised':'Reused')+' Git repository: '+git.root+'.');output.appendLine('Managed .jade state is ignored by Git.');
+   progress.report({message:'Native project configuration is ready.'});
    output.appendLine((result.created?'Created ':'Preserved existing ')+configFile+'. Configuration step complete.');
    if(services.refreshSourceIndex){progress.report({message:'Initialising the shared Git source index…'});await services.refreshSourceIndex(folder);output.appendLine('Shared source index is ready.');}
    if(sameFolder())void vscode.window.showInformationMessage('Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
