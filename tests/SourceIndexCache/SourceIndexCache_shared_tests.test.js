@@ -4,8 +4,8 @@ const {SourceIndexCache}=require('../../extension/src/SourceIndexCache');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 const version='native-build-proof',parser='browser-parser-proof';
 async function fixture(t){
- const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'jade-shared-source-cache-'));
- t.after(async()=>{assert.equal(path.dirname(temporary),await fs.realpath(os.tmpdir()));assert.match(path.basename(temporary),/^jade-shared-source-cache-/);assert.equal((await fs.lstat(temporary)).isSymbolicLink(),false);await fs.rm(temporary,{recursive:true,force:true});});
+ const temporaryRoot=await fs.realpath(os.tmpdir()),temporary=await fs.realpath(await fs.mkdtemp(path.join(temporaryRoot,'jade-shared-source-cache-')));
+ t.after(async()=>{assert.equal(path.dirname(temporary),temporaryRoot);assert.match(path.basename(temporary),/^jade-shared-source-cache-/);assert.equal((await fs.lstat(temporary)).isSymbolicLink(),false);await fs.rm(temporary,{recursive:true,force:true});});
  const repository=path.join(temporary,'repository'),root=path.join(repository,'project'),directory=path.join(root,'.jade/source-index');await fs.mkdir(directory,{recursive:true});
  const relative='project/Fish.cls',uri=pathToFileURL(path.join(repository,relative)).href,rawSha256=hash(Buffer.from('saved bytes with\r\nformatting'));
  const model={schema:'Pets',parentSchema:'RootSchema',lineStarts:[0,7],classes:[{name:'Fish',kind:'class',start:0,end:12,selection:0,regions:[[0,12]],members:[]}]};
@@ -138,7 +138,7 @@ test('real parser navigation/type metadata roundtrips while raw UTF16 proof and 
  const update=packet.updates[0],expected=JSON.parse(JSON.stringify({...parsed,text:'',code:'',excluded:[]}));assert.equal(update.rawSha256,hash(raw));assert.notEqual(update.rawSha256,hash(source));assert.deepEqual({...update.model,uri:f.uri,text:'',code:'',excluded:[]},expected);assert.ok(!JSON.stringify(packet).includes('BODY_MUST_NOT_COPY'));
 });
 test('shared headers require an absolute owning-root identity rather than a cwd-relative alias',async t=>{
- const f=await fixture(t),errors=[];f.header.root=path.relative(process.cwd(),f.root);await fs.writeFile(f.file,JSON.stringify(f.header));assert.deepEqual(await cache(f,{onError:error=>errors.push(error)}).load(),[]);assert.ok(errors.some(error=>/initiali[sz]e|refresh/i.test(error.message)));
+ const f=await fixture(t),errors=[];f.header.root='repository/project';assert.equal(path.isAbsolute(f.header.root),false);await fs.writeFile(f.file,JSON.stringify(f.header));assert.deepEqual(await cache(f,{onError:error=>errors.push(error)}).load(),[]);assert.ok(errors.some(error=>/initiali[sz]e|refresh/i.test(error.message)));
 });
 test('advisory packets group by owning root and existing shard while retaining every saved record',async t=>{
  const f=await fixture(t),other=path.join(f.repository,'other'),directory=path.join(other,'.jade/source-index');await fs.mkdir(directory,{recursive:true});
