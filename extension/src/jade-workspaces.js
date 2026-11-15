@@ -45,12 +45,12 @@ function notebookOutputs(vscode,result,schema,elapsed) {
   return outputs;
 }
 
-function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,beforeOperation,afterOperation}) {
+function registerWorkspaces(vscode,context,{client,configFor,schemaChoices,beforeOperation,afterOperation,prepareSource}) {
   const output=vscode.window.createOutputChannel('Scratch Pad');
   const diagnostics=vscode.languages.createDiagnosticCollection('jade-workspace');
   const changes=new vscode.EventEmitter(),history=new WorkspaceRunHistory(),diagnosticState=new WorkspaceDiagnostics(),failures=new ScratchPadFailures();
   const sourceContext=new WorkspaceContext({workspace:vscode.workspace,pickFolder:()=>vscode.window.showWorkspaceFolderPick({placeHolder:'Choose the project and Jade connection for this Scratch Pad'})});
-  const runner=new JadeWorkspaceRunner({client,configFor:async document=>configFor(document,await sourceContext.resolve(document.uri)),beforeOperation,afterOperation}),plainSchemas=new Map();
+  const runner=new JadeWorkspaceRunner({client,configFor:async document=>configFor(document,await sourceContext.resolve(document.uri)),beforeOperation,afterOperation,prepareSource}),plainSchemas=new Map();
   function progressReporter(progress,started){
     let stage;
     return value=>{

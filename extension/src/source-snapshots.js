@@ -9,7 +9,11 @@ function isNestedSnapshot(uri, workspace, markers) {
   if (!root) return false;
   let directory = path.dirname(uri.fsPath);
   const workspaceRoot = path.resolve(root);
-  while (directory !== workspaceRoot && directory !== path.dirname(directory)) {
+  // Native cache URIs use canonical Windows spelling; the open workspace may
+  // differ in case. Compare path identity before considering its root marker.
+  while (path.relative(workspaceRoot,directory) !== '' && directory !== path.dirname(directory)) {
+    const relative=path.relative(workspaceRoot,directory);
+    if(relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative))break;
     let exists=markers?.get(directory);
     if(exists===undefined){exists=fs.existsSync(path.join(directory,'.jade-extraction'));markers?.set(directory,exists);}
     if(exists)return true;

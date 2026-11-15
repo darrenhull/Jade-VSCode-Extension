@@ -18,6 +18,7 @@ function registerCompileCommands(vscode,context,services){
    output.clear();output.show(true);
    output.appendLine(projectBuild?`Building new and changed Jade sources in ${config.workspaceRoots[0]} (Working; no publish) ...`:`Checking class methods in ${path.basename(config.program)} (no publish) ...`);
    await services.workingFiles(config);
+   await services.ensureSourceIndex?.(config,message=>output.appendLine(message));
    if(config.files)for(const file of config.files)services.diagnostics.delete(vscode.Uri.file(file));
    else{services.diagnostics.forEach?.(uri=>{if(config.workspaceRoots.some(root=>{const relative=path.relative(root,uri.fsPath);return relative!== '..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);}))services.diagnostics.delete(uri);});services.diagnostics.delete(vscode.Uri.file(config.program));}
    const operation=services.startWorking({...config,testSession:services.nativeTests},'compile',text=>output.append(text),services.reportDiagnostic);

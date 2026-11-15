@@ -1,0 +1,28 @@
+{
+  "base": "e6e6ca023fee92f0402d89d7ee5c84fe9e1a4b5c",
+  "date": "2026-11-15",
+  "issues": [
+    100,
+    101
+  ],
+  "red": {
+    "outputUri": "Exact extension-output URI becomes a filesystem program in native debug configuration",
+    "cacheStartup": "Missing/incompatible native cache publishes zero browser classes",
+    "deadline": "Configured321s source-index timeout is absent from both native requests",
+    "windowsRoot": "Case-variant workspace root marker incorrectly excludes canonical native source URI"
+  },
+  "green": {
+    "targetedChecks": 30,
+    "sourceIndexTimeoutSeconds": {
+      "default": 600,
+      "minimum": 1,
+      "maximum": 7200
+    },
+    "warmGateAdditionalNativeCalls": 0
+  },
+  "limits": [
+    "Customer 40k refresh timeout not reproduced locally",
+    "Actual native cache process, package and UI evidence remain pending",
+    "No customer database opened or source published"
+  ]
+}

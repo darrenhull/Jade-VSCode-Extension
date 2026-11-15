@@ -63,3 +63,8 @@ test('native response and pending ownership release remain distinct until cleanu
  try{assert.equal(settled,false);assert.deepEqual(stages.slice(-2),['received','releasing'],'Native response must be visible before the still-pending UI ownership release');}
  finally{release();assert.equal((await operation).passed,true);}
 });
+test('initial source-cache gate preserves the exact snapshot and cancellation prevents execution',async()=>{
+ const doc=document('begin\n write "Hello from Jade";\nend;'),token=cancellation(),calls=[];let finish;
+ const runner=new JadeWorkspaceRunner({configFor:async()=>({schema:'TestSchema',workspaceRoots:['C:/repo']}),prepareSource:async config=>{calls.push(config.workspaceRoots);await new Promise(resolve=>finish=resolve);},client:{request(){assert.fail('Cancelled preparation must not execute Scratch code');}}});
+ const operation=runner.run({document:doc,token});while(!finish)await new Promise(resolve=>setImmediate(resolve));token.cancel();finish();const result=await operation;assert.equal(result.cancelled,true);assert.deepEqual(calls,[['C:/repo']]);assert.equal(result.snapshot.text,doc.getText());
+});

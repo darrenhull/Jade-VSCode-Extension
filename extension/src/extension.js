@@ -279,7 +279,7 @@ function activate(context) {
     beforeOperation: async () => {},
     isBusy: () => publishing,
     setBusy: async value => { publishing = value; await vscode.commands.executeCommand('setContext', 'jadeNative.publishing', value); },
-    resolveSource,classConfig, workingFiles:config=>workingFiles(config,{discover:false}), startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
+    resolveSource,classConfig,ensureSourceIndex:language.ensureSourceIndex, workingFiles:config=>workingFiles(config,{discover:false}), startWorking, nativeTests, output: compileOutput, diagnostics, reportDiagnostic
   });
   context.subscriptions.push(diagnostics, publishOutput, compileOutput, testOutput,
     vscode.commands.registerCommand('jadeNative.disconnectTestRunner',async()=>{if(publishing)throw Error('Wait for the current Jade operation or cancel it first.');await nativeTests.release();testOutput.appendLine('Native test connection closed.');}),
@@ -332,6 +332,7 @@ function activate(context) {
         testOutput.appendLine('Native Jade compiles and runs workspace source in an isolated working database. The configured publish target is not updated.');
         stage('Saving local test sources');
         await workingFiles(config,{discover:false});
+        await language.ensureSourceIndex(config,stage);
         stage('Waiting for native compilation and test results');
         const operation = startWorking({...config, methods: method,testSession:nativeTests}, 'test.run', text => {
           testOutput.append(text); outputObserver?.(text);
