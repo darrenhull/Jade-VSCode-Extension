@@ -237,7 +237,7 @@ function activate(context) {
   });
   require('./application-debug-ui').registerApplicationDebug(vscode,context);
   require('./debugger').registerDebugger(vscode,context,{
-    beforeOperation,config:classConfig,workingFiles,startWorking,reportDiagnostic,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
+    beforeOperation,resolveSource,config:classConfig,workingFiles,startWorking,reportDiagnostic,prepareWorking:(config,output)=>nativeTests.prepareWorking(config,output),isBusy:()=>publishing,
     setBusy:async value=>{publishing=value;await vscode.commands.executeCommand('setContext','jadeNative.publishing',value);}
   });
   objectExplorer=require('./object-explorer').registerObjectExplorer(vscode,context,{

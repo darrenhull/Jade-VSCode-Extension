@@ -1,3 +1,8 @@
+# 0.22.13 - Debug source draft preparation
+
+- Apply pending class-workspace method drafts through the existing shared source preparation before debug save, method selection and compilation. Abort unresolved or conflicted drafts.
+- Preserve ordinary CLS launch behavior and refusal of Output documents as debug source files.
+
 # 0.22.12 - Source index startup and F5 repair
 
 - Initialise a missing or incompatible native source index once before browsing, builds, tests or Scratch Pad execution. Reuse the prepared index on ordinary runs.

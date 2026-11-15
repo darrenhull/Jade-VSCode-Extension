@@ -14,6 +14,9 @@ const {
 function registerDebugger(vscode, context, services) {
   const output = vscode.window.createOutputChannel("Jade Debug");
   context.subscriptions.push(output);
+  const resolveSource=selected=>services.resolveSource
+    ? services.resolveSource(typeof selected==='string'?vscode.Uri.file(selected):selected)
+    : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
   async function select(document, methodName) {
     const methods = debugMethods(document.getText(), document.uri.fsPath);
     if (!methods.length)
@@ -130,7 +133,8 @@ function registerDebugger(vscode, context, services) {
             await services.setBusy(true);
             const selected=a.program||jadeSourceUri(vscode);
             if(!a.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||'')))throw Error('Open a Jade CLS source file before starting the debugger.');
-            const document = await vscode.workspace.openTextDocument(selected);
+            const document = await resolveSource(selected);
+            if(!document)throw Error('Open a Jade CLS source file before starting the debugger.');
             output.clear();
             output.show(true);
             this.assertActive();
@@ -705,9 +709,7 @@ function registerDebugger(vscode, context, services) {
       "jadeNative.debugMethod",
       async (uri, method) => {
         try {
-          const document = uri
-            ? await vscode.workspace.openTextDocument(uri)
-            : vscode.window.activeTextEditor?.document;
+          const document = await resolveSource(uri);
           if (!document || !/\.cls$/i.test(document.uri.fsPath))
             throw Error("Open a Jade CLS file.");
           const selected = await select(document, method);
