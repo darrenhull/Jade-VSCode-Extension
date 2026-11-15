@@ -1,6 +1,6 @@
 {
   "sourceBase": "c2d5dd6",
-  "pendingNativeRelease": "0.10.9",
+  "pendingNativeRelease": "0.10.10",
   "trackedPinUnchanged": "0.10.8",
   "compatibility": {
     "focusedPassed": 18,
@@ -28,9 +28,9 @@
     "originJoinerCancellation": true
   },
   "limits": [
-    "Real native cache/browser/private-candidate probe passed; Scratch/test outcome and origin/joiner tests use controlled native requests and do not execute a JADE test body",
-    "No JADE database or Source accessed by consumer qualification",
-    "Final tracked pin/manifest/full payload and final package remain pending official0.10.9 publication; no Ready claim"
+    "Corrected0.10.10 private native cache/browser probe passed; prior0.10.9 private proof remains historical only and does not qualify the migration guard",
+    "Scratch/test outcome and origin/joiner controls use deterministic native requests; consumer task opens no JADE database or Source",
+    "Final tracked pin/manifest/full payload and package await genuine official0.10.10 publication; no Ready claim"
   ],
   "fullLocalSuiteRun": false,
   "privateNativeQualification": {
@@ -51,5 +51,24 @@
     "databaseOpened": false,
     "receipt": "tests/NativeEmptyFragment/receipts/private-native-candidate.json",
     "artifactStatus": "private coherent build, not an official release; final README/manifest may change after main70 documentation reconciliation without native byte changes"
+  },
+  "correctedPrivateNativeQualification": {
+    "passed": true,
+    "totalTestMilliseconds": 16685.8844,
+    "cacheBuildTimingMeasured": false,
+    "nativeExecutableSha256": "7bcfeda8775d030c772b54d3059fca94f60d3bfffd58d897de8f667e4773f805",
+    "manifestSha256": "15b031c7963cc7501d237a0c287c64e73ab9d759d01e2a21e2095ac6512af29f",
+    "allRuntimeHashesVerified": true,
+    "actualDoctorNativeVersion": "jade-cli/0.10.10/source-index/2",
+    "nativeMetadataFields": 11,
+    "emptyAndPrimitiveCases": true,
+    "nativeRowsPreservedByBrowser": true,
+    "oneUpgradeRefreshPerCase": 1,
+    "warmGateRequests": 0,
+    "sourceBytesUnchanged": true,
+    "ownedBrokerExited": true,
+    "databaseOpened": false,
+    "receipt": "tests/NativeEmptyFragment/receipts/private-native-candidate-0.10.10.json",
+    "artifactStatus": "corrected coherent PRIVATE build; not an official release or tracked pin"
   }
 }
