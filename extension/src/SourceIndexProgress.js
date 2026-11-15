@@ -1,7 +1,7 @@
 'use strict';
 /** Present one owned native cache operation; native code retains source semantics. */
 class SourceIndexProgress{
- constructor({vscode,client,root,config,output,onProgress=()=>{},now=Date.now}){Object.assign(this,{vscode,client,root,config,output,onProgress,now});}
+ constructor({vscode,client,root,config,output,onProgress=()=>{},now=()=>performance.now()}){Object.assign(this,{vscode,client,root,config,output,onProgress,now});}
  run(action){
   const work=async(progress,token)=>{
    const started=this.now();let active,last='Preparing saved Git source inputs',cancelSent;
@@ -10,7 +10,7 @@ class SourceIndexProgress{
    const subscription=token?.onCancellationRequested(cancel),timer=setInterval(()=>report(last),1000);timer.unref?.();report(last);
    const request=async command=>{
     if(token?.isCancellationRequested)return{passed:false,code:130,cancelled:true,report:{error:'Source index preparation cancelled.'}};
-    const remaining=this.config.timeoutMilliseconds-(this.now()-started);
+    const remaining=Math.floor(this.config.timeoutMilliseconds-(this.now()-started));
     if(remaining<=0)return{passed:false,code:2,timedOut:true,report:{error:'Workspace source index preparation timed out.'}};
     active=this.client.request(command,{config:{...this.config,timeoutMilliseconds:remaining}},text=>{this.output.appendLine(text.trimEnd());report(text);});
     if(token?.isCancellationRequested)cancel();
