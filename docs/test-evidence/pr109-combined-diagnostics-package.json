@@ -1,0 +1,42 @@
+{
+  "extensionVersion": "0.22.14",
+  "pullRequest": 109,
+  "closesIssues": [
+    107,
+    108
+  ],
+  "referencesOnly": [
+    94,
+    95
+  ],
+  "parentPr": 104,
+  "diagnosticsOnly": true,
+  "nativeAbortOrCustomerHangClaimedFixed": false,
+  "vsixSha256": "be23591f7e1a289fac3a3c73e9457a0d8680e84b8c1cdd068a9edce6176cabc7",
+  "vsixBytes": 5387430,
+  "sourceModulesByteIdentical": 118,
+  "officialCliVersion": "0.10.10",
+  "sdkAndPinUnchangedFrom": "8b614a5e3db5d0da620eeff851395c24ebcb1165",
+  "nativePinAndAllRuntimeHashesVerified": true,
+  "portableExtractedNoNode": true,
+  "nativeTestDiscovery": true,
+  "testingModuleCarryForward": {
+    "verifiedCommit": "8b614a5e3db5d0da620eeff851395c24ebcb1165",
+    "exactGitBlob": "6253f001460dca230d124558b5c1541ad26cbfb0",
+    "unchanged": true,
+    "earlier45TargetedChecksAnd3UiScreenshotsRetained": true,
+    "unchangedTestsOrUiRerun": false,
+    "testingModuleSha256": "ab89762fcedc2780fb10fbe7271d9b2b5575a1a3f41cd648d9224fbbe02a8eb4"
+  },
+  "newDebuggerChecksPassed": 38,
+  "actualDebugConsoleScreenshots": [
+    "docs/screenshots/debugger-exit-status/success.png",
+    "docs/screenshots/debugger-exit-status/cancelled.png",
+    "docs/screenshots/debugger-exit-status/failure.png",
+    "docs/screenshots/debugger-exit-status/indeterminate.png",
+    "docs/screenshots/debugger-exit-status/legacyStop.png"
+  ],
+  "fullLocalSuiteRun": false,
+  "sourceOrNativeDatabaseOpened": false,
+  "limits": "Native shutdown metadata is optional and supported through controlled protocol packets. Packaged SDK remains official0.10.10; this is no native clean-abort repair and does not establish resolution of the original Scratch/test hang."
+}

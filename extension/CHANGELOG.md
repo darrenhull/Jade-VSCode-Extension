@@ -1,6 +1,7 @@
-# 0.22.14 - Incomplete native test diagnostics
+# 0.22.14 - Test and debugger completion diagnostics
 
 - Distinguish unconfirmed test method completion, unconfirmed cleanup and a selected method absent from the native report. Repeat the original native cause or precise fallback in Test Results output; preserve assertion failures, cancellation and timeout outcomes.
+- Report debugger cancellation, nonzero exits and unconfirmed native shutdown without claiming method completion. Preserve native errors and exit codes; legacy zero exits after an editor stop are labelled stopped. A stop acknowledgement remains nonterminal.
 - This improves failure evidence and does not claim to resolve the separately investigated native Scratch Pad or test hang.
 
 # 0.22.13 - Native empty source fragments and debugger drafts

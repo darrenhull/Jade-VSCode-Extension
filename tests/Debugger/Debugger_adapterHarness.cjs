@@ -1,0 +1,6 @@
+'use strict';
+const {EventEmitter}=require('node:events'),{registerDebugger}=require('../../extension/src/debugger');
+function fixture({open,context={},services={}}={}){let factory;const messages=[],lines=[],disposable={dispose(){}};class Emitter{constructor(){this.events=new EventEmitter();this.event=listener=>{this.events.on('message',listener);return{dispose:()=>this.events.off('message',listener)}};}fire(message){this.events.emit('message',message);}dispose(){this.events.removeAllListeners();}}
+ const vscode={EventEmitter:Emitter,DebugAdapterInlineImplementation:class{constructor(adapter){this.adapter=adapter;}},window:{createOutputChannel:()=>({clear(){},show(){},append(){},appendLine:line=>lines.push(line),dispose(){}})},workspace:{openTextDocument:open},commands:{registerCommand:()=>disposable},languages:{registerCodeLensProvider:()=>disposable},debug:{registerDebugAdapterDescriptorFactory(type,value){factory=value;return disposable;},registerDebugConfigurationProvider:()=>disposable}};
+ registerDebugger(vscode,{subscriptions:[],...context},{isBusy:()=>false,setBusy:async()=>{},...services});const adapter=factory.createDebugAdapterDescriptor().adapter;adapter.onDidSendMessage(message=>messages.push(message));return{adapter,messages,lines};}
+module.exports={fixture};
