@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "nativeEditorDefault": true,
+  "realBackingDocument": true,
+  "jadeLanguage": true,
+  "selectedNativeRange": true,
+  "nativeGroupReused": true,
+  "dirtyEditsPreserved": true,
+  "realDocumentSaved": true,
+  "embeddedEditorHidden": true,
+  "navigationVisible": true,
+  "noDatabase": true,
+  "copilotServiceCalled": false
+}

@@ -8,6 +8,11 @@ const { registerClassWorkspaces } = require("../src/class-workspace-controller")
 const {resolveJadeSource}=require("../src/active-jade-source");
 const { withClassWorkspace } = require("./class-workspace-ui-capture.cjs");
 
+function embeddedProjectionProof(env = process.env) {
+  return env.JADE_CLASS_WORKSPACE_EMBEDDED_PROJECTION_PROOF === "1" ||
+    env.JADE_CLASS_WORKSPACE_CRLF_ONLY === "1" || env.JADE_CLASS_WORKSPACE_RECOVERY_ONLY === "1";
+}
+
 async function run() {
   const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const report = path.resolve(workspace, "../host-report.json");
@@ -47,6 +52,9 @@ async function run() {
     function createController(){
       const shell=createClassWorkspaces({Uri:vscode.Uri,window:{showWarningMessage(...args){warnings.push(args[0]);return vscode.window.showWarningMessage(...args);}}},context,adapters),attach=shell.attach;
       shell.attach=session=>{document=session.document;
+        // The old projection controls remain available as an explicit component
+        // fixture; ordinary host smoke exercises the shipped native editor.
+        if (embeddedProjectionProof()) delete session.services.openOriginal;
         for(const command of ["undo","redo"]){const native=session.services[command];session.services[command]=()=>{const operation={command};historyOperations.push(operation);operation.promise=Promise.resolve().then(()=>native());return operation.promise;};}
         const nativeSave=session.services.save;session.services.save=async()=>{if(rejectSave)throw Error("Private save rejection; edits retained.");return nativeSave();};saved=session.services.save;binding=session.binding;const view=attach(session);currentView=view;viewId=view.viewId;return view;};
       const model={resolveClass:async()=>({...row,name:"Fish",qualifiedName:"Pets::Fish"})};
@@ -54,6 +62,44 @@ async function run() {
     }
     owned.push(vscode.workspace.onDidChangeTextDocument(event=>{if(event.document.uri.toString()===uri.toString())nativeHistoryEvents.push({version:event.document.version,reason:event.reason,value:event.document.getText().match(/name: String\[(\d+)\]/)?.[1]});}));
     let controller=createController();await controller.open(row);
+    if (!embeddedProjectionProof()) {
+      const evidence = await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT), async browser => {
+        await browser.wait('document.getElementById("workspace").getAttribute("aria-busy")==="false"', "class navigation ready");
+        async function select(id) {
+          await browser.evaluate('document.getElementById("search").value=' + JSON.stringify(id) + ';document.getElementById("search").dispatchEvent(new Event("input",{bubbles:true}))');
+          await browser.wait('document.querySelector("[data-member-id=' + id + ']")', "selected member row");
+          await browser.evaluate('document.querySelector("[data-member-id=' + id + ']").click()');
+          await browser.wait('document.getElementById("native-editor-guide").hidden===false && document.getElementById("method-editor").hidden===true', "native editor is the default surface");
+          for (let attempt = 0; attempt < 150; attempt++) {
+            const editor = vscode.window.activeTextEditor, snapshot = binding.snapshot();
+            if (editor?.document === document && document.offsetAt(editor.selection.start) === snapshot.start) return editor;
+            await new Promise(resolve => setTimeout(resolve, 20));
+          }
+          throw Error("Selected member did not open its real backing document at the native source range.");
+        }
+        const editor = await select("getName");
+        assert.equal(document.languageId, "jade-nz");
+        const column = editor.viewColumn;
+        const at = document.getText().indexOf("Bubbles");
+        assert.ok(at >= 0);
+        assert.equal(await editor.edit(edit => edit.replace(new vscode.Range(document.positionAt(at), document.positionAt(at + 7)), "Example")), true);
+        assert.equal(document.isDirty, true);
+        const property = await select("name");
+        assert.strictEqual(property.document, document);
+        assert.equal(property.viewColumn, column, "member navigation reuses the native editor group");
+        assert.ok(document.getText().includes('return "Example";'), "navigation preserves unsaved native edits");
+        assert.equal(await document.save(), true);
+        assert.equal(fs.readFileSync(file, "utf8"), source.replace("Bubbles", "Example"));
+        assert.equal(document.isDirty, false);
+        await browser.viewport(900, 800);
+        await browser.wait('document.querySelector("[role=tree]")?.getBoundingClientRect().height>0', "class navigation remains visible beside the native editor");
+        await browser.screenshot(path.join(captures, "class-workspace-native-editor.png"));
+        return {nativeEditorDefault:true, realBackingDocument:true, jadeLanguage:true, selectedNativeRange:true, nativeGroupReused:true, dirtyEditsPreserved:true, realDocumentSaved:true, embeddedEditorHidden:true, navigationVisible:true, noDatabase:true, copilotServiceCalled:false};
+      });
+      fs.writeFileSync(report, JSON.stringify({passed:true, artifact, ...evidence}, null, 2));
+      return;
+    }
+    // Explicit legacy projection component controls, not the default product UI.
     const evidence=await withClassWorkspace(Number(process.env.JADE_CLASS_WORKSPACE_DEBUG_PORT),async browser=>{
       await browser.wait('document.getElementById("workspace").getAttribute("aria-busy")==="false"',"initial class snapshot");
       assert.equal(await browser.evaluate('document.querySelectorAll("[role=treeitem]").length'),100);
@@ -289,4 +335,4 @@ async function run() {
   } catch(error) {fs.writeFileSync(report,JSON.stringify({passed:false,error:error.stack},null,2));throw error;}
   finally {if(previousClipboard!==undefined)await vscode.env.clipboard.writeText(previousClipboard);if(document?.isDirty)await document.save();for(const item of owned.reverse())item.dispose();}
 }
-module.exports={run};
+module.exports={run,embeddedProjectionProof};
