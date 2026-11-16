@@ -1,0 +1,91 @@
+{
+  "references": {
+    "extension": 116,
+    "native": 96
+  },
+  "base": "8a31897d97e4cad79caf8176003251ec2fa62a5f",
+  "retainedCleanup": "030ddf43f088f585247da0bca1676f9858fea9c8",
+  "setting": "jadeNative.disableJadeGitForWorking",
+  "default": false,
+  "nativeConfiguration": "workingJadeGitPolicy",
+  "nativeValues": [
+    "inherit",
+    "disabled"
+  ],
+  "descriptor": {
+    "format": 1,
+    "configuration": "workingJadeGitPolicy",
+    "values": [
+      "inherit",
+      "disabled"
+    ],
+    "default": "inherit",
+    "scope": "owned-working-only",
+    "reversible": true
+  },
+  "red": {
+    "passed": 10,
+    "failed": 14,
+    "milliseconds": 861.0063,
+    "causes": [
+      "No checkbox/common mapping",
+      "Unsupported CLI started Working instead of refusing",
+      "Source inspection/extraction/publication inherited Working-only flag"
+    ]
+  },
+  "green": {
+    "focusedTests": 50,
+    "milliseconds": 743.4648,
+    "fullLocalSuite": false,
+    "workingBeforeUnsupportedCapability": false,
+    "nativePasswordsAndSourceIniPreserved": true,
+    "cancelBeforeWorkingDispatch": true,
+    "sourcePublicationPolicyRemovedAfterWorkingSpread": true,
+    "reviewedTargetPolicyChangeRejected": true
+  },
+  "ui": {
+    "productionManifestSha256": "7234a83e14c51a0146bf4b5455790670e133a85dc0a2ec105fd526bf3e5636be",
+    "contributionUnchanged": true,
+    "actualVSCodeSettingsRenderer": true,
+    "defaultValue": false,
+    "sourceUnchangedNote": true,
+    "screenshotSha256": "e8ad92dcf20f502b099972dd2e9f7b39547534a389d23862c5ea1e73a394f4eb",
+    "qaBootstrapOnly": true,
+    "productionNativeActivation": false,
+    "nativeDatabaseOpened": false,
+    "officialPinSha256": "60bfc58281015eed91cb691e2978f4ee62c3b3f7c425e4bc82adf6edb2c6f4c8",
+    "screenshot": "docs/test-evidence/working-jadegit-settings.png",
+    "visuallyInspected": true,
+    "ownedCodeAndExtensionHostActuallyExited": true,
+    "ownedProfileRemoved": true,
+    "capture": "Actual VS Code Settings contribution in isolated profile; QA bootstrap opens Settings only, never native code. Playwright capture used because Computer Use kernel assets could not initialize."
+  },
+  "officialPinUnchanged": true,
+  "nativeAssetOrDependencyChanged": false,
+  "nativeDatabaseOpened": false,
+  "privateCliAssetCommitted": false,
+  "limits": "Native16 actual policy/INI qualification is owned by native96. This bridge does not establish Source authentication or close native97. One eventual extension bundle waits for the genuine official16 release.",
+  "capabilityReuse": {
+    "scope": "Only static Working-policy descriptor Promise on existing live client record; no persistent or project capability cache",
+    "seededByExistingDoctorResult": true,
+    "inFlightProbesShared": true,
+    "sourceCapabilitiesRemainFresh": true,
+    "restartInvalidates": true,
+    "failedProbeCanRetry": true,
+    "oldCliStillRejected": true,
+    "closedProbeOwnerCannotAuthorizeNewProcess": true,
+    "returnedSourceObjectsCannotMutateDescriptor": true,
+    "red": {
+      "tests": 7,
+      "passed": 2,
+      "failed": 5
+    },
+    "green": {
+      "newLifecycleControls": 8,
+      "totalFocusedCurrent": 22,
+      "milliseconds": 117.7149
+    },
+    "uiAndPinBytesUnchanged": true,
+    "uiCaptureRepeated": false
+  }
+}

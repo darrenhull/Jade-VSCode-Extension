@@ -24,7 +24,7 @@ function workspaceHtml({ nonce, cspSource, scriptUri, styleUri, editorScriptUri,
  <header class="identity"><button id="back" class="quiet">← Back to Classes</button><div class="identity-title"><span class="eyebrow">CLASS WORKSPACE</span><h1 id="class-name">Loading class…</h1><p id="class-context"></p></div><span id="source-status" class="badge">Workspace source</span></header>
  <nav class="toolbar" aria-label="Class actions"><button id="overview">Overview</button><button id="save-document" class="primary" title="Save the entire current file (Ctrl+S)">Save file</button><span id="save-feedback" class="save-feedback" role="status" aria-live="polite">Entire current file</span><button id="member-picker" aria-expanded="false" aria-controls="member-rail">Browse members <span id="member-count"></span> ▾</button><span class="toolbar-spacer"></span><button id="instances">Instances ↗</button><button id="original">Open Original Source ↗</button><button id="more" aria-label="More class actions" aria-expanded="false">⋯</button></nav>
  <p id="notice" class="notice" role="status" hidden></p>
- <div class="split"><aside id="member-rail" aria-label="Class members"><div class="rail-search"><label for="search">Find a member</label><input id="search" type="search" autocomplete="off" placeholder="Search all members…"><div class="filters"><label class="sr-only" for="kind">Member kind</label><select id="kind"><option value="all">All kinds</option><option value="property">Properties</option><option value="reference">References</option><option value="method">Methods</option><option value="typeMethod">Type methods</option><option value="constant">Constants</option><option value="key">Collection keys</option><option value="base">Inheritance</option></select><label class="inherited"><input id="inherited" type="checkbox" disabled> Inherited</label></div><p id="inherited-reason" class="hint"></p></div><div id="member-tree" role="tree" aria-label="Members" tabindex="0"></div><div id="pagination"><button id="previous" aria-label="Previous member page">‹</button><span id="page-status" aria-live="polite"></span><button id="next" aria-label="Next member page">›</button></div></aside><div id="rail-resizer" role="separator" aria-label="Resize member navigation" aria-orientation="vertical" aria-valuemin="240" aria-valuemax="320" aria-valuenow="280" tabindex="0"></div><main id="canvas"><div class="detail-header"><div><span id="detail-kind" class="eyebrow">OVERVIEW</span><h2 id="detail-title" tabindex="-1">Class overview</h2><p id="detail-origin"></p></div></div><div id="overview-content"></div><pre id="member-detail" hidden></pre><section id="editor-region" aria-label="Member source" hidden><p id="editor-status" class="hint"></p><div id="method-editor"></div><p class="hint save-hint">Save writes the entire source document. Build and Publish are separate actions.</p></section><div id="empty-state" hidden><h3>No members match</h3><p>Try another name or clear the filters.</p><button id="clear-search">Clear filters</button></div><div id="failure" role="alert" hidden><p id="failure-message"></p><button id="retry">Try again</button></div></main></div><div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+ <div class="split"><aside id="member-rail" aria-label="Class members"><div class="rail-search"><label for="search">Find a member</label><input id="search" type="search" autocomplete="off" placeholder="Search all members…"><div class="filters"><label class="sr-only" for="kind">Member kind</label><select id="kind"><option value="all">All kinds</option><option value="property">Properties</option><option value="reference">References</option><option value="method">Methods</option><option value="typeMethod">Type methods</option><option value="constant">Constants</option><option value="key">Collection keys</option><option value="base">Inheritance</option></select><label class="inherited"><input id="inherited" type="checkbox" disabled> Inherited</label></div><p id="inherited-reason" class="hint"></p></div><div id="member-tree" role="tree" aria-label="Members" tabindex="0"></div><div id="pagination"><button id="previous" aria-label="Previous member page">‹</button><span id="page-status" aria-live="polite"></span><button id="next" aria-label="Next member page">›</button></div></aside><div id="rail-resizer" role="separator" aria-label="Resize member navigation" aria-orientation="vertical" aria-valuemin="240" aria-valuemax="320" aria-valuenow="280" tabindex="0"></div><main id="canvas"><div class="detail-header"><div><span id="detail-kind" class="eyebrow">OVERVIEW</span><h2 id="detail-title" tabindex="-1">Class overview</h2><p id="detail-origin"></p></div></div><div id="overview-content"></div><pre id="member-detail" hidden></pre><section id="editor-region" aria-label="Member source" hidden><p id="editor-status" class="hint"></p><div id="native-editor-guide" hidden><p>Edit this member in the VS Code editor beside Class Workspace.</p><p class="hint">That editor provides syntax highlighting and installed inline suggestions.</p><button id="native-editor-focus">Edit in VS Code ↗</button></div><div id="method-editor"></div><p id="embedded-save-hint" class="hint save-hint">Save writes the entire source document. Build and Publish are separate actions.</p></section><div id="empty-state" hidden><h3>No members match</h3><p>Try another name or clear the filters.</p><button id="clear-search">Clear filters</button></div><div id="failure" role="alert" hidden><p id="failure-message"></p><button id="retry">Try again</button></div></main></div><div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 </div>${editorScriptUri ? `<script nonce="${escape(nonce)}" src="${escape(editorScriptUri)}"></script>` : ""}<script nonce="${escape(nonce)}" src="${escape(scriptUri)}"></script></body></html>`;
 }
 function createClassWorkspaces(vscode, context, adapters = {}) {
@@ -45,6 +45,8 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     panel.webview.html = workspaceHtml({ nonce: crypto.randomBytes(18).toString("hex"), cspSource: panel.webview.cspSource, scriptUri: asset("class-workspace.js"), styleUri: asset("class-workspace.css"), editorScriptUri: services.editorScriptUri || asset("method-editor.js"), editorStyleUri: services.editorStyleUri });
     const current = revision => !disposed && !record.closed && record.revision === revision;
     const send = async message => {
+      if(message.command==="editorSnapshot"&&services.openOriginal&&message.snapshot?.available&&!message.snapshot.readOnly)
+        message={...message,snapshot:{...message.snapshot,editorMode:"native"}};
       if (!record.ready || record.closed || disposed) return false;
       try { return await panel.webview.postMessage(message); }
       catch (error) {
@@ -110,7 +112,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       const member = selectedMember();
       return member && ["method", "typeMethod", "property", "reference"].includes(member.kind) && !member.system && (!member.file || member.file === document?.uri?.toString()) ? member : undefined;
     }
-    async function select(id) {
+    async function select(id, openNative=false) {
       if (record.closed || disposed) return;
       const visible = !id || record.snapshot?.groups?.some(group => group.items.some(member => member.id === id)) || record.snapshot?.selected?.id === id;
       ++record.revision;
@@ -147,6 +149,8 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         await send({ command: "editorSnapshot", snapshot: prepared });
         await send({ command: "editorDiagnostics", items: services.diagnostics?.() || [] });
         if (services.draftRecovery) { const draft = await services.draftRecovery.get(); if (selectedCurrent()) await send({ command: "editorDraftRecovery", draft }); }
+        if(openNative&&selectedCurrent()&&record.editorEditable&&panel.active&&services.openOriginal)
+          await services.openOriginal();
       } else if (member && adapters.preview) {
         const preview = await adapters.preview(row, id, document);
         if (selectedCurrent()) await send({ command: "memberDetail", id, preview });
@@ -156,13 +160,16 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.command !== "string" || record.closed) return;
       try {
         switch (value.command) {
-          case "ready": record.ready = true; await load(); if (record.state.selectedId) await select(record.state.selectedId); if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); break;
+          case "ready": record.ready = true; await load(); if (record.state.selectedId) await select(record.state.selectedId, Boolean(selectedId)); if (services.draftRecovery) await send({ command: "editorDraftRecovery", draft: await services.draftRecovery.get() }); break;
           case "search": if (typeof value.query !== "string") return; record.state = normalizeState({ ...record.state, query: value.query, offset: 0 }); await load(); break;
           case "filter": record.state = normalizeState({ ...record.state, kind: value.kind, includeInherited: value.includeInherited === true && record.snapshot?.inheritedAvailable === true, offset: 0 }); await load(); break;
           case "page": if (!Number.isSafeInteger(value.offset) || value.offset < 0 || value.offset > Math.max(0, (record.snapshot?.total || 0) - 1)) return; record.state = normalizeState({ ...record.state, offset: value.offset }); await load(); break;
-          case "select": if (typeof value.id === "string" && value.id.length <= 2048) await select(value.id); break;
+          case "select": if (typeof value.id === "string" && value.id.length <= 2048) await select(value.id, true); break;
           case "layout": record.state = normalizeState({ ...record.state, railWidth: value.railWidth, scrollTop: value.scrollTop }); persist(record); break;
-          case "openOriginal": await adapters.onOriginal?.(row, record.state.selectedId); break;
+          case "openOriginal":
+            if(services.openOriginal&&(!selectedMember()||localEditableMember()))await services.openOriginal(Boolean(localEditableMember()));
+            else await adapters.onOriginal?.(row, record.state.selectedId);
+            break;
           case "instances": await adapters.onInstances?.(row); break;
           case "superclass": if (record.snapshot?.overview?.superclassIdentity) await adapters.onSuperclass?.(row, record.snapshot.overview.superclassIdentity); break;
           case "openDeclaring": { const member = selectedMember(); if (member?.inherited && !member.system) await adapters.onDeclaringClass?.(row, member); break; }

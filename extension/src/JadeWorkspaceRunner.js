@@ -1,5 +1,6 @@
 'use strict';
 const {configDto}=require('./cli-client');
+const {requireWorkingJadeGitPolicy}=require('./working-jadegit-policy');
 const {workspaceSnapshot}=require('./jade-workspace-document');
 
 /** Serializes owned Workspace requests; Jade owns compilation and execution. */
@@ -15,19 +16,24 @@ class JadeWorkspaceRunner {
     const cancelled=()=>({code:130,passed:false,cancelled:true,report:{error:'Workspace execution cancelled.'},snapshot,stale:document.version!==version});
     onProgress({stage:'queued',message:'Queued for Scratch Pad execution'});
     const work=async()=>{
-      let subscription,acquired=false,lease;
+      let subscription,acquired=false,lease,outcome;
+      const finish=value=>(outcome=value);
       try {
-        if(token?.isCancellationRequested)return cancelled();
+        if(token?.isCancellationRequested)return finish(cancelled());
         onProgress({stage:'configuring',message:'Resolving Scratch Pad project and connection'});
         const config=await this.configFor(document);
         config.schema=schema||config.schema;
         if(!/^[A-Za-z_]\w*$/.test(config.schema||''))throw Error('Choose a Jade schema before running the Workspace.');
+        if(config.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit'){
+          await requireWorkingJadeGitPolicy(this.client,config);
+          if(token?.isCancellationRequested)return finish(cancelled());
+        }
         onProgress({stage:'acquiring',message:'Acquiring the Working operation'});
         lease=await this.beforeOperation();acquired=true;
-        if(token?.isCancellationRequested)return cancelled();
+        if(token?.isCancellationRequested)return finish(cancelled());
         onProgress({stage:'preparing',message:'Preparing saved Git source inputs'});
         await this.prepareSource(config,message=>onProgress({stage:'preparing',message}),token);
-        if(token?.isCancellationRequested)return cancelled();
+        if(token?.isCancellationRequested)return finish(cancelled());
         onProgress({stage:'native',message:'Waiting for JADE preparation and execution result'});
         const request=this.client.request('workspace.run',{config:configDto(config),sourceText:snapshot.text,source,lineOffset:0,columnOffset:0},onOutput);
         let cancelSent=false;
@@ -37,10 +43,21 @@ class JadeWorkspaceRunner {
         const result=await request.promise;
         if(!result||typeof result.passed!=='boolean'||!Number.isInteger(result.code))throw Error('The native CLI returned an incomplete Workspace result. Update the Jade CLI bundle.');
         onProgress({stage:'received',message:'JADE response received'});
-        return {...result,snapshot,stale:document.version!==version};
+        return finish({...result,snapshot,stale:document.version!==version});
       } catch(error) {
-        return {...(error.result||{code:2,passed:false,report:{error:error.message}}),snapshot,stale:document.version!==version};
-      } finally {subscription?.dispose();if(acquired){onProgress({stage:'releasing',message:'Releasing the Working operation'});await this.afterOperation(lease);}}
+        return finish({...(error.result||{code:2,passed:false,report:{error:error.message}}),snapshot,stale:document.version!==version});
+      } finally {
+        subscription?.dispose();
+        if(acquired){
+          onProgress({stage:'releasing',message:'Releasing the Working operation'});
+          try {await this.afterOperation(lease);}
+          catch(error){
+            if(!outcome)throw error;
+            outcome.report={...outcome.report,cleanupError:error.message};
+            if(outcome.passed){outcome.passed=false;outcome.code=2;outcome.report.error='Working operation release failed: '+error.message;}
+          }
+        }
+      }
     };
     const operation=this.tail.then(work,work);this.tail=operation.then(()=>{},()=>{});return operation;
   }

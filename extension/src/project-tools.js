@@ -57,6 +57,7 @@ function registerProjectTools(vscode,context,options){
    requireCleanSources();
    if(targetKey(options.config(document))!==id)throw Error('Publication target changed after review. Publish again to review the current database settings.');
    const target={...working,databasePath:config.databasePath,iniPath:config.iniPath,server:config.server};
+   delete target.workingJadeGitPolicy;
    await applyRenames(target,project,text=>output.append(text),new Set(catalog(before).keys()));
    const result=await loadProject(target,bundle,text=>output.append(text));output.appendLine('LoaderExitCode='+result.code);
    if(result.success){saved[id]=project.hash;await context.workspaceState.update('jadeNative.nativeProjectPublished',saved);void vscode.window.showInformationMessage('Published native Jade schemas and resources.');}

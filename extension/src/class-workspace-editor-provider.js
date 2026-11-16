@@ -60,7 +60,14 @@ class ClassWorkspaceEditorProvider {
       save: () => document.save(),
       undo: () => {requireActive();return vscode.commands.executeCommand('undo');},
       redo: () => {requireActive();return vscode.commands.executeCommand('redo');},
-      openOriginal: () => vscode.window.showTextDocument(document, { preview: false, selection: new vscode.Range(position(0), position(0)) }),
+      openOriginal: (memberSelected=true) => {
+        requireActive();
+        const selected=memberSelected ? binding.snapshot() : undefined,start=document.positionAt(selected?.available ? selected.start : 0);
+        return vscode.window.showTextDocument(document, {
+          viewColumn: panel.viewColumn===9 ? 8 : vscode.ViewColumn.Beside,
+          preview: false, selection: new vscode.Range(start,start),
+        });
+      },
       async completions(offset, trigger) {
         const selected = binding.snapshot();
         const result = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', document.uri, position(offset), trigger);

@@ -1,8 +1,9 @@
 'use strict';
 const path=require('node:path'),{spawn}=require('node:child_process'),{StringDecoder}=require('node:string_decoder');
+const {sourceConfiguration,requireWorkingJadeGitPolicy}=require('./working-jadegit-policy');
 function configDto(config){
  const blocked=new Set(['testSession','nativeSession','beforeNativeProcess','signal']);
- return Object.fromEntries(Object.entries(config||{}).filter(([key,value])=>!blocked.has(key)&&typeof value!=='function'));
+ return Object.fromEntries(Object.entries(config||{}).filter(([key,value])=>!blocked.has(key)&&typeof value!=='function'&&!(key==='workingJadeGitPolicy'&&value==='inherit')));
 }
 function cliInvocation(entry,args,options={}){
  if(path.extname(entry).toLowerCase()!=='.exe')throw Error('The Jade CLI must be a native Windows executable.');
@@ -42,6 +43,7 @@ class CliWorkingSession{
   return client;
  }
  request(command,body={},output,events,expectedClient){
+  if(command.startsWith('source.')&&body.config)body={...body,config:sourceConfiguration(body.config)};
   if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
   const client=expectedClient||this.connect(),id=++this.nextId;
   const promise=new Promise((resolve,reject)=>{
@@ -55,6 +57,10 @@ class CliWorkingSession{
   const completion=(async()=>{
    try{
     if(!['compile','test.run'].includes(operation))throw Error('Unsupported Jade CLI operation: '+operation);
+    if(config?.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit'){
+     await requireWorkingJadeGitPolicy(this,config);
+     if(cancelled)return {passed:false,code:130,cancelled:true,report:{compiled:false,executed:false,error:'Working operation cancelled.'}};
+    }
     request=this.request(operation==='compile'?'build':'test',{config:configDto(config)},onOutput);
     const result=await request.promise;
     if(!result||typeof result.passed!=='boolean'||!Number.isInteger(result.code))throw Error('Jade CLI returned an incomplete operation result.');
@@ -70,6 +76,8 @@ class CliWorkingSession{
   if(result?.passed===false)throw Error(result.report?.error||'Jade CLI could not release its native session.');
  }
  async resolveNative(command,config,field,body={},output){
+  if((command.startsWith('working.')||command==='inspect.target'&&body.target==='working')&&config?.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit')
+   await requireWorkingJadeGitPolicy(this,config);
   const request=this.request(command,{config:configDto(config),...body},output);
   const abort=()=>{void this.request('cancel',{operationId:request.id}).promise.catch(()=>{});};
   config?.signal?.addEventListener('abort',abort,{once:true});if(config?.signal?.aborted)abort();
@@ -82,19 +90,38 @@ class CliWorkingSession{
  }
  workingLocation(config){return this.resolveNative('working.location',config,'working');}
  prepareWorking(config,output){return this.resolveNative('working.prepare',config,'working',{},output);}
- inspectionTarget(config,target,output){return this.resolveNative('inspect.target',config,'config',{target},output);}
- runNative(executable,args,options={},output=()=>{}){
+ inspectionTarget(config,target,output){return this.resolveNative('inspect.target',target==='source'?sourceConfiguration(config):config,'config',{target},output);}
+ async runNative(executable,args,options={},output=()=>{}){
   const config=configDto({...options,installPath:options.installPath||path.dirname(path.dirname(executable))});
   for(const name of ['path','ini','server']){const value=args.find(value=>value.startsWith(name+'='))?.slice(name.length+1);if(value)config[{path:'databasePath',ini:'iniPath',server:'server'}[name]]=value;}
+  if(config.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit')await requireWorkingJadeGitPolicy(this,config);
+  if(options.signal?.aborted)return {code:130,success:false,cancelled:true,output:''};
   const request=this.request('native.run',{config,executable,args,options:{timeoutMilliseconds:options.timeoutMilliseconds,cwd:options.cwd,root:options.root}},output);
   const abort=()=>{void this.request('cancel',{operationId:request.id}).promise.catch(()=>{});};
   options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
   return request.promise.finally(()=>options.signal?.removeEventListener('abort',abort));
  }
- sourceCapabilities(config,body={}){return this.resolveNative('doctor',config,'capabilities',body);}
+ async sourceCapabilities(config,body={}){
+  const connection=this.connect();
+  const result=this.resolveNative('doctor',sourceConfiguration(config),'capabilities',body);
+  if(!connection.workingJadeGitCapability){
+   // Only this process-wide descriptor is retained, never project Source capabilities.
+   const probe=result.then(capabilities=>structuredClone(capabilities.workingJadeGitPolicy));
+   connection.workingJadeGitCapability=probe;
+   void probe.catch(()=>{if(connection.workingJadeGitCapability===probe)delete connection.workingJadeGitCapability;});
+  }
+  return result;
+ }
+ async workingJadeGitCapability(config){
+  const connection=this.connect();
+  if(!connection.workingJadeGitCapability)await this.sourceCapabilities(config);
+  const descriptor=await connection.workingJadeGitCapability;
+  if(this.client!==connection)throw Error('The Jade CLI connection closed or changed during the Working capability check. Retry the operation.');
+  return descriptor;
+ }
  startSourceExtraction(config,selection,callbacks){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
-  const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks);
+  const operation=new SourceExtractionOperation(this,configDto(sourceConfiguration(config)),selection,callbacks);
   this.activeSources.add(operation);
   operation.completion.then(()=>this.activeSources.delete(operation),()=>this.activeSources.delete(operation));
   return operation;

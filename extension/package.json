@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.16",
+  "version": "0.22.17",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -772,6 +772,12 @@
           "maximum": 86400,
           "scope": "resource",
           "description": "Timeout in seconds for each Working database preparation utility: Source backup, retained-backup verification and private restore. Test execution has a separate timeout."
+        },
+        "jadeNative.disableJadeGitForWorking": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Disable JadeGit for the Working database. Source is unchanged."
         }
       }
     },
@@ -877,6 +883,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.10.14"
+    "minimumCliVersion": "0.10.16"
   }
 }

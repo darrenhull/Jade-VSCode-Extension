@@ -41,6 +41,8 @@ A map/file reporting `backup complete` does not mean the whole database backup h
 
 For an already-open native JADE IDE, see [refresh after publication](docs/NATIVE-IDE-REFRESH.md). Native load completion and IDE display refresh are separate; preserve unsaved IDE text and use its documented **View → Refresh** when needed.
 
+**Disable JadeGit for the Working database** is an optional Jade Native setting, off by default. Source is unchanged; the bundled CLI must advertise Working-only support.
+
 ## Working database location
 
 Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.
@@ -61,7 +63,7 @@ Moving an existing Working folder does not update its absolute INI paths or owne
 | Debug | Experimental gutter breakpoints, stepping, native caller stacks, selected-frame locals, object expansion and paged collections on compatible runtimes. |
 | Format | Document/selection indentation for native declarations and complete method bodies, preserving tokens, literals and line endings. |
 | Scratch Pad | Run native Workspace statements in Working, see output and compare the two most recent runs. F5 is for builds; Scratch Pad has its own Run action. |
-| Class workspaces | Schema-qualified search, grouped current-file members and editing backed by the original document, with native undo/save. Multi-class files offer a reviewed split into individual class files. |
+| Class workspaces | Schema-qualified navigation beside the standard VS Code source editor, using the real file and its syntax highlighting. Copilot follows normal VS Code availability and settings. Multi-class files retain their reviewed split. |
 | Data browsing | Read-only Source/Working inspection, native object IDs, lazy reference traversal, history, pinned views and collection paging. |
 | Source designer | Create schemas, classes, member/external dictionaries, ordered object arrays and unique object sets. Review source before saving. |
 | Collection rules | Known inherited keys and lifetime permissions, supported key-size checks, Binary comparison, population/block sizing and reviewed existing-file class mappings. Unknown metadata stays explicit. |

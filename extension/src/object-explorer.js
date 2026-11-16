@@ -598,7 +598,7 @@ function registerObjectExplorer(vscode, context, services) {
     if (services.isBusy()) throw Error("Wait for the current Jade operation or cancel it first.");
     const version = ++browseVersion, ownsTransition = () => version === browseVersion && !disposed;
     const config = await configured(undefined,folder);
-    for (const key of ["installPath","databasePath","iniPath","server","characterSet","workingDatabaseDirectory","workingDatabaseGeneration","storagePath","workspaceRoots"])
+    for (const key of ["installPath","databasePath","iniPath","server","characterSet","workingDatabaseDirectory","workingDatabaseGeneration","storagePath","workspaceRoots","workingJadeGitPolicy"])
       if (expected && JSON.stringify(config[key]) !== JSON.stringify(expected[key])) throw Error("Jade targets changed after review. Run Set Up Project again.");
     if (!await connectScopedTarget(requestedRoot,"working",ownsTransition)) return {cancelled:true};
     return {selection:"working",readOnly:true,databasePath:currentTarget?.databasePath};

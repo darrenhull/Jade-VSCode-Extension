@@ -1,0 +1,57 @@
+{
+  "status": "pass",
+  "extensionVersion": "0.22.17",
+  "sourceCheckpoint": "ace90ae92d5ed1699853588df2aa5442921b7a93",
+  "combinedCheckpoints": [
+    "20c2073048d865649c0963bd5e992a7f2ea5af7b",
+    "741a0ca1dbcff5378bf540b7fe8cd1daa47ab8a0"
+  ],
+  "native": {
+    "version": "0.10.16",
+    "tag": "v0.10.16",
+    "tagCommit": "a636afcc12c452f3bb98b52c1b50341ccf8441e6",
+    "releaseId": 447569785,
+    "mainRun": 43944537195,
+    "publishedAt": "2026-11-16T20:25:34Z",
+    "release": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.16",
+    "zipSha256": "41bf458563a7b9e49a9d5cd199788f9f4cec8c504b35d99a2e075b177280a182",
+    "distributionSha256": "92fb1f8cee97b1f1ac2a165801f2e1739ca7ce0b13501d1a96ef77dd66073d97",
+    "exeSha256": "9cd5e82beea9ebcba51fa29db7bc3748c3d6197119203c9252ec785a28ba023f",
+    "runtimeFileCount": 15,
+    "minimumCliVersion": "0.10.16",
+    "officialAssetsVerified": true,
+    "githubImmutableLockClaimed": false
+  },
+  "vsix": {
+    "name": "jade-native-runner-cpp-preview-0.22.17.vsix",
+    "sha256": "b001a1967a8b58671c9d5f76a5775dc038088966c86ea6defcd059427f6c41c8",
+    "bytes": 5550835,
+    "entries": 180,
+    "exactPackagedSourceFiles": 121,
+    "exactRuntimeEntries": 16,
+    "manifestMatchesOfficialBytes": true,
+    "pinSha256": "7e86c59e8ac4c10772ce10246ada98d6a76752f7ae2c51d1d711ff171d4b081c",
+    "lockSha256": "75d6d346f5841f6a1ed788d76de339e5c6905ce3923d768c2c831fb60b610848"
+  },
+  "verification": {
+    "updaterPinMinimumContracts": {
+      "passed": 8,
+      "failed": 0
+    },
+    "portableNoNode": "pass",
+    "outsideCheckout": true,
+    "databaseFreeTestDiscovery": "pass",
+    "ownedBrokerActuallyExited": true,
+    "portableOwnedStageRemoved": true,
+    "fullLocalSuite": false,
+    "sourceUiControlsReused": true,
+    "nativeEditorHostSmoke": "docs/test-evidence/native-member-host-smoke.json",
+    "workingSettingUi": "docs/test-evidence/working-jadegit-settings.png",
+    "memberEditorUi": "docs/test-evidence/native-member-editor.png",
+    "copilotServiceCalled": false
+  },
+  "limits": [
+    "No Source or Working database operation.",
+    "Native member editing supports installed inline providers; no live Copilot service was exercised."
+  ]
+}

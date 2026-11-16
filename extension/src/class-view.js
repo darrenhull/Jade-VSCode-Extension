@@ -69,8 +69,8 @@ function registerClassView(vscode, context, language, options={}) {
   const model=createClassWorkspaceModel({vscode,language,readSource:source});
   async function openOriginal(row,id){
     const member=id&&await model.preview(row,id);
-    if(member?.file)return vscode.commands.executeCommand('jadeNative.showClassMember',member);
-    const identity=await model.resolveClass(row);return vscode.window.showTextDocument(vscode.Uri.parse(identity.file),{preview:false});
+    if(member?.file)return vscode.commands.executeCommand('jadeNative.showClassMember',member,{viewColumn:vscode.ViewColumn.Beside,preview:false});
+    const identity=await model.resolveClass(row);return vscode.window.showTextDocument(vscode.Uri.parse(identity.file),{viewColumn:vscode.ViewColumn.Beside,preview:false});
   }
   const shell=createClassWorkspaces(vscode,context,{
     load:model.load,preview:model.preview,
@@ -444,7 +444,7 @@ function registerClassView(vscode, context, language, options={}) {
     vscode.commands.registerCommand('jadeNative.openClassWorkspace',row=>row?previewController.open(row,{origin:treeOrigin(row)}):vscode.commands.executeCommand('jadeNative.findSourceClass')),
     vscode.commands.registerCommand(
       "jadeNative.showClassMember",
-      async (row) => {
+      async (row, options={}) => {
         const { doc, text } = await source(row.file),
           member = classSections(text, row.file)
             .find((c) => c.name === row.owner)
@@ -452,7 +452,8 @@ function registerClassView(vscode, context, language, options={}) {
             .find((m) => m.name === row.name && (m.kind === row.kind || row.kind==='typeMethod'&&m.kind==='method'&&m.typeMethod));
         if (!member) return;
         const editor = await vscode.window.showTextDocument(doc, {
-            preview: true,
+            preview: options.preview!==false,
+            ...(options.viewColumn!==undefined?{viewColumn:options.viewColumn}:{}),
           }),
           start = doc.positionAt(member.selection),
           end = doc.positionAt(member.selection + member.name.length);

@@ -1,0 +1,30 @@
+{
+  "issue": 116,
+  "base": "8a31897d97e4cad79caf8176003251ec2fa62a5f",
+  "scope": "Preserve primary Scratch result when operation-context release fails",
+  "red": "afterOperation rejection replaced the already-received native6295 result",
+  "green": {
+    "owningControls": 4,
+    "native6295CodeOutputAndSourceDiagnosticsPreserved": true,
+    "adjacentExistingRunnerControls": 10,
+    "executionConfirmationPreservedWhenCleanupFails": true,
+    "oneRpcNoAutomaticReplay": "Controlled actual JSONL adapter/caller boundary, not proof of customer absence of another loop",
+    "cancellation130Preserved": true
+  },
+  "customerLoopClaimedFixed": false,
+  "customerPatchPolicyCauseKnown": false,
+  "finiteJoinFinding": "One JadeJoinSchema jadclient per required project schema before one aggregate schema load",
+  "nativeJoinImplementationChanged": false,
+  "securitySettingsChanged": false,
+  "credentialsChanged": false,
+  "sourceOrWorkingDatabaseOpened": false,
+  "JomExecution": false,
+  "osNativeChildrenStarted": false,
+  "fullSuiteRun": false,
+  "packageBuildRun": false,
+  "remaining": [
+    "Root review and GitHub delivery",
+    "Customer Working JADE log for6295 patch-control decision",
+    "Independent native scope/proof fix owned separately"
+  ]
+}

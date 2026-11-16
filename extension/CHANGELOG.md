@@ -1,3 +1,10 @@
+# 0.22.17 - Working JadeGit option and native member editing
+
+- Bundle official Jade CLI 0.10.16, including scoped Working preparation, reconciliation diagnostics and the Working-only JadeGit policy.
+- Add **Disable JadeGit for the Working database**, off by default. Source is unchanged. Unsupported runtimes refuse the option visibly.
+- Open selected editable class members in their real VS Code source document beside Class Workspace. Native syntax highlighting and installed inline suggestions are available in that editor; Copilot availability depends on the installed provider and its configuration.
+- Preserve dirty documents, protected drafts and inherited/system navigation. Keep the original Scratch failure when operation cleanup also fails.
+
 # 0.22.16 - Official native runtime and combined workspace tools
 
 - Bundle [official Jade CLI 0.10.14](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.14), with the matching verified native helpers and minimum runtime version.
