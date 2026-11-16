@@ -1,0 +1,107 @@
+{
+  "issue": 117,
+  "parentWorkingOptionCheckpoint": "20c2073048d865649c0963bd5e992a7f2ea5af7b",
+  "scope": "Selecting a local editable member opens its real VS Code TextDocument beside Class Workspace; retained source pane shows an explicit handoff, not a competing Copilot-capable editor.",
+  "publicData": "Only newly authored generic ExampleSchema/Sample fixtures and owned UI profiles. No customer images, source, identifiers or paths.",
+  "supportedApiReferences": [
+    "https://code.visualstudio.com/api/references/vscode-api#window.showTextDocument",
+    "https://code.visualstudio.com/api/extension-guides/custom-editors",
+    "https://code.visualstudio.com/docs/editing/ai-powered-suggestions"
+  ],
+  "red": {
+    "owningCases": 3,
+    "passedReadOnlyGuard": 1,
+    "failedNativeEditorCases": 2
+  },
+  "green": {
+    "focusedControls": 59,
+    "milliseconds": 268.5015,
+    "fullLocalSuite": false,
+    "cases": [
+      "real dirty backing document/precise member/adjacent editor",
+      "schema-qualified same-name classes and untrusted webview path ignored",
+      "inherited/system/read-only/protected drafts",
+      "restored and stale/hidden selections do not steal focus",
+      "existing source selection/navigation/recovery boundaries"
+    ]
+  },
+  "ui": {
+    "realClassWorkspace": true,
+    "nativeTextEditor": true,
+    "backingUriScheme": "file",
+    "languageId": "jade-nz",
+    "viewColumn": 2,
+    "realBackingDocumentSave": true,
+    "nativeDocumentReusedAcrossMembers": true,
+    "nativeInlineProviderCalls": 1,
+    "controlledInlineProvider": true,
+    "copilotServiceCalled": false,
+    "nativeDatabaseOpened": false,
+    "navigationVisible": true,
+    "embeddedEditorHidden": true,
+    "nativeSyntaxTokens": [
+      {
+        "text": "Integer",
+        "color": "rgb(78, 201, 176)"
+      },
+      {
+        "text": "Integer",
+        "color": "rgb(78, 201, 176)"
+      },
+      {
+        "text": "begin",
+        "color": "rgb(197, 134, 192)"
+      },
+      {
+        "text": "return",
+        "color": "rgb(197, 134, 192)"
+      },
+      {
+        "text": "begin",
+        "color": "rgb(197, 134, 192)"
+      },
+      {
+        "text": "return",
+        "color": "rgb(197, 134, 192)"
+      }
+    ],
+    "screenshotSha256": "f8ff20e3667142a1d9c40009ac2a40e1f031a369ef2ab729149a3086b1fce5b6",
+    "productInputs": [
+      {
+        "path": "src/class-workspace.js",
+        "sha256": "6d4a6819e65fa88f9eb0c067a11dbf2230a8e97d54a8a6d2b885d56db966c226"
+      },
+      {
+        "path": "src/class-workspace-editor-provider.js",
+        "sha256": "8d63f52f8cd0a9a38a973ba31fffffb6e9a2b958eefdd9cbd9459d03a304d9ae"
+      },
+      {
+        "path": "src/class-view.js",
+        "sha256": "f06dfe884a4b4a0b2fad9d27a084ba05b4a1114b4115643603bc6e3c4d1adcfa"
+      },
+      {
+        "path": "media/class-workspace.js",
+        "sha256": "24c14a71c6c1035f25be98b38a00df8b0c63e5a54dc3d87aeddf80717f17a82e"
+      }
+    ],
+    "genericFixtureOnly": true
+  },
+  "screenshots": [
+    {
+      "path": "docs/test-evidence/native-member-editor.png",
+      "sha256": "f8ff20e3667142a1d9c40009ac2a40e1f031a369ef2ab729149a3086b1fce5b6",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/test-evidence/native-member-editor-narrow.png",
+      "sha256": "53e2abf86b1d3e36955d9aa262ff4d56ad2d7a836bb6b2a97a6aea4efd3925bc",
+      "visuallyInspected": true
+    }
+  ],
+  "responsiveNavigation": "Existing narrow Browse members picker opened and verified; wide class rail and standard editor visible together.",
+  "actualOwnedCodeAndExtensionHostExited": true,
+  "ownedStageRemoved": true,
+  "officialPinAndAssetsUnchanged": true,
+  "nativeDatabaseOpened": false,
+  "limits": "The host used a controlled public inline-completion provider to verify native delivery; no Copilot authentication/service call was made. Copilot remains subject to normal installation/account/settings. Working-option release branch remains frozen independently."
+}
