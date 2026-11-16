@@ -1,6 +1,6 @@
 # Jade CLI — native C++
 
-`jade-cli.exe` 0.10.14 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
+`jade-cli.exe` 0.10.16 is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
@@ -24,7 +24,7 @@ Working preparation starts a fresh private backup when no verified snapshot is a
 
 Method-only builds, test switches and repeated inspection reuse a healthy compatible Working node. Structural loads close it for the native loader/reorganisation path and reopen it automatically. Scratch Pad still uses its native `jadclient` handoff, then the next compatible operation reconnects lazily. Debugging keeps its existing exclusive helper ownership; a paused debugger is not stopped to run another tool.
 
-Compiled-input reuse also checks the existing Working ownership marker and the Windows file identities of its database directory and `_control.dat`. Missing legacy proof or changed identities invalidate compiled-input state and reload local definitions while preserving Working data and native-managed removal history. Successful native loads record the actual identities in that same marker. External in-place writes or restores that retain both file identities remain outside this bounded check.
+When local inputs are required, automatic tests and Scratch refuse an existing Working database with unverified source proof or no usable compiled-input inventory. Run `jade-cli build <intended-file>` for explicit scoped reconciliation under the configured JADE development policy; proof is published only after a successful native load. A fresh restore created by the same operation may perform its initial scoped compilation. Existing records remain evidence; rebuilding `.jade/source-index` does not establish a Working baseline. Native error6295 and JadeGit developer-session requirements remain native policy failures. External in-place writes or restores retaining both file identities remain outside this bounded identity check.
 
 Each inspection consumer owns its cursors. Closing a view or service channel releases only that consumer, retaining the healthy connection. An explicit `inspect.close` service request with `args.disconnect: true` releases the selected physical target when no other inspection consumer owns it; another target is left open. The same request can release an idle retained target after logical close when its original config and target are supplied. A refusal still releases the caller's logical resources.
 
@@ -214,6 +214,8 @@ Project overrides remain optional and relative to `jade.json`:
 ```
 
 Command-line `--profile`, `--install`, `--database`, `--ini`, `--server` and `--schema` override the selected configuration for that invocation. Source arguments remain relative to the terminal folder. `--workspace` selects a workspace root. Full legacy JSON configurations with explicit `installPath`, `databasePath`, `iniPath`, `storagePath` and other settings continue to work. Optional `files`, `methods`, `testDependencyScope`, `workingDatabaseDirectory`, `workingDatabaseGeneration` and `timeoutMilliseconds` retain their engine meanings. Credentials are session inputs, not checked-in configuration. Working preparation utilities (backup, retained-backup verification and restore) use `workingDatabaseTimeoutSeconds` (integer 1..86400, default 7200), independently of `testTimeoutSeconds` (default 120). An explicit `timeoutMilliseconds` retains precedence for API clients. Native stage start/completion, elapsed time and effective limits are logged; per-map backup completion does not mean the whole backup has completed.
+
+**Disable JadeGit for the Working database:** set `workingJadeGitPolicy` to `"disabled"`. The default is `"inherit"`; Source is unchanged.
 
 For isolated automation, `JADE_TOOLS_CONNECTIONS_FILE` selects an absolute private profile-file path. For example:
 

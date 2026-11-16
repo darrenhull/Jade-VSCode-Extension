@@ -41,6 +41,8 @@ GitHub VSIX updates are installed manually. Installing a newer VSIX updates the 
 
 A map/file reporting `backup complete` does not mean the whole database backup has finished. Wait for whole-stage completion and Working connection readiness. Quiet native stages show elapsed time and periodic log messages; no completion percentage is invented. Cancellation can wait for the Source backup's safe boundary before skipping restore. Timeout/failure output retains the stage, native error and relevant paths.
 
+**Disable JadeGit for the Working database** is an optional Jade Native setting, off by default. Source is unchanged; the bundled CLI must advertise Working-only support.
+
 ## Working database location
 
 Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.
@@ -92,7 +94,7 @@ The extension preserves customised skills and unsaved skill edits. It updates on
 
 Choose a workspace class from **Find Class**, the class catalogue or **Object Explorer** to open its **Class Workspace**. Its grouped member rail searches declarations in the current file and shows up to 100 at a time. Use the kind filter and resolved inherited-member toggle to narrow the list; **Back to Classes** restores the originating search, tree or catalogue context.
 
-Selecting a local method, property or reference opens an editable canvas backed by its original source document, with completion, diagnostics, navigation and native undo. Use **Save file** or **Ctrl+S**; saving writes the entire current file, including other unsaved member edits. Configured Auto Save also applies. **Open Original Source** shows that same buffer. Build and Publish remain separate actions. A second class sharing the same physical file opens in a separate editor group so its page can keep its own selection while sharing the document.
+Selecting a local editable method, property or reference opens its real VS Code source document beside Class Workspace. That editor provides syntax highlighting and installed inline suggestions; Copilot follows normal VS Code availability and settings. Navigation preserves unsaved edits in the same document. **Save file** or **Ctrl+S** writes the entire current file, including other unsaved member edits. Build and Publish remain separate actions. Protected drafts and inherited/system source keep their existing safeguards.
 
 Each page keeps its current backing file. It does not switch or close that file to edit a method from another partial file. Opening another source file or declaring class is explicit; separately opened files retain their own pages and native undo history.
 
