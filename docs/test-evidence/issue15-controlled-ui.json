@@ -255,8 +255,22 @@
     },
     {
       "path": "docs/screenshots/native-catalogue-pages/06-old-runtime-update-required.png",
-      "sha256": "2b4d4ddf23fdfed9e6d8a62776954bc4317aeb99a836e56050b284a1d62bd1b1",
-      "visuallyInspected": true
+      "sha256": "077b5e0f01e496a9bc9d8987c37bbfea000f45ada8a5b35ee9d862cf78f8aaac",
+      "visuallyInspected": true,
+      "settledNotificationRun": true
     }
-  ]
+  ],
+  "settledNotificationRun": {
+    "sourceHead": "4352f9e15412d3121f5dac12c06a51193e55aa94",
+    "vsixSha256": "59738a67dac75936f8a2848dc9d70ebeab687498a447550ab5bccd0db0b8cbce",
+    "exactJavaScriptModules": 120,
+    "commandPromiseResolved": true,
+    "toastObservedAfterCommandSettled": true,
+    "notificationGoneBeforeCapture": true,
+    "disappearanceObservedMillisecondsAfterCommand": 902,
+    "lastVisibleMillisecondsAfterCommand": 794,
+    "sourceOrPackageChanged": false,
+    "ownedHostExited": true,
+    "ownedStageRemoved": true
+  }
 }
