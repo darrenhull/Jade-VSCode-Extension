@@ -5,7 +5,7 @@ const { EventEmitter } = require("node:events"),
   os = require("node:os");
 const { registerObjectExplorer } = require("../../extension/src/object-explorer");
 const oid = (n) => n === 10 ? "51.1 (t)" : n === 20 ? "66.101.305.2.1" : `9002.${n}`;
-function setup({ delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget, secretStorage, resolveConfig, closeAutomatically = false } = {}) {
+function setup({ catalogHandler, delayedBusy = false, authentication = false, nativeTarget = false, sourceContext, configError, pullSource, closeSubsequentAutomatically = false, projectScopedConfig = false, resolveInspectionTarget, secretStorage, resolveConfig, closeAutomatically = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "jade-object-ui-")),
     commands = new Map(),
     configCalls = [],
@@ -20,7 +20,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     targetDisconnections = [],
     progressOperations = [],
     contexts = new Map(),
-    prompts = [], outputLines = [];
+    prompts = [], outputLines = [], transportOptions = [];
   let busy = false,
     allowBusy, configurationListener, saveListener;
   const uri = (file) => ({
@@ -177,6 +177,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       if (value && delayedBusy) await new Promise((r) => (allowBusy = r));
     },
     createTransport: options => {
+      transportOptions.push(options);
       sessionData.push({ ...options.config, target: options.target });
       const c = new EventEmitter();
       const denied = typeof authentication === "function" ? authentication(options.config, clients.length) : authentication && !options.config.user;
@@ -197,6 +198,14 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
       c.requests = [];
       c.request = async (command, args) => {
         c.requests.push({ command, args });
+        if (command === "catalog" && catalogHandler) return catalogHandler(args, c);
+        if (command === "catalog" && args?.view) {
+          const schemas=[{name:"Pets",oid:oid(1),total:1,schemaOffset:0},...(args.includeSystem?[{name:"RootSchema",oid:oid(900),total:0,schemaOffset:1}]:[])];
+          const classes=[{name:"Fish",schema:"Pets",oid:oid(2),schemaOffset:0}];
+          const values=(args.view==="schemas"?schemas:classes).filter(row=>(!args.schema||(args.view==="schemas"?row.name:row.schema)===args.schema)&&(!args.name||row.name===args.name)&&(!args.query||(row.schema+"::"+row.name).toLowerCase().includes(args.query.toLowerCase())));
+          const offset=args.offset||0,rows=values.slice(offset,offset+args.limit);
+          return {readOnly:true,catalogueVersion:1,snapshotId:"fixture-snapshot",view:args.view,rows,total:values.length,offset,next_offset:offset+rows.length<values.length?offset+rows.length:null,totalClasses:1};
+        }
         if (command === "catalog")
           return {
             schemas: [
@@ -255,6 +264,7 @@ function setup({ delayedBusy = false, authentication = false, nativeTarget = fal
     errors,
     copied,
     sessionData,
+    transportOptions,
     targetDisconnections,
     prompts,
     outputLines,

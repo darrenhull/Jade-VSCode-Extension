@@ -148,7 +148,13 @@ function registerTesting(vscode, context, execute, sourceIndex, debugExecute) {
           if (result?.cancelled || token?.isCancellationRequested) { run.skipped(item); continue; }
           const outcome = results.get(details.get(item).method);
           if (!result?.report?.tests_completed || !result?.report?.cleanup_complete || !outcome) {
-            const message = result?.report?.error || result?.error || (result?.report?.diagnostics||[]).flatMap(diagnosticLines).join('\n') || (result?.timedOut ? 'Native test run timed out.' : 'Native test run did not produce a complete method result.');
+            const code = Number.isInteger(result?.code) ? ' (code ' + result.code + ')' : '';
+            const incomplete = result?.timedOut ? 'Native test run timed out.'
+              : !result?.report?.tests_completed ? 'Native test method completion was not confirmed' + code + '.'
+              : !result?.report?.cleanup_complete ? 'Native test cleanup was not confirmed for ' + details.get(item).method + code + '.'
+              : 'Native test report did not include the selected method ' + details.get(item).method + code + '.';
+            const message = result?.report?.error || result?.error || (result?.report?.diagnostics||[]).flatMap(diagnosticLines).join('\n') || incomplete;
+            run.appendOutput(message.replace(/\r?\n/g, '\r\n') + '\r\n');
             run.errored(item, new vscode.TestMessage(message));
           } else if (outcome.status === 'passed') run.passed(item);
           else if (outcome.status === 'skipped') run.skipped(item);

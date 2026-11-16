@@ -27,7 +27,7 @@ function registerClassCatalogue(vscode, context, options) {
     model = new ClassBrowserModel({ scope: metadata.scope }),
     filter = { query: typeof saved?.filter?.query==='string'?saved.filter.query.slice(0,4096):"", ...(typeof saved?.filter?.schema==='string'?{schema:saved.filter.schema}:{}), offset: Number.isSafeInteger(saved?.filter?.offset)&&saved.filter.offset>=0?saved.filter.offset:0 },
     selectedId = typeof saved?.selectedId==='string'?saved.selectedId:"", scrollTop = Number.isFinite(saved?.scrollTop)?Math.max(0,saved.scrollTop):0,
-    lastPayload;
+    lastPayload, remotePage;
   const listeners = [];
   function persist(){if(options.scope==='workspace')void Promise.resolve(context.workspaceState?.update(stateKey,{filter:{...filter},selectedId,scrollTop})).catch(()=>{});}
   function viewRow(row) {
@@ -50,8 +50,8 @@ function registerClassCatalogue(vscode, context, options) {
   }
   function publish() {
     if (!panel || disposed) return;
-    const page = model.page({ ...filter, limit: 100 }),
-      suggestions = filter.query.trim()
+    const page = options.getPage && remotePage ? remotePage : model.page({ ...filter, limit: 100 }),
+      suggestions = options.getPage ? (filter.query.trim() ? page.items.slice(0,10).map(viewRow) : []) : filter.query.trim()
         ? model
             .search(filter.query, { schema: filter.schema, limit: 10 })
             .items.map(viewRow)
@@ -72,7 +72,7 @@ function registerClassCatalogue(vscode, context, options) {
       loading,
       filter: { ...filter },
       selectedId, scrollTop,
-      schemas: model.schemas(),
+      schemas: metadata.schemas || model.schemas(),
       columns,
       page: { ...page, items: page.items.map(viewRow) },
       suggestions,
@@ -84,14 +84,21 @@ function registerClassCatalogue(vscode, context, options) {
     ++fetchGeneration;
     loading = true;
     model = new ClassBrowserModel({ scope: metadata.scope });
+    remotePage=undefined;
     publish();
+  }
+  function fail(error) {
+    ++fetchGeneration;
+    loading=false;
+    publish();
+    if(ready)void panel?.webview.postMessage({command:"error",message:error.message});
   }
   async function refresh() {
     const generation = ++fetchGeneration;
     loading = true;
     publish();
     try {
-      const value = await options.getRows();
+      const value = options.getPage ? await options.getPage({...filter,limit:100}) : await options.getRows();
       if (disposed || generation !== fetchGeneration) return;
       const next = Array.isArray(value) ? { rows: value } : value;
       if (!next || !Array.isArray(next.rows))
@@ -101,11 +108,13 @@ function registerClassCatalogue(vscode, context, options) {
         label: next.label || options.label || "Jade classes",
         generation: next.generation,
         nativePaging:next.nativePaging,
+        schemas:next.schemas,
       };
       model = new ClassBrowserModel({ scope: metadata.scope });
       model.setClasses(next.rows);
+      remotePage=next.page;
       if (
-        filter.schema &&
+        !options.getPage && filter.schema &&
         !model.schemas().some((row) => row.name === filter.schema)
       )
         filter.schema = undefined;
@@ -138,10 +147,11 @@ function registerClassCatalogue(vscode, context, options) {
         : filter.schema,
       offset: options.presentation?.instance ? 0 : value.offset ?? 0,
     };
-    model.page(next);
+    if(!Number.isSafeInteger(next.offset)||next.offset<0)throw Error("Invalid class page offset");
+    if(!options.getPage)model.page(next);
     filter = next;
     persist();
-    return publish();
+    return options.getPage ? refresh() : publish();
   }
   async function open(id) {
     if (loading) throw Error("Class catalogue is refreshing");
@@ -274,6 +284,7 @@ function registerClassCatalogue(vscode, context, options) {
     show,
     refresh,
     invalidate,
+    fail,
     update: refresh,
     setFilter,
     open,

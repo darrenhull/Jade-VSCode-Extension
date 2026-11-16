@@ -1,5 +1,5 @@
 "use strict";
-// Native QuickPick controls backed by full metadata search. Never give the
+// QuickPick can use workspace metadata or bounded asynchronous native search. Never give the
 // control all 30,000 rows and rely on its own visible-list filtering.
 function pickClass(vscode, browser, { schema, query = "", title = "Find Jade class", onAccept } = {}) {
   const picker = vscode.window.createQuickPick();
@@ -8,7 +8,7 @@ function pickClass(vscode, browser, { schema, query = "", title = "Find Jade cla
   picker.matchOnDetail = false;
   picker.canSelectMany = false;
   return new Promise(resolve => {
-    let finished = false;
+    let finished = false, revision=0;
     const subscriptions = [];
     const finish = value => {
       if (finished) return;
@@ -18,9 +18,16 @@ function pickClass(vscode, browser, { schema, query = "", title = "Find Jade cla
       resolve(value);
     };
     function update(value) {
+      const version=++revision;
       const result = browser.search(value, { schema });
+      if(result&&typeof result.then==="function"){
+        picker.busy=true;
+        void result.then(page=>{if(!finished&&version===revision){picker.busy=false;display(page);}},error=>{if(!finished&&version===revision){picker.busy=false;void vscode.window.showErrorMessage(error.message);finish(undefined);}});
+      }else display(result);
+    }
+    function display(result){
       picker.title = title + " · " + result.label;
-      // Our full-catalog matcher has already filtered the query. alwaysShow
+      // The owning workspace/native search already filtered the query. alwaysShow
       // prevents QuickPick's second fuzzy pass from hiding qualified matches.
       picker.items = result.items.map(row => ({ label: row.schema + "::" + row.name,
         description: [row.projectName,row.detail || row.description].filter(Boolean).join(' · '), alwaysShow: true, row }));
@@ -30,6 +37,7 @@ function pickClass(vscode, browser, { schema, query = "", title = "Find Jade cla
     }
     subscriptions.push(picker.onDidChangeValue(update),
       picker.onDidAccept(() => {
+        if(picker.busy)return;
         const selected = picker.selectedItems[0];
         if (selected) {onAccept?.(selected.row,{query:picker.value,schema});finish(selected.row);}
       }), picker.onDidHide(() => finish(undefined)));

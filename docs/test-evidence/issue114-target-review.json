@@ -1,0 +1,110 @@
+{
+  "issue": 114,
+  "parent": 35,
+  "sourceHead": "2152d9e14bee55556513056a89c1ae15fb6ad077",
+  "base": "6682b04263b73703326ab299e9b83e81e160d1e7",
+  "red": {
+    "command": "node --test tests/ProjectTools/ProjectTools_fullPublish_tests.test.js",
+    "passed": 7,
+    "failed": 3,
+    "durationMilliseconds": 615.8175,
+    "failures": [
+      "database path changed during approval",
+      "INI path changed during approval",
+      "server mode changed during approval"
+    ],
+    "meaning": "Existing real registered handler wrongly returned successful publication in all three controls."
+  },
+  "green": {
+    "command": "node --test tests/ProjectTools/ProjectTools_fullPublish_tests.test.js tests/ProjectTools/ProjectTools_publish_tests.test.js tests/ProjectTools/ProjectTools_reviewChanges_tests.test.js",
+    "passed": 14,
+    "failed": 0,
+    "durationMilliseconds": 609.7843
+  },
+  "package": {
+    "sourceHead": "2152d9e14bee55556513056a89c1ae15fb6ad077",
+    "vsixSha256": "c32cb95863eb3433b24c4fcc089dfb96436032f636910d9d0138f69000bcb794",
+    "exactJavaScriptModules": 119,
+    "officialPinUnchanged": true,
+    "manifestAndRuntimeHashesVerified": true,
+    "qaActivationOnly": true
+  },
+  "actualUi": {
+    "passed": true,
+    "sourceHead": "2152d9e14bee55556513056a89c1ae15fb6ad077",
+    "nativeExecuted": false,
+    "databaseOpened": false,
+    "mainProfileChanged": false,
+    "realRegisteredCommand": true,
+    "realModalAndErrorNotification": true,
+    "reviewedTarget": "C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\REVIEWED-TARGET-NEVER-OPENED\\system",
+    "changedTarget": "C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\CHANGED-TARGET-NEVER-OPENED\\system",
+    "result": {
+      "success": false,
+      "error": "Publication target changed after review. Publish again to review the current database settings."
+    },
+    "workingOnlyControlledNativeCalls": [
+      {
+        "executable": "C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\INSTALL-NEVER-OPENED\\bin\\jadclient.exe",
+        "args": [
+          "path=C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\WORKING-NEVER-OPENED\\system",
+          "ini=C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\reviewed.ini",
+          "server=singleUser",
+          "schema=JadeSchema",
+          "app=JadeJoinSchema",
+          "startAppParameters",
+          "C:\\Users\\darre\\AppData\\Local\\Temp\\jd-8b2f3958-NoOBXn\\s0",
+          "C:\\Users\\darre\\AppData\\Local\\Temp\\jd-8b2f3958-NoOBXn\\s0.scm",
+          "endAppParameters"
+        ]
+      },
+      {
+        "executable": "C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\INSTALL-NEVER-OPENED\\bin\\jadloadb.exe",
+        "args": [
+          "path=C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\WORKING-NEVER-OPENED\\system",
+          "ini=C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\reviewed.ini",
+          "server=singleUser",
+          "schemaFile=C:\\Users\\darre\\AppData\\Local\\Temp\\jd-8b2f3958-NoOBXn\\workspace.mul",
+          "loadStyle=currentSchemaVersion",
+          "replayableReorg=true",
+          "dontSaveSources=false",
+          "compileUnchangedMethods=true",
+          "allowCircularPackages=true",
+          "deleteIfAbsent=true",
+          "ShowProgress=true"
+        ]
+      },
+      {
+        "kind": "controlled-target-snapshot",
+        "databasePath": "C:\\Users\\darre\\AppData\\Local\\Temp\\jade-headless-host-eajo0I\\REVIEWED-TARGET-NEVER-OPENED\\system"
+      }
+    ],
+    "qualifiedScope": "Target configuration DB/INI/server identity; not structural classification, target file replacement or atomic concurrent-writer exclusion"
+  },
+  "screenshots": [
+    {
+      "path": "docs/screenshots/publish-target-review/01-reviewed-publication-target.png",
+      "sha256": "3cc65efd82e05b0fc23505b878c27b716c27e06370c9e42f4dfde5a4f6c60117",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/publish-target-review/02-target-review-invalidated.png",
+      "sha256": "22695d27fc2a6774a718b2e085bcbe60f3e92e2c2ac510329b21e841a822776c",
+      "visuallyInspected": true
+    }
+  ],
+  "qaOnlyCorrection": "Initial automation selected HTML button tags; actual Code uses role-button anchors. Same immutable VSIX rerun after correcting only the QA selector. First host/stage and final host/stage actually exited and were removed.",
+  "scope": "Existing targetKey canonical database/INI paths plus server(defaultsingleUser). The same reviewed source/membership/draft checks still run. Target loading uses frozen Working runtime settings; no new native identity, parser, cache or impact prediction.",
+  "limits": [
+    "No real Source/Working/native executable opened or run. Controlled target extraction and loader gateway only.",
+    "Does not detect another writer or replacement of a database/INI at the same path; not an atomic compare-and-apply lease.",
+    "Structural method-vs-declaration classification, informational editing hints, target baseline freshness and native outcome matrix remain open in parent35.",
+    "Official CLI0.10.10 pin and runtime bytes unchanged; no new runtime qualification or release claimed."
+  ],
+  "cleanup": {
+    "ownedCodeAndExtensionHostExited": true,
+    "ownedTempProfileAndStageRemoved": true,
+    "ownedGeneratedJoinStageRemoved": true,
+    "mainProfileChanged": false
+  }
+}

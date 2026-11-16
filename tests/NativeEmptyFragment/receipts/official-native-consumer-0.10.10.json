@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "mode": "empty",
+      "sourceBytes": 143,
+      "rawSha256": "917d8ebe52769960892215a7cfa30f1abd8960c413ae24242c09708554eaf736",
+      "emptyTypeEnvelope": true,
+      "nativeMetadataFields": 11,
+      "searchFish": 1,
+      "searchByte": 0,
+      "primitiveMethodPreserved": false,
+      "oneTimeUpgradeRefreshes": 1,
+      "warmGateRequests": 0,
+      "nativeRowsUnchangedByBrowser": true
+    },
+    {
+      "mode": "primitive",
+      "sourceBytes": 421,
+      "rawSha256": "08c6f7ce0ea82e885ee8f4b42236d6668f62b16977c6dae3d69d6acb4d9dd6ef",
+      "emptyTypeEnvelope": false,
+      "nativeMetadataFields": 11,
+      "searchFish": 1,
+      "searchByte": 1,
+      "primitiveMethodPreserved": true,
+      "oneTimeUpgradeRefreshes": 1,
+      "warmGateRequests": 0,
+      "nativeRowsUnchangedByBrowser": true
+    }
+  ],
+  "nativeExecutableSha256": "b25497bb8f79f88a5f76e61d4538550dc009cc2bd632496e5aa736dbb8b2a751",
+  "databaseOpened": false,
+  "nativeVersion": "jade-cli/0.10.10/source-index/2",
+  "consumerModelAdded": false,
+  "privateCandidate": false,
+  "ownedBrokerExited": true
+}

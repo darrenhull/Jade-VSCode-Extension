@@ -1,0 +1,68 @@
+{
+  "extensionVersion": "0.22.15",
+  "pullRequest": 109,
+  "closesIssues": [
+    105,
+    107,
+    108
+  ],
+  "referencesOnly": [
+    94,
+    95
+  ],
+  "parentPr": 104,
+  "diagnosticsOnly": false,
+  "nativeAbortOrCustomerHangClaimedFixed": false,
+  "vsixSha256": "53b4574dc81a834c3f335cacbcdb307572ca61081f48fbf5df8531ee38509232",
+  "vsixBytes": 5392442,
+  "sourceModulesByteIdentical": 119,
+  "officialCliVersion": "0.10.10",
+  "sdkAndPinUnchangedFrom": "8b614a5e3db5d0da620eeff851395c24ebcb1165",
+  "nativePinAndAllRuntimeHashesVerified": true,
+  "portableExtractedNoNode": true,
+  "nativeTestDiscovery": true,
+  "testingModuleCarryForward": {
+    "verifiedCommit": "8b614a5e3db5d0da620eeff851395c24ebcb1165",
+    "exactGitBlob": "6253f001460dca230d124558b5c1541ad26cbfb0",
+    "unchanged": true,
+    "earlier45TargetedChecksAnd3UiScreenshotsRetained": true,
+    "unchangedTestsOrUiRerun": false,
+    "testingModuleSha256": "ab89762fcedc2780fb10fbe7271d9b2b5575a1a3f41cd648d9224fbbe02a8eb4"
+  },
+  "newDebuggerChecksPassed": 38,
+  "actualDebugConsoleScreenshots": [
+    "docs/screenshots/debugger-exit-status/success.png",
+    "docs/screenshots/debugger-exit-status/cancelled.png",
+    "docs/screenshots/debugger-exit-status/failure.png",
+    "docs/screenshots/debugger-exit-status/indeterminate.png",
+    "docs/screenshots/debugger-exit-status/legacyStop.png"
+  ],
+  "fullLocalSuiteRun": false,
+  "sourceOrNativeDatabaseOpened": false,
+  "limits": "Combined unreleased0.22.15 retains105 onboarding and107/108 diagnostics. UI uses actual packaged modules/real VS Code folder reopening with controlled native and anonymous sign-in replies; no native database, installer or elevation. Official SDK remains0.10.10. No clean-abort or customer94/95 hang resolution claim.",
+  "sourceCarryForward": {
+    "verifiedCommit": "dcdd3a5285de258be8f6f54668eb5601247017d1",
+    "all119JavaScriptModulesUnchanged": true,
+    "notesOnlyRepack": true,
+    "readmeManifestChangelogExact": true,
+    "all17PackagedNativeFilesAndManifestByteExact": true,
+    "officialPinAndAllRuntimeHashesReverified": true
+  },
+  "portableCarryForward": {
+    "qualifiedVsixSha256": "6ef8ee692e90e03f4a3093cb2d494a80e4c6f3011709ea566e7866db389e3a7f",
+    "unchanged119JavaScriptAndNativePayload": true,
+    "noRedundantPortableRun": true
+  },
+  "onboarding": {
+    "issue": 105,
+    "targetedPassed": 87,
+    "actualPackagedUiScreenshots": 10,
+    "realFolderRelaunch": true,
+    "extensionHostIncarnations": 2,
+    "continuationWasSeeded": false,
+    "rootSourceAndAllUiReviewAccepted": true,
+    "evidence": "docs/test-evidence/issue105-project-onboarding.json"
+  },
+  "uiAndControlsRerunForNotesOnly": false,
+  "installersExecuted": false
+}

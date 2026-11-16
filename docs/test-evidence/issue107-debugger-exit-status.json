@@ -1,0 +1,86 @@
+{
+  "issue": 107,
+  "parentNativeIssue": "darrenhull/Jade-CLI#27",
+  "base": "fcfdd3f93fa37c644057b314d8d554b9ed13cdf7",
+  "red": {
+    "passed": 2,
+    "failed": 7,
+    "incorrectActual": "Native method completed"
+  },
+  "green": {
+    "affectedDebuggerChecksPassed": 31,
+    "finalFocusedControlsPassed": 11,
+    "fullLocalSuiteRun": false,
+    "finalCombinedDebuggerAndReleaseChecksPassed": 38
+  },
+  "change": "Only native zero exit without cancellation, unconfirmed shutdown or reuse denial prints completion. Cancellation, nonzero exit, missing exit code and optional unconfirmed shutdown metadata produce truthful terminal output; original native errors and numeric exitCode remain unchanged. Stop acknowledgement remains nonterminal.",
+  "nativeContract": {
+    "owner": "source_deadline_repair",
+    "sourceOnly": true,
+    "topLevel": [
+      "exitCode",
+      "result",
+      "cancelled",
+      "shutdown"
+    ],
+    "shutdown": {
+      "state": [
+        "clean",
+        "indeterminate"
+      ],
+      "workingReuseAllowed": "boolean",
+      "recoveryRequired": "false|null",
+      "reason": "string"
+    },
+    "recoveryNullRemainsUnknown": true,
+    "existingLegacyPacketsSupported": true
+  },
+  "nativeSdkChanged": false,
+  "nativeOrCustomerDatabaseOpened": false,
+  "cleanNativeAbortProven": false,
+  "uiEvidencePending": false,
+  "releaseMetadataPending": false,
+  "packagingPending": false,
+  "remainingGates": [
+    "Root final-source/package review and push to existing PR109",
+    "Current-head hosted CI and automated/owner review",
+    "Parent PR104 merge gate before PR109 release"
+  ],
+  "limitations": "Controlled native protocol packets exercise the actual registered adapter; no JADE execution, forced database crash, reset or recovery was performed. This thin-client repair does not solve native abort or the original Scratch/test hang.",
+  "legacyStopZero": {
+    "red": true,
+    "green": true,
+    "usesExistingLocalStopIntent": true,
+    "nativeCancelledMetadataTakesPrecedence": true,
+    "ordinaryLegacyNaturalZeroUnchanged": true
+  },
+  "noTerminalJson": {
+    "actualRegisteredLaunch": true,
+    "actualNativeDebuggerTransport": true,
+    "fakeChildOnly": true,
+    "stopAcknowledgementNonterminal": true,
+    "pendingRequestsRejectedOnActualClose2": true,
+    "frontendOwnershipReleasedOnlyAfterClose": true,
+    "originalCloseCodeLogged": 2,
+    "dapTerminatedEvents": 1,
+    "fabricatedExitedOrSuccess": false,
+    "transportRewrite": false
+  },
+  "ui": {
+    "actualPackagedAdapter": true,
+    "actualVSCodeDebugSessionsAndConsole": true,
+    "controlledLaunchAndNativePackets": true,
+    "nativeDatabaseOpened": false,
+    "visuallyInspected": true,
+    "screenshots": [
+      "docs/screenshots/debugger-exit-status/success.png",
+      "docs/screenshots/debugger-exit-status/cancelled.png",
+      "docs/screenshots/debugger-exit-status/failure.png",
+      "docs/screenshots/debugger-exit-status/indeterminate.png",
+      "docs/screenshots/debugger-exit-status/legacyStop.png"
+    ],
+    "receipt": "tests/Debugger/receipts/exit-status-ui.json",
+    "ownedHostExitedAndStageRemoved": true
+  },
+  "combinedPackageReceipt": "docs/test-evidence/pr109-combined-diagnostics-package.json"
+}

@@ -1,0 +1,101 @@
+{
+  "sourceBase": "c2d5dd6",
+  "pendingNativeRelease": null,
+  "trackedPinUnchanged": false,
+  "compatibility": {
+    "focusedPassed": 18,
+    "nativeCandidateProbeSkippedUntilArtifact": false,
+    "newRequiredNativeField": "emptyTypeEnvelope:boolean",
+    "clientNativeModelAdded": false,
+    "byteNamedExceptionAdded": false,
+    "capturedSourceFormsOnly": [
+      {
+        "bytes": 143,
+        "sha256": "917d8ebe52769960892215a7cfa30f1abd8960c413ae24242c09708554eaf736",
+        "classification": "captured empty envelope"
+      },
+      {
+        "bytes": 421,
+        "sha256": "08c6f7ce0ea82e885ee8f4b42236d6668f62b16977c6dae3d69d6acb4d9dd6ef",
+        "classification": "captured nonempty primitive method"
+      }
+    ],
+    "browserAndSearch": true,
+    "primitiveMethodRetained": "ByteExportProbe::Byte.byteExportProbe",
+    "ordinaryFishRetained": true,
+    "oneTimeNativeVersionUpgrade": 1,
+    "warmScratchAndTestIndexRequests": 0,
+    "originJoinerCancellation": true
+  },
+  "limits": [
+    "Corrected0.10.10 private native cache/browser probe passed; prior0.10.9 private proof remains historical only and does not qualify the migration guard",
+    "Scratch/test outcome and origin/joiner controls use deterministic native requests; consumer task opens no JADE database or Source",
+    "Final official0.10.10 SDK/pin and VSIX locally verified; hosted CI/review remain pending"
+  ],
+  "fullLocalSuiteRun": false,
+  "privateNativeQualification": {
+    "passed": true,
+    "totalTestMilliseconds": 16490.8098,
+    "cacheBuildTimingMeasured": false,
+    "nativeExecutableSha256": "ed751a27a604bb3cc473c0376a0bfe44b160803886b80fc3c6a14240096651d7",
+    "manifestSha256": "67bffb4fc3886ea7fbe2407f489e380886a1bf9f7252a7969193bde900e9b8f1",
+    "allRuntimeHashesVerified": true,
+    "nativeMetadataFields": 11,
+    "requiredBooleanEmptyTypeEnvelope": true,
+    "emptyAndPrimitiveCases": true,
+    "nativeRowsPreservedByBrowser": true,
+    "oneUpgradeRefreshPerCase": 1,
+    "warmGateRequests": 0,
+    "sourceBytesUnchanged": true,
+    "ownedBrokerExited": true,
+    "databaseOpened": false,
+    "receipt": "tests/NativeEmptyFragment/receipts/private-native-candidate.json",
+    "artifactStatus": "private coherent build, not an official release; final README/manifest may change after main70 documentation reconciliation without native byte changes"
+  },
+  "correctedPrivateNativeQualification": {
+    "passed": true,
+    "totalTestMilliseconds": 16685.8844,
+    "cacheBuildTimingMeasured": false,
+    "nativeExecutableSha256": "7bcfeda8775d030c772b54d3059fca94f60d3bfffd58d897de8f667e4773f805",
+    "manifestSha256": "15b031c7963cc7501d237a0c287c64e73ab9d759d01e2a21e2095ac6512af29f",
+    "allRuntimeHashesVerified": true,
+    "actualDoctorNativeVersion": "jade-cli/0.10.10/source-index/2",
+    "nativeMetadataFields": 11,
+    "emptyAndPrimitiveCases": true,
+    "nativeRowsPreservedByBrowser": true,
+    "oneUpgradeRefreshPerCase": 1,
+    "warmGateRequests": 0,
+    "sourceBytesUnchanged": true,
+    "ownedBrokerExited": true,
+    "databaseOpened": false,
+    "receipt": "tests/NativeEmptyFragment/receipts/private-native-candidate-0.10.10.json",
+    "artifactStatus": "corrected coherent PRIVATE build; not an official release or tracked pin"
+  },
+  "finalReleasePreparation": {
+    "extensionVersion": "0.22.13",
+    "minimumCliVersion": "0.10.10",
+    "includedChanges": [
+      "Merged extension102 source-index startup, timeout, progress and cancellation repairs",
+      "Issue103 debugger draft-resolution boundary",
+      "Native empty-type fragment and pending-JCF migration repairs from CLI69/72"
+    ],
+    "officialPublicationVerified": true,
+    "trackedPrivatePinAdded": false,
+    "remainingGates": [
+      "Root final-head push and hosted CI",
+      "Automated and owner review before merge/release"
+    ],
+    "targetedChecks": {
+      "passed": 21,
+      "fullLocalSuiteRun": false,
+      "groups": [
+        "Current-version release notes",
+        "Native empty-fragment consumer/browser/search and warm gate",
+        "Scratch/test producer and joiner cancellation",
+        "Actual registered debug draft launch"
+      ]
+    },
+    "finalPackageReceipt": "docs/test-evidence/pr104-final-package.json"
+  },
+  "trackedOfficialCliVersion": "0.10.10"
+}

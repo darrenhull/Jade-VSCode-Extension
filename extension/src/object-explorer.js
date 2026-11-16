@@ -7,7 +7,7 @@ const { InspectionSession } = require("./object-session"),
 const { validateObjectIdentity } = require("./NativeObjectIdentity");
 const { InspectionHistory } = require("./inspection-history");
 const { fieldText } = require("../media/object-page");
-const { ClassBrowserModel } = require("./class-browser-model");
+const { NativeClassCatalogue } = require("./NativeClassCatalogue");
 const { pickClass } = require("./class-browser-ui");
 const { registerClassCatalogue } = require("./class-catalogue");
 const { readInspectionCredentials, storeInspectionCredentials, deleteInspectionCredentials } = require("./inspection-credentials");
@@ -22,6 +22,7 @@ function registerObjectExplorer(vscode, context, services) {
     treeConsumer = {},
     classVersions = new Map(),
     classOffsets = new Map(),
+    catalogClassPages = new Map(),
     schemaNodes = new Map();
   let catalog,
     classBrowser,
@@ -182,7 +183,7 @@ function registerObjectExplorer(vscode, context, services) {
         const options = {
           config: { ...connectionConfig, readOnly: true },
           target: selection,
-          catalogArgs: { includeSystem: showSystem },
+          catalogArgs: { includeSystem: showSystem, view:'schemas', offset:0, limit:1 },
         };
         client = services.createTransport
           ? services.createTransport(options)
@@ -243,6 +244,7 @@ function registerObjectExplorer(vscode, context, services) {
     classBrowser = undefined;
     classCatalogue?.invalidate();
     classOffsets.clear();
+    catalogClassPages.clear();
     schemaNodes.clear();
     pages.clear();
     for (const record of instanceCatalogues.values()) void record.controller.update().catch(() => {});
@@ -287,44 +289,29 @@ function registerObjectExplorer(vscode, context, services) {
     await releaseNativeCursor(previous?.cursor);
     for(const record of instanceCatalogues.values()) if(record.generation===session.generation && record.oid===oid) void record.controller.update().catch(()=>{});
   }
-  function loadCatalog(reloadEpoch = true) {
-    const client = session.client, target = session.target,
-      generation = session.generation,
-      version = ++catalogVersion;
-    const request = session
-      .request("catalog", { includeSystem: showSystem })
-      .then(
-        (data) => {
-          if (generation !== session.generation)
-            throw Error("Database changed or inspection was cancelled.");
-          if (version !== catalogVersion) return catalogRequest;
-          catalog = data;
-          classOffsets.clear();
-          schemaNodes.clear();
-          classBrowser = new ClassBrowserModel({ scope: classScope() });
-          classBrowser.setClasses(data.schemas.flatMap(schema => schema.classes.map(cls => ({
-            ...cls, schema: cls.schema || schema.name,
-          }))));
-          for (const schema of data.schemas) schemaNodes.set(schema.name, {
-            kind: "schema", name: schema.name, oid: schema.oid,
-            id: JSON.stringify([classScope(), "schema", schema.name]),
-            description: classBrowser.page({ schema: schema.name }).label,
-          });
-          if (classCatalogue?.panel) void classCatalogue.refresh().catch(error => output.appendLine(error.message));
-          return data;
-        },
-        (error) => {
-          if (error.code === 'JADE_INSPECTION_EPOCH_CHANGED' && client === session.client && target === session.target && !disposed) {
-            if (catalogRequest && catalogRequest !== request) return catalogRequest;
-            if (reloadEpoch) return loadCatalog(false);
-          }
-          if (version !== catalogVersion && generation === session.generation)
-            return catalogRequest;
-          throw error;
-        },
-      );
-    catalogRequest = request;
-    return request;
+  function loadCatalog(reloadEpoch = true, {offset=0, refresh=false} = {}) {
+    const client=session.client,target=session.target,generation=session.generation,version=++catalogVersion;
+    if(refresh){catalogClassPages.clear();classCatalogue?.invalidate();}
+    const browser=refresh||!classBrowser?new NativeClassCatalogue(args=>session.request("catalog",{includeSystem:showSystem,...args}),{scope:classScope()}):classBrowser;
+    const request=browser.directory({offset,limit:100,...(refresh?{refresh:true}:{})}).then(data=>{
+      if(generation!==session.generation||client!==session.client)throw Error("Database changed or inspection was cancelled.");
+      if(version!==catalogVersion)return catalogRequest;
+      catalog=data;classBrowser=browser;
+      if(refresh){classOffsets.clear();catalogClassPages.clear();schemaNodes.clear();}
+      for(const schema of data.rows)schemaNodes.set(schema.name,{kind:"schema",name:schema.name,oid:schema.oid,
+        id:JSON.stringify([classScope(),"schema",schema.name]),description:schema.total.toLocaleString("en-US")+" classes"});
+      if(classCatalogue?.panel)void classCatalogue.refresh().catch(error=>output.appendLine(error.message));
+      return data;
+    },error=>{
+      if(error.code==='JADE_INSPECTION_EPOCH_CHANGED'&&client===session.client&&target===session.target&&!disposed){
+        if(catalogRequest&&catalogRequest!==request)return catalogRequest;
+        if(reloadEpoch)return loadCatalog(false);
+      }
+      if(version!==catalogVersion&&generation===session.generation)return catalogRequest;
+      if(version===catalogVersion&&generation===session.generation)classCatalogue?.fail(error);
+      throw error;
+    });
+    catalogRequest=request;return request;
   }
   function cancelPageConsumer(oid, owner) {
     const pending=pageLoads.get(oid),consumers=pending && pageConsumers.get(pending);
@@ -333,6 +320,8 @@ function registerObjectExplorer(vscode, context, services) {
     if(!consumers.size){classVersions.set(oid,(classVersions.get(oid)||0)+1);pageLoads.delete(oid);}
   }
   function classPage(row, next = false, owner = treeConsumer) {
+    if(row.inspectionGeneration!==session.generation||row.catalogueSnapshot&&row.catalogueSnapshot!==classBrowser?.snapshotId)
+      throw Error("Database class snapshot changed. Refresh and choose the class again.");
     if (pageLoads.has(row.oid)) { const pending=pageLoads.get(row.oid);pageConsumers.get(pending)?.add(owner);return pending; }
     const consumers=new Set([owner]);
     const generation = session.generation,
@@ -501,7 +490,7 @@ function registerObjectExplorer(vscode, context, services) {
       }
       throw error;
     }
-    const loaded = await loadCatalog();
+    const loaded = await loadCatalog(true,{refresh:!!catalog});
     if (!loaded) throw Error("Inspection connection was cancelled.");
     events.fire();
     refreshDescription();
@@ -509,11 +498,8 @@ function registerObjectExplorer(vscode, context, services) {
       readOnly: true,
       selection: session.target,
       databasePath: currentTarget.databasePath,
-      schemaCount: loaded.schemas.length,
-      classCount: loaded.schemas.reduce(
-        (sum, schema) => sum + schema.classes.length,
-        0,
-      ),
+      schemaCount: loaded.total,
+      classCount: loaded.totalClasses,
     };
   }
   function entry(row, index) {
@@ -534,36 +520,88 @@ function registerObjectExplorer(vscode, context, services) {
     return { ...row, kind: "class", id: row.browserId, inspectionGeneration: session.generation,
       description: row.collection ? "Collection" : row.persistentAllowed === false ? "Transient class" : undefined };
   }
-  function classChildren(schema) {
-    if (!classBrowser) return [];
-    const page = classBrowser.page({ schema: schema.name, offset: classOffsets.get(schema.name) || 0 });
-    schema.description = page.label;
-    return [
-      ...page.items.map(classNode),
-      { kind: "find", name: "Browse classes…", description: "Search all classes in " + schema.name,
-        id: schema.id + "::find", command: "jadeNative.browseDatabaseClasses", args: [schema] },
-      ...(page.hasPrevious ? [{ kind: "more", name: "Previous 100 classes…", id: schema.id + "::previous",
-        command: "jadeNative.pageObjectClasses", args: [schema.name, page.previousOffset] }] : []),
-      ...(page.hasMore ? [{ kind: "more", name: "Next 100 classes…", id: schema.id + "::next",
-        command: "jadeNative.pageObjectClasses", args: [schema.name, page.nextOffset] }] : []),
-    ];
+  async function classChildren(schema) {
+    if(!classBrowser)return [];
+    const browser=classBrowser,generation=session.generation,version=catalogVersion;
+    const offset=classOffsets.get(schema.name)||0,key=JSON.stringify([schema.name,offset]);
+    let page=catalogClassPages.get(key);
+    if(!page){
+      try { page=await browser.page({schema:schema.name,offset,limit:100}); }
+      catch(error){if(browser!==classBrowser||generation!==session.generation||version!==catalogVersion)return [];throw error;}
+      if(browser!==classBrowser||generation!==session.generation||version!==catalogVersion)return [];
+      if(catalogClassPages.size>=8)catalogClassPages.delete(catalogClassPages.keys().next().value);
+      catalogClassPages.set(key,page);
+    }
+    schema.description=page.label;
+    return [...page.items.map(classNode),{kind:"find",name:"Browse classes…",description:"Search all classes in "+schema.name,
+      id:schema.id+"::find",command:"jadeNative.browseDatabaseClasses",args:[schema]},
+      ...(page.hasPrevious?[{kind:"more",name:"Previous 100 classes…",id:schema.id+"::previous",
+        command:"jadeNative.pageObjectClasses",args:[schema.name,page.previousOffset]}]:[]),
+      ...(page.hasMore?[{kind:"more",name:"Next 100 classes…",id:schema.id+"::next",
+        command:"jadeNative.pageObjectClasses",args:[schema.name,page.nextOffset]}]:[])];
   }
-  async function revealClass(selected, generation = session.generation, isCurrent = () => true) {
-    if (!isCurrent()) return;
-    if (generation !== session.generation || !session.client || !classBrowser)
-      throw Error("Database changed or inspection was cancelled.");
-    const row = classBrowser.find(selected), schema = schemaNodes.get(selected.schema);
-    if (!row || !schema) throw Error("Database class is no longer in this catalog.");
-    const position = classBrowser.positionOf(row, { schema: row.schema });
-    classOffsets.set(row.schema, position.offset);
-    schema.description = classBrowser.page({ schema: row.schema, offset: position.offset }).label;
+  async function revealClass(selected,generation=session.generation,isCurrent=()=>true){
+    if(!isCurrent())return;
+    const browser=classBrowser;
+    if(generation!==session.generation||!session.client||!browser)throw Error("Database changed or inspection was cancelled.");
+    if(selected.catalogueSnapshot&&selected.catalogueSnapshot!==browser.snapshotId)throw Error("Database class snapshot changed. Refresh and choose the class again.");
+    const row=await browser.find(selected);
+    if(!row)throw Error("Database class is no longer in this catalog.");
+    if(selected.oid&&selected.oid!==row.oid)throw Error("Database class identity changed. Refresh and choose the class again.");
+    if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
+    let schema=schemaNodes.get(row.schema);
+    if(!schema){
+      const directory=await browser.directory({schema:row.schema,limit:1});
+      const nativeSchema=directory.rows.find(item=>item.name===row.schema);
+      if(!nativeSchema)throw Error("Database schema is no longer in this catalog.");
+      await loadCatalog(true,{offset:Math.floor(nativeSchema.schemaOffset/100)*100});
+      if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
+      schema=schemaNodes.get(row.schema);
+    }
+    const offset=Math.floor(row.schemaOffset/100)*100;
+    classOffsets.set(row.schema,offset);
+    const children=await classChildren(schema),target=children.find(item=>item.kind==="class"&&item.oid===row.oid);
+    if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
+    if(!target)throw Error("Native class position changed; refresh required.");
     events.fire(schema);
-    await view.reveal(schema, { select: false, focus: false, expand: true });
-    if (generation !== session.generation) throw Error("Database changed or inspection was cancelled.");
-    if (!isCurrent()) return;
-    const target = classChildren(schema).find(item => item.kind === "class" && item.name === row.name);
-    await view.reveal(target, { select: true, focus: true, expand: false });
-    return { schema: row.schema, name: row.name, offset: position.offset, readOnly: true };
+    await view.reveal(schema,{select:false,focus:false,expand:true});
+    if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
+    await view.reveal(target,{select:true,focus:true,expand:false});
+    return {schema:row.schema,name:row.name,offset,readOnly:true};
+  }
+  async function connectScopedTarget(requestedRoot, target, ownsTransition) {
+    return serializeInspectionTransition(async () => {
+      if (!ownsTransition()) return false;
+      const activeConfig = connectionOperation?.config || currentConfig;
+      const sameProject = activeConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+      if (connectionOperation && (!sameProject || connectionOperation.target !== target)) await cancelConnection();
+      if (!ownsTransition()) return false;
+      if (session.disconnecting || (session.client && (!sameProject || session.target !== target))) await session.disconnect();
+      if (!ownsTransition()) return false;
+      if (session.target !== target) await session.select(target);
+      if (!ownsTransition()) return false;
+      inspectionScope = requestedRoot;
+      if (!session.client) {
+        const connected = await connect();
+        if (connected?.cancelled || !session.client) return false;
+      }
+      if (!ownsTransition()) return false;
+      if (!classBrowser) await loadCatalog();
+      return ownsTransition();
+    });
+  }
+  async function connectWorkingProject(projectRoot, expected) {
+    const requestedRoot = path.resolve(projectRoot);
+    const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(requestedRoot));
+    const equal = (a,b) => process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+    if (!folder || !equal(folder.uri.fsPath,requestedRoot)) throw Error("Choose an open project folder before preparing Working.");
+    if (services.isBusy()) throw Error("Wait for the current Jade operation or cancel it first.");
+    const version = ++browseVersion, ownsTransition = () => version === browseVersion && !disposed;
+    const config = await configured(undefined,folder);
+    for (const key of ["installPath","databasePath","iniPath","server","characterSet","workingDatabaseDirectory","workingDatabaseGeneration","storagePath","workspaceRoots"])
+      if (expected && JSON.stringify(config[key]) !== JSON.stringify(expected[key])) throw Error("Jade targets changed after review. Run Set Up Project again.");
+    if (!await connectScopedTarget(requestedRoot,"working",ownsTransition)) return {cancelled:true};
+    return {selection:"working",readOnly:true,databasePath:currentTarget?.databasePath};
   }
   async function browseInstances(value) {
     if (!value || typeof value.schema !== "string" || typeof value.className !== "string" || typeof value.projectRoot !== "string")
@@ -597,26 +635,11 @@ function registerObjectExplorer(vscode, context, services) {
     });
     if (version !== browseVersion || disposed || !choice || !["working", "source"].includes(choice.target)) return { cancelled: true };
     try {
-      const connected = await serializeInspectionTransition(async () => {
-        if (!ownsTransition()) return false;
-        const activeConfig = connectionOperation?.config || currentConfig;
-        const sameProject = activeConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
-        if (connectionOperation && (!sameProject || connectionOperation.target !== choice.target)) await cancelConnection();
-        if (!ownsTransition()) return false;
-        if (session.disconnecting || (session.client && (!sameProject || session.target !== choice.target))) await session.disconnect();
-        if (!ownsTransition()) return false;
-        if (session.target !== choice.target) await session.select(choice.target);
-        if (!ownsTransition()) return false;
-        inspectionScope = requestedRoot;
-        if (!session.client) await connect();
-        if (!ownsTransition()) return false;
-        if (!classBrowser) await loadCatalog();
-        return ownsTransition();
-      });
+      const connected = await connectScopedTarget(requestedRoot, choice.target, ownsTransition);
       if (!connected) return { cancelled: true };
     } catch (error) { return unavailable(error); }
     if (version !== browseVersion || disposed) return { cancelled: true };
-    const row = classBrowser.rows.find(item => item.schema === value.schema && item.name === value.className);
+    const row = await classBrowser.find({schema:value.schema,name:value.className});
     if (!row) {
       const message = value.schema + "::" + value.className + " is not installed in the selected " + choice.label + ". Local source remains available. Publish explicitly to add it, or choose another inspection database.";
       const configure = await vscode.window.showInformationMessage?.(message, "Choose database");
@@ -734,15 +757,17 @@ function registerObjectExplorer(vscode, context, services) {
           if (!session.client || !catalog) return controls;
           return [
             ...controls,
-            ...catalog.schemas
+            ...catalog.rows
               .filter(
                 (s) =>
                   showSystem || !["RootSchema", "JadeSchema"].includes(s.name),
               )
               .map((s) => schemaNodes.get(s.name)),
+            ...(catalog.offset>0?[{kind:"more",name:"Previous 100 schemas…",id:"schemas::previous",command:"jadeNative.pageObjectSchemas",args:[Math.max(0,catalog.offset-100)]}]:[]),
+            ...(catalog.next_offset!==null?[{kind:"more",name:"Next 100 schemas…",id:"schemas::next",command:"jadeNative.pageObjectSchemas",args:[catalog.next_offset]}]:[]),
           ];
         }
-        if (row.kind === "schema") return classChildren(row);
+        if (row.kind === "schema") return await classChildren(row);
         if (row.kind === "class") {
           let page = pages.get(row.oid);
           if (!page) {
@@ -810,10 +835,15 @@ function registerObjectExplorer(vscode, context, services) {
   });
   classCatalogue = registerClassCatalogue(vscode, context, {
     scope: "database", label: "Database classes",
-    getRows: async () => {
+    refreshPage: async()=>{await resetPages();await connect();events.fire();},
+    getPage: async (filter) => {
       if (!session.client) await connect();
       if (!catalog) await loadCatalog();
-      return { rows: classBrowser.rows, scope: classScope(), generation: session.generation,
+      const browser=classBrowser,generation=session.generation;
+      if(filter.schema&&!browser.schemas.has(filter.schema))await browser.directory({schema:filter.schema,limit:1});
+      const page=await browser.page(filter);
+      if(browser!==classBrowser||generation!==session.generation)throw Error("Database changed or inspection was cancelled.");
+      return {rows:page.items,page,schemas:[...browser.schemas.values()].map(row=>({name:row.name,total:row.total})),scope:classScope(),generation:session.generation,
         label: (session.target === "working" ? "Working database" : "Source database") +
           " · Read-only · " + currentTarget.databasePath };
     },
@@ -1430,16 +1460,19 @@ function registerObjectExplorer(vscode, context, services) {
     vscode.commands.registerCommand("jadeNative.findObjectClass", value => action(() => findClass(value))),
     vscode.commands.registerCommand("jadeNative.browseDatabaseClasses", value => action(() =>
       classCatalogue.show({ schema: value?.kind === "schema" ? value.name : typeof value === "string" ? value : undefined }))),
-    vscode.commands.registerCommand("jadeNative.pageObjectClasses", (schemaName, offset) => action(async () => {
-      const schema = schemaNodes.get(schemaName);
-      if (!schema || !classBrowser) return;
-      const page = classBrowser.page({ schema: schemaName, offset });
-      const previous = classBrowser.page({ schema: schemaName, offset: classOffsets.get(schemaName) || 0 });
-      if (previous.offset !== page.offset) await Promise.all(previous.items.map(row => discardClassPage(row.oid)));
-      classOffsets.set(schemaName, page.offset);
-      schema.description = page.label;
-      events.fire(schema);
-      return { schema: schemaName, offset: page.offset, total: page.total };
+    vscode.commands.registerCommand("jadeNative.pageObjectSchemas",offset=>action(async()=>{
+      if(!Number.isSafeInteger(offset)||offset<0)throw Error("Invalid schema page offset");
+      await loadCatalog(true,{offset});events.fire();
+    })),
+    vscode.commands.registerCommand("jadeNative.pageObjectClasses",(schemaName,offset)=>action(async()=>{
+      const schema=schemaNodes.get(schemaName);
+      if(!schema||!classBrowser)return;
+      if(!Number.isSafeInteger(offset)||offset<0)throw Error("Invalid class page offset");
+      const previous=catalogClassPages.get(JSON.stringify([schemaName,classOffsets.get(schemaName)||0]));
+      if(previous&&previous.offset!==offset)await Promise.all(previous.items.map(row=>discardClassPage(row.oid)));
+      classOffsets.set(schemaName,offset);
+      await classChildren(schema);events.fire(schema);
+      return {schema:schemaName,offset,total:classBrowser.schemas.get(schemaName)?.total};
     })),
     vscode.commands.registerCommand("jadeNative.filterObjectInstances", row => action(() => filterInstances(row))),
     vscode.commands.registerCommand("jadeNative.moreObjectInstances", (row) =>
@@ -1497,6 +1530,7 @@ function registerObjectExplorer(vscode, context, services) {
     classCatalogue,
     instanceCatalogue: row => instanceCatalogues.get(instanceCatalogueKey(row))?.controller,
     browseInstances,
+    connectWorkingProject,
     ownsLock: () => lock,
     releaseForOperation: async () => {
       ++browseVersion;

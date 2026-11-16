@@ -20,7 +20,7 @@ function fixture(t,change=()=>{}){
  const service={sourceCapabilities:async()=>({sourceExtraction:{protocol:1,fullSchema:true,available:true,layout:'schema-ddx',requiresPromotionPermit:true,scopes:['all'],versions:['current']}}),startSourceExtraction:(_config,selection,callbacks)=>{
   calls.push({kind:'snapshot',selection,configuration:_config});fs.cpSync(path.join(workspace,'schemas'),path.join(selection.destination,'schemas'),{recursive:true});callbacks.onStage?.({stage:'inventory',completedFiles:0,totalFiles:4});return {completion:Promise.resolve({passed:true,authoritative:true,completedFiles:4}),stop(){}};
  }};
- const vscode={workspace:{workspaceFolders:[folder],textDocuments:documents,openTextDocument:async file=>({uri:{scheme:'file',fsPath:file}})},commands:{registerCommand:(name,handler)=>(commands.set(name,handler),{dispose(){}})},window:{showErrorMessage:async()=>{},showInformationMessage:async()=>{},showWarningMessage:async()=>{await change({root,workspace,source,types,documents,calls});return 'Update Jade Base';}}};
+ const vscode={workspace:{workspaceFolders:[folder],textDocuments:documents,openTextDocument:async file=>({uri:{scheme:'file',fsPath:file}})},commands:{registerCommand:(name,handler)=>(commands.set(name,handler),{dispose(){}})},window:{showErrorMessage:async()=>{},showInformationMessage:async()=>{},showWarningMessage:async()=>{const choice=await change({root,workspace,source,types,documents,calls,config});return typeof choice==='string'?choice:'Update Jade Base';}}};
  registerProjectTools(vscode,{subscriptions:[],workspaceState:{get:(_key,fallback)=>fallback,update:async()=>{}}},{service,config:()=>config,isBusy:()=>busy,setBusy:async value=>busy=value,output:{clear(){},show(){},append(){},appendLine(){}},prepareWorking:async()=>working});
  return {run:()=>commands.get('jadeNative.publishWorkspace')(),calls,config,working,busy:()=>busy};
 }
@@ -35,4 +35,26 @@ for(const [name,change] of [
  ['dirty associated untitled editor',({source,documents})=>documents.push({uri:{scheme:'untitled',fsPath:source},isDirty:true})]
 ])test('full publication refuses '+name+' introduced during approval',async t=>{
  const f=fixture(t,change),result=await f.run();assert.equal(result.success,false);assert.match(result.error,/changed|dirty|save|Multiple class\/type/i);assert.equal(f.calls.some(c=>c.kind==='native'&&c.args.includes('path='+f.config.databasePath)),false);assert.equal(f.busy(),false);
+});
+
+// The approved database identity must be reread after the asynchronous review.
+for(const [name,change] of [
+ ['database path',({config,root})=>{config.databasePath=path.join(root,'other-target-system');}],
+ ['INI path',({config,root})=>{config.iniPath=path.join(root,'other-target.ini');}],
+ ['server mode',({config})=>{config.server='multiUser';}]
+])test('full publication refuses '+name+' changed during approval before any target load',async t=>{
+ const f=fixture(t,change),result=await f.run();
+ assert.equal(result.success,false);
+ assert.match(result.error,/target changed after review.*publish again/i);
+ const native=f.calls.filter(c=>c.kind==='native');
+ assert.ok(native.length>0,'Working validation actually ran');
+ assert.ok(native.every(c=>c.args.includes('path='+f.working.databasePath)),'only the private Working target may have been used');
+ assert.equal(f.calls.filter(c=>c.kind==='snapshot').length,1,'no automatic second target capture');
+ assert.equal(f.busy(),false);
+});
+test('cancelling full publication after a target settings change performs no target load',async t=>{
+ const f=fixture(t,({config,root})=>{config.databasePath=path.join(root,'other-target');return 'Cancel';}),result=await f.run();
+ assert.equal(result.cancelled,true);
+ assert.ok(f.calls.filter(c=>c.kind==='native').every(c=>c.args.includes('path='+f.working.databasePath)));
+ assert.equal(f.busy(),false);
 });

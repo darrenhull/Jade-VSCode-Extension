@@ -1,18 +1,20 @@
 # Extension-led workspace startup
 
-Issue: [#87](https://github.com/darrenhull/Jade-VSCode-Extension/issues/87)
+Current delivery: [#105](https://github.com/darrenhull/Jade-VSCode-Extension/issues/105). Earlier configuration-only delivery: [#87](https://github.com/darrenhull/Jade-VSCode-Extension/issues/87).
 
-Status: the initial configuration-only Initialise Workspace command is implemented for the next extension release. Git installation/cloning, source acquisition and complete first-run orchestration below remain planned. The starting baseline was extension 0.22.6 / CLI 0.10.4; native timeout separation is tracked in [CLI #50](https://github.com/darrenhull/Jade-CLI/issues/50). Official CLI 0.10.5 is now bundled with the matching minimum-version and verified pin. Local final VSIX, portable and packaged initialization/progress UI proofs pass; current-head hosted checks and required reviews remain delivery gates.
+Status: issue105 source checkpoint e2092f5 implements Set Up Project by composing existing Git/native init/extraction/scoped Working services. Missing Git opens standard guidance only. Empty-folder activation uses one exclusive temporary marker plus a matching URI/ownership nonce in standard VS Code globalState, with no credentials or readiness flag. 87 focused controls pass. The final 0.22.15 VSIX passes portable and 119-module byte verification; ten actual packaged UI screens include a real openFolder reload and resumed persisted continuation across two extension hosts. Native replies in UI are controlled; no database or installer was used. Root delivery placement and hosted CI/review remain. Baseline notes below describe the earlier 0.22.6/CLI0.10.4 starting point, not current timeout or native-ignore behavior.
+
+Current defaults are 7200 seconds per Working backup/restore utility and 600 seconds for source-index preparation. Native init already ensures managed .jade state is ignored while preserving user ignore rules. Installation, clone, source extraction and Working preparation remain explicit distinct choices.
 
 ## Outcome and responsibilities
 
-Add **Jade: Initialise Workspace** to guide a developer from a directory or repository to configured native source and a private Working database. On re-entry, identify incomplete prerequisites without repeating expensive work.
+Use **Jade: Set Up Project**, composing **Jade: Initialise Workspace**, to guide a developer from a directory or repository to configured native source and a private Working database. On re-entry, identify incomplete prerequisites without repeating expensive work.
 
 The extension presents choices and progress. Existing VS Code Git features own Git operations; the native CLI owns Jade configuration, runtime selection, database ownership, backup/restore and extraction. Compose existing implementations instead of adding another broker, source serializer, category planner or database-readiness manifest.
 
 Do not automatically build, execute tests/scratch code, commit, push, publish to Source, recover a database, adopt an unmanaged database or discard Working state. Execution and reviewed publication remain separate.
 
-## Verified starting point
+## Verified starting point (historical baseline)
 
 - [extension/package.json](../extension/package.json) at the starting baseline contributed **Jade: Detect Runtime Settings** and **Jade: Extract All Sources**, without Initialise Workspace. The initial implementation now contributes the new configuration-only command.
 - [extension/src/extension.js](../extension/src/extension.js), detectSettings, selects the installation containing bin/jom.dll, Source database/INI and server mode, then saves four folder-scoped VS Code settings. It does not initialize Git or prepare Working.
@@ -55,7 +57,7 @@ Do not automatically build, execute tests/scratch code, commit, push, publish to
 | .jade/working and managed generations | Persistent databases that may hold unpublished state; never automatic cache cleanup, move/adoption or recreation. |
 | Owned transient staging/logs | Reproducible artifacts with bounded retention; cleanup only after owned native processes close. |
 
-Native Working preparation currently creates a wildcard .gitignore inside a new Working root if absent; native init does not exclude all .jade state from Git. Immediate installation instructions therefore ask the user to add .jade/ to the project .gitignore, preserving existing rules, and review status before committing; already tracked files remain tracked. The complete onboarding flow should offer a reviewed ignore update through the appropriate existing owner. Keep .jade outside source/test/publish discovery. Missing cache can rebuild; missing/inconsistent Working ownership fails closed.
+Current native init ensures managed .jade state is ignored while preserving existing rules; already tracked files remain tracked. Native Working preparation also preserves an existing ignore file and creates its owned ignore where needed. Setup reuses native ownership rather than writing another Git ignore implementation. Keep .jade outside source/test/publish discovery. Missing cache can rebuild; missing/inconsistent Working ownership fails closed.
 
 Initially add no persistent onboarding checkpoint database. Re-check repository/configuration and native readiness instead of a wizard success flag. Reopening or re-running setup must not automatically clone, extract, back up again or reset Working. Partial preparation is not a ready database.
 

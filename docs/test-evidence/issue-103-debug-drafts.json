@@ -1,0 +1,32 @@
+{
+  "issue": 103,
+  "base": "67602f9",
+  "reviewThread": "PRRT_kwDOVlO0pc63ttL_",
+  "reviewComment": 4580167477,
+  "red": {
+    "tests": 5,
+    "pass": 2,
+    "fail": 3,
+    "failures": [
+      "Applied visible custom-editor method absent from directly opened backing document",
+      "Conflicted custom-editor draft still reaches compile",
+      "Debug-method command does not prepare custom editor draft"
+    ]
+  },
+  "repair": "Reuse the existing resolveSource service in registered debugger activation, before source save or debug method selection. No new draft storage or native semantics.",
+  "controls": [
+    "Ordinary CLS source behavior unchanged",
+    "Output document rejected before preparation/open/compile"
+  ],
+  "method": "Real extension activation registration evaluated with actual registered debugger adapter/command and actual shared source resolver; controlled compile failure stops before database preparation.",
+  "nativeDatabaseOpened": false,
+  "fullLocalSuiteRun": false,
+  "green": {
+    "targetedChecks": 28,
+    "appliedDraftBeforeReadSaveSelect": true,
+    "conflictedDraftStopsBeforeSaveCompile": true,
+    "debugMethodCommandUsesPreparedDraft": true,
+    "ordinaryClsRetained": true,
+    "outputDocumentRefused": true
+  }
+}

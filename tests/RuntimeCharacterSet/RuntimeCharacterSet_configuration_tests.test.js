@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module');
 const root=path.resolve(__dirname,'../..'),manifest=require('../../extension/package.json');
 function activation(inspectionField='workspaceFolderValue',override){
- const folders=['ANSI','Unicode','Automatic','ExplicitAuto'].map(name=>({name,uri:{scheme:'file',fsPath:'C:/'+name}})),reads=[],writes=[],services={};
+ const folders=['ANSI','Unicode','Automatic','ExplicitAuto'].map(name=>({name,uri:{scheme:'file',fsPath:'C:/'+name}})),reads=[],writes=[],services={};let onboardingRegistrations=0,onboardingResumes=0;
  const folderFor=resource=>folders.find(folder=>resource?.fsPath===folder.uri.fsPath||resource?.fsPath.startsWith(folder.uri.fsPath+'/'));
  const settings=new Map([[folders[0],{installPath:'C:/Jade-ANSI',characterSet:'ansi'}],[folders[1],{installPath:'C:/Jade-Unicode',characterSet:'unicode'}],[folders[2],{installPath:'C:/Jade-Auto'}],[folders[3],{installPath:'C:/Jade-Auto',characterSet:'auto'}]]);
  if(override)settings.set(folders[0],{...settings.get(folders[0]),...override});
@@ -11,6 +11,8 @@ function activation(inspectionField='workspaceFolderValue',override){
  const registrations={'./object-explorer':'registerObjectExplorer','./compile-commands':'registerCompileCommands','./jade-workspaces':'registerWorkspaces','./debugger':'registerDebugger','./sidebar':'registerSidebar'};
  vm.runInNewContext('(function(require,module){'+fs.readFileSync(filename,'utf8')+'\n})',{process,Buffer,console})((name)=>{
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
+  if(name==='./workspace-initialization')return {registerWorkspaceInitialization:()=>({initialize:async()=>assert.fail('Configuration fixture must not initialize a project')})};
+  if(name==='./workspace-onboarding')return {registerWorkspaceOnboarding(_vscode,_context,services){onboardingRegistrations++;assert.equal(typeof services.initialize,'function');assert.equal(typeof services.connectWorking,'function');return {async resume(){onboardingResumes++;}};}};
   if(name==='./language-tools')return{registerLanguageTools:()=>language};
   if(name==='./config'){const loaded={exports:{}};vm.runInNewContext('(function(require,module){'+fs.readFileSync(path.join(root,'extension/src/config.js'),'utf8')+'\n})',{process})((key)=>key==='node:fs'?{...fs,existsSync:()=>true}:require(key),loaded);return loaded.exports;}
   if(name==='./cli-client')return{CliWorkingSession:class{}};
@@ -19,6 +21,7 @@ function activation(inspectionField='workspaceFolderValue',override){
   return noop;
  },module);
  module.exports.activate({subscriptions:[],extensionPath:'C:/extension',globalStorageUri:{fsPath:'C:/storage'},workspaceState:{get:()=> 'initial'}});
+ assert.equal(onboardingRegistrations,1);assert.equal(onboardingResumes,1);
  return{folders,reads,writes,services};
 }
 test('character-set setting is optional, resource-scoped and defaults to automatic native detection',()=>{

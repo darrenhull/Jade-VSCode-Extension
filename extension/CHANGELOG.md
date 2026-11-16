@@ -1,3 +1,30 @@
+# 0.22.16 - Official native runtime and combined workspace tools
+
+- Bundle [official Jade CLI 0.10.14](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.14), with the matching verified native helpers and minimum runtime version.
+- Browse database schemas and classes through bounded native pages and searches, including off-page reveal and explicit refresh. The native catalogue is still acquired eagerly; automatic external-database notifications are not provided.
+- Reuse compatible native source-cache metadata across CLI releases and repeated preparations while preserving exact shard/Git validation, changed-source handling and original failures. This does not remove first-index work or guarantee every cold preparation is fast.
+- Preserve generated native load diagnostics until their consumers have stopped; an unconfirmed process exit cannot report successful native preparation. This is not a guarantee of clean JADE shutdown after every forced stop.
+- Retain guided project setup, incomplete-test and debugger-exit diagnostics, pending debugger draft handling, native IDE refresh guidance, and publication refusal when the reviewed target configuration changes.
+- Working remains separate from Source. Build, test and Scratch Pad reuse does not cache execution results or publish source changes. The earlier customer hang still requires confirmation on the delivered bundle.
+
+
+# 0.22.15 - Guided project setup and completion diagnostics
+
+- Add Jade: Set Up Project for choosing or creating a project directory, cloning or explicitly pulling through VS Code Git, existing native workspace initialization, source acquisition and optional reviewed Working preparation.
+- Offer standard Git installation guidance without executing installers. Continue safely after opening a selected project using an owned temporary activation marker; preserve user files and mismatched markers.
+- Reuse existing native configuration, local-edit protection, sign-in, Working ownership, timeouts and cancellable progress. Setup does not build, test or publish.
+
+- Distinguish unconfirmed test method completion, unconfirmed cleanup and a selected method absent from the native report. Repeat the original native cause or precise fallback in Test Results output; preserve assertion failures, cancellation and timeout outcomes.
+- Report debugger cancellation, nonzero exits and unconfirmed native shutdown without claiming method completion. Preserve native errors and exit codes; legacy zero exits after an editor stop are labelled stopped. A stop acknowledgement remains nonterminal.
+- This improves failure evidence and does not claim to resolve the separately investigated native Scratch Pad or test hang.
+
+# 0.22.13 - Native empty source fragments and debugger drafts
+
+- Bundle [official Jade CLI 0.10.10](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.10), preserving valid empty native type fragments without inventing declarations and retaining real primitive methods. The native migration guard handles empty fragments when JCF migrations are pending.
+- Apply pending class-workspace method drafts through the existing shared source preparation before debug save, method selection and compilation. Abort unresolved or conflicted drafts.
+- Preserve ordinary CLS launch behavior and refusal of Output documents as debug source files.
+- Retain 0.22.12's configurable source-index timeout, progress notification, ownership-aware cancellation and Windows extraction-root repair. The updated native cache version requires one index rebuild; ordinary prepared runs continue to reuse the index.
+
 # 0.22.12 - Source index startup and F5 repair
 
 - Initialise a missing or incompatible native source index once before browsing, builds, tests or Scratch Pad execution. Reuse the prepared index on ordinary runs.

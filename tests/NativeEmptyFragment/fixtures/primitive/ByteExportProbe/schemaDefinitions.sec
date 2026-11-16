@@ -1,0 +1,4 @@
+﻿jadeVersionNumber "25.0.01";
+schemaDefinition
+ByteExportProbe subschemaOf RootSchema completeDefinition;
+	setModifiedTimeStamp "JadeLoader" "25.0.01" 2026:11:15:20:37:08;

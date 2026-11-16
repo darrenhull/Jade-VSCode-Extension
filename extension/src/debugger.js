@@ -14,6 +14,9 @@ const {
 function registerDebugger(vscode, context, services) {
   const output = vscode.window.createOutputChannel("Jade Debug");
   context.subscriptions.push(output);
+  const resolveSource=selected=>services.resolveSource
+    ? services.resolveSource(typeof selected==='string'?vscode.Uri.file(selected):selected)
+    : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
   async function select(document, methodName) {
     const methods = debugMethods(document.getText(), document.uri.fsPath);
     if (!methods.length)
@@ -130,7 +133,8 @@ function registerDebugger(vscode, context, services) {
             await services.setBusy(true);
             const selected=a.program||jadeSourceUri(vscode);
             if(!a.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||'')))throw Error('Open a Jade CLS source file before starting the debugger.');
-            const document = await vscode.workspace.openTextDocument(selected);
+            const document = await resolveSource(selected);
+            if(!document)throw Error('Open a Jade CLS source file before starting the debugger.');
             output.clear();
             output.show(true);
             this.assertActive();
@@ -589,12 +593,23 @@ function registerDebugger(vscode, context, services) {
         });
         output.appendLine(message.message);
       } else if (message.event === "exited") {
+        const cancelled = message.cancelled === true || message.exitCode === 130;
+        const stopRequested = this.cancelled && message.cancelled === undefined;
+        const shutdownUnconfirmed = message.shutdown && message.shutdown.state !== "clean";
+        const reuseBlocked = message.shutdown?.workingReuseAllowed === false;
+        const completed = message.exitCode === 0 && !cancelled && !stopRequested && !shutdownUnconfirmed && !reuseBlocked;
+        const code = Number.isInteger(message.exitCode) ? " (exit code " + message.exitCode + ")" : "";
+        let summary = completed
+          ? "Native method completed" + (message.result?.value ? " → " + message.result.value : "")
+          : cancelled ? "Native method cancelled" + code + "."
+          : stopRequested ? "Native debug session stopped" + code + "."
+          : Number.isInteger(message.exitCode) ? "Native method exited with code " + message.exitCode + "."
+          : "Native method exited without an exit code.";
+        if (shutdownUnconfirmed) summary += " Native shutdown was not confirmed.";
+        if (reuseBlocked) summary += " Working database reuse is blocked.";
         this.event("output", {
-          category: "console",
-          output:
-            "Native method completed" +
-            (message.result?.value ? " → " + message.result.value : "") +
-            "\n",
+          category: completed || cancelled || stopRequested ? "console" : "stderr",
+          output: summary + "\n",
         });
         this.event("exited", { exitCode: message.exitCode });
       }
@@ -705,9 +720,7 @@ function registerDebugger(vscode, context, services) {
       "jadeNative.debugMethod",
       async (uri, method) => {
         try {
-          const document = uri
-            ? await vscode.workspace.openTextDocument(uri)
-            : vscode.window.activeTextEditor?.document;
+          const document = await resolveSource(uri);
           if (!document || !/\.cls$/i.test(document.uri.fsPath))
             throw Error("Open a Jade CLS file.");
           const selected = await select(document, method);
