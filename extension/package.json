@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.14",
+  "version": "0.22.15",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -25,6 +25,7 @@
     "virtualWorkspaces": false
   },
   "activationEvents": [
+    "workspaceContains:.jade/project-setup.pending",
     "workspaceContains:jade.json",
     "workspaceContains:**/*.cls",
     "onLanguage:jade-nz",
@@ -70,6 +71,11 @@
       ]
     },
     "commands": [
+      {
+        "command": "jadeNative.setupProject",
+        "title": "Set Up Project",
+        "category": "Jade"
+      },
       {
         "command": "jadeNative.initializeWorkspace",
         "title": "Initialise Workspace",

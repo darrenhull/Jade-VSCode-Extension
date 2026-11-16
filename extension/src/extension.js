@@ -178,7 +178,7 @@ function activate(context) {
       workspaceRoots:[folder.uri.fsPath],storagePath:settings.cacheDirectory?path.resolve(folder.uri.fsPath,settings.cacheDirectory):path.join(context.globalStorageUri.fsPath,'native'),
       workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
   }
-  require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings,refreshSourceIndex:language.refreshSourceIndex});
+  const workspaceInitialization=require('./workspace-initialization').registerWorkspaceInitialization(vscode,context,{client:nativeTests,isBusy:()=>publishing,configFor:folder=>inspectionConfig(undefined,folder),detect:detectSettings,refreshSourceIndex:language.refreshSourceIndex});
   async function refreshCache(config, output = compileOutput, fromDatabase = true) {
     if (!fromDatabase && !config.systemSnapshotPath) throw new Error('Run Jade: Refresh Type Cache to read system metadata from the configured database.');
     output.appendLine(fromDatabase ? 'Refreshing RootSchema system definitions in a read-only database session ...' : 'Importing RootSchema system definitions into external C++ cache ...');
@@ -257,6 +257,13 @@ function activate(context) {
     },
     inspectionTarget:(config,selection,output)=>nativeTests.inspectionTarget(config,selection,output),workingLocation:config=>nativeTests.workingLocation(config)
   });
+  const onboarding=require('./workspace-onboarding').registerWorkspaceOnboarding(vscode,context,{
+    initialize:workspaceInitialization.initialize,
+    targets:async folder=>{const config=inspectionConfig(undefined,folder);return{config,working:await nativeTests.workingLocation(config)};},
+    extract:resource=>vscode.commands.executeCommand('jadeNative.extractAllSources',resource),
+    connectWorking:(folder,reviewed)=>objectExplorer.connectWorkingProject(folder.uri.fsPath,reviewed)
+  });
+  void onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
   const workspaceOperationGuard=new (require('./WorkspaceOperationGuard').WorkspaceOperationGuard)({
     isBusy:()=>publishing,
     claim:value=>{publishing=value;},
@@ -470,7 +477,7 @@ function activate(context) {
     vscode.commands.registerCommand('jadeNative.discover', detectSettingsCommand),
     vscode.commands.registerCommand('jadeNative.checkFile', () => vscode.commands.executeCommand('jadeNative.compileClass'))
   );
-  return {classView,objectExplorer,testing,nativeTests,workspaces,sourcePull};
+  return {classView,objectExplorer,testing,nativeTests,workspaces,sourcePull,onboarding};
 }
 
 function deactivate(){return activeNativeService?.dispose();}

@@ -1,0 +1,40 @@
+{
+  "issue": 105,
+  "base": "3e15f2639c609d2b44a72e35eecb210ea4bcaa67",
+  "version": "0.22.15",
+  "red": {
+    "initialWorkflowFailed": 6,
+    "initialCancellationControlPassed": 1,
+    "actualActivationAndManifestFailed": true,
+    "emptyFolderMarkerAndOwnershipFailed": 3,
+    "actualScopedCancellationError": "Connect to a database first."
+  },
+  "green": {
+    "focusedPassed": 87,
+    "fullLocalSuiteRun": false
+  },
+  "boundaries": {
+    "git": "Built-in vscode.git API1 clone/openRepository/pull; native init owns init and ignore",
+    "gitApiPrimarySource": "https://github.com/microsoft/vscode/blob/main/extensions/git/src/api/git.d.ts",
+    "installersExecuted": false,
+    "elevation": false,
+    "continuation": "Standard VSCode globalState URI+random ownership nonce and exclusive .jade/project-setup.pending activation marker; revalidated and consumed only for matching open root+marker",
+    "broadStartupActivationAdded": false,
+    "initialization": "Existing registerWorkspaceInitialization command/service",
+    "working": "Existing ObjectExplorer owned scoped transition, sign-in, progress, cancellation and native readiness",
+    "source": "Existing extraction command with local-edit protection"
+  },
+  "sdkOrPinChanged": false,
+  "sourceOrNativeDatabaseOpened": false,
+  "packagePending": true,
+  "uiPending": true,
+  "documentationPending": true,
+  "remainingGates": [
+    "Root source review",
+    "Startup instructions and scoped plan update",
+    "One actual VSIX/portable/exact-source verification",
+    "Actual packaged UI/continuation evidence with controlled native responses and no database",
+    "Hosted CI and automated/owner review after parent104/109 dependency chain"
+  ],
+  "limits": "Git/native responses in focused tests are controlled. The actual activation wiring and scoped ObjectExplorer controls execute product code. No installed Git software, Source backup, restore, user code or publication was performed."
+}

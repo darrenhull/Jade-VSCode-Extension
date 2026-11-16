@@ -565,6 +565,40 @@ function registerObjectExplorer(vscode, context, services) {
     await view.reveal(target, { select: true, focus: true, expand: false });
     return { schema: row.schema, name: row.name, offset: position.offset, readOnly: true };
   }
+  async function connectScopedTarget(requestedRoot, target, ownsTransition) {
+    return serializeInspectionTransition(async () => {
+      if (!ownsTransition()) return false;
+      const activeConfig = connectionOperation?.config || currentConfig;
+      const sameProject = activeConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
+      if (connectionOperation && (!sameProject || connectionOperation.target !== target)) await cancelConnection();
+      if (!ownsTransition()) return false;
+      if (session.disconnecting || (session.client && (!sameProject || session.target !== target))) await session.disconnect();
+      if (!ownsTransition()) return false;
+      if (session.target !== target) await session.select(target);
+      if (!ownsTransition()) return false;
+      inspectionScope = requestedRoot;
+      if (!session.client) {
+        const connected = await connect();
+        if (connected?.cancelled || !session.client) return false;
+      }
+      if (!ownsTransition()) return false;
+      if (!classBrowser) await loadCatalog();
+      return ownsTransition();
+    });
+  }
+  async function connectWorkingProject(projectRoot, expected) {
+    const requestedRoot = path.resolve(projectRoot);
+    const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(requestedRoot));
+    const equal = (a,b) => process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+    if (!folder || !equal(folder.uri.fsPath,requestedRoot)) throw Error("Choose an open project folder before preparing Working.");
+    if (services.isBusy()) throw Error("Wait for the current Jade operation or cancel it first.");
+    const version = ++browseVersion, ownsTransition = () => version === browseVersion && !disposed;
+    const config = await configured(undefined,folder);
+    for (const key of ["installPath","databasePath","iniPath","server","characterSet","workingDatabaseDirectory","workingDatabaseGeneration","storagePath","workspaceRoots"])
+      if (expected && JSON.stringify(config[key]) !== JSON.stringify(expected[key])) throw Error("Jade targets changed after review. Run Set Up Project again.");
+    if (!await connectScopedTarget(requestedRoot,"working",ownsTransition)) return {cancelled:true};
+    return {selection:"working",readOnly:true,databasePath:currentTarget?.databasePath};
+  }
   async function browseInstances(value) {
     if (!value || typeof value.schema !== "string" || typeof value.className !== "string" || typeof value.projectRoot !== "string")
       throw Error("Choose a workspace class with an explicit project and schema.");
@@ -597,22 +631,7 @@ function registerObjectExplorer(vscode, context, services) {
     });
     if (version !== browseVersion || disposed || !choice || !["working", "source"].includes(choice.target)) return { cancelled: true };
     try {
-      const connected = await serializeInspectionTransition(async () => {
-        if (!ownsTransition()) return false;
-        const activeConfig = connectionOperation?.config || currentConfig;
-        const sameProject = activeConfig?.workspaceRoots?.some(root => path.resolve(root).toLowerCase() === requestedRoot.toLowerCase());
-        if (connectionOperation && (!sameProject || connectionOperation.target !== choice.target)) await cancelConnection();
-        if (!ownsTransition()) return false;
-        if (session.disconnecting || (session.client && (!sameProject || session.target !== choice.target))) await session.disconnect();
-        if (!ownsTransition()) return false;
-        if (session.target !== choice.target) await session.select(choice.target);
-        if (!ownsTransition()) return false;
-        inspectionScope = requestedRoot;
-        if (!session.client) await connect();
-        if (!ownsTransition()) return false;
-        if (!classBrowser) await loadCatalog();
-        return ownsTransition();
-      });
+      const connected = await connectScopedTarget(requestedRoot, choice.target, ownsTransition);
       if (!connected) return { cancelled: true };
     } catch (error) { return unavailable(error); }
     if (version !== browseVersion || disposed) return { cancelled: true };
@@ -1497,6 +1516,7 @@ function registerObjectExplorer(vscode, context, services) {
     classCatalogue,
     instanceCatalogue: row => instanceCatalogues.get(instanceCatalogueKey(row))?.controller,
     browseInstances,
+    connectWorkingProject,
     ownsLock: () => lock,
     releaseForOperation: async () => {
       ++browseVersion;
