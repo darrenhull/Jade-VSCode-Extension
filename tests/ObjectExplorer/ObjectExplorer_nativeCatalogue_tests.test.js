@@ -110,3 +110,16 @@ test('schema directory itself stays paged and exact class reveal reaches an init
   roots=await f.controller.provider.getChildren();assert.equal(roots.filter(x=>x.kind==='schema').length,5);assert.equal(roots.some(x=>x.name==='Schema204'),true);
  }finally{await f.cleanup();}
 });
+
+test('Database class catalogue Refresh button explicitly reacquires native snapshot rather than rereading cached pages',async()=>{
+ const n=nativeCatalogue(),f=setup({catalogHandler:n.handler,closeAutomatically:true});
+ try{
+  await f.connect();await f.commands.get('jadeNative.browseDatabaseClasses')();
+  const panel=f.panels.at(-1);await panel.receive({command:'ready'});
+  n.replace();await panel.receive({command:'refresh'});
+  assert.ok(n.calls.some(x=>x.view==='schemas'&&x.refresh===true),'Catalogue Refresh must use native refresh');
+  await panel.receive({command:'query',query:'Fish259',schema:'Pets',offset:0});
+  const payload=panel.messages.filter(x=>x.command==='catalogue').at(-1);
+  assert.equal(payload.page.items[0].name,'Fish259');
+ }finally{await f.cleanup();}
+});

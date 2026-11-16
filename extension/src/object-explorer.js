@@ -833,6 +833,7 @@ function registerObjectExplorer(vscode, context, services) {
   });
   classCatalogue = registerClassCatalogue(vscode, context, {
     scope: "database", label: "Database classes",
+    refreshPage: async()=>{await resetPages();await connect();events.fire();},
     getPage: async (filter) => {
       if (!session.client) await connect();
       if (!catalog) await loadCatalog();
