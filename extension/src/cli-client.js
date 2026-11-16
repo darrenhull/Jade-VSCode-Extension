@@ -101,7 +101,24 @@ class CliWorkingSession{
   options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();
   return request.promise.finally(()=>options.signal?.removeEventListener('abort',abort));
  }
- sourceCapabilities(config,body={}){return this.resolveNative('doctor',sourceConfiguration(config),'capabilities',body);}
+ async sourceCapabilities(config,body={}){
+  const connection=this.connect();
+  const result=this.resolveNative('doctor',sourceConfiguration(config),'capabilities',body);
+  if(!connection.workingJadeGitCapability){
+   // Only this process-wide descriptor is retained, never project Source capabilities.
+   const probe=result.then(capabilities=>structuredClone(capabilities.workingJadeGitPolicy));
+   connection.workingJadeGitCapability=probe;
+   void probe.catch(()=>{if(connection.workingJadeGitCapability===probe)delete connection.workingJadeGitCapability;});
+  }
+  return result;
+ }
+ async workingJadeGitCapability(config){
+  const connection=this.connect();
+  if(!connection.workingJadeGitCapability)await this.sourceCapabilities(config);
+  const descriptor=await connection.workingJadeGitCapability;
+  if(this.client!==connection)throw Error('The Jade CLI connection closed or changed during the Working capability check. Retry the operation.');
+  return descriptor;
+ }
  startSourceExtraction(config,selection,callbacks){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
   const operation=new SourceExtractionOperation(this,configDto(sourceConfiguration(config)),selection,callbacks);

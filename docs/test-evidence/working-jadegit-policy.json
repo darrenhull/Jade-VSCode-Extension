@@ -64,5 +64,28 @@
   "nativeAssetOrDependencyChanged": false,
   "nativeDatabaseOpened": false,
   "privateCliAssetCommitted": false,
-  "limits": "Native16 actual policy/INI qualification is owned by native96. This bridge does not establish Source authentication or close native97. One eventual extension bundle waits for the genuine official16 release."
+  "limits": "Native16 actual policy/INI qualification is owned by native96. This bridge does not establish Source authentication or close native97. One eventual extension bundle waits for the genuine official16 release.",
+  "capabilityReuse": {
+    "scope": "Only static Working-policy descriptor Promise on existing live client record; no persistent or project capability cache",
+    "seededByExistingDoctorResult": true,
+    "inFlightProbesShared": true,
+    "sourceCapabilitiesRemainFresh": true,
+    "restartInvalidates": true,
+    "failedProbeCanRetry": true,
+    "oldCliStillRejected": true,
+    "closedProbeOwnerCannotAuthorizeNewProcess": true,
+    "returnedSourceObjectsCannotMutateDescriptor": true,
+    "red": {
+      "tests": 7,
+      "passed": 2,
+      "failed": 5
+    },
+    "green": {
+      "newLifecycleControls": 8,
+      "totalFocusedCurrent": 22,
+      "milliseconds": 117.7149
+    },
+    "uiAndPinBytesUnchanged": true,
+    "uiCaptureRepeated": false
+  }
 }

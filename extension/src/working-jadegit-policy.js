@@ -8,7 +8,7 @@ async function requireWorkingJadeGitPolicy(client,config) {
   const policy=config?.workingJadeGitPolicy??'inherit';
   if(policy==='inherit')return;
   if(policy!=='disabled')throw Error('Choose inherit or disabled for the Working JadeGit policy.');
-  const descriptor=(await client.sourceCapabilities(sourceConfiguration(config)))?.workingJadeGitPolicy;
+  const descriptor=await client.workingJadeGitCapability(sourceConfiguration(config));
   if(descriptor?.format!==1||descriptor.configuration!=='workingJadeGitPolicy'||
      descriptor.default!=='inherit'||descriptor.scope!=='owned-working-only'||descriptor.reversible!==true||
      !Array.isArray(descriptor.values)||descriptor.values.length!==2||
