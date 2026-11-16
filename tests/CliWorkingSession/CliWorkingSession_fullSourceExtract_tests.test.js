@@ -13,7 +13,8 @@ function fixture() {
     packets.push(JSON.parse(line));
     return true;
   };
-  child.kill = () => {};
+  child.stdin.end = () => queueMicrotask(() => child.emit("close", 0));
+  child.kill = () => queueMicrotask(() => child.emit("close", 2));
   const session = new CliWorkingSession({
     entry: "jade-cli.exe",
     spawn: () => child,

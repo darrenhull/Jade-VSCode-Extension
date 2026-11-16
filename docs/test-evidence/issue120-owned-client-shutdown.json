@@ -1,0 +1,48 @@
+{
+  "issue": 120,
+  "base": "107bd35d45d19e13c959aa286b107fe734e429e7",
+  "scope": "Extension-owned stdio service cancellation, drain, EOF and actual exit; shared broker retirement remains separately gated.",
+  "red": {
+    "passed": 1,
+    "failed": 3,
+    "milliseconds": 166.9425,
+    "failures": [
+      "No awaited actual-close Promise",
+      "No cancellation of in-flight Working request",
+      "Repeated disposal has no shared closure"
+    ]
+  },
+  "green": {
+    "passed": 27,
+    "failed": 0,
+    "milliseconds": 7039.7539,
+    "actualOwnedNodeFixtureChildren": 4,
+    "allActualChildrenExited": true,
+    "fullLocalSuite": false,
+    "nativeCliOrJadeExecuted": false
+  },
+  "controls": [
+    "Idle EOF and actual close, idempotence, no restart during disposal",
+    "Owned Working cancellation preserves original6295 result",
+    "Bounded captured-child fallback; unconfirmed exit rejects",
+    "Failed startup remains tracked until close",
+    "Five metadata probes reuse one stdio client",
+    "Actual graceful replacement, bounded unresponsive-child exit, other client preserved",
+    "Existing extraction lease, permit, partial/cancelled outcome and close controls"
+  ],
+  "defaults": {
+    "gracefulMilliseconds": 3000,
+    "fallbackExitMilliseconds": 1000
+  },
+  "unchanged": {
+    "extensionVersion": "0.22.17",
+    "officialCliPin": "0.10.16",
+    "sourceConfigurationAndCredentials": true
+  },
+  "remaining": [
+    "The shared broker is not retired by this checkpoint.",
+    "Native atomic last-client/fingerprint retirement is required before claiming old-runtime shutdown on update.",
+    "Two role-specific stdio/broker processes are expected; process names alone do not identify a leak."
+  ],
+  "qualification": "Synthetic records and owned Node children only; no customer process, native/database operation, UI or package build."
+}

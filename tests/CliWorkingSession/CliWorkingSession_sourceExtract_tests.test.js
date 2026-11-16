@@ -26,8 +26,13 @@ function fixture() {
         requests.push(JSON.parse(line));
         return true;
       };
+      child.stdin.end = () => {
+        child.ended = true;
+        queueMicrotask(() => child.emit("close", 0));
+      };
       child.kill = () => {
         child.killed = true;
+        queueMicrotask(() => child.emit("close", 2));
       };
       children.push(child);
       return child;
@@ -251,7 +256,8 @@ test("normal disposal cancels and waits for native result before closing service
     },
   });
   await closing;
-  assert.equal(f.children[0].killed, true);
+  assert.equal(f.children[0].ended, true);
+  assert.notEqual(f.children[0].killed, true);
   assert.equal((await op.completion).status, "cancelled");
 });
 
