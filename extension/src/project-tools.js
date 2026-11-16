@@ -55,6 +55,7 @@ function registerProjectTools(vscode,context,options){
    requireCleanSources();
    const current=await scanProject(root);if(current.hash!==project.hash)throw Error('Source files changed after review (including additions or deletions). Publish again.');
    requireCleanSources();
+   if(targetKey(options.config(document))!==id)throw Error('Publication target changed after review. Publish again to review the current database settings.');
    const target={...working,databasePath:config.databasePath,iniPath:config.iniPath,server:config.server};
    await applyRenames(target,project,text=>output.append(text),new Set(catalog(before).keys()));
    const result=await loadProject(target,bundle,text=>output.append(text));output.appendLine('LoaderExitCode='+result.code);
