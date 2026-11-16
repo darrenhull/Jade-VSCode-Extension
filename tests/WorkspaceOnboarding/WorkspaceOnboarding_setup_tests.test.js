@@ -43,3 +43,44 @@ test('failed opening preserves a marker whose owner changed before cleanup',asyn
 test('declining resume removes only the owned marker and intent',async t=>{const f=fixture(t),nonce=require('node:crypto').randomUUID(),managed=path.join(f.root,'.jade');fs.mkdirSync(managed);fs.writeFileSync(path.join(managed,'project-setup.pending'),JSON.stringify({format:'jade-project-setup/1',nonce}));fs.writeFileSync(path.join(managed,'keep.txt'),'keep');f.state.set('jadeNative.pendingProjectSetup',{uri:f.folder.uri.toString(),nonce});assert.equal((await f.controller.resume()).cancelled,true);assert.equal(f.state.size,0);assert.deepEqual(fs.readdirSync(managed),['keep.txt']);assert.ok(!f.calls.some(c=>c[0]==='initialize'));});
 test('repeated setup clicks join the same initialization attempt',async t=>{const f=fixture(t,{picks:['folder','existing','later']});let release,initializations=0;const gate=new Promise(resolve=>release=resolve);f.services.initialize=async()=>{initializations++;await gate;return{passed:true,code:0};};const first=f.controller.setup(),second=f.controller.setup();assert.equal(first,second);await new Promise(resolve=>setImmediate(resolve));assert.equal(initializations,1);release();assert.equal((await first).configurationReady,true);});
 test('removing the reviewed folder cancels before Working connection',async t=>{const f=fixture(t,{picks:['folder','existing','working']});f.vscode.window.showWarningMessage=async()=>{f.vscode.workspace.workspaceFolders=[];return'Prepare Working';};assert.equal((await f.controller.setup()).passed,false);assert.ok(!f.calls.some(c=>c[0]==='working'));});
+
+
+const verifiedWorkingBaseline={status:'verified',origin:'same-generation-native-extraction',scope:'all',identity:{binding:'opaque-native-proof'}};
+test('combined setup uses one reviewed Working sync without separate export or connect',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Prepare Working']});
+ f.services.syncWorkingSources=async(folder,config)=>{f.calls.push(['sync',folder.uri.fsPath,config]);return{passed:true,code:0,workingBaseline:verifiedWorkingBaseline};};
+ const value=await f.controller.setup();
+ assert.equal(f.calls.filter(c=>c[0]==='sync').length,1,'Combined setup omitted the single native sync');
+ assert.equal(f.calls.filter(c=>['extract','working'].includes(c[0])).length,0,'Combined setup repeated Source export or Working connection');
+ assert.equal(value.workingPrepared,true);assert.deepEqual(value.workingBaseline,verifiedWorkingBaseline);
+ assert.ok(!f.logs.some(x=>x.includes('prepared and connected')),'Native baseline does not establish inspection connection');
+});
+test('combined setup decline happens before any extraction or Working side effects',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working']});await f.controller.setup();
+ assert.ok(!f.calls.some(c=>['extract','working','sync'].includes(c[0])),'Declined combined review already extracted sources');
+});
+test('combined setup preserves native cancellation evidence and incomplete Working state',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Prepare Working']});
+ const native={passed:false,code:130,status:'cancelled',partial:true,completedFiles:1,counts:{added:1}};
+ f.services.syncWorkingSources=async()=>native;const value=await f.controller.setup();
+ assert.equal(value.cancelled,true);assert.equal(value.workingPrepared,false);assert.deepEqual(value.sourceResult,native);
+ assert.ok(!f.calls.some(c=>['extract','working'].includes(c[0])));
+});
+test('combined setup cannot claim readiness from an unverified native summary',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Prepare Working']});
+ f.services.syncWorkingSources=async()=>({passed:true,code:0,workingBaseline:{status:'reconciliation-required'}});
+ const value=await f.controller.setup();assert.equal(value.passed,false);assert.notEqual(value.workingPrepared,true);assert.match(value.error,/baseline|verified|reconcil/i);
+});
+test('ordinary Source-only setup remains extraction only and has no Working baseline',async t=>{
+ const f=fixture(t,{picks:['folder','extract','later']});const value=await f.controller.setup();
+ assert.equal(f.calls.filter(c=>c[0]==='extract').length,1);assert.equal(value.workingPrepared,false);assert.equal(value.workingBaseline,undefined);
+});
+
+
+test('combined setup activation delegates to the one shared SourcePull Working sync adapter',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Prepare Working']});
+ const source=fs.readFileSync(path.join(__dirname,'../../extension/src/extension.js'),'utf8'),start=source.indexOf('  const onboarding='),end=source.indexOf('  const workspaceOperationGuard=',start);
+ const config={installPath:'C:/Jade',databasePath:'C:/Source/system',iniPath:'C:/Source/jade.ini',server:'singleUser',workspaceRoots:[f.root]};let synced=0;
+ require('node:vm').runInNewContext(source.slice(start,end),{require:name=>require(path.join(__dirname,'../../extension/src',name)),vscode:f.vscode,context:f.context,workspaceInitialization:{initialize:f.services.initialize},inspectionConfig:()=>config,nativeTests:{workingLocation:async()=>({databasePath:path.join(f.root,'.jade/working/system')})},sourcePull:{runWorkingSync:async(folder,reviewed)=>{synced++;assert.equal(folder,f.folder);assert.equal(reviewed,config);return{passed:true,code:0,workingBaseline:verifiedWorkingBaseline};}},objectExplorer:{connectWorkingProject:async()=>assert.fail('Combined sync must not connect/export again')}});
+ const value=await f.commands.get('jadeNative.setupProject')();assert.equal(synced,1);assert.equal(value.workingPrepared,true);assert.equal(f.calls.filter(c=>c[0]==='command'&&c[1]==='jadeNative.extractAllSources').length,0);
+});

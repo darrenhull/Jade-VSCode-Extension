@@ -9,6 +9,7 @@ const { resolveSourcePullSelection } = require("./source-pull-selection");
 const { readSelectedBaselineReceipt } = require("./source-baseline-receipt");
 const { sourceTargetPath, selectedSourcePaths } = require("./source-pull-path");
 const { elapsedLabel } = require("./pull-progress");
+const { requireWorkingJadeGitPolicy } = require("./working-jadegit-policy");
 const stageLabels = {
   opening: "Opening Source",
   inventory: "Selecting class sources",
@@ -39,11 +40,15 @@ class SourcePullController {
   runSchemas(folder, schemas) {
     return this.runFull(folder, "schemas", schemas);
   }
-  runFull(folder, scope, schemas) {
+  runWorkingSync(folder, reviewedConfig) {
+    return this.runFull(folder, "all", undefined, { workingSync: true, reviewedConfig });
+  }
+  runFull(folder, scope, schemas, options = {}) {
     return this.vscode.window.withProgress(
       {
         location: this.vscode.ProgressLocation.Notification,
         title:
+          options.workingSync ? "Preparing Working and extracting its sources" :
           scope === "all"
             ? "Extracting all Source schemas"
             : "Refreshing selected Source schemas",
@@ -53,6 +58,7 @@ class SourcePullController {
         this.run(folder, {
           scope,
           schemas,
+          ...options,
           preparationProgress: progress,
           preparationToken: token,
         }),
@@ -61,7 +67,7 @@ class SourcePullController {
 
   async run(
     resource,
-    { scope = "classes", schemas, preparationProgress, preparationToken } = {},
+    { scope = "classes", schemas, preparationProgress, preparationToken, workingSync = false, reviewedConfig } = {},
   ) {
     const full = scope !== "classes";
     let refreshAll = false,
@@ -77,7 +83,8 @@ class SourcePullController {
     const labels = full
       ? {
           ...stageLabels,
-          inventory: "Discovering complete Source inventory",
+          ...(workingSync ? { opening: "Preparing owned Working", closing: "Closing Working extraction" } : {}),
+          inventory: workingSync ? "Discovering complete Working inventory" : "Discovering complete Source inventory",
           "native-write": "Writing native Source files",
         }
       : stageLabels;
@@ -97,6 +104,8 @@ class SourcePullController {
     let expectedFiles = 0;
     try {
       if (this.disposed) throw Error("Source pull is closed.");
+      if (workingSync && (!full || !reviewedConfig || typeof reviewedConfig !== "object"))
+        throw Error("Review the Working target before starting complete Working source sync.");
       if (this.running)
         throw Error("A Source extraction is already preparing or running.");
       this.running = true;
@@ -113,7 +122,7 @@ class SourcePullController {
         full
           ? services.resolveProject || resolveSourcePullProject
           : services.resolve || resolveSourcePullSelection
-      )(vscode, resource, services.settings, {
+      )(vscode, resource, workingSync ? () => ({ ...reviewedConfig }) : services.settings, {
         prepareSource: services.prepareSource,
       });
       const { folder, config, destination, selection } = resolved;
@@ -136,6 +145,12 @@ class SourcePullController {
         throw Error(
           "The bundled Jade CLI does not support this native streaming scope (complete schemas require full-schema support). Update Jade Tools; no batch fallback was run.",
         );
+      if (workingSync) {
+        const support = capability.workingBaseline;
+        if (support?.format !== 1 || !Array.isArray(support.modes) || !support.modes.includes("fresh"))
+          throw Error("Update Jade Tools: the bundled Jade CLI does not support same-generation Working source sync.");
+        await requireWorkingJadeGitPolicy(services.service, config);
+      }
       let baselineReceipt, baselineWarning;
       try {
         if (!full)
@@ -175,7 +190,7 @@ class SourcePullController {
       output.show(true);
       log(
         full
-          ? scope === "all"
+          ? workingSync ? "Preparing fresh owned Working and extracting its current source baseline." : scope === "all"
             ? "Extracting all user schema sources from Source (current version)."
             : "Refreshing Source schemas: " +
               schemas.join(", ") +
@@ -321,7 +336,7 @@ class SourcePullController {
                 counts: {},
                 completedFiles: 0,
               };
-            operation = services.service.startSourceExtraction(
+            operation = (workingSync ? services.service.startWorkingSync.bind(services.service) : services.service.startSourceExtraction.bind(services.service))(
               config,
               {
                 destination,

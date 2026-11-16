@@ -120,8 +120,14 @@ class CliWorkingSession{
   return descriptor;
  }
  startSourceExtraction(config,selection,callbacks){
+  return this.startExtraction(sourceConfiguration(config),selection,callbacks,'source.extract');
+ }
+ startWorkingSync(config,selection,callbacks){
+  return this.startExtraction(config,selection,callbacks,'working.sync');
+ }
+ startExtraction(config,selection,callbacks,command){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
-  const operation=new SourceExtractionOperation(this,configDto(sourceConfiguration(config)),selection,callbacks);
+  const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks,command);
   this.activeSources.add(operation);
   operation.completion.then(()=>this.activeSources.delete(operation),()=>this.activeSources.delete(operation));
   return operation;

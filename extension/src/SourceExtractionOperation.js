@@ -48,12 +48,16 @@ class SourceExtractionOperation {
       version = "current",
     },
     callbacks = {},
+    command = "source.extract",
   ) {
+    if (!["source.extract", "working.sync"].includes(command)) throw Error("Unsupported extraction operation.");
+    this.command = command;
     if (version !== "current")
       throw Error(
         "Streaming extraction currently supports the current source version only.",
       );
     const full = scope !== "classes";
+    if (command === "working.sync" && !full) throw Error("Working sync requires a complete schema or all-schema scope.");
     if (
       !["classes", "schemas", "all"].includes(scope) ||
       !path.isAbsolute(destination) ||
@@ -110,7 +114,7 @@ class SourceExtractionOperation {
     this.observedCounts = {};
     this.seenTickets = new Set();
     this.request = session.request(
-      "source.extract",
+      command,
       {
         config: { ...config, extractionTimeoutSeconds: config?.extractionTimeoutSeconds ?? DEFAULT_EXTRACTION_TIMEOUT_SECONDS },
         destination,
@@ -348,6 +352,11 @@ class SourceExtractionOperation {
         "Native extraction result does not match received file outcomes.",
         result,
       );
+    if (this.command === "working.sync" && result.passed &&
+        (result.workingBaseline?.status !== "verified" ||
+         result.workingBaseline.origin !== "same-generation-native-extraction" ||
+         result.workingBaseline.scope !== this.scope || result.workingBaseline.identity == null))
+      return this.failedResult("Native Working source baseline was not verified.", result);
     if (this.failure && result.passed)
       return this.failedResult(this.failure.message, result);
     return this.failure

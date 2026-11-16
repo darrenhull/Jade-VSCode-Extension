@@ -263,6 +263,7 @@ function activate(context) {
     initialize:workspaceInitialization.initialize,
     targets:async folder=>{const config=inspectionConfig(undefined,folder);return{config,working:await nativeTests.workingLocation(config)};},
     extract:resource=>vscode.commands.executeCommand('jadeNative.extractAllSources',resource),
+    syncWorkingSources:(folder,reviewed)=>sourcePull.runWorkingSync(folder,reviewed),
     connectWorking:(folder,reviewed)=>objectExplorer.connectWorkingProject(folder.uri.fsPath,reviewed)
   });
   void onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
