@@ -1,0 +1,50 @@
+{
+  "issue": 107,
+  "parentNativeIssue": "darrenhull/Jade-CLI#27",
+  "base": "fcfdd3f93fa37c644057b314d8d554b9ed13cdf7",
+  "red": {
+    "passed": 2,
+    "failed": 7,
+    "incorrectActual": "Native method completed"
+  },
+  "green": {
+    "affectedDebuggerChecksPassed": 31,
+    "finalFocusedControlsPassed": 11,
+    "fullLocalSuiteRun": false
+  },
+  "change": "Only native zero exit without cancellation, unconfirmed shutdown or reuse denial prints completion. Cancellation, nonzero exit, missing exit code and optional unconfirmed shutdown metadata produce truthful terminal output; original native errors and numeric exitCode remain unchanged. Stop acknowledgement remains nonterminal.",
+  "nativeContract": {
+    "owner": "source_deadline_repair",
+    "sourceOnly": true,
+    "topLevel": [
+      "exitCode",
+      "result",
+      "cancelled",
+      "shutdown"
+    ],
+    "shutdown": {
+      "state": [
+        "clean",
+        "indeterminate"
+      ],
+      "workingReuseAllowed": "boolean",
+      "recoveryRequired": "false|null",
+      "reason": "string"
+    },
+    "recoveryNullRemainsUnknown": true,
+    "existingLegacyPacketsSupported": true
+  },
+  "nativeSdkChanged": false,
+  "nativeOrCustomerDatabaseOpened": false,
+  "cleanNativeAbortProven": false,
+  "uiEvidencePending": true,
+  "releaseMetadataPending": true,
+  "packagingPending": true,
+  "remainingGates": [
+    "Root source checkpoint review",
+    "Actual packaged Debug Console terminal-state screenshots",
+    "Coordinate final diagnostic release/native CLI27 contract and package once its source/release is approved",
+    "Final-head CI and automated/owner review"
+  ],
+  "limitations": "Controlled native protocol packets exercise the actual registered adapter; no JADE execution, forced database crash, reset or recovery was performed. This thin-client repair does not solve native abort or the original Scratch/test hang."
+}

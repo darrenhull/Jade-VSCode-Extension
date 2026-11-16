@@ -593,12 +593,21 @@ function registerDebugger(vscode, context, services) {
         });
         output.appendLine(message.message);
       } else if (message.event === "exited") {
+        const cancelled = message.cancelled === true || message.exitCode === 130;
+        const shutdownUnconfirmed = message.shutdown && message.shutdown.state !== "clean";
+        const reuseBlocked = message.shutdown?.workingReuseAllowed === false;
+        const completed = message.exitCode === 0 && !cancelled && !shutdownUnconfirmed && !reuseBlocked;
+        const code = Number.isInteger(message.exitCode) ? " (exit code " + message.exitCode + ")" : "";
+        let summary = completed
+          ? "Native method completed" + (message.result?.value ? " → " + message.result.value : "")
+          : cancelled ? "Native method cancelled" + code + "."
+          : Number.isInteger(message.exitCode) ? "Native method exited with code " + message.exitCode + "."
+          : "Native method exited without an exit code.";
+        if (shutdownUnconfirmed) summary += " Native shutdown was not confirmed.";
+        if (reuseBlocked) summary += " Working database reuse is blocked.";
         this.event("output", {
-          category: "console",
-          output:
-            "Native method completed" +
-            (message.result?.value ? " → " + message.result.value : "") +
-            "\n",
+          category: completed || cancelled ? "console" : "stderr",
+          output: summary + "\n",
         });
         this.event("exited", { exitCode: message.exitCode });
       }
