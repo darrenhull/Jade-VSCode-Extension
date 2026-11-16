@@ -1,0 +1,49 @@
+{
+  "reason": "Root-approved message-only cleanup before first push; parent15 remains open, scoped112 closes separately",
+  "base": "6682b04263b73703326ab299e9b83e81e160d1e7",
+  "oldTip": "a2b71882a6012856870272e858d2f7d36ff4e2a1",
+  "newTip": "2211ac5373f5845a3374b14d3cd2aa562812b3c6",
+  "allCommitTreesIdentical": true,
+  "allProductPackageAndArtifactBytesUnchanged": true,
+  "testsAndPackageNotRerun": true,
+  "uiReceiptOldProductHead": "1df3aa579ee326871f4aa09162459cb9aa0c6561",
+  "uiReceiptOldEvidenceHead": "4352f9e15412d3121f5dac12c06a51193e55aa94",
+  "unchangedVsixSha256": "59738a67dac75936f8a2848dc9d70ebeab687498a447550ab5bccd0db0b8cbce",
+  "mapping": [
+    {
+      "oldCommit": "7fd1c310c64de296723636d316cc4cc827b2e528",
+      "newCommit": "82a3d46821b4fdb0e1a0444d0ddc90ad6df9e6bb",
+      "tree": "6f4bd50f9a5d091dc55e482ded78c4e7107bfdab",
+      "treeIdentical": true,
+      "messageChanged": true
+    },
+    {
+      "oldCommit": "7a8d342d02c48596d666d49bf719c2984b7277cf",
+      "newCommit": "3397e89a0b3646c6307302f700738f7915099a02",
+      "tree": "3ff7f6c9187734336216817e13085b22d9246cb8",
+      "treeIdentical": true,
+      "messageChanged": false
+    },
+    {
+      "oldCommit": "1df3aa579ee326871f4aa09162459cb9aa0c6561",
+      "newCommit": "a7772fc89c98cca932dddba5c4a4a1ea396d93cd",
+      "tree": "1f3463dad4dba1d17a29e6dd4edb15ac72d1fd98",
+      "treeIdentical": true,
+      "messageChanged": false
+    },
+    {
+      "oldCommit": "4352f9e15412d3121f5dac12c06a51193e55aa94",
+      "newCommit": "218ba54a9f3beb04330bbca06f458690e2f00b95",
+      "tree": "e775308737fb231eb43a271274b73bc71250fad3",
+      "treeIdentical": true,
+      "messageChanged": false
+    },
+    {
+      "oldCommit": "a2b71882a6012856870272e858d2f7d36ff4e2a1",
+      "newCommit": "2211ac5373f5845a3374b14d3cd2aa562812b3c6",
+      "tree": "adea302d2d5ef0e4e26f253767689b2aeb59d339",
+      "treeIdentical": true,
+      "messageChanged": false
+    }
+  ]
+}
