@@ -64,9 +64,9 @@ function fixture(t) {
           const snapshotId = 'scale-snapshot-' + snapshotGeneration;
           if (args.snapshotId && args.snapshotId !== snapshotId) throw Error('Native catalogue snapshot changed; refresh required.');
           let selected = args.view === 'schemas' ? schemas : allRows;
-          if (args.schema) selected = selected.filter(row => row.schema === args.schema);
+          if (args.schema) selected = selected.filter(row => (args.view === 'schemas' ? row.name : row.schema) === args.schema);
           if (args.name) selected = selected.filter(row => row.name === args.name);
-          if (args.query) selected = selected.filter(row => (row.schema + '::' + row.name).toLowerCase().includes(args.query.toLowerCase()));
+          if (args.query) selected = selected.filter(row => (args.view === 'schemas' ? row.name : row.schema + '::' + row.name).toLowerCase().includes(args.query.toLowerCase()));
           const packet = selected.slice(args.offset, args.offset + args.limit);
           assert.ok(packet.length <= 100);
           return { readOnly: true, catalogueVersion: 1, snapshotId, view: args.view, rows: packet,
