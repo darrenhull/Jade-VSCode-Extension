@@ -39,6 +39,8 @@ GitHub releases require manual VSIX installation. A new CLI release opens a revi
 
 A map/file reporting `backup complete` does not mean the whole database backup has finished. Wait for whole-stage completion and Working connection readiness. Quiet native stages show elapsed time and periodic log messages; no completion percentage is invented. Cancellation can wait for the Source backup's safe boundary before skipping restore. Timeout/failure output retains the stage, native error and relevant paths.
 
+For an already-open native JADE IDE, see [refresh after publication](docs/NATIVE-IDE-REFRESH.md). Native load completion and IDE display refresh are separate; preserve unsaved IDE text and use its documented **View → Refresh** when needed.
+
 ## Working database location
 
 Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.
