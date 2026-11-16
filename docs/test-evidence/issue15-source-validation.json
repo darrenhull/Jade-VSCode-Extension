@@ -1,0 +1,46 @@
+{
+  "issue": 15,
+  "nativeDependency": "darrenhull/Jade-CLI#90",
+  "base": "6682b04",
+  "scope": "Source-only; frozen109 untouched; no runtime version, SDK/pin or package assembly change",
+  "red": [
+    "Five registered handler controls failed against unmodified6682",
+    "Same-adapter refresh accepted stale late success",
+    "Pending native QuickPick accepted old row",
+    "Old catalogue OID dispatched instances after refresh",
+    "Off-page selected schema omitted from filter"
+  ],
+  "green": {
+    "lastFocused": {
+      "tests": 21,
+      "passed": 21,
+      "failed": 0
+    },
+    "affectedArea": {
+      "tests": 182,
+      "passed": 182,
+      "failed": 0,
+      "note": "Before final off-page exact-directory UI filter lookup; its dedicated regression and adjacent21 controls then passed."
+    }
+  },
+  "nativeRequests": "Controlled shared transport; actual CliInspectionTransport probe tested with modern/legacy response. No native DB execution.",
+  "coverage": [
+    "Bounded schema-only connect",
+    "100-row class pages and last result",
+    "Remote query/schema filtering",
+    "Exact off-page reveal",
+    "Native schema directory paging over205schemas",
+    "Stale pending result suppressed",
+    "Refresh stale OID blocked",
+    "Origin target/session identity preserved",
+    "Old runtime bounded probe and update-required diagnostic",
+    "Existing authentication/cursor/target regressions"
+  ],
+  "remaining": [
+    "Root source review",
+    "Official coherent native90 dependency",
+    "Actual packaged running UI screenshots",
+    "Portable final artifact and pin verification",
+    "Current-head CI/review; source checkpoint is not Ready or customer-scale proof"
+  ]
+}
