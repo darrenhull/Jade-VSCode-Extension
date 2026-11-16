@@ -1,3 +1,13 @@
+# 0.22.16 - Official native runtime and combined workspace tools
+
+- Bundle [official Jade CLI 0.10.14](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.14), with the matching verified native helpers and minimum runtime version.
+- Browse database schemas and classes through bounded native pages and searches, including off-page reveal and explicit refresh. The native catalogue is still acquired eagerly; automatic external-database notifications are not provided.
+- Reuse compatible native source-cache metadata across CLI releases and repeated preparations while preserving exact shard/Git validation, changed-source handling and original failures. This does not remove first-index work or guarantee every cold preparation is fast.
+- Preserve generated native load diagnostics until their consumers have stopped; an unconfirmed process exit cannot report successful native preparation. This is not a guarantee of clean JADE shutdown after every forced stop.
+- Retain guided project setup, incomplete-test and debugger-exit diagnostics, pending debugger draft handling, native IDE refresh guidance, and publication refusal when the reviewed target configuration changes.
+- Working remains separate from Source. Build, test and Scratch Pad reuse does not cache execution results or publish source changes. The earlier customer hang still requires confirmation on the delivered bundle.
+
+
 # 0.22.15 - Guided project setup and completion diagnostics
 
 - Add Jade: Set Up Project for choosing or creating a project directory, cloning or explicitly pulling through VS Code Git, existing native workspace initialization, source acquisition and optional reviewed Working preparation.
