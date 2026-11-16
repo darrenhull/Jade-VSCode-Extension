@@ -1,0 +1,262 @@
+{
+  "passed": true,
+  "scope": "Actual packaged modules with wrapped QA activation and controlled modern/legacy shared inspection transport",
+  "sourceHead": "1df3aa579ee326871f4aa09162459cb9aa0c6561",
+  "nativeExecuted": false,
+  "databaseOpened": false,
+  "kernelExecuted": false,
+  "mainProfileChanged": false,
+  "schemaDirectoryRows": 100,
+  "classPageRows": 100,
+  "totalAdvertisedClasses": 40001,
+  "tailLookup": "LargeSchema::Class39999",
+  "nativeOffset": 39900,
+  "exactIdentityRevalidated": true,
+  "refreshReacquiredSnapshot": true,
+  "oldClassOidBlocked": true,
+  "oldRuntimeUpdateRequired": true,
+  "failedRefreshLoadingCleared": true,
+  "correctOffPageCaption": true,
+  "calls": [
+    {
+      "id": 1,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "schemas",
+        "offset": 0,
+        "limit": 1
+      }
+    },
+    {
+      "id": 2,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "schemas",
+        "offset": 0,
+        "limit": 100,
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 3,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-1",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 4,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "query": "",
+        "snapshotId": "controlled-snapshot-1",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 5,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "query": "Class39999",
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-1",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 6,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 1,
+        "schema": "LargeSchema",
+        "name": "Class39999",
+        "snapshotId": "controlled-snapshot-1",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 7,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 39900,
+        "limit": 100,
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-1",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 8,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "schemas",
+        "offset": 0,
+        "limit": 100,
+        "refresh": true,
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 9,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "query": "Class39999",
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-2",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 10,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-2",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 11,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "query": "Class39999",
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-2",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 12,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "schemas",
+        "offset": 0,
+        "limit": 100,
+        "refresh": true,
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 13,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-2",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 14,
+      "command": "inspect.catalog",
+      "args": {
+        "includeSystem": false,
+        "view": "classes",
+        "offset": 0,
+        "limit": 100,
+        "schema": "LargeSchema",
+        "snapshotId": "controlled-snapshot-2",
+        "connectionEpoch": "controlled-session"
+      }
+    },
+    {
+      "id": 15,
+      "command": "inspect.close"
+    }
+  ],
+  "maxCatalogLimit": 100,
+  "qualificationLimits": [
+    "Synthetic transport is not native connected proof",
+    "Native owner/includeSystem invariant unqualified",
+    "No automatic external multiuser mutation detection",
+    "Official pin remains0.10.10; future native90 required"
+  ],
+  "package": {
+    "sourceHead": "1df3aa579ee326871f4aa09162459cb9aa0c6561",
+    "vsixSha256": "59738a67dac75936f8a2848dc9d70ebeab687498a447550ab5bccd0db0b8cbce",
+    "exactJavaScriptModules": 120,
+    "officialPinUnchanged": true,
+    "manifestAndRuntimeHashesVerified": true,
+    "qaActivationOnly": true
+  },
+  "targetedTests": {
+    "tests": 186,
+    "passed": 186,
+    "failed": 0
+  },
+  "cleanup": {
+    "actualOwnedHostExit": 0,
+    "actualExtensionHostExited": true,
+    "ownedProfileExtensionsAndStageRemoved": true
+  },
+  "screenshots": [
+    {
+      "path": "docs/screenshots/native-catalogue-pages/01-bounded-tree.png",
+      "sha256": "859ea726c73949a6d9b06b6d5543ab62130b350b455664fee04a3546726a12d2",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/native-catalogue-pages/02-native-first-page.png",
+      "sha256": "df27bb57fbd74c01464cfd4f1e5eef64fc055de0f7b7c1eee44ab450bfdba5d4",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/native-catalogue-pages/03-native-tail-search.png",
+      "sha256": "f16e8fb4370664ffc8bf45dd74d96614b06e646592304c3f1ba8ec3c7229a011",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/native-catalogue-pages/04-off-page-tree-reveal.png",
+      "sha256": "6dd94ba4b3bceda4a896eb5564e636ae008c4e728422361f396852b6de6c7560",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/native-catalogue-pages/05-refreshed-empty-query.png",
+      "sha256": "b62d79af17d67fe4338f45d1e2f59c4d3e2d9b67e96e0281c348b8ae9b46b2cd",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/screenshots/native-catalogue-pages/06-old-runtime-update-required.png",
+      "sha256": "2b4d4ddf23fdfed9e6d8a62776954bc4317aeb99a836e56050b284a1d62bd1b1",
+      "visuallyInspected": true
+    }
+  ]
+}
