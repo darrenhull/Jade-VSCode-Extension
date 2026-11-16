@@ -1,0 +1,33 @@
+{
+  "pullRequest": 109,
+  "failedHead": "f5a7052ba720892c5b11a8b5b4de6685c88e7f87",
+  "run": 43789890455,
+  "job": 133045674513,
+  "failedStep": "Run npm test",
+  "failure": "17 activation-fixture failures: onboarding.resume is not a function; two generic module stubs did not model the new onboarding registration contract.",
+  "red": {
+    "files": 2,
+    "tests": 18,
+    "failed": 17,
+    "passed": 1,
+    "actualLocalReproduction": true
+  },
+  "green": {
+    "tests": 46,
+    "passed": 46,
+    "failed": 0,
+    "files": [
+      "tests/RuntimeCharacterSet/RuntimeCharacterSet_configuration_tests.test.js",
+      "tests/WorkspaceContext/WorkspaceContext_activation_tests.test.js",
+      "tests/WorkspaceOnboarding/WorkspaceOnboarding_setup_tests.test.js"
+    ]
+  },
+  "repair": "Only two existing activation fixtures: explicit initialization/onboarding service boundaries, async resume, assertions registration/resume occur once. Every original configuration/selection assertion retained. No production fallback or assertion removal.",
+  "productSourceChanged": false,
+  "sdkOrPinChanged": false,
+  "packageChanged": false,
+  "carriedVsixSha256": "53b4574dc81a834c3f335cacbcdb307572ca61081f48fbf5df8531ee38509232",
+  "fullLocalSuiteRun": false,
+  "sourceOrDatabaseOperation": false,
+  "remaining": "Root review/push and current-head GitHub CI; Draft parent104 dependency remains."
+}

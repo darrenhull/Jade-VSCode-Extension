@@ -12,10 +12,12 @@ function activateScratchConfiguration(){
   window:{createOutputChannel:()=>({})},commands:{registerCommand:()=>({})}
  };
  const language={setWorkspaceSchemaResolver(){},setWorkspaceResourceResolver(){}};
- let options;const exported={exports:{}},noop=new Proxy({},{get:()=>()=>({})});
+ let options,onboardingRegistrations=0,onboardingResumes=0;const exported={exports:{}},noop=new Proxy({},{get:()=>()=>({})});
  const source=fs.readFileSync(path.resolve(__dirname,'../../extension/src/extension.js'),'utf8');
  vm.runInNewContext('(function(require,module){'+source+'\n})',{process,Buffer,console})((name)=>{
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
+  if(name==='./workspace-initialization')return {registerWorkspaceInitialization:()=>({initialize:async()=>assert.fail('Configuration fixture must not initialize a project')})};
+  if(name==='./workspace-onboarding')return {registerWorkspaceOnboarding(_vscode,_context,services){onboardingRegistrations++;assert.equal(typeof services.initialize,'function');assert.equal(typeof services.connectWorking,'function');return {async resume(){onboardingResumes++;}};}};
   if(name==='./language-tools')return {registerLanguageTools:()=>language};
   if(name==='./cli-client')return {CliWorkingSession:class{}};
   if(name==='./WorkspaceOperationGuard')return require('../../extension/src/WorkspaceOperationGuard');
@@ -24,6 +26,7 @@ function activateScratchConfiguration(){
   return noop;
  },exported);
  exported.exports.activate({subscriptions:[],extensionPath:'C:/extension',globalStorageUri:{fsPath:'C:/storage'},workspaceState:{get:()=> 'initial'}});
+ assert.equal(onboardingRegistrations,1);assert.equal(onboardingResumes,1);
  let prompts=0;const context=new WorkspaceContext({workspace:vscode.workspace,pickFolder:async()=>{prompts++;return b;}});
  return {a,b,notebookDocuments,reads,context,configFor:options.configFor,prompts:()=>prompts};
 }
