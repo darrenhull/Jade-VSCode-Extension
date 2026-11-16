@@ -30,21 +30,25 @@
   "uiPending": false,
   "documentationPending": false,
   "remainingGates": [
-    "Root final package/UI review and delivery placement (separate Draft or combined extension)",
-    "Hosted current-head CI and automated/owner review after parent104/109 dependency chain"
+    "Root push to existing Draft PR109 and current-head hosted CI",
+    "Parent104 merge, automated/owner review and protected delivery"
   ],
   "limits": "87 focused controls passed; no full local suite. Packaged UI uses actual workflow/init/ObjectExplorer modules from VSIX and two real extension-host incarnations. Portable smoke executes the packaged native CLI outside the checkout without Node on PATH for database-free workspace discovery only; no Source/native database was opened. The customer hang in94/95 and native clean abort27 remain unproven.",
   "sourceCheckpoint": "e2092f5fd9f7fbed3e39f619cce90989d78d1546",
   "package": {
     "version": "0.22.15",
     "path": "dist/jade-native-runner-cpp-preview-0.22.15.vsix",
-    "sha256": "6ef8ee692e90e03f4a3093cb2d494a80e4c6f3011709ea566e7866db389e3a7f",
-    "bytes": 5392449,
+    "sha256": "53b4574dc81a834c3f335cacbcdb307572ca61081f48fbf5df8531ee38509232",
+    "bytes": 5392442,
     "sourceModulesExact": 119,
     "readmeManifestChangelogExact": true,
     "portableSmokePassed": true,
     "officialCliVersion": "0.10.10",
-    "sdkOrPinChanged": false
+    "sdkOrPinChanged": false,
+    "previousQualifiedUiAndPortableSha256": "6ef8ee692e90e03f4a3093cb2d494a80e4c6f3011709ea566e7866db389e3a7f",
+    "notesOnlyRepack": true,
+    "sourceAndNativePayloadUnchangedFrom": "dcdd3a5285de258be8f6f54668eb5601247017d1",
+    "portableAndUiCarryForward": true
   },
   "ui": {
     "actualPackagedWorkflowModules": true,
@@ -118,5 +122,11 @@
       }
     ],
     "limitations": "Real VS Code command/UI, built-in Git API discovery, filesystem marker, standard globalState and openFolder/extension-host restart. Native initialization/preparation and anonymous sign-in replies are controlled. No Source/native database, installer, elevation, network clone or real credential entry."
-  }
+  },
+  "combinedPullRequest": 109,
+  "closesIssues": [
+    105,
+    107,
+    108
+  ]
 }

@@ -1,10 +1,8 @@
-# 0.22.15 - Guided project setup
+# 0.22.15 - Guided project setup and completion diagnostics
 
 - Add Jade: Set Up Project for choosing or creating a project directory, cloning or explicitly pulling through VS Code Git, existing native workspace initialization, source acquisition and optional reviewed Working preparation.
 - Offer standard Git installation guidance without executing installers. Continue safely after opening a selected project using an owned temporary activation marker; preserve user files and mismatched markers.
 - Reuse existing native configuration, local-edit protection, sign-in, Working ownership, timeouts and cancellable progress. Setup does not build, test or publish.
-
-# 0.22.14 - Test and debugger completion diagnostics
 
 - Distinguish unconfirmed test method completion, unconfirmed cleanup and a selected method absent from the native report. Repeat the original native cause or precise fallback in Test Results output; preserve assertion failures, cancellation and timeout outcomes.
 - Report debugger cancellation, nonzero exits and unconfirmed native shutdown without claiming method completion. Preserve native errors and exit codes; legacy zero exits after an editor stop are labelled stopped. A stop acknowledgement remains nonterminal.
