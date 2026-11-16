@@ -26,15 +26,97 @@
   },
   "sdkOrPinChanged": false,
   "sourceOrNativeDatabaseOpened": false,
-  "packagePending": true,
-  "uiPending": true,
-  "documentationPending": true,
+  "packagePending": false,
+  "uiPending": false,
+  "documentationPending": false,
   "remainingGates": [
-    "Root source review",
-    "Startup instructions and scoped plan update",
-    "One actual VSIX/portable/exact-source verification",
-    "Actual packaged UI/continuation evidence with controlled native responses and no database",
-    "Hosted CI and automated/owner review after parent104/109 dependency chain"
+    "Root final package/UI review and delivery placement (separate Draft or combined extension)",
+    "Hosted current-head CI and automated/owner review after parent104/109 dependency chain"
   ],
-  "limits": "Git/native responses in focused tests are controlled. The actual activation wiring and scoped ObjectExplorer controls execute product code. No installed Git software, Source backup, restore, user code or publication was performed."
+  "limits": "87 focused controls passed; no full local suite. Packaged UI uses actual workflow/init/ObjectExplorer modules from VSIX and two real extension-host incarnations. Portable smoke executes the packaged native CLI outside the checkout without Node on PATH for database-free workspace discovery only; no Source/native database was opened. The customer hang in94/95 and native clean abort27 remain unproven.",
+  "sourceCheckpoint": "e2092f5fd9f7fbed3e39f619cce90989d78d1546",
+  "package": {
+    "version": "0.22.15",
+    "path": "dist/jade-native-runner-cpp-preview-0.22.15.vsix",
+    "sha256": "6ef8ee692e90e03f4a3093cb2d494a80e4c6f3011709ea566e7866db389e3a7f",
+    "bytes": 5392449,
+    "sourceModulesExact": 119,
+    "readmeManifestChangelogExact": true,
+    "portableSmokePassed": true,
+    "officialCliVersion": "0.10.10",
+    "sdkOrPinChanged": false
+  },
+  "ui": {
+    "actualPackagedWorkflowModules": true,
+    "actualScopedMarkerActivation": true,
+    "actualOpenFolderRelaunch": true,
+    "continuationWasSeeded": false,
+    "extensionHostIncarnations": 2,
+    "actualVSCodeGitApi": true,
+    "controlledNativeInitAndWorking": true,
+    "controlledAnonymousCredentialFixture": true,
+    "configurationReady": true,
+    "workingPrepared": true,
+    "ownedMarkerAndIntentConsumed": true,
+    "prepares": 1,
+    "initializations": 2,
+    "extractions": 0,
+    "directoryAndUserBytesPreserved": true,
+    "missingGitInstallerExecuted": false,
+    "failureOriginalPreserved": true,
+    "sourceOrNativeDatabaseOpened": false,
+    "screenshots": [
+      {
+        "path": "docs/screenshots/project-onboarding/complete.png",
+        "sha256": "ed6870455c4e07f136e7c8cd9234a713e13a96f8fb28efe4ccede8ecdf4c0095",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/continue.png",
+        "sha256": "9bd4278722b291b6ffdfc7fff4fde7024c4d8fd008fe09c4ae0ad081d260c166",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/failure.png",
+        "sha256": "246134d25cc17d33c873435af8844d477cda8bb371e6f072044d8b631f466ca2",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/folders.png",
+        "sha256": "a9bdbd7b4280632fa63daf90786c5d88239c14c92ec36ed5b25896fd645251a8",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/missingGit.png",
+        "sha256": "d0f233f1467988e59730cd70310aca2e5f9cf52df996d18e8b52dd62038c08cd",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/progress.png",
+        "sha256": "e609313b80d11f16ef7de61adb91311109d456a8d20c441b719276e230f977d4",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/project-choice.png",
+        "sha256": "01df06c68ca73ea20565443e6431266a00dda68253c4c4ca1ff00604aa37d22f",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/review.png",
+        "sha256": "2ccd4e27ac852642562cc231a0f2a4efe1ae51be84e5b3c056902afe1640d91e",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/sources.png",
+        "sha256": "cce562dd501b9d1fa841a264fefd4098e0f5ae3d0a21c0d3992bc4dd60be9ef8",
+        "visuallyInspected": true
+      },
+      {
+        "path": "docs/screenshots/project-onboarding/working-choice.png",
+        "sha256": "8a2aafee289d583814c5d5f298a22eff44a9e6d914ada03800e2aac0d6b426f1",
+        "visuallyInspected": true
+      }
+    ],
+    "limitations": "Real VS Code command/UI, built-in Git API discovery, filesystem marker, standard globalState and openFolder/extension-host restart. Native initialization/preparation and anonymous sign-in replies are controlled. No Source/native database, installer, elevation, network clone or real credential entry."
+  }
 }
