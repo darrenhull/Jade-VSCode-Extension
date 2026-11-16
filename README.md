@@ -41,6 +41,8 @@ A map/file reporting `backup complete` does not mean the whole database backup h
 
 For an already-open native JADE IDE, see [refresh after publication](docs/NATIVE-IDE-REFRESH.md). Native load completion and IDE display refresh are separate; preserve unsaved IDE text and use its documented **View → Refresh** when needed.
 
+**Disable JadeGit for the Working database** is an optional Jade Native setting, off by default. Source is unchanged; the bundled CLI must advertise Working-only support.
+
 ## Working database location
 
 Leave **Jade Native: Working Database Directory** empty for automatic selection. New Working databases use `.jade/working` inside the selected source project. An existing ready Working database in the older tool-storage location is retained when no project base exists. Recreating an automatic base uses a separate managed generation and preserves the previous base.

@@ -15,13 +15,15 @@ const {diagnosticLocation,diagnosticLines}=require('./compiler-diagnostic-presen
 
 let activeNativeService;
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope'];
+const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope', 'disableJadeGitForWorking'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));
   const characterSet = settings.inspect?.('characterSet');
   if (!['globalValue', 'workspaceValue', 'workspaceFolderValue', 'globalLanguageValue', 'workspaceLanguageValue', 'workspaceFolderLanguageValue'].some(scope => characterSet?.[scope] !== undefined))
     delete values.characterSet;
+  values.workingJadeGitPolicy = values.disableJadeGitForWorking === true ? 'disabled' : 'inherit';
+  delete values.disableJadeGitForWorking;
   return values;
 }
 

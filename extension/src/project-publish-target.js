@@ -2,11 +2,12 @@
 const fs=require('node:fs');
 const {scanProject}=require('./native-project');
 const {sourceTargetPath}=require('./source-pull-path');
+const {sourceConfiguration}=require('./working-jadegit-policy');
 /** A private immutable review snapshot, produced by the existing native serializer. */
 async function capturePublishTarget(service,config,destination,output=()=>{}){
  if(!service?.sourceCapabilities||!service?.startSourceExtraction)throw Error('The native streaming Source session is unavailable for publication review.');
  fs.mkdirSync(destination,{recursive:false});
- const reviewConfig={...config,workspaceRoots:[destination]};
+ const reviewConfig={...sourceConfiguration(config),workspaceRoots:[destination]};
  const capability=(await service.sourceCapabilities(reviewConfig,{cwd:destination}))?.sourceExtraction;
  if(capability?.protocol!==1||capability.fullSchema!==true||capability.available!==true||capability.layout!=='schema-ddx'||capability.requiresPromotionPermit!==true||!capability.scopes?.includes('all')||!capability.versions?.includes('current'))throw Error('Update Jade Tools to review complete native schema sources; no batch fallback was run.');
  const reported=new Set();

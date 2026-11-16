@@ -1,5 +1,6 @@
 'use strict';
 const {configDto}=require('./cli-client');
+const {requireWorkingJadeGitPolicy}=require('./working-jadegit-policy');
 const {workspaceSnapshot}=require('./jade-workspace-document');
 
 /** Serializes owned Workspace requests; Jade owns compilation and execution. */
@@ -23,6 +24,10 @@ class JadeWorkspaceRunner {
         const config=await this.configFor(document);
         config.schema=schema||config.schema;
         if(!/^[A-Za-z_]\w*$/.test(config.schema||''))throw Error('Choose a Jade schema before running the Workspace.');
+        if(config.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit'){
+          await requireWorkingJadeGitPolicy(this.client,config);
+          if(token?.isCancellationRequested)return finish(cancelled());
+        }
         onProgress({stage:'acquiring',message:'Acquiring the Working operation'});
         lease=await this.beforeOperation();acquired=true;
         if(token?.isCancellationRequested)return finish(cancelled());

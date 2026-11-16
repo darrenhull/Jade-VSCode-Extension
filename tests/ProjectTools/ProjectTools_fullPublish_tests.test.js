@@ -12,8 +12,8 @@ function fixture(t,change=()=>{}){
  fs.writeFileSync(path.join(workspace,'schemas/Pets/_exposedListDefinitions.sec'),'_exposedListDefinitions\n');
  const calls=[],documents=[],commands=new Map();let busy=false;
  const config={installPath:root,databasePath:path.join(root,'target-system'),iniPath:path.join(root,'target.ini'),storagePath:path.join(root,'storage'),schema:'Pets',workspaceRoots:[workspace]},working={...config,root:path.join(root,'working'),databasePath:path.join(root,'working/system')};
- gateway.configure({runNative:async(executable,args)=>{
-  calls.push({kind:'native',args});assert.ok(!args.includes('app=JadeBatchExtract'),'Full publication must not fall back to Every + organisation');
+ gateway.configure({runNative:async(executable,args,configuration)=>{
+  calls.push({kind:'native',args,configuration});assert.ok(!args.includes('app=JadeBatchExtract'),'Full publication must not fall back to Every + organisation');
   if(args.includes('app=JadeJoinSchema')){const last=args.indexOf('endAppParameters');fs.writeFileSync(args[last-1],fs.readFileSync(source));}
   return {success:true,code:0,output:''};
  }});t.after(()=>gateway.configure(undefined));
@@ -57,4 +57,12 @@ test('cancelling full publication after a target settings change performs no tar
  assert.equal(result.cancelled,true);
  assert.ok(f.calls.filter(c=>c.kind==='native').every(c=>c.args.includes('path='+f.working.databasePath)));
  assert.equal(f.busy(),false);
+});
+
+test('Working JadeGit opt-out cannot cross the reviewed Source publication boundary',async t=>{
+ const f=fixture(t);f.config.workingJadeGitPolicy='disabled';f.working.workingJadeGitPolicy='disabled';f.working.iniPath=path.join(f.working.root,'working.ini');f.config.username=f.working.username='fixture-user';f.config.password=f.working.password='fixture-password';
+ const result=await f.run();assert.equal(result.success,true,result.error);
+ const source=f.calls.filter(c=>c.kind==='native'&&c.args.includes('path='+f.config.databasePath));assert.equal(source.length,1);assert.ok(source[0].args.includes('ini='+f.config.iniPath));assert.equal(Object.hasOwn(source[0].configuration,'workingJadeGitPolicy'),false);assert.equal(source[0].configuration.password,f.config.password);
+ const snapshot=f.calls.find(c=>c.kind==='snapshot');assert.equal(snapshot.configuration.iniPath,f.config.iniPath);assert.equal(Object.hasOwn(snapshot.configuration,'workingJadeGitPolicy'),false);
+ assert.ok(f.calls.filter(c=>c.kind==='native'&&c.args.includes('path='+f.working.databasePath)).every(c=>c.configuration.workingJadeGitPolicy==='disabled'&&c.args.includes('ini='+f.working.iniPath)));
 });
