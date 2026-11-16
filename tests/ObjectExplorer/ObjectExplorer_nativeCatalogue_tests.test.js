@@ -123,3 +123,27 @@ test('Database class catalogue Refresh button explicitly reacquires native snaps
   assert.equal(payload.page.items[0].name,'Fish259');
  }finally{await f.cleanup();}
 });
+
+test('off-page reveal publishes its native page label before VS Code renders the schema caption',async()=>{
+ const n=nativeCatalogue(),f=setup({catalogHandler:n.handler,closeAutomatically:true});
+ try{
+  await f.connect();const schema=(await f.controller.provider.getChildren()).find(x=>x.name==='Pets');
+  await f.controller.provider.getChildren(schema);const captions=[];
+  f.controller.view.reveal=async row=>{if(row.kind==='schema')captions.push(f.controller.provider.getTreeItem(row).description);};
+  await f.commands.get('jadeNative.browseDatabaseClasses')();
+  const panel=f.panels.at(-1);await panel.receive({command:'ready'});await panel.receive({command:'query',query:'Fish259',schema:'Pets',offset:0});
+  const state=panel.messages.filter(x=>x.command==='catalogue').at(-1);
+  await panel.receive({command:'open',id:state.page.items[0].browserId});
+  assert.match(captions[0],/201–260 of 260 classes/,'Visible schema caption must describe the revealed native page');
+ }finally{await f.cleanup();}
+});
+test('failed explicit native refresh clears catalogue loading and shows its original capability error',async()=>{
+ const n=nativeCatalogue(),f=setup({catalogHandler:n.handler,closeAutomatically:true});
+ try{
+  await f.connect();await f.commands.get('jadeNative.browseDatabaseClasses')();const panel=f.panels.at(-1);await panel.receive({command:'ready'});
+  f.clients[0].request=async(command,args)=>command==='catalog'?{readOnly:true,rows:[],total:0,offset:args.offset,next_offset:null}:{readOnly:true};
+  await f.commands.get('jadeNative.refreshObjects')();
+  assert.equal(f.controller.classCatalogue.snapshot().loading,false,'A failed refresh must not keep spinning indefinitely');
+  assert.ok(panel.messages.some(x=>x.command==='error'&&/Update.*Jade CLI/.test(x.message)));
+ }finally{await f.cleanup();}
+});

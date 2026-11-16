@@ -87,6 +87,12 @@ function registerClassCatalogue(vscode, context, options) {
     remotePage=undefined;
     publish();
   }
+  function fail(error) {
+    ++fetchGeneration;
+    loading=false;
+    publish();
+    if(ready)void panel?.webview.postMessage({command:"error",message:error.message});
+  }
   async function refresh() {
     const generation = ++fetchGeneration;
     loading = true;
@@ -278,6 +284,7 @@ function registerClassCatalogue(vscode, context, options) {
     show,
     refresh,
     invalidate,
+    fail,
     update: refresh,
     setFilter,
     open,

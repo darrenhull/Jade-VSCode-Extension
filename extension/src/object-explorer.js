@@ -308,6 +308,7 @@ function registerObjectExplorer(vscode, context, services) {
         if(reloadEpoch)return loadCatalog(false);
       }
       if(version!==catalogVersion&&generation===session.generation)return catalogRequest;
+      if(version===catalogVersion&&generation===session.generation)classCatalogue?.fail(error);
       throw error;
     });
     catalogRequest=request;return request;
@@ -558,11 +559,12 @@ function registerObjectExplorer(vscode, context, services) {
       schema=schemaNodes.get(row.schema);
     }
     const offset=Math.floor(row.schemaOffset/100)*100;
-    classOffsets.set(row.schema,offset);events.fire(schema);
-    await view.reveal(schema,{select:false,focus:false,expand:true});
-    if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
+    classOffsets.set(row.schema,offset);
     const children=await classChildren(schema),target=children.find(item=>item.kind==="class"&&item.oid===row.oid);
+    if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
     if(!target)throw Error("Native class position changed; refresh required.");
+    events.fire(schema);
+    await view.reveal(schema,{select:false,focus:false,expand:true});
     if(browser!==classBrowser||generation!==session.generation||!isCurrent())return;
     await view.reveal(target,{select:true,focus:true,expand:false});
     return {schema:row.schema,name:row.name,offset,readOnly:true};
