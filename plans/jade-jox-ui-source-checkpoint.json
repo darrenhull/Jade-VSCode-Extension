@@ -58,6 +58,18 @@
         "Cancellation during shared Working release"
       ],
       "scope": "Controlled native adapter only; no real native or database execution"
+    },
+    "preparedRunFailureBoundary": {
+      "redFailures": 3,
+      "providerAndControllerPassed": 39,
+      "milliseconds": 179.194,
+      "controls": [
+        "Shared upload/compile failure stops further class requests",
+        "Unknown native cleanup stops further class requests",
+        "Transport failure stops further class requests",
+        "Completed native assertion outcomes still dispatch the following class",
+        "Original native code/error retained; queued methods get explicit not-executed error"
+      ]
     }
   },
   "remainingQualification": [

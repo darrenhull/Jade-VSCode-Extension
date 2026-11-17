@@ -217,9 +217,21 @@ class NativeSourceProvider {
     if (!this.flags.deploymentFromSavedSnapshot || command === 'test' && !this.flags.nativeTests || command === 'workspace.run' && !this.flags.nativeScratch)
       throw Error('This Jade CLI does not yet support executing saved JOX source.');
     const results = [];
+    let stopped;
     for (const { selection, settings = {} } of operations) {
-      try { results.push({ result: await this.executePrepared(command, selection, { token, output, settings }, snapshot) }); }
-      catch (error) { results.push({ error }); }
+      if (stopped) {
+        if (stopped.cancelled) results.push({ result: { passed: false, code: 130, cancelled: true } });
+        else results.push({ error: Object.assign(Error('Not executed because the previous native operation did not confirm completion and cleanup. ' + stopped.error.message),
+          { result: stopped.result || { passed: false, code: 2, report: { error: stopped.error.message } } }) });
+        continue;
+      }
+      try {
+        const result = await this.executePrepared(command, selection, { token, output, settings }, snapshot);
+        results.push({ result });
+        if (result.cancelled) stopped = { cancelled: true };
+        else if (command === 'test' && (result.report?.tests_completed !== true || result.report?.cleanup_complete !== true))
+          stopped = { result, error: Error(result.report?.error || 'Native test completion and cleanup were not confirmed.') };
+      } catch (error) { results.push({ error }); stopped = { error, result: error.result }; }
     }
     return results;
   }

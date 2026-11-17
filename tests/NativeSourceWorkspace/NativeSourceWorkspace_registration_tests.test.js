@@ -238,3 +238,23 @@ test('cancellation during the shared Working release skips every queued class wi
   assert.equal(f.testRuns[0].filter(event => event.name === 'errored').length, 0);
   assert.equal(registered.workspace.executing, false);
 });
+
+for (const failure of ['shared-compile', 'unknown-cleanup', 'transport']) test(failure + ' failure stops later classes in the same prepared project run', async () => {
+  const primary = { passed: false, code: failure === 'shared-compile' ? 6295 : 2, report: { error: 'Original native failure',
+    compiled: false, tests_completed: failure === 'unknown-cleanup', cleanup_complete: failure === 'shared-compile' } };
+  const f = setup({ testing: true, reply: (command, request) => {
+    if (command === 'test') { if (failure === 'transport') throw Error('Original native channel failure'); return primary; }
+    if (command !== 'source.semantic.query') return;
+    const items = ['One', 'Other'].map(owner => ({ id: owner, name: 'value', kind: 'method', testIdentity: { schema: 'Example', class: owner, method: 'value' } }));
+    return { passed: true, code: 0, body: { ...f.snapshot, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await registered.testing.discover(); const result = await registered.testing.run({});
+  assert.equal(f.requests.filter(request => request.command === 'test').length, 1, 'A failed shared upload/cleanup must not be retried once per class');
+  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 2);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'errored').length, 2);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'passed').length, 0);
+  assert.equal(result.code, primary.code);
+  assert.equal(result.report.error, failure === 'transport' ? 'Original native channel failure' : primary.report.error);
+  assert.equal(registered.workspace.executing, false);
+});
