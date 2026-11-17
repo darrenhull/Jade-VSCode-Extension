@@ -201,14 +201,33 @@ class NativeSourceProvider {
     return this.retain(next);
   }
 
-  async execute(command, selection, { token, output, settings = {} } = {}) {
+  async execute(command, selection, options = {}) {
+    const [entry] = await this.executeBatch(command, [{ selection, settings: options.settings }], options);
+    if (entry.error) throw entry.error;
+    return entry.result;
+  }
+
+  async executeBatch(command, operations, { token, output } = {}) {
     if (!['build', 'test', 'workspace.run'].includes(command)) throw Error('Unsupported semantic execution command.');
-    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
-    // One native prepare observes saved Git changes. There is no browser graph
-    // comparison, legacy baseline check or second source-index preparation.
+    if (!Array.isArray(operations) || !operations.length) throw Error('Select native source operations before execution.');
+    if (token?.isCancellationRequested) return operations.map(() => ({ result: { passed: false, code: 130, cancelled: true } }));
+    // One preparation binds saved content for the complete project run. Each
+    // native request still executes independently and reports its own outcome.
     const snapshot = await this.prepare(token);
     if (!this.flags.deploymentFromSavedSnapshot || command === 'test' && !this.flags.nativeTests || command === 'workspace.run' && !this.flags.nativeScratch)
       throw Error('This Jade CLI does not yet support executing saved JOX source.');
+    const results = [];
+    for (const { selection, settings = {} } of operations) {
+      try { results.push({ result: await this.executePrepared(command, selection, { token, output, settings }, snapshot) }); }
+      catch (error) { results.push({ error }); }
+    }
+    return results;
+  }
+
+  async executePrepared(command, selection, { token, output, settings }, snapshot) {
+    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
+    this.assertBinding(snapshot);
+    if (snapshot.snapshotHash !== this.snapshot.snapshotHash) throw Error('The native source snapshot changed during this project run.');
     if (!Array.isArray(selection?.entityIds) || !selection.entityIds.length || selection.entityIds.some(id => typeof id !== 'string' || !id))
       throw Error('Select a native source entity before execution.');
     if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };

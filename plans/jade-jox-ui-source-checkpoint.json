@@ -3,15 +3,62 @@
   "status": "Controlled source integration; native and running UI qualification outstanding",
   "nativeContract": "sourceSemantic format 1; projectionText whole-document edit; independent nativeScratch capability",
   "configuration": "Prepare carries selected cwd and only explicit VS Code overrides; native resolves jade.json/private profiles and returns canonical sourceRoots. Existing Database Objects configuration remains separate pending native shared resolution.",
-  "testExecution": "Batch selected native entities by project/schema/class, one native prepare per operation, preserve individual method outcomes",
+  "testExecution": "One native prepare per project TestController run; serial project/schema/class requests preserve every native method outcome, cancellation and per-request target validation",
   "defaultRoute": "One shared CLI and native source model; no CLS index, parser, watcher, baseline verification or hydration/staging route initialized",
-  "sharedInterface": ["Class catalogue", "Class Workspace renderer", "Native Jade editor", "Test Controller", "Scratch Pad", "Database Objects target and credential handling"],
+  "sharedInterface": [
+    "Class catalogue",
+    "Class Workspace renderer",
+    "Native Jade editor",
+    "Test Controller",
+    "Scratch Pad",
+    "Database Objects target and credential handling"
+  ],
   "targetedEvidence": {
-    "providerControls": { "passed": 26, "milliseconds": 136.346 },
-    "refreshRaceControls": { "passed": 9, "milliseconds": 136.425 },
-    "nativeRegistrationAndAffectedSharedControls": { "passed": 37, "milliseconds": 384.965 },
-    "batchConfigAndAffectedProviderControls": { "passed": 46, "milliseconds": 269.511 },
-    "boundaries": ["Controlled native DTOs, not actual JADE", "No database or Source calls", "Native results and cancellation remain authoritative", "Every requested test/Scratch execution dispatched again"]
+    "providerControls": {
+      "passed": 26,
+      "milliseconds": 136.346
+    },
+    "refreshRaceControls": {
+      "passed": 9,
+      "milliseconds": 136.425
+    },
+    "nativeRegistrationAndAffectedSharedControls": {
+      "passed": 37,
+      "milliseconds": 384.965
+    },
+    "batchConfigAndAffectedProviderControls": {
+      "passed": 46,
+      "milliseconds": 269.511
+    },
+    "boundaries": [
+      "Controlled native DTOs, not actual JADE",
+      "No database or Source calls",
+      "Native results and cancellation remain authoritative",
+      "Every requested test/Scratch execution dispatched again"
+    ],
+    "hostedActivationFixtureMigration": {
+      "passed": 20,
+      "milliseconds": 174.1715,
+      "initialFailures": 18,
+      "scope": "Only the three actual hosted-failing fixture files; no production relaxation"
+    },
+    "nativeFlagsShape": {
+      "passed": 2,
+      "redFailures": 2,
+      "scope": "Actual nested entity.flags shape; no automatic editable inherited/system declaration"
+    },
+    "projectPreparedRun": {
+      "providerRegistrationScratchPassed": 36,
+      "milliseconds": 923.9822,
+      "additionalMixedAndClosurePassed": 2,
+      "finalRegistrationScratchPassed": 20,
+      "finalMilliseconds": 195.5965,
+      "redControls": [
+        "Repeated prepare across classes",
+        "Cancellation during shared Working release"
+      ],
+      "scope": "Controlled native adapter only; no real native or database execution"
+    }
   },
   "remainingQualification": [
     "Real maintained JOX catalogue/read/projectionText save and exact origin mapping",
@@ -19,12 +66,28 @@
     "Native projection metadata reopen across process restart; stale dirty buffers must never rebase",
     "Mapped native compiler Problems once actual F3 mapping fields are frozen",
     "Actual running generic UI screenshot (computer-use kernel asset initialization currently fails)",
-    "Migration of obsolete default-CLS activation fixtures to the qualified JOX route"
+    "Migration of obsolete default-CLS activation fixtures to the qualified JOX route",
+    "Native accepted-generation save events and JOX watcher/discovery refresh without dirty-buffer rebasing"
   ],
-  "unqualifiedActions": ["Source publication/extraction", "JOX debugger mapping", "Project reference/call hierarchy queries"],
+  "unqualifiedActions": [
+    "Source publication/extraction",
+    "JOX debugger mapping",
+    "Project reference/call hierarchy queries"
+  ],
   "pruningAfterNativeQualification": {
-    "remove": ["Unregistered activateLegacyCls", "CLS-only workspace-index and SourceIndexCache wiring", "CLS-only Class Workspace model/controller and MethodDocumentBinding coupling", "CLS source-index startup/watchers and duplicate JS project join/staging preparation", "Obsolete CLS activation fixtures/contributions"],
-    "retain": ["Needed Jade lexer/editor utilities", "Shared Class Workspace/catalogue presentation", "Shared notebook/test/result/lifecycle presentation", "Small native provider boundary for future formats"],
+    "remove": [
+      "Unregistered activateLegacyCls",
+      "CLS-only workspace-index and SourceIndexCache wiring",
+      "CLS-only Class Workspace model/controller and MethodDocumentBinding coupling",
+      "CLS source-index startup/watchers and duplicate JS project join/staging preparation",
+      "Obsolete CLS activation fixtures/contributions"
+    ],
+    "retain": [
+      "Needed Jade lexer/editor utilities",
+      "Shared Class Workspace/catalogue presentation",
+      "Shared notebook/test/result/lifecycle presentation",
+      "Small native provider boundary for future formats"
+    ],
     "recovery": "Preserved jade-cls backup is unchanged"
   },
   "pinVersionPackageInstallChanged": false

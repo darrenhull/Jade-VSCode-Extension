@@ -163,7 +163,7 @@ test('selected native tests batch by project/schema/class and retain every indiv
   assert.deepEqual(calls[0].body.semanticSelection.entityIds, ['opaque-a', 'opaque-b']);
   assert.deepEqual(calls[0].body.config.methods, ['first', 'second']);
   assert.equal(calls[0].body.config.schema, 'Example');
-  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 3);
+  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 2, 'one discovery prepare and one shared prepare for all selected classes in this project');
   assert.equal(f.testRuns[0].filter(event => event.name === 'passed').length, 3);
 });
 test('project closure while native preparation is pending prevents the Working execution', async () => {
@@ -184,4 +184,57 @@ test('pre-cancelled execution never probes native capabilities or saves source',
   registered.workspace.saveDirty = () => assert.fail('Pre-cancelled Run must not save');
   const result = await registered.workspace.execute(project, 'test', { entityIds: ['test'] }, { token: { isCancellationRequested: true } });
   assert.equal(result.code, 130); assert.equal(f.requests.length, 0); assert.equal(f.client.probes, 0);
+});
+
+test('one project preparation preserves mixed individual outcomes across native classes', async () => {
+  const identities = [['a', 'One', 'bad'], ['b', 'One', 'ignored'], ['c', 'Other', 'good']];
+  const f = setup({ testing: true, reply: (command, request) => {
+    if (command === 'test') return { passed: request.config.methods.includes('good'), code: request.config.methods.includes('good') ? 0 : 1,
+      report: { tests_completed: true, cleanup_complete: true, results: request.config.methods.map(method =>
+        ({ method, status: method === 'bad' ? 'failed' : method === 'ignored' ? 'skipped' : 'passed', message: 'Native assertion result' })) } };
+    if (command !== 'source.semantic.query') return;
+    const items = identities.map(([id, owner, method]) => ({ id, name: method, kind: 'method', testIdentity: { schema: 'Example', class: owner, method } }));
+    return { passed: true, code: 0, body: { ...f.snapshot, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await registered.testing.discover(); await registered.testing.run({});
+  const events = f.testRuns[0];
+  for (const name of ['failed', 'skipped', 'passed']) assert.equal(events.filter(event => event.name === name).length, 1, name);
+  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 2);
+  assert.equal(f.requests.filter(request => request.command === 'test').length, 2);
+});
+
+test('project closing after a native class result prevents every remaining class request in that prepared run', async () => {
+  const f = setup({ testing: true, reply: (command, request) => {
+    if (command === 'test') { f.vscode.workspace.workspaceFolders = []; return { passed: true, code: 0,
+      report: { tests_completed: true, cleanup_complete: true, results: [{ method: 'value', status: 'passed' }] } }; }
+    if (command !== 'source.semantic.query') return;
+    const items = ['One', 'Other'].map(owner => ({ id: owner, name: 'value', kind: 'method', testIdentity: { schema: 'Example', class: owner, method: 'value' } }));
+    return { passed: true, code: 0, body: { ...f.snapshot, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await registered.testing.discover(); await registered.testing.run({});
+  assert.equal(f.requests.filter(request => request.command === 'test').length, 1);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'passed').length, 1);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'errored').length, 1);
+  assert.equal(registered.workspace.executing, false);
+  assert.equal(f.testRuns[0].at(-1).name, 'end');
+});
+
+test('cancellation during the shared Working release skips every queued class without another preparation', async () => {
+  const f = setup({ testing: true, reply: (command, request) => {
+    if (command !== 'source.semantic.query') return;
+    const items = ['One', 'Other'].map(owner => ({ id: owner, name: 'value', kind: 'method', testIdentity: { schema: 'Example', class: owner, method: 'value' } }));
+    return { passed: true, code: 0, body: { ...f.snapshot, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await registered.testing.discover();
+  const token = { isCancellationRequested: false };
+  registered.workspace.beforeOperation = async () => { token.isCancellationRequested = true; };
+  await registered.testing.run({}, token);
+  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 1);
+  assert.equal(f.requests.filter(request => request.command === 'test').length, 0);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'skipped').length, 2);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'errored').length, 0);
+  assert.equal(registered.workspace.executing, false);
 });

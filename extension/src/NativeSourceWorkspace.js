@@ -120,8 +120,16 @@ class NativeSourceWorkspace {
   }
 
   async execute(project, command, selection, options) {
+    return this.withExecution(project, options, () => project.provider.execute(command, selection, options));
+  }
+
+  async executeBatch(project, command, operations, options) {
+    return this.withExecution(project, options, () => project.provider.executeBatch(command, operations, options),
+      () => operations.map(() => ({ result: { passed: false, code: 130, cancelled: true } })));
+  }
+
+  async withExecution(project, options, operation, cancellation = () => ({ passed: false, code: 130, cancelled: true })) {
     const cancelled = () => options?.token?.isCancellationRequested;
-    const cancellation = () => ({ passed: false, code: 130, cancelled: true });
     if (cancelled()) return cancellation();
     this.project(project.folder);
     if (this.executing) throw Error('Another Jade Working operation is running.');
@@ -131,7 +139,7 @@ class NativeSourceWorkspace {
       if (cancelled()) return cancellation();
       this.project(project.folder);
       await this.saveDirty(project);
-      return await project.provider.execute(command, selection, options);
+      return await operation();
     } finally { this.executing = false; }
   }
 

@@ -56,17 +56,33 @@ function registerNativeSourceTesting(vscode, context, workspace) {
       groups.get(key).push(item);
     }
     try {
+      const projects = new Map();
       for (const items of groups.values()) {
-        if (token?.isCancellationRequested) { items.forEach(item => run.skipped(item)); continue; }
-        items.forEach(item => run.started(item));
-        const { project, entity } = details.get(items[0]);
-        const identity = entity.testIdentity;
+        const { project } = details.get(items[0]);
+        if (!projects.has(project)) projects.set(project, []);
+        projects.get(project).push(items);
+      }
+      for (const [project, batches] of projects) {
+        if (token?.isCancellationRequested) { batches.flat().forEach(item => run.skipped(item)); continue; }
+        batches.flat().forEach(item => run.started(item));
+        let results;
         try {
-          const result = await workspace.execute(project, 'test', { entityIds: items.map(item => details.get(item).entity.id) }, {
-            token, settings: { schema: identity.schema, methods: items.map(item => details.get(item).entity.testIdentity.method),
-              ...(items.length === 1 ? { testIdentity: identity } : {}) }, output: text => run.appendOutput(text.replace(/\r?\n/g, '\r\n'))
-          });
-          lastResult = result;
+          results = await workspace.executeBatch(project, 'test', batches.map(items => {
+            const identity = details.get(items[0]).entity.testIdentity;
+            return { selection: { entityIds: items.map(item => details.get(item).entity.id) },
+              settings: { schema: identity.schema, methods: items.map(item => details.get(item).entity.testIdentity.method),
+                ...(items.length === 1 ? { testIdentity: identity } : {}) } };
+          }), { token, output: text => run.appendOutput(text.replace(/\r?\n/g, '\r\n')) });
+        } catch (error) { results = batches.map(() => ({ error })); }
+        for (let index = 0; index < batches.length; index++) {
+          const items = batches[index], entry = results[index];
+          if (entry?.error || !entry?.result) {
+            const error = entry?.error || Error('Native test operation did not return a result.');
+            lastResult = error.result || { passed: false, code: 2, report: { error: error.message } };
+            items.forEach(item => run.errored(item, new vscode.TestMessage(error.message)));
+            continue;
+          }
+          const result = lastResult = entry.result;
           for (const item of items) {
             const identity = details.get(item).entity.testIdentity;
             const outcome = result.report?.results?.find(value => value.method === identity.method &&
@@ -78,9 +94,6 @@ function registerNativeSourceTesting(vscode, context, workspace) {
             else if (outcome.status === 'skipped') run.skipped(item);
             else run.failed(item, new vscode.TestMessage(outcome.message || 'Native Jade test failed.'));
           }
-        } catch (error) {
-          lastResult = error.result || { passed: false, code: 2, report: { error: error.message } };
-          items.forEach(item => run.errored(item, new vscode.TestMessage(error.message)));
         }
       }
     } finally { run.end(); running = false; }
