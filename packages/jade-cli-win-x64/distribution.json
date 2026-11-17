@@ -1,52 +1,59 @@
 {
+  "platform": "win32",
   "sourceComparison": {
     "scope": "classSource",
     "bytePolicy": "exact",
     "protocol": 1,
-    "representation": "native-section-cls",
-    "version": "current"
+    "version": "current",
+    "representation": "native-section-cls"
   },
-  "oidFormat": "jade-native",
-  "runtime": "native-cpp",
+  "executableSha256": "f939906388599f6760eb0791104ce1a42ffbe78e487309b27c11c79c97675da8",
   "runtimeFiles": {
-    "native/jade-test-helper-unicode.exe": "6b33f9ce6a5854df4457592a276c764c43476b85da87d698318fb16084c01084",
-    "native/jade-debug-helper-unicode.exe": "f31787479fe127c979844471158cf471ff8ee75ac85f71d3e652784243b8dd98",
     "native/jade-test-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
+    "native/jade-source-helper-ansi.exe": "dffd346ed932d0b3c4050962fe3f83a0defe8d5f9e252881c49c4f91d4f3499e",
+    "native/jade-test-helper-unicode.exe": "6b33f9ce6a5854df4457592a276c764c43476b85da87d698318fb16084c01084",
+    "native/jade-source-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
+    "native/debugger-abi.json": "73e1ff8ac2e417ed75b2170fbd365041b50f0c3d3f03cf00199851be3055f4f5",
+    "README.md": "62245399511ef24a6b27eea8f0fc33dc1678d7aa18649dc49cdf02ac69dbb038",
+    "native/jade-source-helper-unicode.exe": "9166afd78e38734f95e7e7486ea577c07101d68d099112647b535d8e34f6a1fc",
     "native/jade-native-helper.exe": "77a10c9a8c38ff2f8b71bedd48a163948cab4422bd33e7300d0c3ffd4d9d39a0",
-    "native/jade-source-helper-ansi.exe": "648b0749f94e3572c86a0d12b8831b0c6651bb45fc17b64ece9e006bc4b1e233",
+    "native/jade-inspect-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
+    "ThirdPartyNotices.txt": "ac1241ef6060a10dea5357a2f7c4452a77cc05d8d7d9c930d9c67eea5c74942f",
     "native/jade-debug-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
     "native/jade-test-helper-ansi.exe": "6c744ed1f2e512903e7d88c3e39761f4f42b3bf37eaab935fc63fb3d12560d82",
-    "native/jade-inspect-helper-ansi.exe": "934fcc23f15f5c234dff710deee84e260890fdba6ac16c3be134fbe0cfa0aa01",
-    "native/debugger-abi.json": "73e1ff8ac2e417ed75b2170fbd365041b50f0c3d3f03cf00199851be3055f4f5",
-    "native/jade-source-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
-    "ThirdPartyNotices.txt": "ac1241ef6060a10dea5357a2f7c4452a77cc05d8d7d9c930d9c67eea5c74942f",
-    "README.md": "62245399511ef24a6b27eea8f0fc33dc1678d7aa18649dc49cdf02ac69dbb038",
-    "native/jade-source-helper-unicode.exe": "3cb06af88f2667337b285703198279af90c6c0f384c41de739ef431e96562067",
-    "native/jade-inspect-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
-    "native/jade-inspect-helper-unicode.exe": "0e24ca1f68298d58a5f78337cb818c1903f9c39aaf744824d0944cfac8799eb3"
+    "native/jade-inspect-helper-unicode.exe": "0e24ca1f68298d58a5f78337cb818c1903f9c39aaf744824d0944cfac8799eb3",
+    "native/jade-debug-helper-unicode.exe": "f31787479fe127c979844471158cf471ff8ee75ac85f71d3e652784243b8dd98",
+    "native/jade-inspect-helper-ansi.exe": "934fcc23f15f5c234dff710deee84e260890fdba6ac16c3be134fbe0cfa0aa01"
   },
+  "oidFormat": "jade-native",
+  "executable": "jade-cli.exe",
+  "packageVersion": "0.10.17",
+  "formatVersion": 2,
+  "runtime": "native-cpp",
   "characterSets": [
     "ansi",
     "unicode"
   ],
-  "formatVersion": 2,
-  "platform": "win32",
-  "executableSha256": "9cd5e82beea9ebcba51fa29db7bc3748c3d6197119203c9252ec785a28ba023f",
-  "arch": "x64",
-  "executable": "jade-cli.exe",
-  "packageVersion": "0.10.16",
   "sourceExtraction": {
+    "protocol": 1,
+    "fullSchema": true,
+    "layout": "schema-ddx",
+    "versions": [
+      "current"
+    ],
     "gitComparison": true,
+    "workingBaseline": {
+      "format": 1,
+      "modes": [
+        "fresh",
+        "verify"
+      ]
+    },
     "scopes": [
       "classes",
       "schemas",
       "all"
-    ],
-    "fullSchema": true,
-    "layout": "schema-ddx",
-    "protocol": 1,
-    "versions": [
-      "current"
     ]
-  }
+  },
+  "arch": "x64"
 }

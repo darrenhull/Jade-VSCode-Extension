@@ -1,3 +1,10 @@
+# 0.22.18 - Working source baselines and owned runtime cleanup
+
+- Bundle verified official Jade CLI 0.10.17 with matching native helpers.
+- Combined project setup prepares Working first and extracts once from that copy. Add **Jade: Verify Working Source Baseline** for existing copies; matching saved source avoids reloading unchanged definitions. Test and Scratch bodies still execute.
+- Cancel and drain this extension’s requests before graceful client closure; wait for actual exit with bounded fallback against only its owned client. Native handover preserves busy/shared runtimes and safely refuses unsupported older runtimes.
+- Verification preserves Working data and workspace files. Source extraction/publication policies are unchanged. Matching source is not a compilation/test result; structural loading remains tracked in [CLI #106](https://github.com/darrenhull/Jade-CLI/issues/106).
+
 # 0.22.17 - Working JadeGit option and native member editing
 
 - Bundle official Jade CLI 0.10.16, including scoped Working preparation, reconciliation diagnostics and the Working-only JadeGit policy.

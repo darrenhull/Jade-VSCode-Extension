@@ -1,0 +1,55 @@
+{
+  "status": "pass-with-ui-capture-unavailable",
+  "extensionVersion": "0.22.18",
+  "reviewedConsumerSource": "0b63641f5b90cdf10bc131eca44ba87f64212728",
+  "officialNative": {
+    "version": "0.10.17",
+    "release": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.10.17",
+    "releaseId": 448027478,
+    "tagCommit": "55efb907aa36bfee13705b7fd638fb20eff3bc1a",
+    "reviewedSource": "551863901ac011dfb3e62eb4fbddb2c206cd2cf6",
+    "equalSourceTree": "35f19ace586fa944cd4e0b43ef2722d35c81d704",
+    "mainRun": 44002349045,
+    "apiChecksumsAndAllManifestBytesVerified": true,
+    "committedHelperAndAbiGitBlobsVerified": 13,
+    "archiveSha256": "9ad4080ff56ee682e51093fa00c23bf95ef9f939af7de570352d0567ea0c57c2",
+    "executableSha256": "f939906388599f6760eb0791104ce1a42ffbe78e487309b27c11c79c97675da8",
+    "distributionSha256": "868ac8f8a25dc6751f641577a57900279d16897414f5d4a2a857d47ac5e89975",
+    "githubImmutableReleaseLock": false
+  },
+  "package": {
+    "name": "jade-native-runner-cpp-preview-0.22.18.vsix",
+    "sha256": "16a1fdc2438dc80e290482c90588f87d7075f45e5793569ec4601f24e855651f",
+    "bytes": 5597356,
+    "checksumFileSha256": "f085603caf79b1e8abd1965505f2ca6d709507ec82146eec4289b3c02ea4cd3e",
+    "allEntries": 181,
+    "sourceBackedEntriesExact": 179,
+    "shippedSourceModulesExact": 122,
+    "manifestRuntimeMembersExact": 15,
+    "executableAlsoExact": true,
+    "officialPinMinimumAndCanonicalVersionsConsistent": true
+  },
+  "gates": {
+    "focusedContractsPassed": 20,
+    "focusedContractsDurationMilliseconds": 11713.2093,
+    "priorReviewedConsumerControls": 116,
+    "unchangedConsumerControlsRepeated": false,
+    "vsixBuilds": 1,
+    "atomicOfficialUpdaterUsed": true,
+    "extractedVsixNoNodePortableDiscoveryPassed": true,
+    "ownedPortableBrokerActuallyExited": true,
+    "dependencyLockGraphUnchangedExceptRootVersion": true
+  },
+  "limits": [
+    "Computer Use initialization failed: failed to write kernel assets; path not found (os error3). No UI repair, fallback capture or screenshot claim",
+    "No licensed JADE/JOM or Source/Working database calls, connected qualification, user installation, full local suite or large-corpus repeat",
+    "Matching source provenance does not claim compilation or test success; structural load behavior remains tracked in CLI106",
+    "Source publication/authentication policy is unchanged"
+  ],
+  "privateEvidenceHashes": {
+    "officialAssetVerification": "819e7138d8aa7008b2fdca23f76bd6cd97f3159ea021e294e1bf34219c6fe518",
+    "vsixAllEntryProof": "ad2edb429b8140d9775ad2df695460ab0ac54f959759646c6ef012ced7c7c75f",
+    "pinAndUpdaterContracts": "00f86a489aed49e4f33e6fd718ef5fc633a9e08f2f4124dc1b67ebc8056bcf56",
+    "portableLog": "525292bbeb7be590ac26236de46285ede5b97496df1d1e7f353b717af06929e6"
+  }
+}
