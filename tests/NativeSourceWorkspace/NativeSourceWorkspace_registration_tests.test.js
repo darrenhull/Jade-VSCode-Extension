@@ -136,7 +136,7 @@ for (const sourceKind of ['inherited', 'system']) test(sourceKind + ' Class Work
   const f = setup({ reply: (command, request) => {
     if (command === 'source.semantic.read') return { passed: true, code: 0, body: { ...structuredClone(f.document), entityId: request.entityId } };
     if (command !== 'source.semantic.query') return;
-    const items = request.kind === 'member' ? [{ id: f.document.entityId, name: 'value', kind: 'method', [sourceKind]: true, qualifiedName: { schema: 'Example', type: 'Base', member: 'value' } }] : [];
+    const items = request.kind === 'member' ? [{ id: f.document.entityId, name: 'value', kind: 'method', flags: { [sourceKind]: true, readOnly: true }, qualifiedName: { schema: 'Example', type: 'Base', member: 'value' } }] : [];
     return { passed: true, code: 0, body: { provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
   } });
   const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });

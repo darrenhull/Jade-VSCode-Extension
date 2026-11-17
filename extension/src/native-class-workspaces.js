@@ -2,6 +2,12 @@
 const { createClassWorkspaces } = require('./class-workspace');
 const groupNames = { property: 'Properties', reference: 'References', method: 'Methods', typeMethod: 'Type methods', constant: 'Constants', key: 'Collection keys', base: 'Inheritance' };
 
+function nativeMember(entity, owner = entity.qualifiedName?.type) {
+  return { ...entity, nativeEntity: entity, owner, schema: entity.qualifiedName?.schema,
+    kind: entity.flags?.typeMethod === true ? 'typeMethod' : entity.kind, detail: entity.signature,
+    inherited: entity.flags?.inherited === true, system: entity.flags?.system === true };
+}
+
 function createNativeClassWorkspaceModel({ workspace } = {}) {
   return {
     async load(row, state = {}) {
@@ -11,10 +17,7 @@ function createNativeClassWorkspaceModel({ workspace } = {}) {
         ...(state.kind && state.kind !== 'all' ? { memberKind: state.kind } : {}), search: state.query || '',
         includeInherited: state.includeInherited === true, offset: state.offset || 0, limit: 100 });
       const groups = new Map();
-      const members = page.items.map(entity => ({ ...entity, nativeEntity: entity,
-        owner: entity.qualifiedName?.type, schema: entity.qualifiedName?.schema,
-        kind: entity.typeMethod === true ? 'typeMethod' : entity.kind, detail: entity.signature,
-        inherited: entity.inherited === true, system: entity.system === true }));
+      const members = page.items.map(entity => nativeMember(entity));
       for (const member of members) {
         const label = groupNames[member.kind] || 'Other members';
         if (!groups.has(label)) groups.set(label, { label, items: [] });
@@ -90,7 +93,7 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
     if (!['class', 'interface', 'primitive', 'type'].includes(type?.kind)) throw Error('Choose a class from the native source catalogue.');
     const nativeBinding = project.provider.binding();
     const row = { ...input, provider: nativeBinding.provider, projectId: nativeBinding.projectId, entityId: type.id,
-      entity: type, ...(input.typeEntity ? { selectedMember: { ...input.entity, owner: type.name } } : {}) };
+      entity: type, ...(input.typeEntity ? { selectedMember: nativeMember(input.entity, type.name) } : {}) };
     const key = keyFor(row), existing = views.get(key);
     if (existing) { existing.panel.reveal(existing.panel.viewColumn); if (row.selectedMember) await existing.view.select(row.selectedMember.id); return { opened: true, reused: true }; }
     const uri = await sourceUri(row, type.id);
