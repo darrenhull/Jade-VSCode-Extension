@@ -60,8 +60,34 @@ test("explicit refresh updates clean documents while preserving dirty originals"
   const f = await setup(), uri = await f.files.open(f.document.entityId);
   f.snapshot.generation = "generation-2"; f.document.generation = "generation-2"; f.document.revision.generation = "generation-2";
   await f.native.prepare();
-  assert.equal(await f.files.refresh(uri, { dirty: true }), false);
+  assert.equal(await f.files.refresh(uri, { currentState: () => ({ dirty: true }) }), false);
   assert.equal(f.files.binding(uri).revision.generation, "generation-1");
-  assert.equal(await f.files.refresh(uri, { dirty: false }), true);
+  assert.equal(await f.files.refresh(uri, { currentState: () => ({ dirty: false }) }), true);
   assert.equal(f.files.binding(uri).revision.generation, "generation-2");
+});
+test("editing while a native refresh is pending cannot replace the original save revision", async () => {
+  const f = await setup(), uri = await f.files.open(f.document.entityId), current = { dirty: false, version: 1 };
+  const original = f.native.read.bind(f.native); let finish;
+  f.native.read = async () => new Promise(resolve => { finish = resolve; });
+  const refresh = f.files.refresh(uri, { currentState: () => ({ ...current }) });
+  while (!finish) await new Promise(done => setImmediate(done));
+  current.dirty = true; current.version = 2;
+  f.snapshot.generation = "generation-2"; f.document.generation = "generation-2"; f.document.revision.generation = "generation-2";
+  await f.native.prepare(); finish(await original(f.document.entityId));
+  assert.equal(await refresh, false); assert.equal(f.files.binding(uri).revision.generation, "generation-1");
+  await f.files.writeFile(uri, Buffer.from("dirty editor text"), { overwrite: true });
+  assert.equal(f.requests.at(-1).body.baseRevision.generation, "generation-1");
+});
+test("a save begun or completed during refresh cannot be overwritten by its stale response", async () => {
+  const f = await setup(), uri = await f.files.open(f.document.entityId); let finish;
+  const original = f.native.read.bind(f.native);
+  const stale = await original(f.document.entityId);
+  f.native.read = async () => new Promise(resolve => { finish = resolve; });
+  const refresh = f.files.refresh(uri, { currentState: () => ({ dirty: false, version: 1 }) });
+  while (!finish) await new Promise(done => setImmediate(done));
+  await f.files.writeFile(uri, Buffer.from("new saved document"), { overwrite: true });
+  finish(stale);
+  assert.equal(await refresh, false);
+  assert.equal(f.files.binding(uri).revision.generation, "generation-2");
+  assert.equal(Buffer.from(f.files.readFile(uri)).toString(), "new saved document");
 });

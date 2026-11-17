@@ -75,10 +75,15 @@ class JadeSourceFileSystemProvider {
     this.entities.delete(value.document.entityId);
   }
 
-  async refresh(uri, { dirty = false } = {}) {
+  async refresh(uri, { currentState } = {}) {
+    if (typeof currentState !== 'function') throw Error('Current editor state is required before refreshing a source document.');
     const value = this.record(uri);
-    if (dirty || value.saving) return false;
+    const before = currentState(), original = value.document;
+    if (before.dirty || value.saving) return false;
     const document = await this.provider.read(value.document.entityId);
+    const after = currentState();
+    if (after.dirty || value.saving || this.documents.get(uri.toString()) !== value || value.document !== original ||
+        before.version !== after.version || before.document !== after.document) return false;
     const changed = document.projection.text !== value.document.projection.text;
     value.document = document;
     if (changed) {
