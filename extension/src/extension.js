@@ -272,6 +272,11 @@ function activate(context) {
     claim:value=>{publishing=value;},
     updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value)
   });
+  const baselineVerification=require('./working-baseline-verification').registerWorkingBaselineVerification(vscode,context,{
+    client:nativeTests,configFor:folder=>inspectionConfig(undefined,folder),
+    beforeOperation:()=>workspaceOperationGuard.acquire(),
+    afterOperation:lease=>workspaceOperationGuard.release(lease)
+  });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
     client:nativeTests,prepareSource:language.ensureSourceIndex,
     configFor:(_document,scope)=>inspectionConfig({uri:scope.configurationResource},scope.folder),

@@ -72,6 +72,11 @@
     },
     "commands": [
       {
+        "command": "jadeNative.verifyWorkingSourceBaseline",
+        "title": "Verify Working Source Baseline",
+        "category": "Jade"
+      },
+      {
         "command": "jadeNative.setupProject",
         "title": "Set Up Project",
         "category": "Jade"

@@ -125,6 +125,9 @@ class CliWorkingSession{
  startWorkingSync(config,selection,callbacks){
   return this.startExtraction(config,selection,callbacks,'working.sync');
  }
+ startWorkingBaselineVerification(config,selection,callbacks){
+  return this.startExtraction(config,selection,callbacks,'working.baseline.verify');
+ }
  startExtraction(config,selection,callbacks,command){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
   const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks,command);
