@@ -20,7 +20,7 @@ function fixture(options = {}) {
   const client = {
     async sourceCapabilities(value) { calls.push(["capabilities", value]); return { sourceExtraction: { workingBaseline: { format: 1, modes: options.unsupported ? ["fresh"] : ["fresh", "verify"] } } }; },
     async workingJadeGitCapability() { return { format: 1, configuration: "workingJadeGitPolicy", values: ["inherit", "disabled"], default: "inherit", scope: "owned-working-only", reversible: true }; },
-    async workingLocation(value) { calls.push(["location", value]); return { databasePath: "C:/private/working/system" }; },
+    async workingLocation(value) { calls.push(["location", value]); if (options.changeSettings) config.iniPath = "C:/changed.ini"; if (options.closeDuringLocation) closed = true; return { databasePath: "C:/private/working/system" }; },
     startWorkingBaselineVerification(value, selection, callbacks) {
       calls.push(["verify", value, selection, callbacks]);
       active = { completion: options.deferred ? new Promise(r => { resolve = r; }) : Promise.resolve(options.result || verified()), stop() { calls.push("stop"); } };
@@ -35,22 +35,22 @@ function fixture(options = {}) {
     ProgressLocation: { Notification: 15 },
     commands: { registerCommand(name, handler) { commands.set(name, handler); return { dispose() {} }; } },
     workspace: {
-      get workspaceFolders() { return closed ? [] : [folder]; },
+      get workspaceFolders() { return closed ? [] : options.cancelProjectChoice ? [folder, { ...folder, name: "Other" }] : [folder]; },
       getWorkspaceFolder: () => closed ? undefined : folder,
       fs: { writeFile() { throw Error("Workspace write forbidden"); } },
     },
     window: {
       createOutputChannel: () => output,
-      async showQuickPick(items) { return items[0]; },
-      async showWarningMessage(message, detail) { messages.push([message, detail]); if (options.changeSettings) config.iniPath = "C:/changed.ini"; if (options.closeDuringReview) closed = true; return options.decline ? undefined : "Verify Working"; },
+      async showQuickPick(items) { return options.cancelProjectChoice ? undefined : items[0]; },
+      async showWarningMessage() { throw Error("Verification must not ask for a second approval"); },
       async showInformationMessage(message) { messages.push(message); },
       async showErrorMessage(message) { messages.push(message); },
-      withProgress: (_options, fn) => fn({ report: value => calls.push(["progress", value]) }, token),
+      withProgress: (options, fn) => { calls.push(["notification", options]); return fn({ report: value => calls.push(["progress", value]) }, token); },
     },
   };
   const api = registerWorkingBaselineVerification(vscode, { subscriptions }, {
     client, configFor: () => config,
-    async beforeOperation() { calls.push("claim"); return "owned-lease"; },
+    async beforeOperation() { calls.push("claim"); if (options.changeAfterGuard) config.iniPath = "C:/changed.ini"; if (options.closeAfterGuard) closed = true; return "owned-lease"; },
     async afterOperation(lease) { assert.equal(lease, "owned-lease"); calls.push("release"); if (options.cleanupFailure) throw Error("Context release failed"); },
   });
   return { api, config, calls, messages, commands, subscriptions,
@@ -71,10 +71,9 @@ test("palette action verifies existing Working without workspace promotion or in
   assert.equal(callbacks.onPermit, undefined, "native-private terminal promotion needs no client write permission");
   assert.equal(f.calls.filter(c => c === "claim").length, 1);
   assert.equal(f.calls.filter(c => c === "release").length, 1);
-  assert.match(f.messages[0][1].detail, /C:\/private\/working\/system/);
-  assert.match(f.messages[0][1].detail, /saved workspace files/);
-  assert.match(f.messages[0][1].detail, /stay intact/);
-  assert.match(f.messages.at(-1), /not compilation/i);
+  assert.match(f.calls.find(c => Array.isArray(c) && c[0] === "notification")[1].title, /C:\/private\/working\/system/);
+  assert.ok(f.calls.some(c => Array.isArray(c) && c[0] === "log" && c[1].includes("C:/private/working/system")));
+  assert.equal(f.messages.at(-1), "Saved source files match this Working copy.");
 });
 
 test("old CLI refuses clearly without starting verification", async () => {
@@ -86,7 +85,7 @@ test("old CLI refuses clearly without starting verification", async () => {
   assert.equal(f.calls.includes("claim"), false);
 });
 
-for (const option of ["decline", "preCancelled"]) test(option + " starts no export or database operation", async () => {
+for (const option of ["cancelProjectChoice", "preCancelled"]) test(option + " starts no export or database operation", async () => {
   const f = fixture({ [option]: true });
   const result = await f.api.verify();
   assert.equal(result.cancelled, true);
@@ -149,7 +148,7 @@ test("registration uses selected project settings and shared operation guard", (
   });
 });
 
-for (const option of ["changeSettings", "closeDuringReview"]) test(option + " refuses the stale reviewed target", async () => {
+for (const option of ["changeSettings", "closeDuringLocation"]) test(option + " refuses the stale reviewed target", async () => {
   const f = fixture({ [option]: true });
   const result = await f.api.verify();
   assert.equal(result.passed, false);
@@ -173,4 +172,13 @@ test("repeated invocation joins the one active verification without a second sta
   const second = f.api.verify(); assert.equal(first, second);
   f.resolve(verified()); await second;
   assert.equal(started(f).length, 1);
+});
+
+for (const option of ["changeAfterGuard", "closeAfterGuard"]) test(option + " rejects a changed target after asynchronous guard acquisition", async () => {
+  const f = fixture({ [option]: true });
+  const result = await f.api.verify();
+  assert.equal(result.passed, false);
+  assert.match(result.error, /settings changed|project closed/i);
+  assert.equal(started(f).length, 0);
+  assert.equal(f.calls.filter(c => c === "release").length, 1);
 });

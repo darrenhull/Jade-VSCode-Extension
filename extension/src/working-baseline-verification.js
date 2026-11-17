@@ -30,34 +30,27 @@ function registerWorkingBaselineVerification(vscode, context, services) {
     const requireConfig = () => {
       requireFolder();
       if (!isDeepStrictEqual(config, services.configFor(folder)))
-        throw Error("Jade settings changed during review. Run Verify Working Source Baseline again.");
+        throw Error("Jade settings changed. Run Verify Working Source Baseline again.");
     };
     const capabilities = await services.client.sourceCapabilities(config);
     const baseline = capabilities?.sourceExtraction?.workingBaseline;
     if (baseline?.format !== 1 || !Array.isArray(baseline.modes) || !baseline.modes.includes("verify"))
-      throw Error("Update the Jade CLI bundle to verify an existing Working source baseline. This CLI does not support verification.");
+      throw Error("Update the Jade CLI bundle to compare saved source files with an existing Working copy. This CLI does not support verification.");
     await requireWorkingJadeGitPolicy(services.client, config);
     const working = await services.client.workingLocation(config);
     requireFolder();
     if (typeof working?.databasePath !== "string" || !working.databasePath)
       throw Error("The Jade CLI did not identify the existing Working target.");
-    const choice = await vscode.window.showWarningMessage("Verify this Working database against saved workspace files?", {
-      modal: true,
-      detail: "Project: " + root + "\nWorking: " + working.databasePath +
-        "\n\nWorking data and workspace source files stay intact. Native verification compares definitions with saved workspace files and updates its managed source-baseline proof only after a match. This verifies source provenance, not compilation or test success.",
-    }, "Verify Working");
-    if (choice !== "Verify Working") return cancelled();
-    requireFolder();
     requireConfig();
 
     let lease, result, primaryError;
     try {
       lease = await services.beforeOperation();
       result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification,
-        title: "Verifying Working source baseline", cancellable: true }, async (progress, token) => {
+        title: "Checking saved source files · " + working.databasePath, cancellable: true }, async (progress, token) => {
         requireConfig();
         if (token.isCancellationRequested) return cancelled();
-        log("Verifying saved source provenance for Working: " + working.databasePath + ".");
+        log("Comparing saved source files with Working: " + working.databasePath + ". Working data and workspace files stay intact.");
         const operation = services.client.startWorkingBaselineVerification(config,
           { destination: root, cwd: root, scope: "all" }, {
             onOutput: text => output.append(text),
@@ -94,13 +87,13 @@ function registerWorkingBaselineVerification(vscode, context, services) {
       if (result.code !== 0 || result.workingBaseline?.status !== "verified" ||
           result.workingBaseline.origin !== "same-generation-native-extraction" ||
           result.workingBaseline.scope !== "all" || result.workingBaseline.identity == null)
-        throw Error("Native Working source baseline was not verified.");
-      log("Working source baseline verified. This is not compilation or test confirmation.");
-      void vscode.window.showInformationMessage("Working source baseline verified; not compilation or test confirmation.");
+        throw Error("The Jade CLI did not confirm that saved source files match this Working copy.");
+      log("Saved source files match this Working copy.");
+      void vscode.window.showInformationMessage("Saved source files match this Working copy.");
     } else if (result?.status === "cancelled" || result?.code === 130) {
-      log("Working source baseline verification cancelled. Review native cleanup details before retrying.");
+      log(result.report?.error || "Working source comparison cancelled.");
     } else {
-      const message = result?.report?.error || "Working source baseline verification did not complete.";
+      const message = result?.report?.error || "Working source comparison did not complete.";
       log(message); void vscode.window.showErrorMessage(message);
     }
     return result;

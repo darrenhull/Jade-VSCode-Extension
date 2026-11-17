@@ -24,10 +24,10 @@
     "logSha256": "93f98a69662e8a0d36e666a3fdbaf42ded33d4077646c870848badbdb7b86b6b"
   },
   "green": {
-    "passed": 50,
+    "passed": 52,
     "failed": 0,
-    "durationMs": 269.9554,
-    "logSha256": "4b5567cc3a36288119a10413ff36531fc708a15e34b646b62bb1a63abe7bb65c",
+    "durationMs": 252.4845,
+    "logSha256": "db77a89d7e0114f3cf88fad68fd582aff0fad90a4fa52818fadb6bc4d5e3d455",
     "testFiles": [
       "tests/WorkingBaselineVerification/WorkingBaselineVerification_run_tests.test.js",
       "tests/CliWorkingSession/CliWorkingSession_verifyBaseline_tests.test.js",
@@ -41,5 +41,18 @@
     "Running palette/notification screenshot outstanding in this source-only scope",
     "Combined native artifact and connected verification are separate gates",
     "Existing source-only onboarding b7 and separate shutdown120 checkpoint unchanged"
-  ]
+  ],
+  "reviewedUx": {
+    "parent": "0403056c9e775238227be4d719964d7c53241c0f",
+    "approval": "Explicit command plus project choice; no second modal",
+    "workingTarget": "Shown in progress and log",
+    "successMessage": "Saved source files match this Working copy.",
+    "targetGuards": "Settings and project rechecked after capability/location and asynchronous operation guard",
+    "red": {
+      "passed": 0,
+      "failed": 1,
+      "cause": "Old implementation asked for second approval",
+      "logSha256": "bee5830f733ca6071bcce703b4b3fcde69b32a9ccbd97ec81da3448a6aef0562"
+    }
+  }
 }
