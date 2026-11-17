@@ -1,0 +1,28 @@
+{
+  "issue": 122,
+  "status": "Controlled source integration; native and running UI qualification outstanding",
+  "nativeContract": "sourceSemantic format 1; projectionText whole-document edit; independent nativeScratch capability",
+  "defaultRoute": "One shared CLI and native source model; no CLS index, parser, watcher, baseline verification or hydration/staging route initialized",
+  "sharedInterface": ["Class catalogue", "Class Workspace renderer", "Native Jade editor", "Test Controller", "Scratch Pad", "Database Objects target and credential handling"],
+  "targetedEvidence": {
+    "providerControls": { "passed": 26, "milliseconds": 136.346 },
+    "refreshRaceControls": { "passed": 9, "milliseconds": 136.425 },
+    "nativeRegistrationAndAffectedSharedControls": { "passed": 37, "milliseconds": 384.965 },
+    "boundaries": ["Controlled native DTOs, not actual JADE", "No database or Source calls", "Native results and cancellation remain authoritative", "Every requested test/Scratch execution dispatched again"]
+  },
+  "remainingQualification": [
+    "Real maintained JOX catalogue/read/projectionText save and exact origin mapping",
+    "Actual Working saved-change upload/build/test/edited rerun and branch/revert convergence",
+    "Native projection metadata reopen across process restart; stale dirty buffers must never rebase",
+    "Mapped native compiler Problems once actual F3 mapping fields are frozen",
+    "Actual running generic UI screenshot (computer-use kernel asset initialization currently fails)",
+    "Migration of obsolete default-CLS activation fixtures to the qualified JOX route"
+  ],
+  "unqualifiedActions": ["Source publication/extraction", "JOX debugger mapping", "Project reference/call hierarchy queries"],
+  "pruningAfterNativeQualification": {
+    "remove": ["Unregistered activateLegacyCls", "CLS-only workspace-index and SourceIndexCache wiring", "CLS-only Class Workspace model/controller and MethodDocumentBinding coupling", "CLS source-index startup/watchers and duplicate JS project join/staging preparation", "Obsolete CLS activation fixtures/contributions"],
+    "retain": ["Needed Jade lexer/editor utilities", "Shared Class Workspace/catalogue presentation", "Shared notebook/test/result/lifecycle presentation", "Small native provider boundary for future formats"],
+    "recovery": "Preserved jade-cls backup is unchanged"
+  },
+  "pinVersionPackageInstallChanged": false
+}

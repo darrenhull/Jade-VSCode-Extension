@@ -3,6 +3,7 @@ const crypto = require("node:crypto");
 const KINDS = new Set(["all", "property", "reference", "method", "typeMethod", "constant", "key", "base"]);
 const STATE_KEY = "jade.classWorkspaces.v1";
 function classIdentity(row) {
+  if (row.provider && row.projectId && row.entityId) return JSON.stringify([row.provider, row.projectId, row.entityId]);
   return JSON.stringify([String(row.projectId || row.projectRoot || row.workspaceRoot || row.project || ""), String(row.schema || ""), String(row.owner || row.className || row.name || ""), String(row.importIdentity || ""), String(row.packageAlias || ""), String(row.file || "")]);
 }
 function normalizeState(value = {}) {
@@ -135,7 +136,10 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       if (record.snapshot) { record.snapshot = { ...record.snapshot, state: { ...record.state } }; await send({ command: "workspace", revision: record.revision, snapshot: record.snapshot, focusDetail: true }); }
       if (!selectedCurrent()) return;
       const member = selectedMember();
-      if (member && binding && ["method", "typeMethod", "property", "reference"].includes(member.kind)) {
+      if (member && services.openMember) {
+        const snapshot = await services.openMember(member, { openNative: openNative && panel.active, isCurrent: selectedCurrent });
+        if (selectedCurrent() && snapshot) await send({ command: "editorSnapshot", snapshot });
+      } else if (member && binding && ["method", "typeMethod", "property", "reference"].includes(member.kind)) {
         const memberFile = String(member.file || ""), documentFile = document?.uri?.toString();
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
         const preview = foreign && adapters.preview ? await adapters.preview(row, id, document) : undefined;
@@ -200,12 +204,13 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "editorSave": {
             if(record.saving)break;
             record.saving=true;
-            await send({command:"saveState",status:"saving",dirty:document?.isDirty ?? true});
+            const sourceDocument=()=>services.currentDocument?.()||document;
+            await send({command:"saveState",status:"saving",dirty:sourceDocument()?.isDirty ?? true});
             try{
               if(typeof services.save!=="function"||await services.save()===false)throw Error("The current source file was not saved. Your edits remain in the document.");
-              await send({command:"saveState",status:"saved",dirty:document?.isDirty ?? false});
+              await send({command:"saveState",status:"saved",dirty:sourceDocument()?.isDirty ?? false});
             }catch(error){
-              await send({command:"saveState",status:"error",dirty:document?.isDirty ?? true,message:error?.message || String(error)});
+              await send({command:"saveState",status:"error",dirty:sourceDocument()?.isDirty ?? true,message:error?.message || String(error)});
               await send({command:"notice",message:error?.message || String(error)});
             }finally{record.saving=false;}
             break;

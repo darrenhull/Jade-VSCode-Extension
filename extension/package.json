@@ -27,7 +27,7 @@
   "activationEvents": [
     "workspaceContains:.jade/project-setup.pending",
     "workspaceContains:jade.json",
-    "workspaceContains:**/*.cls",
+    "workspaceContains:**/*.jox",
     "onLanguage:jade-nz",
     "onDebug:jade-native-experimental",
     "onNotebook:jade-workspace"
@@ -39,7 +39,7 @@
         "displayName": "Class Workspace",
         "selector": [
           {
-            "filenamePattern": "*.cls"
+            "filenamePattern": "**/.jade/projections/*.jade"
           }
         ],
         "priority": "option"
@@ -411,22 +411,22 @@
       {
         "command": "jadeNative.runLocalTests",
         "key": "ctrl+f5",
-        "when": "editorTextFocus && resourceExtname == .cls && !inDebugMode && !jadeNative.publishing"
+        "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
       },
       {
         "command": "jadeNative.buildWorkspace",
         "key": "f5",
-        "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
+        "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
       },
       {
         "command": "jadeNative.publishClass",
         "key": "shift+f5",
-        "when": "editorTextFocus && (resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf) && !inDebugMode && !jadeNative.publishing"
+        "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
       },
       {
         "command": "jadeNative.scratchpadCompileInfo",
         "key": "f5",
-        "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && resourceExtname == .jade && editorLangId == jade-nz))"
+        "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && (resourceExtname == .jade && resourceScheme != jade-source) && editorLangId == jade-nz))"
       },
       {
         "command": "jadeNative.buildWorkspace",
@@ -489,12 +489,12 @@
       ],
       "editor/title": [
         {
-          "when": "resourceExtname == .jade && editorLangId == jade-nz",
+          "when": "(resourceExtname == .jade && resourceScheme != jade-source) && editorLangId == jade-nz",
           "command": "jadeNative.runWorkspace",
           "group": "navigation@1"
         },
         {
-          "when": "resourceExtname == .jade && editorLangId == jade-nz",
+          "when": "(resourceExtname == .jade && resourceScheme != jade-source) && editorLangId == jade-nz",
           "command": "jadeNative.compareWorkspaceRuns",
           "group": "navigation@2"
         }
@@ -579,37 +579,37 @@
       "editor/context": [
         {
           "command": "jadeNative.runLocalTests",
-          "when": "resourceExtname == .cls",
+          "when": "resourceScheme == jade-source",
           "group": "navigation"
         },
         {
           "command": "jadeNative.compileClass",
-          "when": "resourceExtname == .cls",
+          "when": "resourceScheme == jade-source",
           "group": "navigation"
         },
         {
           "command": "jadeNative.publishClass",
-          "when": "resourceExtname == .cls",
+          "when": "resourceScheme == jade-source",
           "group": "navigation"
         },
         {
           "command": "jadeNative.debugMethod",
-          "when": "resourceExtname == .cls",
+          "when": "resourceScheme == jade-source",
           "group": "navigation"
         },
         {
           "command": "jadeNative.runWorkspaceSelection",
-          "when": "editorLangId == jade-nz && resourceExtname == .jade && editorHasSelection",
+          "when": "editorLangId == jade-nz && (resourceExtname == .jade && resourceScheme != jade-source) && editorHasSelection",
           "group": "navigation@1"
         },
         {
           "command": "jadeNative.buildWorkspace",
-          "when": "resourceExtname == .cls || resourceExtname == .scm || resourceExtname == .sec || resourceExtname == .ddx || resourceExtname == .jcf",
+          "when": "resourceScheme == jade-source",
           "group": "navigation"
         },
         {
           "command": "jadeNative.pullSelectedClassFromSource",
-          "when": "resourceExtname == .cls",
+          "when": "resourceScheme == jade-source",
           "group": "jadeSource@1"
         }
       ],

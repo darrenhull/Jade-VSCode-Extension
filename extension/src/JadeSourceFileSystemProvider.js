@@ -20,7 +20,7 @@ class JadeSourceFileSystemProvider {
     if (this.opening.has(entityId)) return this.opening.get(entityId);
     const operation = (async () => {
       const document = await this.provider.read(entityId, token);
-      const uri = this.vscode.Uri.from({ scheme: 'jade-source', path: '/' + crypto.randomUUID() + '.jade' });
+      const uri = this.vscode.Uri.from({ scheme: 'jade-source', path: '/.jade/projections/' + crypto.randomUUID() + '.jade' });
       const now = Date.now();
       this.documents.set(uri.toString(), { uri, document, ctime: now, mtime: now, saving: false });
       this.entities.set(entityId, uri);

@@ -112,7 +112,7 @@ function registerClassCatalogue(vscode, context, options) {
       };
       model = new ClassBrowserModel({ scope: metadata.scope });
       model.setClasses(next.rows);
-      remotePage=next.page;
+      remotePage=next.page ? {...next.page,items:next.page.items.map(row=>model.find(row)).filter(Boolean)} : undefined;
       if (
         !options.getPage && filter.schema &&
         !model.schemas().some((row) => row.name === filter.schema)
@@ -158,19 +158,7 @@ function registerClassCatalogue(vscode, context, options) {
     if (metadata.nativePaging?.stale) throw Error("This instance snapshot is disconnected. Reopen instances from the connected database.");
     if (typeof id !== "string" || id.length > 16384)
       throw Error("Unknown class identity");
-    let identity;
-    try {
-      identity = JSON.parse(id);
-    } catch {
-      throw Error("Unknown class identity");
-    }
-    if (
-      !Array.isArray(identity) ||
-      ![3,4].includes(identity.length) ||
-      identity[0] !== metadata.scope
-    )
-      throw Error("Unknown class identity");
-    const row = model.find({ schema: identity[1], name: identity[2], projectId: identity[3] });
+    const row = model.findBrowserId(id);
     if (!row || row.browserId !== id) throw Error("Unknown class identity");
     selectedId = id;
     persist();

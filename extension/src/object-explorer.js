@@ -100,7 +100,7 @@ function registerObjectExplorer(vscode, context, services) {
     }
     let doc = vscode.window.activeTextEditor?.document;
     if (doc?.uri.scheme !== "file" || !/.cls$/i.test(doc.uri.fsPath) || !vscode.workspace.getWorkspaceFolder(doc.uri)) {
-      const active = doc?.uri && vscode.workspace.getWorkspaceFolder(doc.uri);
+      const active = doc?.uri && (services.workspaceFolder?.(doc.uri) || vscode.workspace.getWorkspaceFolder(doc.uri));
       const folder =
         active ||
         (folders.length === 1
