@@ -51,19 +51,26 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
       const view = shell.attach({ document, panel, row, selectedId: row.selectedMember?.id, services: {
         async openMember(member, { openNative = false, isCurrent = () => true } = {}) {
           row.selectedMember = member;
+          if (member.system) return { available: false, readOnly: true, editorMode: 'native', owner: member.owner, member: member.name,
+            kind: member.kind, text: member.signature || member.detail || member.name, reason: 'System declarations are read-only.' };
           const uri = await sourceUri(row, member.id);
           const nextDocument = await vscode.workspace.openTextDocument(uri);
           await vscode.languages.setTextDocumentLanguage(nextDocument, 'jade-nz');
           const native = row.project.files.binding(uri);
           if (!isCurrent()) return;
           selectedDocument = nextDocument;
+          if (member.inherited) return { available: false, readOnly: true, editorMode: 'native', owner: member.owner, member: member.name,
+            kind: member.kind, text: selectedDocument.getText(), reason: 'This inherited declaration is read-only here. Open Original Source to edit its declaration explicitly.' };
           if (openNative) await original(row, member.id);
           return { available: true, editorMode: 'native', readOnly: !row.project.files.editable(native),
             owner: member.owner, member: member.name, kind: member.kind, uri: uri.toString(),
             text: selectedDocument.getText(), version: selectedDocument.version, dirty: selectedDocument.isDirty };
         },
         openOriginal: () => original(row, row.selectedMember?.id),
-        save: () => selectedDocument.save(),
+        save: () => {
+          if (row.selectedMember?.inherited || row.selectedMember?.system) throw Error('Save this declaration in its native source editor.');
+          return selectedDocument.save();
+        },
         currentDocument: () => selectedDocument,
         build: () => vscode.commands.executeCommand('jadeNative.compileClass', selectedDocument.uri),
         runTests: () => vscode.commands.executeCommand('jadeNative.runLocalTests', selectedDocument.uri),

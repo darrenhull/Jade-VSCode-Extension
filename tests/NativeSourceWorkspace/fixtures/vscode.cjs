@@ -1,7 +1,7 @@
 'use strict';
 const { fixture } = require('../../NativeSourceProvider/fixtures/provider.cjs');
 function setup(options = {}) {
-  const f = fixture(options), commands = new Map(), trees = new Map(), languages = new Map(), fileSystems = new Map(), editors = new Map(), documents = [], panels = [];
+  const f = fixture(options), commands = new Map(), trees = new Map(), languages = new Map(), fileSystems = new Map(), editors = new Map(), documents = [], panels = [], shown = [];
   class Emitter {
     constructor() { this.listeners = new Set(); this.event = fn => { this.listeners.add(fn); return { dispose: () => this.listeners.delete(fn) }; }; }
     fire(value) { for (const fn of this.listeners) fn(value); }
@@ -26,7 +26,7 @@ function setup(options = {}) {
         const provider = fileSystems.get(resource.scheme); const content = await provider.readFile(resource);
         doc = { uri: resource, isDirty: false, getText: () => Buffer.from(content).toString(), save: async () => true }; documents.push(doc); return doc; }
     },
-    window: { registerCustomEditorProvider: (id, provider) => { editors.set(id, provider); return { dispose() {} }; }, createTreeView: (id, options) => { trees.set(id, options.treeDataProvider); return { dispose() {} }; }, showTextDocument: async document => document,
+    window: { registerCustomEditorProvider: (id, provider) => { editors.set(id, provider); return { dispose() {} }; }, createTreeView: (id, options) => { trees.set(id, options.treeDataProvider); return { dispose() {} }; }, showTextDocument: async document => { shown.push(document); return document; },
       createOutputChannel: () => ({ appendLine() {}, append() {}, show() {}, dispose() {} }), showErrorMessage: async () => {},
       withProgress: async (_, run) => run({ report() {} }, { onCancellationRequested: () => ({ dispose() {} }) }) },
     commands: { registerCommand: (id, fn) => { commands.set(id, fn); return { dispose() {} }; }, executeCommand: async (id, ...args) => commands.get(id)?.(...args) },
@@ -59,7 +59,7 @@ function setup(options = {}) {
   };
   vscode.window.createWebviewPanel = panel;
   commands.set('vscode.openWith', async (resource, id) => editors.get(id).resolveCustomTextEditor(await vscode.workspace.openTextDocument(resource), panel()));
-  return { ...f, vscode, commands, trees, languages, fileSystems, editors, panels, folder, documents, closed, changed, testRuns, controllers,
+  return { ...f, vscode, commands, trees, languages, fileSystems, editors, panels, shown, folder, documents, closed, changed, testRuns, controllers,
     context: { subscriptions: [], extensionUri: uri('file:///C:/extension'), extensionPath: 'C:/extension', workspaceState: { get() {}, update: async () => {} } } };
 }
 module.exports = { setup };

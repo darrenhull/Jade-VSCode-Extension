@@ -131,3 +131,18 @@ test('actual compile command uses the selected native identity and preserves ori
   assert.deepEqual(f.requests.at(-1).body.semanticSelection, { entityIds: [f.document.entityId] });
   assert.equal(f.requests.at(-1).body.config.password, '');
 });
+for (const sourceKind of ['inherited', 'system']) test(sourceKind + ' Class Workspace member selection cannot open an editable foreign declaration automatically', async () => {
+  const f = setup({ reply: (command, request) => {
+    if (command === 'source.semantic.read') return { passed: true, code: 0, body: { ...structuredClone(f.document), entityId: request.entityId } };
+    if (command !== 'source.semantic.query') return;
+    const items = request.kind === 'member' ? [{ id: f.document.entityId, name: 'value', kind: 'method', [sourceKind]: true, qualifiedName: { schema: 'Example', type: 'Base', member: 'value' } }] : [];
+    return { passed: true, code: 0, body: { provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  const project = await registered.workspace.prepare(f.folder);
+  await registered.classView.workspaces.open({ project, entity: { id: 'native-type', name: 'Generic', kind: 'class', qualifiedName: { schema: 'Example', type: 'Generic' } } });
+  const panel = f.panels[0]; await panel.receive({ command: 'ready' }); await panel.receive({ command: 'select', id: f.document.entityId });
+  assert.equal(f.shown.length, 0);
+  const snapshot = panel.sent.filter(message => message.command === 'editorSnapshot').at(-1).snapshot;
+  assert.equal(snapshot.readOnly, true); assert.equal(snapshot.available, false);
+});
