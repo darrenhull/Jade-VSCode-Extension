@@ -39,25 +39,29 @@ class JadeSourceFileSystemProvider {
 
   binding(uri) { return structuredClone(this.record(uri).document); }
 
+  editable(document) {
+    return this.provider.flags?.projectionEdit && document.projection.editKind === 'projectionText' && document.supportedEdits.includes('projectionText');
+  }
+
   stat(uri) {
     const value = this.record(uri);
     return { type: this.vscode.FileType.File, ctime: value.ctime, mtime: value.mtime,
       size: Buffer.byteLength(value.document.projection.text, 'utf8'),
-      ...(this.provider.flags?.projectionEdit && value.document.supportedEdits.length ? {} : { permissions: this.vscode.FilePermission.Readonly }) };
+      ...(this.editable(value.document) ? {} : { permissions: this.vscode.FilePermission.Readonly }) };
   }
 
   readFile(uri) { return Buffer.from(this.record(uri).document.projection.text, 'utf8'); }
 
   async writeFile(uri, content, options) {
     const value = this.record(uri);
-    if (!this.provider.flags?.projectionEdit || !value.document.supportedEdits.length)
+    if (!this.editable(value.document))
       throw this.vscode.FileSystemError.NoPermissions('This source kind is read-only; native editing support is unavailable.');
     if (value.saving) throw this.vscode.FileSystemError.Unavailable('A save is already pending for this source document.');
     if (!options?.overwrite) throw this.vscode.FileSystemError.FileExists(uri);
     const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
     value.saving = true;
     try {
-      const document = await this.provider.applyEdit(value.document, text, value.document.supportedEdits[0]);
+      const document = await this.provider.applyEdit(value.document, text, value.document.projection.editKind);
       value.document = document;
       value.mtime = Math.max(Date.now(), value.mtime + 1);
       this.changes.fire([{ type: this.vscode.FileChangeType.Changed, uri: value.uri }]);
@@ -69,6 +73,19 @@ class JadeSourceFileSystemProvider {
     if (!value || value.saving) return;
     this.documents.delete(uri.toString());
     this.entities.delete(value.document.entityId);
+  }
+
+  async refresh(uri, { dirty = false } = {}) {
+    const value = this.record(uri);
+    if (dirty || value.saving) return false;
+    const document = await this.provider.read(value.document.entityId);
+    const changed = document.projection.text !== value.document.projection.text;
+    value.document = document;
+    if (changed) {
+      value.mtime = Math.max(Date.now(), value.mtime + 1);
+      this.changes.fire([{ type: this.vscode.FileChangeType.Changed, uri: value.uri }]);
+    }
+    return true;
   }
 
   watch() { return { dispose() {} }; }

@@ -43,7 +43,7 @@ for (const invalid of ["hash", "origin", "cache", "generation"]) test("read refu
 test("save uses the original opened revision even after background preparation", async () => {
   const f = setup(); await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId);
   f.snapshot.generation = "generation-2"; await f.provider.prepare();
-  const saved = await f.provider.applyEdit(doc, "value(): Integer;\nbegin\n return 2;\nend;", "methodSource");
+  const saved = await f.provider.applyEdit(doc, "value(): Integer;\nbegin\n return 2;\nend;", "projectionText");
   assert.deepEqual(f.requests.at(-1).body.baseRevision, f.document.revision);
   assert.equal(saved.revision.generation, "generation-2");
   assert.equal(doc.revision.generation, "generation-1");
@@ -52,14 +52,14 @@ test("stale edit keeps the original native result and never retries/rebases", as
   const failed = { passed: false, code: 409, report: { error: "Saved JOX changed", reason: "stale-generation" } };
   const f = setup({ reply: command => command === "source.semantic.applyEdit" ? failed : undefined });
   await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId);
-  await assert.rejects(f.provider.applyEdit(doc, "new source", "methodSource"), e => e.result.code === 409 && e.message === "Saved JOX changed");
+  await assert.rejects(f.provider.applyEdit(doc, "new source", "projectionText"), e => e.result.code === 409 && e.message === "Saved JOX changed");
   assert.equal(f.requests.filter(r => r.command === "source.semantic.applyEdit").length, 1);
   assert.equal(doc.revision.generation, "generation-1");
 });
 test("unqualified editing and forged document bindings fail before native write", async () => {
   const f = setup({ flags: { projectionEdit: false } }); await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId);
-  await assert.rejects(f.provider.applyEdit(doc, "changed", "methodSource"), /support|read.only/i);
-  await assert.rejects(f.provider.applyEdit(clone(doc), "changed", "methodSource"), /document|binding/i);
+  await assert.rejects(f.provider.applyEdit(doc, "changed", "projectionText"), /support|read.only/i);
+  await assert.rejects(f.provider.applyEdit(clone(doc), "changed", "projectionText"), /document|binding/i);
   assert.equal(f.requests.some(r => r.command === "source.semantic.applyEdit"), false);
 });
 test("native process replacement requires a fresh preparation, not stale snapshot reuse", async () => {
@@ -77,7 +77,7 @@ test("failed capability probes retry on the same process", async () => {
 test("mutating UI revision data cannot change the native save precondition", async () => {
   const f = setup(); await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId);
   doc.revision.originByteHash = "0".repeat(64); doc.entityId = "foreign";
-  await f.provider.applyEdit(doc, "new source", "methodSource");
+  await f.provider.applyEdit(doc, "new source", "projectionText");
   assert.equal(f.requests.at(-1).body.entityId, f.document.entityId);
   assert.deepEqual(f.requests.at(-1).body.baseRevision, f.document.revision);
 });
@@ -94,6 +94,11 @@ test("parser-only native capabilities never enable execution", async () => {
   const f = setup({ flags: { deploymentFromSavedSnapshot: false, nativeTests: false } });
   await assert.rejects(f.provider.execute("test", { entityIds: ["a"] }), /does not yet support/);
   assert.deepEqual(f.requests.map(r => r.command), ["source.semantic.prepare"]);
+});
+test("native test qualification cannot enable Scratch execution", async () => {
+  const f = setup({ reply: command => command === "workspace.run" ? { passed: true, code: 0 } : undefined });
+  await assert.rejects(f.provider.execute("workspace.run", { entityIds: ["a"] }), /Scratch|support/);
+  assert.equal(f.requests.some(request => request.command === "workspace.run"), false);
 });
 test("cancel refusal after native completion preserves authoritative success", async () => {
   let resolve, cancel;

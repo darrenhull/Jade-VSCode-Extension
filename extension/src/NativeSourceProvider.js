@@ -89,7 +89,7 @@ class NativeSourceProvider {
     required(snapshot.generation, 'generation binding');
     hash(snapshot.snapshotHash, 'snapshot');
     this.snapshot = clone(snapshot);
-    this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests']
+    this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch']
       .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     return clone(snapshot);
   }
@@ -106,13 +106,15 @@ class NativeSourceProvider {
       if (value[key] !== expected[key]) throw Error('Invalid native source ' + key + ' binding.');
   }
 
-  async query({ kind, parentId, search, offset = 0, limit = 100 }, token) {
+  async query({ kind, parentId, search, memberKind, includeInherited, offset = 0, limit = 100 }, token) {
     if (!['schema', 'type', 'member', 'test'].includes(kind)) throw Error('Unsupported native source query kind.');
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100)
       throw Error('Native source query limit is outside its bounds.');
     const binding = this.binding();
     const body = { ...binding, kind, ...(parentId === undefined ? {} : { parentId: required(parentId, 'parent identity') }),
-      ...(search === undefined ? {} : { search: String(search) }), offset, limit };
+      ...(search === undefined ? {} : { search: String(search) }),
+      ...(memberKind === undefined ? {} : { memberKind: required(memberKind, 'member kind') }),
+      ...(includeInherited === undefined ? {} : { includeInherited: includeInherited === true }), offset, limit };
     const page = await this.request('source.semantic.query', body, token);
     this.assertBinding(page, binding);
     if (!Array.isArray(page.items) || page.items.length > limit || page.offset !== offset || page.limit !== limit ||
@@ -143,6 +145,9 @@ class NativeSourceProvider {
         crypto.createHash('sha256').update(document.projection.text, 'utf8').digest('hex') !== hash(document.projection.contentHash, 'projection'))
       throw Error('Native projection text hash does not match.');
     if (!Array.isArray(document.supportedEdits)) throw Error('Missing native supported edit kinds.');
+    if (document.supportedEdits.length && (!this.flags?.projectionEdit || document.projection.editKind !== 'projectionText' ||
+        !document.supportedEdits.includes('projectionText')))
+      throw Error('Native projection editing capability and edit kind do not agree.');
     return document;
   }
 
@@ -166,7 +171,7 @@ class NativeSourceProvider {
     if (!retained) throw Error('This document has no native editor binding.');
     this.assertConnection(retained.connection);
     const document = retained.document;
-    if (!this.flags?.projectionEdit || !document.supportedEdits.includes(editKind))
+    if (!this.flags?.projectionEdit || editKind !== 'projectionText' || document.projection.editKind !== editKind || !document.supportedEdits.includes(editKind))
       throw Error('This source kind is read-only; native editing support is unavailable.');
     if (typeof replacementText !== 'string') throw Error('Native source replacement must be text.');
     const saved = await this.request('source.semantic.applyEdit', {
@@ -187,15 +192,18 @@ class NativeSourceProvider {
     // One native prepare observes saved Git changes. There is no browser graph
     // comparison, legacy baseline check or second source-index preparation.
     const snapshot = await this.prepare(token);
-    if (!this.flags.deploymentFromSavedSnapshot || command !== 'build' && !this.flags.nativeTests)
+    if (!this.flags.deploymentFromSavedSnapshot || command === 'test' && !this.flags.nativeTests || command === 'workspace.run' && !this.flags.nativeScratch)
       throw Error('This Jade CLI does not yet support executing saved JOX source.');
     if (!Array.isArray(selection?.entityIds) || !selection.entityIds.length || selection.entityIds.some(id => typeof id !== 'string' || !id))
       throw Error('Select a native source entity before execution.');
     if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
+    if (this.config.workingJadeGitPolicy && this.config.workingJadeGitPolicy !== 'inherit')
+      await require('./working-jadegit-policy').requireWorkingJadeGitPolicy(this.client, this.config);
     const connection = this.connection;
     const { methods, ...arguments_ } = settings;
     if (Object.hasOwn(arguments_, 'config')) throw Error('Native project configuration cannot be replaced by execution arguments.');
-    const request = this.client.request(command, { ...arguments_, config: { ...clone(this.config), ...(methods === undefined ? {} : { methods }) },
+    const request = this.client.request(command, { ...arguments_, config: { ...clone(this.config),
+      ...(settings.testIdentity ? { schema: settings.testIdentity.schema } : {}), ...(methods === undefined ? {} : { methods }) },
       sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId, generation: snapshot.generation, snapshotHash: snapshot.snapshotHash },
       semanticSelection: clone(selection) }, output, undefined, connection);
     const cancel = () => {

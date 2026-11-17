@@ -49,3 +49,19 @@ test("read-only kinds and arbitrary cache/filesystem operations cannot write sou
   assert.throws(() => f.files.stat({ toString: () => "file:///C:/project/.jade/projections/document.jade" }), /found|owned/i);
   assert.equal(f.requests.some(r => r.command === "source.semantic.applyEdit"), false);
 });
+test("whole projection saves use the explicit native edit kind, never array order", async () => {
+  const f = await setup();
+  f.document.supportedEdits = ["methodBody", "projectionText"];
+  const uri = await f.files.open(f.document.entityId);
+  await f.files.writeFile(uri, Buffer.from("whole Jade document"), { overwrite: true });
+  assert.equal(f.requests.at(-1).body.editKind, "projectionText");
+});
+test("explicit refresh updates clean documents while preserving dirty originals", async () => {
+  const f = await setup(), uri = await f.files.open(f.document.entityId);
+  f.snapshot.generation = "generation-2"; f.document.generation = "generation-2"; f.document.revision.generation = "generation-2";
+  await f.native.prepare();
+  assert.equal(await f.files.refresh(uri, { dirty: true }), false);
+  assert.equal(f.files.binding(uri).revision.generation, "generation-1");
+  assert.equal(await f.files.refresh(uri, { dirty: false }), true);
+  assert.equal(f.files.binding(uri).revision.generation, "generation-2");
+});
