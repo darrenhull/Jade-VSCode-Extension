@@ -7,7 +7,7 @@ const config={workingJadeGitPolicy:'disabled',iniPath:'C:/source/jade.ini',schem
 function fixture(doctor=()=>({passed:true,code:0,capabilities:{workingJadeGitPolicy:descriptor}})){
  const packets=[],children=[];
  const session=new CliWorkingSession({entry:'fixture-cli.exe',spawn:()=>{
-  const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.kill=()=>{};children.push(child);
+  const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.kill=()=>{};child.stdin.end=()=>queueMicrotask(()=>child.emit("close",0,null));children.push(child);
   child.stdin.write=text=>{const packet=JSON.parse(text);packets.push({...packet,connection:children.indexOf(child)});let closeAfter=false;
    let result;if(packet.command==='doctor'){const outcome=doctor(packet,children.indexOf(child));result=outcome.result||outcome;closeAfter=outcome.closeAfter===true;}else result={passed:true,success:true,code:0,working:{root:'C:/working'},config:{selection:packet.target},report:{executed:true}};
    queueMicrotask(()=>{child.stdout.emit('data',Buffer.from(JSON.stringify({id:packet.id,event:'result',result})+'\n'));if(closeAfter)child.emit('close',0);});

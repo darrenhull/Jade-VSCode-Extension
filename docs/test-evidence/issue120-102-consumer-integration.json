@@ -1,0 +1,47 @@
+{
+  "issues": [
+    120,
+    121
+  ],
+  "status": "pass",
+  "sourceBase": "6a1d29e17d8f97635160e08790f2b34e90bc6972",
+  "reviewedCleanup": "4a39a72c999886157a08b8f8191a8cafee1410e7",
+  "integrationCommit": "436408a9d74c26bd9bba876aa1c8f91f34558ba0",
+  "merge": "Clean cherry-pick; no conflicts or additional production changes",
+  "preserved": [
+    "working.sync and working.baseline.verify share existing active source operation tracking",
+    "Cancellation remains on original stdio connection; native terminal result drains before graceful EOF",
+    "Disposal awaits actual captured-child close with bounded exact-child fallback and no reconnect",
+    "Native failure6295 and verified success after late-cancel refusal remain authoritative",
+    "Verification requests native-private terminal promotion, refuses client permits, and has no workspace/index callbacks",
+    "Working policy and blank credentials stay intact; normal Source stripping remains unchanged"
+  ],
+  "focusedValidation": {
+    "passed": 116,
+    "failed": 0,
+    "durationMilliseconds": 4272.2325,
+    "newBaselineDisposalCases": 4,
+    "syntheticActualNodeChildren": 4,
+    "allOwnedNodeChildrenActuallyExited": true,
+    "groups": [
+      "CliWorkingSession_baselineShutdown",
+      "CliWorkingSession_shutdown",
+      "CliWorkingSession_ownedShutdown",
+      "CliWorkingSession_verifyBaseline",
+      "CliWorkingSession_fullSourceExtract",
+      "CliWorkingSession_sourceExtract",
+      "CliWorkingSession_workingPolicyCapability",
+      "WorkingBaselineVerification_run",
+      "WorkspaceOnboarding_setup",
+      "SourcePullController_run"
+    ],
+    "rawLogSha256": "35dbf1648902fb9280bea95b43a0ba2ef2f64d92103f16ff59384f3a741f906f"
+  },
+  "testOnlyAdaptations": "The new verification and Working-policy fake children now emit an actual close event after graceful stdin EOF",
+  "limits": [
+    "Only captured extension stdio-client disposal is qualified here; shared native broker retirement belongs to native103",
+    "Reviewed120 original RED/GREEN evidence retained unchanged",
+    "No native executable, JADE, database, SDK, version/pin/package changes or push",
+    "Baseline palette running-UI evidence remains a separate source-only gate"
+  ]
+}

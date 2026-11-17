@@ -6,7 +6,7 @@ const { CliWorkingSession } = require("../../extension/src/cli-client");
 function fixture(callbacks = {}) {
   const packets = [], child = new EventEmitter();
   child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.stdin = new EventEmitter();
-  child.stdin.write = line => { packets.push(JSON.parse(line)); return true; }; child.kill = () => {};
+  child.stdin.write = line => { packets.push(JSON.parse(line)); return true; }; child.stdin.end = () => queueMicrotask(() => child.emit("close", 0, null)); child.kill = () => {};
   const session = new CliWorkingSession({ entry: "jade-cli.exe", spawn: () => child });
   const op = session.startWorkingBaselineVerification({ databasePath: "C:/source", iniPath: "C:/source.ini", user: "", password: "", workingJadeGitPolicy: "disabled" }, { destination: "C:/example", scope: "all" }, callbacks);
   const emit = value => child.stdout.emit("data", Buffer.from(JSON.stringify(value) + "\n"));
