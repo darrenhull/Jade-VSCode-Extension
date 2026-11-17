@@ -76,20 +76,36 @@ function registerWorkspaceOnboarding(vscode,context,services){
   if(initialized?.passed!==true||initialized.code!==0)throw Error(initialized?.report?.error||initialized?.error||'Native workspace initialization did not complete.');
   const base={gitReady:true,configurationReady:true,workingPrepared:false};
   const source=await vscode.window.showQuickPick([{label:'Use existing source files',kind:'existing'},{label:'Extract sources from Source',kind:'extract'},{label:'Get sources later',kind:'later'}],{title:'Project source files · '+folder.name});if(!source)return{...base,cancelled:true};requireFolder(folder);
-  if(source.kind==='extract'){log('Opening the existing native source extraction workflow. Local edits remain protected.');const extracted=await services.extract(folder.uri);requireFolder(folder);if(extracted?.cancelled||extracted?.status==='cancelled')return{...base,cancelled:true,sourceChoice:'extract'};if(extracted?.passed!==true)throw Error(extracted?.report?.error||extracted?.error||'Source extraction did not complete.');}
   const choice=await vscode.window.showQuickPick([{label:'Prepare Working database',description:'First use can back up Source and restore its private copy',kind:'working'},{label:'Prepare Working later',kind:'later'}],{title:'Private Working database · '+folder.name});if(!choice)return{...base,cancelled:true,sourceChoice:source.kind};requireFolder(folder);
   if(choice.kind==='working'){
    const targets=await services.targets(folder);requireFolder(folder);const c=targets.config;
-   const confirm=await vscode.window.showWarningMessage('Prepare the private Working database for this project?',{modal:true,detail:'Project: '+folder.uri.fsPath+'\nJade installation: '+c.installPath+'\nSource: '+c.databasePath+'\nSource INI: '+c.iniPath+'\nServer: '+c.server+'\nWorking: '+targets.working.databasePath+'\n\nFirst use takes a consistent Source backup and restores it separately. Existing valid Working state is reused. Working is persistent; no build, test or publication is started.'},'Prepare Working');
+   const confirm=await vscode.window.showWarningMessage('Prepare the private Working database for this project?',{modal:true,detail:'Project: '+folder.uri.fsPath+'\nJade installation: '+c.installPath+'\nSource: '+c.databasePath+'\nSource INI: '+c.iniPath+'\nServer: '+c.server+'\nWorking: '+targets.working.databasePath+'\n\n'+(source.kind==='extract'?'Native setup prepares owned Working and extracts from that same generation. Existing Working data is preserved.':'First use takes a consistent Source backup and restores its private copy. Existing valid Working state is reused.')+' Working is persistent; no build, test or publication is started.'},'Prepare Working');
    if(confirm!=='Prepare Working')return{...base,cancelled:true,sourceChoice:source.kind};requireFolder(folder);
-   log('Preparing Working through the existing connection workflow. Its notification shows native progress, timeout and cancellation.');
-   const connected=await services.connectWorking(folder,c);requireFolder(folder);
-   if(connected?.cancelled)return{...base,cancelled:true,sourceChoice:source.kind};
-   if(connected?.selection!=='working'||connected?.readOnly!==true)throw Error(connected?.error||'Working preparation was not confirmed by the native connection.');
-   base.workingPrepared=true;
+   if(source.kind==='extract'){
+    log('Preparing one owned Working generation and extracting its native source baseline. Local edits remain protected.');
+    const extracted=await services.syncWorkingSources(folder,c);requireFolder(folder);
+    if(extracted?.cancelled||extracted?.status==='cancelled')return{...base,cancelled:true,sourceChoice:source.kind,sourceResult:extracted};
+    if(extracted?.passed!==true)return{...base,passed:false,code:extracted?.code??2,error:extracted?.report?.error||extracted?.error||'Working source sync did not complete.',sourceChoice:source.kind,sourceResult:extracted};
+    if(extracted.workingBaseline?.status!=='verified'||extracted.workingBaseline.origin!=='same-generation-native-extraction')
+     throw Error('Native Working source baseline was not verified. Review the native reconciliation action before continuing.');
+    base.workingPrepared=true;base.workingBaseline=extracted.workingBaseline;
+   }else{
+    log('Preparing Working through the existing connection workflow. Its notification shows native progress, timeout and cancellation.');
+    const connected=await services.connectWorking(folder,c);requireFolder(folder);
+    if(connected?.cancelled)return{...base,cancelled:true,sourceChoice:source.kind};
+    if(connected?.selection!=='working'||connected?.readOnly!==true)throw Error(connected?.error||'Working preparation was not confirmed by the native connection.');
+    base.workingPrepared=true;
+   }
   }
-  const result={...base,sourceChoice:source.kind};log('Project configuration ready. Source route: '+source.kind+'. Working: '+(base.workingPrepared?'prepared and connected.':'not prepared.'));
-  void vscode.window.showInformationMessage('Jade project configuration is ready. Working '+(base.workingPrepared?'is prepared and connected.':'has not been prepared.'));return result;
+  if(source.kind==='extract'&&choice.kind!=='working'){
+   log('Opening the existing native Source extraction workflow. Local edits remain protected.');
+   const extracted=await services.extract(folder.uri);requireFolder(folder);
+   if(extracted?.cancelled||extracted?.status==='cancelled')return{...base,cancelled:true,sourceChoice:source.kind};
+   if(extracted?.passed!==true)throw Error(extracted?.report?.error||extracted?.error||'Source extraction did not complete.');
+  }
+  const workingStatus=base.workingBaseline?'prepared with its native source baseline.':base.workingPrepared?'prepared and connected.':'not prepared.';
+  const result={...base,sourceChoice:source.kind};log('Project configuration ready. Source route: '+source.kind+'. Working: '+workingStatus);
+  void vscode.window.showInformationMessage('Jade project configuration is ready. Working '+(base.workingBaseline?'is prepared with its native source baseline.':base.workingPrepared?'is prepared and connected.':'has not been prepared.'));return result;
  }
  function setup(resource){if(pending)return pending;pending=run(resource).catch(error=>{log(error.message);void vscode.window.showErrorMessage(error.message);return{passed:false,error:error.message};}).finally(()=>{pending=undefined;});return pending;}
  async function resume(){

@@ -11,15 +11,21 @@ function cliInvocation(entry,args,options={}){
  return {executable:entry,args,options:{...options,shell:false,env}};
 }
 class CliWorkingSession{
- constructor({entry=path.join(__dirname,'../vendor/jade-tools-cli/jade-cli.exe'),spawn:spawnProcess=spawn}={}){
+ constructor({entry=path.join(__dirname,'../vendor/jade-tools-cli/jade-cli.exe'),spawn:spawnProcess=spawn,shutdownTimeoutMilliseconds=3000,killTimeoutMilliseconds=1000}={}){
   this.entry=entry;this.spawn=spawnProcess;this.nextId=0;this.pending=new Map();this.client=undefined;this.disposed=false;this.activeSources=new Set();
+  if (![shutdownTimeoutMilliseconds,killTimeoutMilliseconds].every(value=>Number.isSafeInteger(value)&&value>0&&value<=30000)) throw Error('Invalid owned CLI shutdown deadline.');
+  this.shutdownTimeoutMilliseconds=shutdownTimeoutMilliseconds;
+  this.killTimeoutMilliseconds=killTimeoutMilliseconds;
+  this.ownedClients=new Set();
  }
  connect(){
   if(this.disposed)throw Error('Jade CLI connection is disposed.');
   if(this.client)return this.client;
   const invocation=cliInvocation(this.entry,['service','--stdio'],{windowsHide:true,stdio:['pipe','pipe','pipe']});
   const child=this.spawn(invocation.executable,invocation.args,invocation.options);
-  const client={child,decoder:new StringDecoder('utf8'),buffer:'',stderr:''};this.client=client;
+  const client={child,decoder:new StringDecoder('utf8'),buffer:'',stderr:'',closed:false};
+  client.closePromise=new Promise(resolve=>{client.resolveClose=resolve;});
+  this.ownedClients.add(client);this.client=client;
   const fail=error=>{
    if(this.client===client)this.client=undefined;
    for(const [id,request]of this.pending)if(request.client===client){this.pending.delete(id);request.reject(error);}
@@ -39,7 +45,11 @@ class CliWorkingSession{
     }
    }catch(error){fail(Error('Invalid Jade CLI response: '+error.message));child.kill();}
   });
-  child.once('close',(code,signal)=>fail(Error('Jade CLI closed before completing its request (exit '+code+(signal?', '+signal:'')+').'+(client.stderr?' '+client.stderr:''))));
+  child.once('close',(code,signal)=>{
+   client.closed=true;this.ownedClients.delete(client);
+   fail(Error('Jade CLI closed before completing its request (exit '+code+(signal?', '+signal:'')+').'+(client.stderr?' '+client.stderr:'')));
+   client.resolveClose({code,signal});
+  });
   return client;
  }
  request(command,body={},output,events,expectedClient){
@@ -47,9 +57,10 @@ class CliWorkingSession{
   if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
   const client=expectedClient||this.connect(),id=++this.nextId;
   const promise=new Promise((resolve,reject)=>{
-   this.pending.set(id,{resolve,reject,output,events,client});
+   this.pending.set(id,{resolve,reject,output,events,client,command});
    try{client.child.stdin.write(JSON.stringify({id,command,...body})+'\n');}catch(error){this.pending.delete(id);reject(error);}
   });
+  const pending=this.pending.get(id);if(pending)pending.promise=promise;
   return {id,promise,client};
  }
  startWorking(config,operation,onOutput=()=>{},onReport=()=>{}){
@@ -120,23 +131,59 @@ class CliWorkingSession{
   return descriptor;
  }
  startSourceExtraction(config,selection,callbacks){
+  return this.startExtraction(sourceConfiguration(config),selection,callbacks,'source.extract');
+ }
+ startWorkingSync(config,selection,callbacks){
+  return this.startExtraction(config,selection,callbacks,'working.sync');
+ }
+ startWorkingBaselineVerification(config,selection,callbacks){
+  return this.startExtraction(config,selection,callbacks,'working.baseline.verify');
+ }
+ startExtraction(config,selection,callbacks,command){
   const {SourceExtractionOperation}=require('./SourceExtractionOperation');
-  const operation=new SourceExtractionOperation(this,configDto(sourceConfiguration(config)),selection,callbacks);
+  const operation=new SourceExtractionOperation(this,configDto(config),selection,callbacks,command);
   this.activeSources.add(operation);
   operation.completion.then(()=>this.activeSources.delete(operation),()=>this.activeSources.delete(operation));
   return operation;
  }
  dispose(){
   if(this.disposed)return this.closing;
-  const client=this.client,active=[...this.activeSources];
-  // EOF is not a safe cancellation request. Send explicit owner-bound cancel,
-  // retain the original connection for replies, and await native close/result.
-  for(const operation of active)operation.stop();
+  const clients=[...this.ownedClients],active=[...this.activeSources];
+  const operations=[...this.pending.entries()].filter(([,request])=>clients.includes(request.client));
   this.disposed=true;
-  const close=()=>{if(this.client===client)this.client=undefined;if(client)client.child.kill();};
-  if(active.length)this.closing=Promise.allSettled(active.map(operation=>operation.completion)).then(close);
-  else close();
+  // Cancellation stays on the original connection. EOF alone is not cancellation.
+  for(const operation of active)operation.stop();
+  const sourceIds=new Set(active.map(operation=>operation.id));
+  for(const [id,request]of operations){
+   if(sourceIds.has(id)||['cancel','source.cancel','source.permit'].includes(request.command))continue;
+   try{void this.request('cancel',{operationId:id},undefined,undefined,request.client).promise.catch(()=>{});}catch{}
+  }
+  this.closing=this.closeOwnedClients(clients,[...operations.map(([,request])=>request.promise),...active.map(operation=>operation.completion)]);
+  // VS Code subscriptions may call dispose without awaiting it. deactivate still
+  // returns this same rejecting promise; an unconfirmed exit is never success.
+  void this.closing.catch(()=>{});
   return this.closing;
+ }
+ async closeOwnedClients(clients,operations){
+  const deadline=Date.now()+this.shutdownTimeoutMilliseconds;
+  const wait=async(promise,milliseconds)=>{
+   if(milliseconds<=0)return false;
+   let timer;
+   try{return await Promise.race([promise.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),milliseconds);})]);}
+   finally{clearTimeout(timer);}
+  };
+  const closed=()=>Promise.all(clients.map(client=>client.closePromise));
+  if(await wait(Promise.allSettled(operations),deadline-Date.now())){
+   for(const client of clients){
+    if(client.closed)continue;
+    try{client.child.stdin.end();}catch{/* The bounded owned-child fallback below still applies. */}
+   }
+   if(await wait(closed(),deadline-Date.now()))return;
+  }
+  // This is the captured stdio child only, never the shared broker or its JADE jobs.
+  for(const client of clients)if(!client.closed){try{client.child.kill();}catch{}}
+  if(!await wait(closed(),this.killTimeoutMilliseconds))
+   throw Error('The owned Jade CLI service did not confirm exit after bounded shutdown.');
  }
 }
 module.exports={CliWorkingSession,configDto,cliInvocation};

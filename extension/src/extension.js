@@ -263,6 +263,7 @@ function activate(context) {
     initialize:workspaceInitialization.initialize,
     targets:async folder=>{const config=inspectionConfig(undefined,folder);return{config,working:await nativeTests.workingLocation(config)};},
     extract:resource=>vscode.commands.executeCommand('jadeNative.extractAllSources',resource),
+    syncWorkingSources:(folder,reviewed)=>sourcePull.runWorkingSync(folder,reviewed),
     connectWorking:(folder,reviewed)=>objectExplorer.connectWorkingProject(folder.uri.fsPath,reviewed)
   });
   void onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
@@ -270,6 +271,11 @@ function activate(context) {
     isBusy:()=>publishing,
     claim:value=>{publishing=value;},
     updateContext:value=>vscode.commands.executeCommand('setContext','jadeNative.publishing',value)
+  });
+  const baselineVerification=require('./working-baseline-verification').registerWorkingBaselineVerification(vscode,context,{
+    client:nativeTests,configFor:folder=>inspectionConfig(undefined,folder),
+    beforeOperation:()=>workspaceOperationGuard.acquire(),
+    afterOperation:lease=>workspaceOperationGuard.release(lease)
   });
   const workspaces=require('./jade-workspaces').registerWorkspaces(vscode,context,{
     client:nativeTests,prepareSource:language.ensureSourceIndex,

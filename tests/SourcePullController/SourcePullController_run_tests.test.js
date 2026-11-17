@@ -441,3 +441,26 @@ test('failed Source Pull prints native error first followed by safe recent-opera
 test('successful Source Pull does not print stray failure-operation history',async(t)=>{
  const f=fixture(t,async()=>result({report:{recentOperations:[{operation:'SHOULD-NOT-LOG'}]}}));await f.controller.run();assert.doesNotMatch(f.logs.join('\n'),/SHOULD-NOT-LOG/);
 });
+
+
+for(const supported of [true,false])test('working sync '+(supported?'delegates once to native with the exact reviewed configuration':'refuses unsupported capability without ordinary Source fallback'),async t=>{
+ const f=fixture(t,()=>result({scope:'all',completedFiles:0,counts:{}}));let sync=0,ordinary=0;
+ const config={installPath:'C:/Jade',databasePath:'C:/Source/system',iniPath:'C:/Source/jade.ini',workingJadeGitPolicy:'disabled',userName:'',password:''};
+ f.controller.services.resolveProject=async(_vscode,_folder,settings)=>({...f.resolved,config:settings(f.resolved.folder),cwd:f.root});
+ f.service.sourceCapabilities=async()=>({sourceExtraction:{protocol:1,scopes:['classes','schemas','all'],fullSchema:true,available:true,layout:'schema-ddx',requiresPromotionPermit:true,versions:['current'],...(supported?{workingBaseline:{format:1,modes:['fresh','verify']}}:{})}});
+ f.service.workingJadeGitCapability=async()=>({format:1,configuration:'workingJadeGitPolicy',values:['inherit','disabled'],default:'inherit',scope:'owned-working-only',reversible:true});
+ const original=f.service.startSourceExtraction;f.service.startSourceExtraction=(...args)=>{ordinary++;return original(...args);};
+ f.service.startWorkingSync=(received,input)=>{sync++;assert.deepEqual(received,config);assert.equal(input.scope,'all');return{stop(){},completion:Promise.resolve(result({scope:'all',completedFiles:0,counts:{},workingBaseline:{status:'verified',origin:'same-generation-native-extraction',scope:'all',identity:'opaque'}}))};};
+ const value=await f.controller.runWorkingSync(f.resolved.folder,config);
+ assert.equal(ordinary,0,'Working sync fell back to an ordinary Source export');assert.equal(sync,supported?1:0);
+ if(supported)assert.equal(value.passed,true);else{assert.equal(value.passed,false);assert.match(value.report.error,/support|update/i);}
+});
+
+
+test('working sync still refuses an unsupported enabled Working policy before native work',async t=>{
+ const f=fixture(t,()=>result());let starts=0;
+ f.controller.services.resolveProject=async()=>({...f.resolved,config:{workingJadeGitPolicy:'disabled'},cwd:f.root});
+ f.service.sourceCapabilities=async()=>({sourceExtraction:{protocol:1,scopes:['all'],fullSchema:true,available:true,layout:'schema-ddx',requiresPromotionPermit:true,versions:['current'],workingBaseline:{format:1,modes:['fresh']}}});
+ f.service.workingJadeGitCapability=async()=>undefined;f.service.startWorkingSync=()=>{starts++;throw Error('Unadvertised Working policy reached native execution');};
+ const value=await f.controller.runWorkingSync(f.resolved.folder,{});assert.equal(value.passed,false);assert.match(value.report.error,/Working-only capability/);assert.equal(starts,0);assert.equal(f.busy(),false);
+});

@@ -33,7 +33,7 @@ const key = (value) =>
     ? value.replaceAll(String.fromCharCode(92), "/").toLowerCase()
     : undefined;
 
-/** One client-promoted native extraction, bound to its original stdio client. */
+/** One native source stream, bound to its original stdio client and promotion mode. */
 class SourceExtractionOperation {
   constructor(
     session,
@@ -48,12 +48,16 @@ class SourceExtractionOperation {
       version = "current",
     },
     callbacks = {},
+    command = "source.extract",
   ) {
+    if (!["source.extract", "working.sync", "working.baseline.verify"].includes(command)) throw Error("Unsupported extraction operation.");
+    this.command = command;
     if (version !== "current")
       throw Error(
         "Streaming extraction currently supports the current source version only.",
       );
     const full = scope !== "classes";
+    if (command !== "source.extract" && !full) throw Error("Working source baseline operations require a complete schema or all-schema scope.");
     if (
       !["classes", "schemas", "all"].includes(scope) ||
       !path.isAbsolute(destination) ||
@@ -78,7 +82,7 @@ class SourceExtractionOperation {
         : undefined;
     this.seenFiles = new Set();
     this.inventoryKnown = !full;
-    if (typeof callbacks.onPermit !== "function")
+    if (command !== "working.baseline.verify" && typeof callbacks.onPermit !== "function")
       throw Error(
         "Native extraction requires an editor promotion-permission handler.",
       );
@@ -110,14 +114,14 @@ class SourceExtractionOperation {
     this.observedCounts = {};
     this.seenTickets = new Set();
     this.request = session.request(
-      "source.extract",
+      command,
       {
         config: { ...config, extractionTimeoutSeconds: config?.extractionTimeoutSeconds ?? DEFAULT_EXTRACTION_TIMEOUT_SECONDS },
         destination,
         ...(cwd ? { cwd } : {}),
         ...(full ? { scope, ...(schemas ? { schemas } : {}) } : { selection }),
         version,
-        promotion: "client",
+        promotion: command === "working.baseline.verify" ? "terminal" : "client",
         ...(baselineReceipt ? { baselineReceipt } : {}),
       },
       (text) => this.notify("onOutput", text),
@@ -210,6 +214,8 @@ class SourceExtractionOperation {
         this.expectedTotal = Math.max(this.expectedTotal, packet.totalFiles);
         this.notify("onStage", packet);
       } else if (packet.event === "source.permitRequired") {
+        if (this.command === "working.baseline.verify")
+          throw Error("Working verification must not request client file-write permission.");
         const ticketKey = typeof packet.ticket + ":" + packet.ticket;
         const validTicket = token(packet.ticket) && packet.ticket.length <= 128;
         if (
@@ -286,6 +292,7 @@ class SourceExtractionOperation {
             "Native file completion does not match its pending permission.",
           );
         if (
+          this.command !== "working.baseline.verify" &&
           ["added", "updated"].includes(packet.outcome) &&
           (!this.pendingPermit || !this.pendingPermit.allow)
         )
@@ -299,7 +306,7 @@ class SourceExtractionOperation {
         this.observedFiles++;
         this.observedCounts[packet.outcome] =
           (this.observedCounts[packet.outcome] || 0) + 1;
-        this.notify("onFile", packet);
+        if (this.command !== "working.baseline.verify") this.notify("onFile", packet);
       } else throw Error("Unknown native source extraction event.");
     } catch (error) {
       this.fail(error);
@@ -348,6 +355,11 @@ class SourceExtractionOperation {
         "Native extraction result does not match received file outcomes.",
         result,
       );
+    if (this.command !== "source.extract" && result.passed &&
+        (result.workingBaseline?.status !== "verified" ||
+         result.workingBaseline.origin !== "same-generation-native-extraction" ||
+         result.workingBaseline.scope !== this.scope || result.workingBaseline.identity == null))
+      return this.failedResult("Native Working source baseline was not verified.", result);
     if (this.failure && result.passed)
       return this.failedResult(this.failure.message, result);
     return this.failure

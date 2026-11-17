@@ -1,0 +1,65 @@
+{
+  "nativeIssue": 102,
+  "base": "107bd35d45d19e13c959aa286b107fe734e429e7",
+  "phase": "Source-only consumer checkpoint; future native sync capability required.",
+  "protocol": {
+    "command": "working.sync",
+    "scope": "all",
+    "capability": "sourceExtraction.workingBaseline",
+    "requiredFormat": 1,
+    "requiredMode": "fresh",
+    "events": "Existing source.* progress, permit and cancel events",
+    "summary": "Native workingBaseline status/origin/scope with an opaque identity; no JavaScript hash inventory or proof"
+  },
+  "flow": [
+    "Reuse existing source and Working choices; review Working targets before side effects",
+    "Extract+Working uses one working.sync and no second export/connect",
+    "Extract+later stays ordinary source.extract",
+    "Existing sources+Working retains the existing connection workflow",
+    "Decline/cancel before combined start performs no extraction or Working preparation"
+  ],
+  "red": {
+    "passed": 1,
+    "failed": 7,
+    "milliseconds": 380.8041,
+    "causes": [
+      "Missing Working sync adapter",
+      "Combined flow used ordinary Source export",
+      "Extraction ran before declined Working review",
+      "Native cancellation/provenance absent from combined outcome"
+    ]
+  },
+  "green": {
+    "passed": 82,
+    "failed": 0,
+    "milliseconds": 1716.1257,
+    "groups": [
+      "WorkspaceOnboarding_setup",
+      "SourcePullController_run",
+      "CliWorkingSession_fullSourceExtract",
+      "CliWorkingSession_sourceExtract",
+      "CliWorkingSession_workingPolicyCapability"
+    ],
+    "fullLocalSuite": false
+  },
+  "boundaries": [
+    "Exact reviewed configuration used by combined operation",
+    "Working policy and blank credentials retained for working.sync; ordinary Source strips Working policy",
+    "Enabled Working policy still requires its existing capability",
+    "Old CLI lacks sync capability: actionable refusal without fallback",
+    "Unknown or unverified native baseline cannot report prepared",
+    "Cancellation retains native partial result and no readiness claim",
+    "Native source-baseline provenance is not compilation, test execution or inspection connection success"
+  ],
+  "unchanged": {
+    "runtimeShutdownCheckpoint": "4a39a72c999886157a08b8f8191a8cafee1410e7",
+    "extensionVersion": "0.22.17",
+    "officialCliPin": "0.10.16"
+  },
+  "notPerformed": [
+    "Native CLI/JADE/database calls",
+    "Version/pin/package changes",
+    "UI capture or installed-user qualification",
+    "Remote push"
+  ]
+}

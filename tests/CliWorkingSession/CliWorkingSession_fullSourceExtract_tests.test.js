@@ -13,7 +13,8 @@ function fixture() {
     packets.push(JSON.parse(line));
     return true;
   };
-  child.kill = () => {};
+  child.stdin.end = () => queueMicrotask(() => child.emit("close", 0));
+  child.kill = () => queueMicrotask(() => child.emit("close", 2));
   const session = new CliWorkingSession({
     entry: "jade-cli.exe",
     spawn: () => child,
@@ -273,4 +274,37 @@ test('streaming extraction explicitly forwards two-hour default and preserves ov
   assert.equal(f.packets[0].config.extractionTimeoutSeconds,timeout??7200);
   const id=begin(f);end(f,id,{count:0,counts:{}});await op.completion;
  }
+});
+
+test('working sync native adapter preserves Working policy and blank credentials on one original connection',async()=>{
+ const f=fixture(),config={workingJadeGitPolicy:'disabled',userName:'',password:''};
+ assert.equal(typeof f.session.startWorkingSync,'function','Native Working sync adapter is missing');
+ const op=f.session.startWorkingSync(config,{destination:'C:/owned-fixture',scope:'all'},{onPermit:()=>true});
+ assert.equal(f.packets.length,1);assert.equal(f.packets[0].command,'working.sync');assert.equal(f.packets[0].config.workingJadeGitPolicy,'disabled');assert.equal(f.packets[0].config.userName,'');assert.equal(f.packets[0].config.password,'');
+ const id=begin(f);f.emit({id,event:'source.stage',lease:'owned',stage:'inventory',completedFiles:0,totalFiles:0});
+ const binding={status:'verified',origin:'same-generation-native-extraction',scope:'all',identity:{native:'opaque'}};
+ f.emit({id,event:'result',result:{passed:true,code:0,status:'completed',scope:'all',version:'current',authoritative:true,partial:false,completedFiles:0,counts:{},workingBaseline:binding}});
+ assert.deepEqual((await op.completion).workingBaseline,binding);f.session.dispose();
+});
+
+
+for(const baseline of [undefined,{status:'verified',origin:'other',scope:'all',identity:'opaque'},{status:'verified',origin:'same-generation-native-extraction',scope:'schemas',identity:'opaque'}])test('working sync rejects missing or wrong native baseline provenance '+JSON.stringify(baseline),async()=>{
+ const f=fixture(),op=f.session.startWorkingSync({},{destination:'C:/owned-fixture',scope:'all'},{onPermit:()=>true}),id=begin(f);
+ f.emit({id,event:'source.stage',lease:'owned',stage:'inventory',completedFiles:0,totalFiles:0});
+ f.emit({id,event:'result',result:{passed:true,code:0,status:'completed',scope:'all',version:'current',authoritative:true,partial:false,completedFiles:0,counts:{},workingBaseline:baseline}});
+ const value=await op.completion;assert.equal(value.passed,false);assert.equal(value.code,2);assert.match(value.clientError,/baseline was not verified/);f.session.dispose();
+});
+test('working sync retains owner-bound cancel and original native refusal without a baseline',async()=>{
+ const f=fixture(),op=f.session.startWorkingSync({},{destination:'C:/owned-fixture',scope:'all'},{onPermit:()=>true}),id=begin(f);
+ op.stop();assert.ok(f.packets.some(p=>p.command==='source.cancel'&&p.lease==='owned'));
+ f.emit({id,event:'result',result:{passed:false,code:130,status:'cancelled',scope:'all',version:'current',authoritative:false,partial:false,completedFiles:0,counts:{},report:{error:'Controlled cancelled cleanup'}}});
+ const value=await op.completion;assert.equal(value.code,130);assert.equal(value.report.error,'Controlled cancelled cleanup');assert.equal(value.workingBaseline,undefined);f.session.dispose();
+});
+test('ordinary Source extraction strips Working policy and does not create baseline authority',async()=>{
+ const f=fixture(),op=f.session.startSourceExtraction({workingJadeGitPolicy:'disabled',userName:'',password:''},{destination:'C:/owned-fixture',scope:'all'},{onPermit:()=>true}),id=begin(f);
+ assert.equal(f.packets[0].command,'source.extract');assert.equal(f.packets[0].config.workingJadeGitPolicy,undefined);assert.equal(f.packets[0].config.userName,'');assert.equal(f.packets[0].config.password,'');
+ f.emit({id,event:'source.stage',lease:'owned',stage:'inventory',completedFiles:0,totalFiles:0});end(f,id,{count:0,counts:{}});assert.equal((await op.completion).workingBaseline,undefined);f.session.dispose();
+});
+test('working sync rejects selected-class mode before a native request',()=>{
+ const f=fixture();assert.throws(()=>f.session.startWorkingSync({},{destination:'C:/owned-fixture',selection:[{kind:'class',schema:'ExampleSchema',name:'Sample',path:'Sample.cls'}]},{onPermit:()=>true}),/complete schema/);assert.equal(f.packets.length,0);f.session.dispose();
 });
