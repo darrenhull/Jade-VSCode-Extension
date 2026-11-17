@@ -3,7 +3,7 @@ const vscode = require('vscode');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { resolveConfig, inspectInstall, schemaFromSource } = require('./config');
+const { resolveConfig, inspectInstall, schemaFromSource, explicitlyConfigured } = require('./config');
 const {resolveWorkingDirectory}=require('./working-directory');
 const {isManagedProjectPath}=require('./source-index-scope');
 const { startCpp } = require('./cpp-runner');
@@ -24,6 +24,15 @@ function defaults(resource) {
     delete values.characterSet;
   values.workingJadeGitPolicy = values.disableJadeGitForWorking === true ? 'disabled' : 'inherit';
   delete values.disableJadeGitForWorking;
+  return values;
+}
+function explicitDefaults(resource) {
+  const settings = vscode.workspace.getConfiguration('jadeNative', resource);
+  const values = explicitlyConfigured(settings, keys);
+  if (Object.hasOwn(values, 'disableJadeGitForWorking')) {
+    values.workingJadeGitPolicy = values.disableJadeGitForWorking === true ? 'disabled' : 'inherit';
+    delete values.disableJadeGitForWorking;
+  }
   return values;
 }
 
@@ -120,7 +129,8 @@ function activate(context) {
   activeNativeService = nativeTests;
   require('./cli-gateway').configure(nativeTests);
   context.subscriptions.push(nativeTests,{dispose:()=>require('./cli-gateway').configure(undefined)});
-  const configFor = folder => {
+  const configFor = folder => ({sourceFormat:'jox',...Object.fromEntries(Object.entries(explicitDefaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]))});
+  const inspectionConfigFor = folder => {
     const settings = Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]));
     const installPath = settings.installPath || process.env.JADE_INSTALL || '';
     const databasePath = settings.databasePath || (installPath ? path.join(installPath,'system') : '');
@@ -135,7 +145,7 @@ function activate(context) {
     client:nativeTests,isBusy:()=>source.workspace.executing,
     config:(_document,folder)=>{
       const selected=folder||source.workspace.projectForUri(_document?.uri).folder;
-      const config=configFor(selected);
+      const config=inspectionConfigFor(selected);
       if(!config.installPath)throw Object.assign(Error('Set jadeNative.installPath or use Detect Runtime Settings.'),{code:'JADE_RUNTIME_NOT_CONFIGURED'});
       return config;
     },

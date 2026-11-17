@@ -2,12 +2,15 @@
   "issue": 122,
   "status": "Controlled source integration; native and running UI qualification outstanding",
   "nativeContract": "sourceSemantic format 1; projectionText whole-document edit; independent nativeScratch capability",
+  "configuration": "Prepare carries selected cwd and only explicit VS Code overrides; native resolves jade.json/private profiles and returns canonical sourceRoots. Existing Database Objects configuration remains separate pending native shared resolution.",
+  "testExecution": "Batch selected native entities by project/schema/class, one native prepare per operation, preserve individual method outcomes",
   "defaultRoute": "One shared CLI and native source model; no CLS index, parser, watcher, baseline verification or hydration/staging route initialized",
   "sharedInterface": ["Class catalogue", "Class Workspace renderer", "Native Jade editor", "Test Controller", "Scratch Pad", "Database Objects target and credential handling"],
   "targetedEvidence": {
     "providerControls": { "passed": 26, "milliseconds": 136.346 },
     "refreshRaceControls": { "passed": 9, "milliseconds": 136.425 },
     "nativeRegistrationAndAffectedSharedControls": { "passed": 37, "milliseconds": 384.965 },
+    "batchConfigAndAffectedProviderControls": { "passed": 46, "milliseconds": 269.511 },
     "boundaries": ["Controlled native DTOs, not actual JADE", "No database or Source calls", "Native results and cancellation remain authoritative", "Every requested test/Scratch execution dispatched again"]
   },
   "remainingQualification": [

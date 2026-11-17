@@ -86,6 +86,7 @@ test('shipped activation uses one shared CLI and never loads legacy source index
   assert.equal(config.databasePath, settings.databasePath); assert.equal(config.iniPath, settings.iniPath);
   assert.equal(config.user, ''); assert.equal(config.password, '');
   assert.equal(config.sourceFormat, 'jox');
+  assert.deepEqual(Object.keys(registered.workspace.project(f.folder).provider.config), ['sourceFormat'], 'Built-in defaults must not override native jade.json/profile discovery');
   assert.ok(f.fileSystems.has('jade-source'));
   await exported.exports.deactivate(); assert.equal(disposed, true);
 });
@@ -145,4 +146,42 @@ for (const sourceKind of ['inherited', 'system']) test(sourceKind + ' Class Work
   assert.equal(f.shown.length, 0);
   const snapshot = panel.sent.filter(message => message.command === 'editorSnapshot').at(-1).snapshot;
   assert.equal(snapshot.readOnly, true); assert.equal(snapshot.available, false);
+});
+test('selected native tests batch by project/schema/class and retain every individual outcome', async () => {
+  const tests = [['opaque-a', 'One', 'first'], ['opaque-b', 'One', 'second'], ['opaque-c', 'Other', 'first']];
+  const f = setup({ testing: true, reply: (command, request) => {
+    if (command === 'test') return { passed: true, code: 0, report: { tests_completed: true, cleanup_complete: true,
+      results: request.config.methods.map(method => ({ method, status: 'passed' })) } };
+    if (command !== 'source.semantic.query') return;
+    const items = tests.map(([id, owner, method]) => ({ id, name: method, kind: 'method', testIdentity: { schema: 'Example', class: owner, method } }));
+    return { passed: true, code: 0, body: { provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation, items, total: items.length, offset: 0, limit: 100, nextOffset: null } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await registered.testing.discover(); await registered.testing.run({});
+  const calls = f.requests.filter(request => request.command === 'test');
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].body.semanticSelection.entityIds, ['opaque-a', 'opaque-b']);
+  assert.deepEqual(calls[0].body.config.methods, ['first', 'second']);
+  assert.equal(calls[0].body.config.schema, 'Example');
+  assert.equal(f.requests.filter(request => request.command === 'source.semantic.prepare').length, 3);
+  assert.equal(f.testRuns[0].filter(event => event.name === 'passed').length, 3);
+});
+test('project closure while native preparation is pending prevents the Working execution', async () => {
+  let finish;
+  const f = setup({ reply: command => command === 'source.semantic.prepare' ? new Promise(resolve => { finish = resolve; }) : undefined });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  const project = registered.workspace.project(f.folder);
+  const operation = registered.workspace.execute(project, 'test', { entityIds: ['native-test'] });
+  while (!finish) await new Promise(resolve => setImmediate(resolve));
+  f.vscode.workspace.workspaceFolders = [];
+  finish({ passed: true, code: 0, body: structuredClone(f.snapshot) });
+  await assert.rejects(operation, /no longer open|project changed/);
+  assert.equal(f.requests.some(request => request.command === 'test'), false);
+});
+test('pre-cancelled execution never probes native capabilities or saves source', async () => {
+  const f = setup(), registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  const project = registered.workspace.project(f.folder);
+  registered.workspace.saveDirty = () => assert.fail('Pre-cancelled Run must not save');
+  const result = await registered.workspace.execute(project, 'test', { entityIds: ['test'] }, { token: { isCancellationRequested: true } });
+  assert.equal(result.code, 130); assert.equal(f.requests.length, 0); assert.equal(f.client.probes, 0);
 });

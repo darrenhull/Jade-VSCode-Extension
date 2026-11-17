@@ -5,7 +5,8 @@ function createSemanticWorkspaceTransport(workspace, client) {
   let prepared, activeRequest;
   const projectFor = config => {
     const roots = config.workspaceRoots;
-    const folder = roots?.length === 1 && workspace.folders().find(value => value.uri.fsPath === roots[0]);
+    const root = config.cwd || (roots?.length === 1 ? roots[0] : undefined);
+    const folder = workspace.folders().find(value => value.uri.fsPath === root);
     if (!folder || config.sourceFormat !== 'jox') throw Error('Scratch Pad has no configured JOX project binding.');
     return workspace.project(folder);
   };
@@ -25,7 +26,8 @@ function createSemanticWorkspaceTransport(workspace, client) {
         if (!prepared || prepared.project !== project || prepared.schema !== body.config.schema ||
             prepared.generation !== binding.generation || client.client !== prepared.connection)
           throw Error('Scratch Pad source selection changed before execution. Retry the operation.');
-        activeRequest = client.request(command, { ...body, code: body.sourceText,
+        const { cwd, ...config } = body.config;
+        activeRequest = client.request(command, { ...body, config, cwd: project.folder.uri.fsPath, code: body.sourceText,
           sourceSnapshot: prepared.sourceSnapshot, semanticSelection: { entityIds: [prepared.entityId] } }, args[0], args[1], prepared.connection);
         return activeRequest;
       }
@@ -56,7 +58,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
 function registerNativeSourceWorkspaces(vscode, context, workspace, client) {
   const transport = createSemanticWorkspaceTransport(workspace, client);
   return registerWorkspaces(vscode, context, { ...transport,
-    configFor: (_document, scope) => ({ ...workspace.project(scope.folder).provider.config }),
+    configFor: (_document, scope) => ({ ...workspace.project(scope.folder).provider.config, cwd: scope.folder.uri.fsPath }),
     schemaChoices: async scope => {
       const project = await workspace.prepare(scope.folder);
       const page = await project.provider.query({ kind: 'schema', offset: 0, limit: 100 });

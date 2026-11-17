@@ -21,11 +21,14 @@ class NativeSourceWorkspace {
   project(folder) {
     const current = this.folders().find(value => value.uri.toString() === folder?.uri.toString());
     if (!current) throw Error('The selected Jade project is no longer open.');
-    const config = configDto({ ...this.configFor(current), sourceFormat: 'jox', workspaceRoots: [current.uri.fsPath] });
+    const supplied = { ...this.configFor(current), sourceFormat: 'jox' };
+    const config = configDto(supplied);
+    if (Object.hasOwn(supplied, 'workingJadeGitPolicy')) config.workingJadeGitPolicy = supplied.workingJadeGitPolicy;
     const key = current.uri.toString();
     let project = this.projects.get(key);
     if (!project) {
-      const provider = new NativeSourceProvider({ client: this.client, config });
+      const provider = new NativeSourceProvider({ client: this.client, config, projectRoot: current.uri.fsPath,
+        validateContext: () => { if (this.project(current) !== project) throw Error('The selected source project changed.'); } });
       project = { folder: current, provider, files: new JadeSourceFileSystemProvider(this.vscode, provider) };
       this.projects.set(key, project);
       this.forwarding.set(project, project.files.onDidChangeFile(changes => this.events.fire(changes)));
@@ -117,11 +120,16 @@ class NativeSourceWorkspace {
   }
 
   async execute(project, command, selection, options) {
+    const cancelled = () => options?.token?.isCancellationRequested;
+    const cancellation = () => ({ passed: false, code: 130, cancelled: true });
+    if (cancelled()) return cancellation();
     this.project(project.folder);
     if (this.executing) throw Error('Another Jade Working operation is running.');
     this.executing = true;
     try {
       await this.beforeOperation?.();
+      if (cancelled()) return cancellation();
+      this.project(project.folder);
       await this.saveDirty(project);
       return await project.provider.execute(command, selection, options);
     } finally { this.executing = false; }

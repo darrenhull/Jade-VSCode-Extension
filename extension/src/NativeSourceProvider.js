@@ -25,12 +25,13 @@ function contained(root, uri, label) {
 // Retains transport/document bindings only. The native provider owns the semantic
 // graph, saved snapshot, source formats, dependency selection and edit semantics.
 class NativeSourceProvider {
-  constructor({ client, config }) {
+  constructor({ client, config, projectRoot = config?.workspaceRoots?.[0], validateContext = () => {} }) {
     this.client = client;
+    this.validateContext = validateContext;
     this.config = clone(configDto(config));
-    if (this.config.sourceFormat !== 'jox' || this.config.workspaceRoots?.length !== 1)
-      throw Error('A JOX source provider requires one configured project root.');
-    this.root = path.resolve(required(this.config.workspaceRoots[0], 'project root'));
+    if (Object.hasOwn(config, 'workingJadeGitPolicy')) this.config.workingJadeGitPolicy = config.workingJadeGitPolicy;
+    if (this.config.sourceFormat !== 'jox') throw Error('A JOX source provider requires its native format binding.');
+    this.root = path.resolve(required(projectRoot, 'project context'));
     this.documents = new WeakMap();
   }
 
@@ -64,6 +65,7 @@ class NativeSourceProvider {
   async request(command, body, token) {
     this.assertConnection();
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+    this.validateContext();
     const connection = this.connection;
     const request = this.client.request(command, body, undefined, undefined, connection);
     const cancel = () => {
@@ -82,12 +84,20 @@ class NativeSourceProvider {
   }
 
   async prepare(token) {
+    if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+    this.validateContext();
     const capabilities = await this.capability();
-    const snapshot = await this.request('source.semantic.prepare', { config: clone(this.config) }, token);
+    const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token);
     if (snapshot.provider !== 'jox') throw Error('Invalid native provider binding.');
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
     hash(snapshot.snapshotHash, 'snapshot');
+    if (!Array.isArray(snapshot.sourceRoots) || !snapshot.sourceRoots.length) throw Error('Missing native source root binding.');
+    this.sourceRoots = snapshot.sourceRoots.map(uri => {
+      const value = new URL(uri);
+      if (value.search || value.hash || value.protocol !== 'file:') throw Error('Invalid native source root URI.');
+      return fileURLToPath(value);
+    });
     this.snapshot = clone(snapshot);
     this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch']
       .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
@@ -135,7 +145,11 @@ class NativeSourceProvider {
     hash(revision.memberHash, 'member');
     if (document.origin?.format !== 'jox' || document.origin.originByteHash !== revision.originByteHash)
       throw Error('Invalid native origin hash binding.');
-    const origin = contained(this.root, document.origin.uri, 'origin');
+    let origin;
+    for (const root of this.sourceRoots) {
+      try { origin = contained(root, document.origin.uri, 'origin'); break; } catch { /* Try only the native-returned configured roots. */ }
+    }
+    if (!origin) throw Error('Native origin is outside its configured source roots.');
     const managed = path.join(this.root, '.jade');
     const relative = path.relative(managed, origin);
     if (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))
@@ -189,6 +203,7 @@ class NativeSourceProvider {
 
   async execute(command, selection, { token, output, settings = {} } = {}) {
     if (!['build', 'test', 'workspace.run'].includes(command)) throw Error('Unsupported semantic execution command.');
+    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
     // One native prepare observes saved Git changes. There is no browser graph
     // comparison, legacy baseline check or second source-index preparation.
     const snapshot = await this.prepare(token);
@@ -199,11 +214,13 @@ class NativeSourceProvider {
     if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
     if (this.config.workingJadeGitPolicy && this.config.workingJadeGitPolicy !== 'inherit')
       await require('./working-jadegit-policy').requireWorkingJadeGitPolicy(this.client, this.config);
+    this.validateContext();
+    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
     const connection = this.connection;
-    const { methods, ...arguments_ } = settings;
+    const { methods, schema, ...arguments_ } = settings;
     if (Object.hasOwn(arguments_, 'config')) throw Error('Native project configuration cannot be replaced by execution arguments.');
-    const request = this.client.request(command, { ...arguments_, config: { ...clone(this.config),
-      ...(settings.testIdentity ? { schema: settings.testIdentity.schema } : {}), ...(methods === undefined ? {} : { methods }) },
+    const request = this.client.request(command, { ...arguments_, cwd: this.root, config: { ...clone(this.config),
+      ...(schema !== undefined ? { schema } : settings.testIdentity ? { schema: settings.testIdentity.schema } : {}), ...(methods === undefined ? {} : { methods }) },
       sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId, generation: snapshot.generation, snapshotHash: snapshot.snapshotHash },
       semanticSelection: clone(selection) }, output, undefined, connection);
     const cancel = () => {

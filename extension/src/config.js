@@ -43,6 +43,14 @@ function inspectInstall(directory) {
     serverConnection: ini.jadeclient?.servernodespecifications || '' };
 }
 
+function explicitlyConfigured(settings, names) {
+  const scopes = ['globalValue', 'workspaceValue', 'workspaceFolderValue', 'globalLanguageValue', 'workspaceLanguageValue', 'workspaceFolderLanguageValue'];
+  return Object.fromEntries(names.filter(name => {
+    const value = settings.inspect?.(name);
+    return scopes.some(scope => value?.[scope] !== undefined);
+  }).map(name => [name, settings.get(name)]));
+}
+
 function resolveConfig(config, defaults = {}) {
   const resolved = { ...defaults, ...Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined && value !== '')) };
   resolved.installPath ||= process.env.JADE_INSTALL || '';
@@ -69,4 +77,4 @@ function resolveConfig(config, defaults = {}) {
   return resolved;
 }
 
-module.exports = { parseIni, readIni, schemaFromSource, hasMethodBodies, inspectInstall, resolveConfig };
+module.exports = { parseIni, readIni, schemaFromSource, hasMethodBodies, inspectInstall, resolveConfig, explicitlyConfigured };
