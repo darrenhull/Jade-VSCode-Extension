@@ -13,7 +13,8 @@ function activation(inspectionField='workspaceFolderValue',override){
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
   if(name==='./workspace-initialization')return {registerWorkspaceInitialization:()=>({initialize:async()=>assert.fail('Configuration fixture must not initialize a project')})};
   if(name==='./workspace-onboarding')return {registerWorkspaceOnboarding(_vscode,_context,services){onboardingRegistrations++;assert.equal(typeof services.initialize,'function');assert.equal(typeof services.connectWorking,'function');return {async resume(){onboardingResumes++;}};}};
-  if(name==='./language-tools')return{registerLanguageTools:()=>language};
+  if(name==='./language-tools')assert.fail('JOX activation must not register the legacy CLS language index');
+  if(name==='./register-jox-workspace')return{registerJoxWorkspace:(_v,_c,value)=>{services.jox=value;return{workspace:{executing:false}};}};
   if(name==='./config'){const loaded={exports:{}};vm.runInNewContext('(function(require,module){'+fs.readFileSync(path.join(root,'extension/src/config.js'),'utf8')+'\n})',{process})((key)=>key==='node:fs'?{...fs,existsSync:()=>true}:require(key),loaded);return loaded.exports;}
   if(name==='./cli-client')return{CliWorkingSession:class{}};
   if(['./ProjectSkillInstaller','./WorkspaceOperationGuard','./working-directory','./source-index-scope'].includes(name))return localRequire(name);
@@ -21,34 +22,41 @@ function activation(inspectionField='workspaceFolderValue',override){
   return noop;
  },module);
  module.exports.activate({subscriptions:[],extensionPath:'C:/extension',globalStorageUri:{fsPath:'C:/storage'},workspaceState:{get:()=> 'initial'}});
- assert.equal(onboardingRegistrations,1);assert.equal(onboardingResumes,1);
- return{folders,reads,writes,services};
+ assert.equal(onboardingRegistrations,0);assert.equal(onboardingResumes,0);
+ assert.equal(typeof services.jox.configFor,'function');
+ return{folders,reads,writes,services,source:folder=>services.jox.configFor(folder),inspection:folder=>services['./object-explorer'].config(undefined,folder)};
 }
 test('character-set setting is optional, resource-scoped and defaults to automatic native detection',()=>{
  const setting=manifest.contributes.configuration.properties['jadeNative.characterSet'];assert.ok(setting);assert.deepEqual(setting.enum,['auto','ansi','unicode']);assert.equal(setting.default,'auto');assert.equal(setting.scope,'resource');
  const [major,minor]=manifest.jadeNative.minimumCliVersion.split('.').map(Number);assert.ok(major>0||major===0&&minor>=6,'Do not release the setting with a CLI older than the native character ABI support.');
  require('../../scripts/NativeCompatibility.cjs').requireNativeVersion(path.join(root,'packages/jade-cli-win-x64'),manifest.jadeNative.minimumCliVersion);
 });
-for(const [index,expected] of ['ansi','unicode',undefined,'auto'].entries())test('actual activation resolves '+(expected||'omitted native default')+' for build, inspection, Scratch and debug configuration without writing settings',()=>{
+for(const [index,expected] of ['ansi','unicode',undefined,'auto'].entries())test('actual activation resolves '+(expected||'omitted native default')+' for native JOX execution and inspection without writing settings',()=>{
  const host=activation(),folder=host.folders[index],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
- const configurations=[host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri}),host.services['./debugger'].config(document),host.services['./sidebar'].settings(folder)];
+ const configurations=[host.source(folder),host.inspection(folder)];
  assert.ok(configurations.every(config=>config.characterSet===expected));if(expected===undefined)assert.ok(configurations.every(config=>!Object.hasOwn(config,'characterSet'))); assert.deepEqual(host.writes,[]);assert.ok(host.reads.every(resource=>resource.fsPath.startsWith(folder.uri.fsPath)));
 });
 for(const scope of ['globalValue','workspaceValue','workspaceFolderValue','globalLanguageValue','workspaceLanguageValue','workspaceFolderLanguageValue'])test('explicit character-set setting from '+scope+' is retained',()=>{
- const host=activation(scope),folder=host.folders[0];assert.equal(host.services['./object-explorer'].config(undefined,folder).characterSet,'ansi');assert.deepEqual(host.writes,[]);
+ const host=activation(scope),folder=host.folders[0];assert.equal(host.inspection(folder).characterSet,'ansi');assert.deepEqual(host.writes,[]);
 });
 for(const characterSet of ['',null,17])test('explicit invalid '+JSON.stringify(characterSet)+' selection reaches native configuration validation unchanged',()=>{
  const host=activation('workspaceFolderValue',{characterSet}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
- const configs=[host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri}),host.services['./debugger'].config(document)];
+ const configs=[host.source(folder),host.inspection(folder)];
  assert.ok(configs.every(config=>config.characterSet===characterSet));assert.deepEqual(host.writes,[]);
 });
 
 
-test('actual class and Working inspection configuration resolve relative directories in the selected workspace',()=>{
- const host=activation('workspaceFolderValue',{workingDatabaseDirectory:'.jade/working'}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
- const expected=path.resolve(folder.uri.fsPath,'.jade/working');
- for(const config of [host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri}),host.services['./debugger'].config(document)])assert.equal(config.workingDatabaseDirectory,expected);
+test('native JOX config retains relative overrides for native resolution while Working inspection binds the selected workspace',()=>{
+ const host=activation('workspaceFolderValue',{workingDatabaseDirectory:'.jade/working'}),folder=host.folders[0];
+ assert.equal(host.source(folder).workingDatabaseDirectory,'.jade/working');
+ assert.equal(host.inspection(folder).workingDatabaseDirectory,path.resolve(folder.uri.fsPath,'.jade/working'));
+ assert.equal(host.source(folder).sourceFormat,'jox');
+ assert.equal(Object.hasOwn(host.source(folder),'workspaceRoots'),false);
  assert.deepEqual(host.writes,[]);
 });
 
-test('dedicated Working preparation limit reaches actual build, inspection and Scratch configuration',()=>{const host=activation('workspaceFolderValue',{workingDatabaseTimeoutSeconds:7200,testTimeoutSeconds:30}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};const configs=[host.services['./compile-commands'].classConfig(document),host.services['./object-explorer'].config(document,folder),host.services['./jade-workspaces'].configFor(document,{folder,configurationResource:folder.uri})];assert.ok(configs.every(config=>config.workingDatabaseTimeoutSeconds===7200&&config.testTimeoutSeconds===30));});
+test('dedicated Working preparation limit reaches native JOX execution and inspection configuration',()=>{
+ const host=activation('workspaceFolderValue',{workingDatabaseTimeoutSeconds:7200,testTimeoutSeconds:30}),folder=host.folders[0];
+ for(const config of [host.source(folder),host.inspection(folder)]){assert.equal(config.workingDatabaseTimeoutSeconds,7200);assert.equal(config.testTimeoutSeconds,30);}
+ assert.deepEqual(host.writes,[]);
+});
