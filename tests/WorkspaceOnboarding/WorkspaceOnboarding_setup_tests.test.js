@@ -84,3 +84,62 @@ test('combined setup activation delegates to the one shared SourcePull Working s
  require('node:vm').runInNewContext(source.slice(start,end),{require:name=>require(path.join(__dirname,'../../extension/src',name)),vscode:f.vscode,context:f.context,workspaceInitialization:{initialize:f.services.initialize},inspectionConfig:()=>config,nativeTests:{workingLocation:async()=>({databasePath:path.join(f.root,'.jade/working/system')})},sourcePull:{runWorkingSync:async(folder,reviewed)=>{synced++;assert.equal(folder,f.folder);assert.equal(reviewed,config);return{passed:true,code:0,workingBaseline:verifiedWorkingBaseline};}},objectExplorer:{connectWorkingProject:async()=>assert.fail('Combined sync must not connect/export again')}});
  const value=await f.commands.get('jadeNative.setupProject')();assert.equal(synced,1);assert.equal(value.workingPrepared,true);assert.equal(f.calls.filter(c=>c[0]==='command'&&c[1]==='jadeNative.extractAllSources').length,0);
 });
+
+test('JOX setup creates Working and extracts once without legacy baseline or a second connection',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Create Working and extract']});f.services.jox=true;
+ const target={config:{installPath:'C:/Runtime',databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},working:{databasePath:'C:/Project/.jade/working/system',identity:'native-target'},destination:'C:/Project/sources'};
+ f.services.targets=async()=>target;
+ const snapshot={provider:'jox',projectId:'opaque-project',generation:'native-generation',snapshotHash:'native-hash'};
+ f.services.initializeWorkingSources=async(folder,reviewed)=>{assert.equal(reviewed,target);f.calls.push(['joxInitialize']);return{sourceSnapshot:snapshot,extractedFiles:7};};
+ const value=await f.controller.setup();assert.equal(value.workingPrepared,true);assert.deepEqual(value.sourceSnapshot,snapshot);
+ assert.equal(f.calls.filter(c=>c[0]==='joxInitialize').length,1);assert.ok(!f.calls.some(c=>['extract','working','sync'].includes(c[0])));
+ assert.ok(!f.logs.some(line=>/source index|verified|baseline|connected\./i.test(line)));
+});
+test('JOX setup declined at target review never starts restore or export',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working']});f.services.jox=true;
+ f.services.initializeWorkingSources=async()=>{f.calls.push(['joxInitialize']);};
+ assert.equal((await f.controller.setup()).cancelled,true);assert.ok(!f.calls.some(c=>['extract','working','sync','joxInitialize'].includes(c[0])));
+});
+test('JOX extraction deferred with Working never falls back to Source export',async t=>{
+ const f=fixture(t,{picks:['folder','extract','later']});f.services.jox=true;
+ const value=await f.controller.setup();assert.equal(value.deferred,true);assert.equal(value.workingPrepared,false);
+ assert.ok(!f.calls.some(c=>['extract','working','sync'].includes(c[0])));
+});
+
+test('JOX activation registers the actual setup action with one reviewed native request and no extra prepare',async t=>{
+ const f=fixture(t,{picks:['extract','working'],warnings:['Create Working and extract']});f.commands.clear();
+ f.vscode.window.withProgress=async(_options,run)=>run({report(){}},{isCancellationRequested:false});
+ f.vscode.window.showInformationMessage=async()=>undefined;
+ const requests=[],body={sourceSnapshot:{provider:'jox',projectId:'native',generation:'g',snapshotHash:'h'},extractedFiles:7};
+ const project={folder:f.folder,provider:{config:{sourceFormat:'jox',workingJadeGitPolicy:'inherit'},connection:{},root:f.root,
+  capability:async()=>({catalogue:true,initialization:true}),request:async(command,args)=>{requests.push([command,args]);return{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:'C:/Runtime',identity:'reviewed-working'},source:{databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},initialization:{destination:path.join(f.root,'sources')}};},
+  initialize:async(args)=>{requests.push(['working.initialize',args]);return body;}}};
+ const workspace={executing:false,project:()=>project,changing:new Map(),pendingChanges:new Map(),beforeOperation:async()=>requests.push(['release-own-inspection']),observeSources:()=>requests.push(['watch']),refresh:async(_folder,_token,options)=>{requests.push(['refresh',options]);throw Error('synthetic view refresh cancelled after native commit');}};
+ const client={request:(command,args)=>{requests.push([command,args]);return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})}}};
+ const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor:()=>({sourceFormat:'jox'}),detect:async()=>undefined});
+ assert.ok(f.commands.has('jadeNative.setupProject')&&f.commands.has('jadeNative.initializeWorkspace'));
+ const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.workingPrepared,true,JSON.stringify(result));
+ const start=requests.find(row=>row[0]==='working.initialize');assert.deepEqual(start[1],{destination:path.join(f.root,'sources'),expectedWorkingIdentity:'reviewed-working'});
+ assert.equal(requests.filter(row=>row[0]==='working.initialize').length,1);assert.ok(requests.some(row=>row[0]==='refresh'&&row[1].prepared===true));
+ assert.ok(!requests.some(row=>['source.semantic.prepare','source.extract','working.sync','source.index.prepare'].includes(row[0])));
+ let choice=0;f.vscode.window.showQuickPick=async rows=>{const kind=choice++===0?'existing':'working';return rows.find(row=>row.kind===kind);};
+ f.vscode.window.showWarningMessage=async()=> 'Prepare Working';
+ const existing=await setup.onboarding.setup(f.folder.uri);assert.equal(existing.workingPrepared,true,JSON.stringify(existing));
+ const prepare=requests.find(row=>row[0]==='working.prepare');assert.equal(prepare[1].expectedWorkingIdentity,'reviewed-working');
+ assert.deepEqual(prepare[1].config,project.provider.config);assert.equal(requests.filter(row=>row[0]==='working.initialize').length,1);
+ choice=0;f.vscode.window.showQuickPick=async rows=>{const kind=choice++===0?'extract':'working';return rows.find(row=>row.kind===kind);};
+ f.vscode.window.showWarningMessage=async()=> 'Create Working and extract';
+ project.provider.initialize=async args=>{requests.push(['working.initialize',args]);return{...body,viewRefreshRequired:true,warning:'Working and source creation completed; reconnect the view.'};};
+ const refreshes=requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length;
+ const closed=await setup.onboarding.setup(f.folder.uri);assert.equal(closed.workingPrepared,true,JSON.stringify(closed));
+ assert.equal(requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length,refreshes,'Completed setup reconnected/refreshed a replaced runtime');
+ const before=requests.length;project.provider.capability=async()=>{throw Error('Update the Jade CLI: JOX unsupported');};
+ const old=await f.commands.get('jadeNative.initializeWorkspace')(f.folder.uri);assert.equal(old.passed,false);assert.match(old.error,/JOX unsupported/);assert.equal(requests.length,before,'Direct setup silently used the old CLI init');
+});
+
+test('JOX setup preserves committed native outcome when its project closes after extraction',async t=>{
+ const f=fixture(t,{picks:['folder','extract','working'],warnings:['Create Working and extract']});f.services.jox=true;
+ const snapshot={provider:'jox',projectId:'native',generation:'g',snapshotHash:'h'};
+ f.services.initializeWorkingSources=async()=>{f.vscode.workspace.workspaceFolders=[];return{sourceSnapshot:snapshot};};
+ const value=await f.controller.setup();assert.equal(value.workingPrepared,true);assert.deepEqual(value.sourceSnapshot,snapshot);assert.equal(value.projectClosed,true);
+});

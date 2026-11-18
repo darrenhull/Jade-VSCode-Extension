@@ -5,19 +5,44 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ('jade-native-updater-'+[guid]::NewGu
 function Assert($Condition,$Message){if(!$Condition){throw $Message}}
 function Reject($Action,$Pattern){try{& $Action;throw 'Expected rejection was missing'}catch{if($_.Exception.Message -notmatch $Pattern){throw}}}
 function ChangeManifest($Archive,$Change){$entry=$Archive.GetEntry('distribution.json');$reader=[IO.StreamReader]::new($entry.Open());try{$manifest=$reader.ReadToEnd()|ConvertFrom-Json -AsHashtable}finally{$reader.Dispose()};$entry.Delete();& $Change $manifest;$entry=$Archive.CreateEntry('distribution.json');$writer=[IO.StreamWriter]::new($entry.Open());try{$writer.Write(($manifest|ConvertTo-Json -Depth 8))}finally{$writer.Dispose()}}
-function Archive($Name,$Extra=$null){
+function Archive($Name,$Extra=$null,[switch]$Jox){
  $directory=Join-Path $root $Name;[IO.Directory]::CreateDirectory((Join-Path $directory 'native'))|Out-Null
  [IO.File]::WriteAllText((Join-Path $directory 'jade-cli.exe'),'native '+$Name)
  [IO.File]::WriteAllText((Join-Path $directory 'native/helper.exe'),'helper')
  $manifest=@{formatVersion=2;runtime='native-cpp';platform='win32';arch='x64';packageVersion='0.2.0';executable='jade-cli.exe';executableSha256=(Get-FileHash (Join-Path $directory 'jade-cli.exe')).Hash.ToLowerInvariant();runtimeFiles=@{'native/helper.exe'=(Get-FileHash (Join-Path $directory 'native/helper.exe')).Hash.ToLowerInvariant()}}
  [IO.Directory]::CreateDirectory((Join-Path $directory 'native'))|Out-Null
- foreach($helper in @('jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json')){$relative='native/'+$helper;$file=Join-Path $directory $relative;[IO.File]::WriteAllText($file,'verified '+$helper);$manifest.runtimeFiles[$relative]=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()}
+ if($Jox){$manifest.packageVersion='0.11.0';$manifest.oidFormat='jade-native';$manifest.joxRuntime=@{format=1;characterSet='unicode';engineCommit=('a'*40);initialization=$true;managedUpload=$true;nativeTests=$true;nativeScratch=$false}}
+ $helpers=if($Jox){@('jade-inspect-helper.exe','jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe','jox/jade-jox-test-helper-unicode.exe','jox/jadegitscm.dll','jox/jadegitdev.dll')}else{@('jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json')}
+ foreach($runtimeName in $helpers){$relative='native/'+$runtimeName;$file=Join-Path $directory $relative;[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($file))|Out-Null;[IO.File]::WriteAllText($file,'verified '+$runtimeName);$manifest.runtimeFiles[$relative]=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()}
  [IO.File]::WriteAllText((Join-Path $directory 'distribution.json'),($manifest|ConvertTo-Json -Depth 6))
  $zip=Join-Path $root ($Name+'.zip');Compress-Archive -Path (Join-Path $directory '*') -DestinationPath $zip
  if($Extra){$archive=[IO.Compression.ZipFile]::Open($zip,[IO.Compression.ZipArchiveMode]::Update);try{& $Extra $archive}finally{$archive.Dispose()}}
  return $zip
 }
 try{
+ $jox=Archive 'jox-valid' -Jox;$joxConsumer=Join-Path $root 'jox-consumer'
+ $joxInstalled=Install-NativeRelease -Root $joxConsumer -Archive $jox -ExpectedHash (Get-FileHash $jox).Hash -Version '0.11.0'
+ Assert $joxInstalled.updated 'Qualified JOX package without retired CLS/debug helpers was rejected'
+ $joxPin=Join-Path $joxConsumer 'packages/jade-cli-pin.json';$priorJoxPin=[IO.File]::ReadAllText($joxPin)
+ Assert ((Get-Content -LiteralPath $joxPin -Raw|ConvertFrom-Json).version -eq '0.11.0') 'JOX install did not update its exact pin'
+ $joxUnchanged=Install-NativeRelease -Root $joxConsumer -Archive $jox -ExpectedHash (Get-FileHash $jox).Hash -Version '0.11.0'
+ Assert (!$joxUnchanged.updated) 'Unchanged JOX receipt was not reused'
+ foreach($helper in @('native/jox/jade-jox-test-helper-unicode.exe','native/jox/jadegitscm.dll','native/jox/jadegitdev.dll','native/jade-inspect-helper.exe','native/jade-inspect-helper-ansi.exe','native/jade-inspect-helper-unicode.exe')){
+  $missing=Archive ('jox-missing-'+[IO.Path]::GetFileName($helper)) -Jox -Extra {param($z)ChangeManifest $z {param($m)$m.runtimeFiles.Remove($helper)};$z.GetEntry($helper).Delete()}
+  Reject {Install-NativeRelease -Root $joxConsumer -Archive $missing -ExpectedHash (Get-FileHash $missing).Hash -Version '0.11.0'} 'Required (native|JOX) runtime'
+ }
+ foreach($flag in @('initialization','managedUpload','nativeTests')){
+  $unqualified=Archive ('jox-unqualified-'+$flag) -Jox -Extra {param($z)ChangeManifest $z {param($m)$m.joxRuntime[$flag]=$false}}
+  Reject {Install-NativeRelease -Root $joxConsumer -Archive $unqualified -ExpectedHash (Get-FileHash $unqualified).Hash -Version '0.11.0'} 'qualified JOX'
+ }
+ $stringFlag=Archive 'jox-string-flag' -Jox -Extra {param($z)ChangeManifest $z {param($m)$m.joxRuntime.initialization='true'}}
+ Reject {Install-NativeRelease -Root $joxConsumer -Archive $stringFlag -ExpectedHash (Get-FileHash $stringFlag).Hash -Version '0.11.0'} 'boolean'
+ $wrongOid=Archive 'jox-wrong-oid' -Jox -Extra {param($z)ChangeManifest $z {param($m)$m.oidFormat='legacy'}}
+ Reject {Install-NativeRelease -Root $joxConsumer -Archive $wrongOid -ExpectedHash (Get-FileHash $wrongOid).Hash -Version '0.11.0'} 'qualified JOX'
+ $changedJox=Archive 'jox-tampered' -Jox -Extra {param($z)ChangeManifest $z {param($m)$m.runtimeFiles['native/jox/jadegitscm.dll']='0'*64}}
+ Reject {Install-NativeRelease -Root $joxConsumer -Archive $changedJox -ExpectedHash (Get-FileHash $changedJox).Hash -Version '0.11.0'} 'checksum mismatch'
+ Assert ([IO.File]::ReadAllText($joxPin) -eq $priorJoxPin) 'Rejected JOX package changed the previous pin'
+ Assert ([IO.File]::ReadAllText((Join-Path $joxConsumer 'packages/jade-cli-win-x64/jade-cli.exe')) -eq 'native jox-valid') 'Rejected JOX package changed the previous payload'
  $missingHelper=Archive 'missing-required-helper' {param($z)ChangeManifest $z {param($m)$m.runtimeFiles.Remove('native/jade-debug-helper.exe')};$z.GetEntry('native/jade-debug-helper.exe').Delete()}
  Reject {Install-NativeRelease -Root (Join-Path $root 'missing-helper-consumer') -Archive $missingHelper -ExpectedHash (Get-FileHash $missingHelper).Hash -Version '0.2.0'} 'Required native runtime'
  $repository=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path

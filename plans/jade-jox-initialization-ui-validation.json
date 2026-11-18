@@ -1,0 +1,70 @@
+{
+  "scope": "JOX explicit project setup and native project-root editor binding",
+  "issues": [
+    122
+  ],
+  "nativeContract": {
+    "command": "working.initialize",
+    "review": "existing project choice and one Source/Working target review",
+    "destination": "native preview-selected new or empty source root",
+    "expectedWorkingIdentity": "forwarded from native target preview",
+    "result": "native sourceSnapshot/projectRoot/sourceRoots adopted without another prepare",
+    "capability": "sourceSemantic format1 provider jox initialization===true; otherwise explicit unsupported"
+  },
+  "behavior": [
+    "Config-only init uses existing native profile/config/Git authority; no JavaScript source/profile discovery or source-index preparation",
+    "One fresh native initialization; no separate Source export, backup/connect replay or client inventory",
+    "Native private credentials are omitted unless explicitly supplied; explicit Working policy is retained",
+    "Existing-files Working preparation forwards the same reviewed identity",
+    "Native completion survives late view cancellation and project closure; native failure code/partial report retained",
+    "Logical editor context stays selected-folder-qualified; native projectRoot owns derived cache and restart binding"
+  ],
+  "verification": {
+    "newProviderControls": {
+      "red": "missing initialize API; nested native root incorrectly rejected and foreign root accepted",
+      "green": 9
+    },
+    "newSetupControls": {
+      "red": "legacy combined route/source fallback; missing actual registration; old-runtime direct init bypass; late view/close incorrectly masked native completion",
+      "green": 5
+    },
+    "newConfigOnlyControl": {
+      "red": "undefined runtime defaults replaced native discovery",
+      "green": 1
+    },
+    "adjacentChecks": [
+      "24 provider contract +8 recovery controls passed with the new native root binding",
+      "37 owning setup module controls passed before the final additional lifecycle assertions; final changed JOX cases rechecked individually",
+      "29 config-only module controls passed before adding the capability hook; hook and related JOX action rechecked",
+      "18 charset/workspace activation controls passed;2 affected activation-registration guards rechecked after strengthening assertions"
+    ]
+  },
+  "limits": {
+    "actualNativeInitialization": "pending native orchestration, same-SCM extraction and connected qualification; no mock-only completion claim",
+    "actualRunningUI": "outstanding: previously verified computer-use kernel-assets error OS3; no repair or simulated screenshot",
+    "nativeCompilationOrTests": "not claimed by setup adapter controls",
+    "database": "no real Source/Working/JOM call in these controls",
+    "packagePinVersionInstall": "unchanged; no package or install"
+  },
+  "commands": [
+    "node --test tests/NativeSourceProvider/NativeSourceProvider_initialization_tests.test.js",
+    "node --test tests/NativeSourceProvider/NativeSourceProvider_contract_tests.test.js tests/NativeSourceProvider/NativeSourceProvider_recovery_tests.test.js",
+    "node --test tests/WorkspaceOnboarding/WorkspaceOnboarding_setup_tests.test.js",
+    "node --test tests/WorkspaceInitialization/WorkspaceInitialization_command_tests.test.js",
+    "node --test tests/RuntimeCharacterSet/RuntimeCharacterSet_configuration_tests.test.js tests/WorkspaceContext/WorkspaceContext_activation_tests.test.js"
+  ],
+  "lineEndings": "Original unchanged-line endings retained; normalized UTF-8 content before/after restoration is identical. No source/UI rerun for EOL-only correction.",
+  "reviewFollowup": {
+    "problem": "Confirmed native initialization could be masked by connection closure/replacement before view delivery",
+    "red": [
+      "Closed reply boundary lost confirmed result",
+      "Replacement reply boundary lost confirmed result",
+      "Replacement-process capability probe retained an older source descriptor"
+    ],
+    "green": {
+      "completionAndStrictReadEditControls": 5,
+      "actualSetupNoAutomaticReconnectControl": 1
+    },
+    "behavior": "Only confirmed working.initialize preserves its native body plus a view-refresh warning. It validates but never retains the old snapshot on a replaced process; no automatic reconnect/query follows. Ordinary source read/save connection guards stay strict."
+  }
+}

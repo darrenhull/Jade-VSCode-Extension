@@ -134,3 +134,10 @@ test('missing native Git confirmation is actionable and cannot claim configurati
 test('native Git setup failure preserves its cause and never starts source-cache refresh',async t=>{
  const s=setup(t,{result:{passed:false,code:2,report:{error:'Git executable was not found'}}}),refreshes=[];s.services.refreshSourceIndex=async()=>refreshes.push(true);const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);assert.equal(result.passed,false);assert.equal(result.error,'Git executable was not found');assert.equal(refreshes.length,0);assert.ok(s.logs.every(value=>!/Configuration step complete|Shared source index is ready/.test(value)));
 });
+
+test('JOX config-only setup leaves private-profile discovery native and forwards no undefined runtime defaults',async t=>{
+ const s=setup(t);s.services.nativeDiscovery=true;s.services.configFor=()=>({sourceFormat:'jox'});
+ await s.initialize(s.folder.uri);
+ assert.deepEqual(s.calls[0].argv,['--config',path.join(s.root,'jade.json')]);
+ assert.ok(!s.messages.some(value=>typeof value==='string'&&/Extract All Sources/.test(value)));
+});

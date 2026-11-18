@@ -1,0 +1,23 @@
+{
+  "status": "PASS-controlled-adapters",
+  "baseCommit": "5060469bc2aea3155077131977be84b41b1ad37e",
+  "recoveryRed": "Six intended failures against prior source: random/process-local URI, absent native reopen, lost recovery key and unavailable restored-project routing",
+  "projectDisposalRed": "Two intended failures against prior source: missing owned model disposal and no captured-connection cleanup boundary",
+  "finalAffectedAdapterTests": 71,
+  "finalAffectedAdapterFailures": 0,
+  "policyWireRed": "Semantic prepare lost selected Working policy while protected Source stripping still passed",
+  "policyWireAndAdjacentControls": 24,
+  "policyWireAndAdjacentFailures": 0,
+  "boundaries": [
+    "Native opaque per-open key plus selected-project URI routes restored editors; original base is validated by native reopen",
+    "Dirty recovery text is not overwritten or automatically rebound after native stale refusal",
+    "Read/save retains native recovery key, accepted source snapshot and original hashes of other dirty documents",
+    "Explicit clean close releases native document; host disposal preserves disk recovery bindings and closes only its captured native project model",
+    "Disposal never reconnects to release an old model and never globally shuts down the shared broker",
+    "Only source.semantic requests retain selected Working policy; Source extraction/index/inspection remain protected and credentials remain unchanged"
+  ],
+  "actualNativeServiceEvidence": "Paired native jox-editor-service-validation.json records real CLI/broker filesystem endpoints; these JavaScript controls use controlled transport fixtures",
+  "actualUiCapture": "Outstanding: approved computer-use path still fails before app access with missing kernel assets (OS error 3); no workaround or false screenshot claim",
+  "nativeUploadCompileTestQualified": false,
+  "packageOrPrivateRuntimePinChanged": false
+}

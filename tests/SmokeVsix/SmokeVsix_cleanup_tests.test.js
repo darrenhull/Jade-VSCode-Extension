@@ -10,8 +10,8 @@ function fixture(t,mode){
  const original=fs.readFileSync(path.resolve(__dirname,'../../scripts/smoke-vsix.ps1'),'utf8');
  // Instrument only the external process boundary, never launch fixture binaries.
  // Refuse to run if any CLI invocation was not replaced by the recording fake.
- const nativeCalls=[...original.matchAll(/&\s+\$cli\b([^\r\n]*)/g)].map(match=>match[1].trim());assert.deepEqual(nativeCalls,['source refresh --workspace $workspace --json','tests list --json','status --json|ConvertFrom-Json','shutdown --json|Out-Null']);assert.doesNotMatch(original,/Start-Process|ProcessStartInfo/);
- let script=original.replace(/&\s+\$cli\b/g,'Invoke-TestNative');assert.equal(/&\s*\$cli\b/.test(script),false);
+ const nativeCalls=[...original.matchAll(/&\s+\$cli\b([^\r\n]*)/g)].map(match=>match[1].trim());assert.deepEqual(nativeCalls,['source refresh --workspace $workspace --json','tests list --json','status --json|ConvertFrom-Json','shutdown --json|Out-Null']);assert.equal((original.match(/\[Diagnostics\.ProcessStartInfo\]::new\(\)/g)||[]).length,1);
+ let script=original.replace(/&\s+\$cli\b/g,'Invoke-TestNative').replace('[Diagnostics.ProcessStartInfo]::new()',"$(throw 'Unexpected JOX service launch in a legacy smoke fixture')");assert.doesNotMatch(script,/Start-Process|ProcessStartInfo/);assert.equal(/&\s*\$cli\b/.test(script),false);
  if(mode==='setup'){const marker=" $workspace=Join-Path $temporary 'workspace';";assert.ok(script.includes(marker));script=script.replace(marker," throw 'fixture setup failed'\n"+marker);}
  const smoke=path.join(root,'smoke.ps1');fs.writeFileSync(smoke,script);fs.copyFileSync(path.resolve(__dirname,'../../scripts/VerifyNativeDistribution.ps1'),path.join(root,'VerifyNativeDistribution.ps1'));
  const calls=path.join(root,'calls.jsonl'),sentinel=path.join(root,'shared-broker-sentinel'),sharedState=path.join(root,'shared-state'),sharedConnections=path.join(root,'shared-connections.json'),after=path.join(root,'after.json');fs.writeFileSync(sentinel,'running');fs.writeFileSync(sharedConnections,'unchanged');

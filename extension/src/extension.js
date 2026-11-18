@@ -3,7 +3,7 @@ const vscode = require('vscode');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { resolveConfig, inspectInstall, schemaFromSource } = require('./config');
+const { resolveConfig, inspectInstall, schemaFromSource, explicitlyConfigured } = require('./config');
 const {resolveWorkingDirectory}=require('./working-directory');
 const {isManagedProjectPath}=require('./source-index-scope');
 const { startCpp } = require('./cpp-runner');
@@ -24,6 +24,15 @@ function defaults(resource) {
     delete values.characterSet;
   values.workingJadeGitPolicy = values.disableJadeGitForWorking === true ? 'disabled' : 'inherit';
   delete values.disableJadeGitForWorking;
+  return values;
+}
+function explicitDefaults(resource) {
+  const settings = vscode.workspace.getConfiguration('jadeNative', resource);
+  const values = explicitlyConfigured(settings, keys);
+  if (Object.hasOwn(values, 'disableJadeGitForWorking')) {
+    values.workingJadeGitPolicy = values.disableJadeGitForWorking === true ? 'disabled' : 'inherit';
+    delete values.disableJadeGitForWorking;
+  }
   return values;
 }
 
@@ -116,6 +125,35 @@ async function detectSettingsCommand(resource, cancellationToken) {
   catch (error) { void vscode.window.showErrorMessage(error.message); }
 }
 function activate(context) {
+  const nativeTests = new CliWorkingSession({entry:path.join(context.extensionPath,'vendor','jade-tools-cli','jade-cli.exe')});
+  activeNativeService = nativeTests;
+  require('./cli-gateway').configure(nativeTests);
+  context.subscriptions.push(nativeTests,{dispose:()=>require('./cli-gateway').configure(undefined)});
+  const configFor = folder => ({sourceFormat:'jox',...Object.fromEntries(Object.entries(explicitDefaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]))});
+  const inspectionConfigFor = folder => require('./inspection-config').inspectionConfiguration(nativeTests,folder.uri.fsPath,configFor(folder));
+  let objectExplorer;
+  const source = require('./register-jox-workspace').registerJoxWorkspace(vscode,context,{client:nativeTests,configFor,instances:row=>objectExplorer?.browseInstances(row)});
+  objectExplorer = require('./object-explorer').registerObjectExplorer(vscode,context,{
+    client:nativeTests,isBusy:()=>source.workspace.executing,
+    config:(_document,folder)=>{
+      const selected=folder||source.workspace.projectForUri(_document?.uri).folder;
+      return inspectionConfigFor(vscode.workspace.getWorkspaceFolder(selected.uri)||selected);
+    },
+    workspaceFolder:uri=>uri?.scheme==='jade-source'?source.workspace.projectForUri(uri).folder:vscode.workspace.getWorkspaceFolder(uri),
+    sourceContext:selection=>source.workspace.sourceContext(selection),
+    inspectionTarget:(config,target,output)=>nativeTests.inspectionTarget({user:'',password:'',...config},target,output),
+    workingLocation:config=>nativeTests.workingLocation(config)
+  });
+  source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
+  const setup=require('./jox-project-setup').registerJoxProjectSetup(vscode,context,source.workspace,{client:nativeTests,configFor,detect:detectSettings});
+  void setup.onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
+  context.subscriptions.push(vscode.commands.registerCommand('jadeNative.discover',detectSettingsCommand));
+  return {...source,objectExplorer,setup};
+}
+
+// Retained only while the JOX path is being qualified; the jade-cls backup is
+// the recoverable distribution. This path is not registered or initialized.
+function activateLegacyCls(context) {
   void require('./legacy-member-tabs').retireLegacyMemberTabs(vscode,context);
   const nativeTests = new CliWorkingSession({entry:path.join(context.extensionPath,'vendor','jade-tools-cli','jade-cli.exe')});
   const language=require('./language-tools').registerLanguageTools(vscode,context,{client:nativeTests});

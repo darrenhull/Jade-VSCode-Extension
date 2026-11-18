@@ -1,0 +1,117 @@
+{
+  "format": 1,
+  "passed": true,
+  "scope": "Actual extracted extension adapters with the normal unpublished CLI package: owned fresh setup, settled native syntax failure, same-live correction, and unchanged repeated native test. No installation or official release/pin change.",
+  "nodeCaseMilliseconds": 35401.2396,
+  "sourceIniUnchanged": true,
+  "failedPublicationCursorUnchanged": true,
+  "sameNativeHelperConnectionAndEpoch": true,
+  "sameBrokerAndNativeProcessIds": true,
+  "nativeHelperGracefulReleaseConfirmed": true,
+  "ownedBrokerNaturalExit": true,
+  "stdioActualExit": true,
+  "supervisor": {
+    "childExitCode": 0,
+    "ownedSubtreeNaturalExit": true,
+    "ownedSubtreeSettled": true,
+    "forcedCleanup": false,
+    "timedOut": false
+  },
+  "manifestUnchanged": true,
+  "manifestSha256": "c71ab43411d2e64397b49b6706a16c308d339f793e7fa2650246af31e1280110",
+  "executableSha256": "2aa786694598854fbd9c19b4e818937d08f54c381fdc997470b2f65b40d8be9c",
+  "runtime": {
+    "native/jox/jade-jox-test-helper-unicode.exe": "6368be77ddfacf48df1b5946fad543f7fbbd1c4c4bb158b9366186caebcb9de7",
+    "native/jox/jadegitscm.dll": "53bc4df596cb2874a0dba3cc9db3e9073cb9d4e47267256e8db38b53c943e531",
+    "native/jox/jadegitdev.dll": "3942947c93ab976754ee6c2d5c74c4321e487fddc7b64d6e078e76a973369319"
+  },
+  "joxRuntime": {
+    "nativeScratch": false,
+    "initialization": true,
+    "characterSet": "unicode",
+    "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+    "format": 1,
+    "managedUpload": true,
+    "nativeTests": true
+  },
+  "adapterSha256": {
+    "src/cli-client.js": "6d9b04a3b49bbabe7c03e293572f42c65eced5f376258828bda54aab1d409c81",
+    "src/NativeSourceProvider.js": "1a7c5528381d36e2c25fe3c5b7abbcf12811912adb116bedbc47a9c16b47a4cc",
+    "src/working-jadegit-policy.js": "d22f32e608ae20ba999ba1debe1f8f6c79794c91b7e602be40436dc0a3732506"
+  },
+  "scriptSha256": "7c22dc51ad65fa2721dba3453e30e0d645cf9b26ed6c6d7fcad2d489015d0931",
+  "packetSha256": "6d1af0df2daeef102697670f4cebe32fd530e8d834250e8d2ba6362d633566b3",
+  "privateReceiptSha256": "5305751a29e2b87ff4dc65fc802ad3cc8de754b691a4cf7e27efbc0380b6e33a",
+  "steps": [
+    {
+      "phase": "preview",
+      "milliseconds": 44,
+      "changedOrigins": 0
+    },
+    {
+      "phase": "initialize",
+      "milliseconds": 21779,
+      "changedOrigins": 0
+    },
+    {
+      "phase": "open-editor",
+      "milliseconds": 77,
+      "changedOrigins": 0
+    },
+    {
+      "phase": "save-typo",
+      "milliseconds": 493,
+      "changedOrigins": 0
+    },
+    {
+      "phase": "syntax-failure",
+      "milliseconds": 2496,
+      "code": 8511,
+      "passed": false,
+      "uploaded": false,
+      "compiled": false,
+      "executed": false,
+      "changedOrigins": 1,
+      "nativeCode": 8511
+    },
+    {
+      "phase": "save-correction",
+      "milliseconds": 466,
+      "changedOrigins": 0
+    },
+    {
+      "phase": "corrected-test",
+      "milliseconds": 5123,
+      "code": 0,
+      "passed": true,
+      "uploaded": true,
+      "compiled": true,
+      "executed": true,
+      "changedOrigins": 1,
+      "testsCompleted": true,
+      "cleanupComplete": true,
+      "nativeCode": 0
+    },
+    {
+      "phase": "repeat-corrected-test",
+      "milliseconds": 1683,
+      "code": 0,
+      "passed": true,
+      "uploaded": false,
+      "compiled": false,
+      "executed": true,
+      "changedOrigins": 0,
+      "testsCompleted": true,
+      "cleanupComplete": true
+    }
+  ],
+  "priorFailedCase": {
+    "privateReceiptSha256": "3fe98b2fcef940003957d56c6cd81990aab6db95663d15c342fcfbdc520bfff7",
+    "cause": "Fixture checked compilerOutput alone; native error 6027 was in the existing loader output. The failed target was preserved and naturally closed. One separately authorized fresh target then passed the corrected assertion."
+  },
+  "limits": [
+    "No running desktop UI qualification; existing computer-use OS error 3 remains outstanding.",
+    "Current/latest native object preservation is independently covered by the native guard qualification; this public path verifies no execution and unchanged accepted cursor after failure.",
+    "Candidate remains unpublished; canonical official pin and staged consumer version are separate."
+  ]
+}

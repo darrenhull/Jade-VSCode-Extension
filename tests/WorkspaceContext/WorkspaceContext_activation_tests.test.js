@@ -7,18 +7,21 @@ function activateScratchConfiguration(){
  const folderFor=value=>value?.scheme==='file'?[a,b].find(folder=>value.fsPath===folder.uri.fsPath||value.fsPath.startsWith(folder.uri.fsPath+'/')):undefined;
  const values=new Map([[a,{installPath:'C:/Jade-A'}],[b,{installPath:'C:/Jade-B',databasePath:'${workspaceFolder}/source/system',iniPath:'${workspaceFolder}/source/custom.ini',cacheDirectory:'state',server:'multiUser'}]]);
  const vscode={
-  workspace:{workspaceFolders:[a,b],notebookDocuments,textDocuments:[],isTrusted:false,onDidOpenTextDocument:()=>({dispose(){}}),onDidChangeWorkspaceFolders:()=>({dispose(){}}),getWorkspaceFolder:folderFor,getConfiguration(_section,resource){reads.push(resource);const settings=values.get(folderFor(resource))||{installPath:'C:/Wrong-Global-Jade',server:'singleUser'};return {get:key=>settings[key]};}},
+  workspace:{workspaceFolders:[a,b],notebookDocuments,textDocuments:[],isTrusted:false,onDidOpenTextDocument:()=>({dispose(){}}),onDidChangeWorkspaceFolders:()=>({dispose(){}}),getWorkspaceFolder:folderFor,getConfiguration(_section,resource){reads.push(resource);const settings=values.get(folderFor(resource))||{installPath:'C:/Wrong-Global-Jade',server:'singleUser'};return {get:key=>settings[key],inspect:key=>({workspaceFolderValue:settings[key]})};}},
   languages:{createDiagnosticCollection:()=>({}),registerCodeLensProvider:()=>({})},
   window:{createOutputChannel:()=>({})},commands:{registerCommand:()=>({})}
  };
  const language={setWorkspaceSchemaResolver(){},setWorkspaceResourceResolver(){}};
- let options,onboardingRegistrations=0,onboardingResumes=0;const exported={exports:{}},noop=new Proxy({},{get:()=>()=>({})});
+ let options,onboardingRegistrations=0,onboardingResumes=0,joxSetupRegistrations=0;const exported={exports:{}},noop=new Proxy({},{get:()=>()=>({})});
  const source=fs.readFileSync(path.resolve(__dirname,'../../extension/src/extension.js'),'utf8');
  vm.runInNewContext('(function(require,module){'+source+'\n})',{process,Buffer,console})((name)=>{
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
+  if(name==='./jox-project-setup')return{registerJoxProjectSetup(_v,_c,_workspace,options){joxSetupRegistrations++;assert.equal(typeof options.configFor,'function');return{onboarding:{async resume(){}}};}};
   if(name==='./workspace-initialization')return {registerWorkspaceInitialization:()=>({initialize:async()=>assert.fail('Configuration fixture must not initialize a project')})};
   if(name==='./workspace-onboarding')return {registerWorkspaceOnboarding(_vscode,_context,services){onboardingRegistrations++;assert.equal(typeof services.initialize,'function');assert.equal(typeof services.connectWorking,'function');return {async resume(){onboardingResumes++;}};}};
-  if(name==='./language-tools')return {registerLanguageTools:()=>language};
+  if(name==='./language-tools')assert.fail('JOX activation must not register a CLS index');
+  if(name==='./config')return require('../../extension/src/config');
+  if(name==='./register-jox-workspace')return {registerJoxWorkspace(_v,_c,value){options=value;return {workspace:{executing:false}};}};
   if(name==='./cli-client')return {CliWorkingSession:class{}};
   if(name==='./WorkspaceOperationGuard')return require('../../extension/src/WorkspaceOperationGuard');
   if(name==='./ProjectSkillInstaller')return require('../../extension/src/ProjectSkillInstaller');
@@ -26,21 +29,21 @@ function activateScratchConfiguration(){
   return noop;
  },exported);
  exported.exports.activate({subscriptions:[],extensionPath:'C:/extension',globalStorageUri:{fsPath:'C:/storage'},workspaceState:{get:()=> 'initial'}});
- assert.equal(onboardingRegistrations,1);assert.equal(onboardingResumes,1);
+ assert.equal(onboardingRegistrations,0);assert.equal(onboardingResumes,0);assert.equal(joxSetupRegistrations,1);
  let prompts=0;const context=new WorkspaceContext({workspace:vscode.workspace,pickFolder:async()=>{prompts++;return b;}});
  return {a,b,notebookDocuments,reads,context,configFor:options.configFor,prompts:()=>prompts};
 }
 test('actual activation reads an untitled Scratch Pad connection from its selected project and reuses that selection',async()=>{
  const host=activateScratchConfiguration(),document={uri:uri('Scratch-1','untitled')},scope=await host.context.resolve(document.uri);
- const config=host.configFor(document,scope);
+ const config=host.configFor(scope.folder);
  assert.equal(config.installPath,'C:/Jade-B');assert.equal(config.databasePath,'C:/B/source/system');assert.equal(config.iniPath,'C:/B/source/custom.ini');assert.equal(config.server,'multiUser');
- assert.deepEqual(Array.from(config.workspaceRoots),['C:/B']);assert.equal(config.storagePath,path.resolve('C:/B','state'));
+ assert.equal(Object.hasOwn(config,'workspaceRoots'),false);assert.equal(config.cacheDirectory,'state');assert.equal(config.sourceFormat,'jox');
  assert.equal(host.reads.at(-1),host.b.uri);assert.equal(scope.resource,document.uri);
- assert.equal(host.configFor(document,await host.context.resolve(document.uri)).installPath,'C:/Jade-B');assert.equal(host.prompts(),1);
+ assert.equal(host.configFor((await host.context.resolve(document.uri)).folder).installPath,'C:/Jade-B');assert.equal(host.prompts(),1);
 });
-test('actual activation retains saved notebook resource settings without asking for another project',async()=>{
+test('actual activation resolves a saved notebook to its owning JOX project without another project prompt',async()=>{
  const host=activateScratchConfiguration(),notebookUri=uri('C:/B/Saved.jadeworkspace'),document={uri:uri('C:/B/Saved.jadeworkspace#1','vscode-notebook-cell')};
  host.notebookDocuments.push({uri:notebookUri,getCells:()=>[{document}]});
- const scope=await host.context.resolve(document.uri),config=host.configFor(document,scope);
- assert.equal(config.installPath,'C:/Jade-B');assert.equal(host.reads.at(-1),notebookUri);assert.equal(host.prompts(),0);
+ const scope=await host.context.resolve(document.uri),config=host.configFor(scope.folder);
+ assert.equal(scope.configurationResource,notebookUri);assert.equal(config.installPath,'C:/Jade-B');assert.equal(host.reads.at(-1),host.b.uri);assert.equal(host.prompts(),0);
 });

@@ -70,18 +70,26 @@ function registerWorkspaceOnboarding(vscode,context,services){
   if(!folder)return continueAfterOpen(uri);
   requireFolder(folder);const repository=await api.openRepository(folder.uri);requireFolder(folder);
   if(repository?.state?.remotes?.length){const choice=await vscode.window.showQuickPick([{label:'Use the current checkout',kind:'current'},{label:'Pull changes with Git',kind:'pull'}],{title:'Repository sources · '+folder.name,placeHolder:repository.rootUri?.fsPath||folder.uri.fsPath});if(!choice)return{cancelled:true};if(choice.kind==='pull'){log('Pulling through VS Code Git; conflicts and local edits remain under Git control.');await repository.pull();requireFolder(folder);}}
-  log('Initialising project configuration, Git ignore and the shared source index in '+folder.uri.fsPath+'.');
+  log('Initialising project configuration and Git ignore'+(services.jox?'':' and the shared source index')+' in '+folder.uri.fsPath+'.');
   const initialized=await services.initialize(folder.uri);requireFolder(folder);
   if(initialized?.cancelled)return{cancelled:true,configurationReady:false,workingPrepared:false};
   if(initialized?.passed!==true||initialized.code!==0)throw Error(initialized?.report?.error||initialized?.error||'Native workspace initialization did not complete.');
   const base={gitReady:true,configurationReady:true,workingPrepared:false};
-  const source=await vscode.window.showQuickPick([{label:'Use existing source files',kind:'existing'},{label:'Extract sources from Source',kind:'extract'},{label:'Get sources later',kind:'later'}],{title:'Project source files · '+folder.name});if(!source)return{...base,cancelled:true};requireFolder(folder);
+  const source=await vscode.window.showQuickPick([{label:'Use existing source files',kind:'existing'},{label:services.jox?'Create Working copy and extract sources':'Extract sources from Source',kind:'extract'},{label:'Get sources later',kind:'later'}],{title:'Project source files · '+folder.name});if(!source)return{...base,cancelled:true};requireFolder(folder);
   const choice=await vscode.window.showQuickPick([{label:'Prepare Working database',description:'First use can back up Source and restore its private copy',kind:'working'},{label:'Prepare Working later',kind:'later'}],{title:'Private Working database · '+folder.name});if(!choice)return{...base,cancelled:true,sourceChoice:source.kind};requireFolder(folder);
   if(choice.kind==='working'){
-   const targets=await services.targets(folder);requireFolder(folder);const c=targets.config;
-   const confirm=await vscode.window.showWarningMessage('Prepare the private Working database for this project?',{modal:true,detail:'Project: '+folder.uri.fsPath+'\nJade installation: '+c.installPath+'\nSource: '+c.databasePath+'\nSource INI: '+c.iniPath+'\nServer: '+c.server+'\nWorking: '+targets.working.databasePath+'\n\n'+(source.kind==='extract'?'Native setup prepares owned Working and extracts from that same generation. Existing Working data is preserved.':'First use takes a consistent Source backup and restores its private copy. Existing valid Working state is reused.')+' Working is persistent; no build, test or publication is started.'},'Prepare Working');
-   if(confirm!=='Prepare Working')return{...base,cancelled:true,sourceChoice:source.kind};requireFolder(folder);
-   if(source.kind==='extract'){
+   const targets=await services.targets(folder,{initialization:source.kind==='extract'});requireFolder(folder);const c=targets.config;
+   const combinedJox=services.jox&&source.kind==='extract',action=combinedJox?'Create Working and extract':'Prepare Working';
+   const confirm=await vscode.window.showWarningMessage(combinedJox?'Create Working copy and extract sources?':'Prepare the private Working database for this project?',{modal:true,detail:'Project: '+folder.uri.fsPath+'\nJade installation: '+c.installPath+'\nSource: '+c.databasePath+'\nSource INI: '+c.iniPath+'\nServer: '+c.server+'\nWorking: '+targets.working.databasePath+'\n\n'+(combinedJox?'Native setup restores a fresh private Working copy, then extracts JOX sources once from that copy. Existing Working data and source files are preserved.':source.kind==='extract'?'Native setup prepares owned Working and extracts from that same generation. Existing Working data is preserved.':'First use takes a consistent Source backup and restores its private copy. Existing valid Working state is reused.')+' Working is persistent; no build, test or publication is started.'},action);
+   if(confirm!==action)return{...base,cancelled:true,sourceChoice:source.kind};requireFolder(folder);
+   if(combinedJox){
+    log('Creating Working and extracting its saved JOX sources. Existing data and files are preserved.');
+    const extracted=await services.initializeWorkingSources(folder,targets);
+    if(!extracted?.sourceSnapshot)throw Error('Native setup did not return its saved source snapshot.');
+    base.workingPrepared=true;base.sourceSnapshot=extracted.sourceSnapshot;
+    if(!openFolder(folder.uri))return{...base,projectClosed:true};
+    requireFolder(folder);
+   }else if(source.kind==='extract'){
     log('Preparing one owned Working generation and extracting its native source baseline. Local edits remain protected.');
     const extracted=await services.syncWorkingSources(folder,c);requireFolder(folder);
     if(extracted?.cancelled||extracted?.status==='cancelled')return{...base,cancelled:true,sourceChoice:source.kind,sourceResult:extracted};
@@ -91,11 +99,14 @@ function registerWorkspaceOnboarding(vscode,context,services){
     base.workingPrepared=true;base.workingBaseline=extracted.workingBaseline;
    }else{
     log('Preparing Working through the existing connection workflow. Its notification shows native progress, timeout and cancellation.');
-    const connected=await services.connectWorking(folder,c);requireFolder(folder);
+    const connected=await services.connectWorking(folder,services.jox?targets:c);requireFolder(folder);
     if(connected?.cancelled)return{...base,cancelled:true,sourceChoice:source.kind};
     if(connected?.selection!=='working'||connected?.readOnly!==true)throw Error(connected?.error||'Working preparation was not confirmed by the native connection.');
     base.workingPrepared=true;
    }
+  }
+  if(services.jox&&source.kind==='extract'&&choice.kind!=='working'){
+   log('Working setup was deferred. No sources were extracted.');return{...base,deferred:true,sourceChoice:'later'};
   }
   if(source.kind==='extract'&&choice.kind!=='working'){
    log('Opening the existing native Source extraction workflow. Local edits remain protected.');
@@ -103,11 +114,11 @@ function registerWorkspaceOnboarding(vscode,context,services){
    if(extracted?.cancelled||extracted?.status==='cancelled')return{...base,cancelled:true,sourceChoice:source.kind};
    if(extracted?.passed!==true)throw Error(extracted?.report?.error||extracted?.error||'Source extraction did not complete.');
   }
-  const workingStatus=base.workingBaseline?'prepared with its native source baseline.':base.workingPrepared?'prepared and connected.':'not prepared.';
+  const workingStatus=base.sourceSnapshot?'prepared with saved JOX sources.':base.workingBaseline?'prepared with its native source baseline.':base.workingPrepared?(services.jox?'prepared.':'prepared and connected.'):'not prepared.';
   const result={...base,sourceChoice:source.kind};log('Project configuration ready. Source route: '+source.kind+'. Working: '+workingStatus);
-  void vscode.window.showInformationMessage('Jade project configuration is ready. Working '+(base.workingBaseline?'is prepared with its native source baseline.':base.workingPrepared?'is prepared and connected.':'has not been prepared.'));return result;
+  void vscode.window.showInformationMessage('Jade project configuration is ready. Working '+(base.sourceSnapshot?'is prepared with saved JOX sources.':base.workingBaseline?'is prepared with its native source baseline.':base.workingPrepared?(services.jox?'is prepared.':'is prepared and connected.'):'has not been prepared.'));return result;
  }
- function setup(resource){if(pending)return pending;pending=run(resource).catch(error=>{log(error.message);void vscode.window.showErrorMessage(error.message);return{passed:false,error:error.message};}).finally(()=>{pending=undefined;});return pending;}
+ function setup(resource){if(pending)return pending;pending=run(resource).catch(error=>{log(error.message);void vscode.window.showErrorMessage(error.message);return{...error.result,passed:false,error:error.message};}).finally(()=>{pending=undefined;});return pending;}
  async function resume(){
   const intent=context.globalState.get(CONTINUATION);if(intent===undefined)return;
   if(!intent||typeof intent.uri!=='string'||typeof intent.nonce!=='string'||!/^[0-9a-f-]{36}$/i.test(intent.nonce)){await context.globalState.update(CONTINUATION,undefined);return;}

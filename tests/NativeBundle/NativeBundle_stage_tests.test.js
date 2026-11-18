@@ -25,3 +25,43 @@ test('a feature minimum rejects an older native runtime before replacing a previ
 });
 test('packaging rejects pre-capability distributions even with valid checksums',t=>{const f=fixture(t);f.manifest.packageVersion='0.3.1';delete f.manifest.oidFormat;fs.writeFileSync(path.join(f.source,'distribution.json'),JSON.stringify(f.manifest));assert.throws(()=>bundleCli(f),/native Jade object identities/i);assert.equal(fs.existsSync(f.destination),false);});
 test('explicit candidate staging uses its own verified bytes without claiming the shipping pin',t=>{const f=fixture(t),prior=process.env.JADE_CLI_DISTRIBUTION;process.env.JADE_CLI_DISTRIBUTION=f.source;try{assert.equal(bundleCli({verifyOnly:true}),f.source);}finally{if(prior===undefined)delete process.env.JADE_CLI_DISTRIBUTION;else process.env.JADE_CLI_DISTRIBUTION=prior;}});
+
+function joxFixture(t){
+ const f=fixture(t);f.manifest.packageVersion='0.11.0';
+ f.manifest.joxRuntime={format:1,characterSet:'unicode',engineCommit:'a'.repeat(40),managedUpload:true,nativeTests:true,initialization:true,nativeScratch:false};
+ for(const name of ['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll']){
+  const relative='native/jox/'+name;fs.mkdirSync(path.dirname(path.join(f.source,relative)),{recursive:true});
+  const bytes=Buffer.from('synthetic packaging fixture '+name);fs.writeFileSync(path.join(f.source,relative),bytes);
+  f.manifest.runtimeFiles[relative]=crypto.createHash('sha256').update(bytes).digest('hex');
+ }
+ for(const name of ['jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe']){const bytes=Buffer.from('synthetic inspector '+name);fs.writeFileSync(path.join(f.source,'native',name),bytes);f.manifest.runtimeFiles['native/'+name]=crypto.createHash('sha256').update(bytes).digest('hex');}
+ f.save=()=>fs.writeFileSync(path.join(f.source,'distribution.json'),JSON.stringify(f.manifest));f.save();return f;
+}
+test('JOX packaging refuses unqualified initial-flow flags before replacing the existing bundle',t=>{
+ for(const field of ['managedUpload','nativeTests','initialization']){
+  const f=joxFixture(t);f.manifest.joxRuntime[field]=false;f.save();fs.mkdirSync(f.destination);fs.writeFileSync(path.join(f.destination,'keep'),'previous');
+  assert.throws(()=>bundleCli({...f,requireJox:true}),/qualified JOX/i);assert.equal(fs.readFileSync(path.join(f.destination,'keep'),'utf8'),'previous');
+ }
+});
+test('JOX packaging refuses missing trio members and malformed provider bindings',t=>{
+ for(const change of [f=>delete f.manifest.runtimeFiles['native/jox/jade-jox-test-helper-unicode.exe'],f=>delete f.manifest.runtimeFiles['native/jox/jadegitscm.dll'],f=>delete f.manifest.runtimeFiles['native/jox/jadegitdev.dll'],f=>f.manifest.joxRuntime.format=2,f=>f.manifest.joxRuntime.characterSet='ansi',f=>f.manifest.joxRuntime.engineCommit='unbound']){
+  const f=joxFixture(t);change(f);f.save();assert.throws(()=>bundleCli({...f,requireJox:true}),/JOX/i);assert.equal(fs.existsSync(f.destination),false);
+ }
+});
+test('JOX packaging preserves shared runtime assets and explicit unsupported Scratch without changing flags',t=>{
+ const f=joxFixture(t),original=fs.readFileSync(path.join(f.source,'distribution.json'));
+ bundleCli({...f,requireJox:true});assert.deepEqual(fs.readFileSync(path.join(f.destination,'distribution.json')),original);
+ for(const relative of Object.keys(f.manifest.runtimeFiles))assert.deepEqual(fs.readFileSync(path.join(f.destination,relative)),fs.readFileSync(path.join(f.source,relative)));
+ assert.equal(JSON.parse(original).joxRuntime.nativeScratch,false);
+ fs.writeFileSync(path.join(f.source,'native/jox/jadegitscm.dll'),'tampered');assert.throws(()=>bundleCli({...f,requireJox:true}),/checksum/i);
+ assert.deepEqual(fs.readFileSync(path.join(f.destination,'distribution.json')),original);
+});
+
+test('JOX basic package needs its reachable inspector trio and does not require retired debugger or CLS helpers',t=>{
+ const f=joxFixture(t);
+ for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-native-helper.exe','debugger-abi.json']){delete f.manifest.runtimeFiles['native/'+name];fs.unlinkSync(path.join(f.source,'native',name));}
+ f.save();assert.doesNotThrow(()=>bundleCli({...f,requireJox:true}));
+ for(const name of ['jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe','jade-inspect-helper.exe']){
+  const missing=joxFixture(t);delete missing.manifest.runtimeFiles['native/'+name];missing.save();assert.throws(()=>bundleCli({...missing,requireJox:true}),/required native/i);
+ }
+});

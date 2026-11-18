@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "passed": true,
+  "unpublishedCandidate": true,
+  "scope": "Actual extracted extension JavaScript and ordinary public CLI service on an approved disposable native fixture; no private binding or capability substitution.",
+  "candidate": {
+    "extensionVersion": "0.23.0",
+    "minimumCliVersion": "0.11.0",
+    "officialPinChanged": false,
+    "vsixSha256": "fda850175c3e8de15cb56636a6614160f16192901b76c33033527ffe439b97e8",
+    "vsixBytes": 9149328,
+    "nativeZipSha256": "065d7aaf54067d004511a65948fb5cb3464a9061992a988521b2467dbcfa5207",
+    "manifestSha256": "ff45545d1f51cf9860c8eba7c9ddb1eb0cb0c6d5b55a601edeb7eb6cd6025ffe",
+    "cliSha256": "0112c21b501f8725da8b9d869619e09c26b0a1fd37002bb69d66418a20f408a0",
+    "helperSha256": "c5a213041729d1c86f5a37a75b10437fb992d1478e22e3a4f6716ea1b1625e63",
+    "scmSha256": "cddab67623573486e2943783f7163f5440e080cb11dcdaa05700008aa9d6f7dd",
+    "providerSha256": "3942947c93ab976754ee6c2d5c74c4321e487fddc7b64d6e078e76a973369319"
+  },
+  "packagedSource": {
+    "entries": 171,
+    "allEqualStagedBytes": true,
+    "gitEolOnlyDifferences": 0,
+    "intentionalStagedEntries": [
+      "package.json",
+      "readme.md",
+      "changelog.md"
+    ],
+    "scriptSha256": "9586a81d2a83a21ef3f17690977c6ad995bdacc5346f2915f8acbe02a49a151a",
+    "adapters": {
+      "cli-client.js": "6d9b04a3b49bbabe7c03e293572f42c65eced5f376258828bda54aab1d409c81",
+      "NativeSourceProvider.js": "1a7c5528381d36e2c25fe3c5b7abbcf12811912adb116bedbc47a9c16b47a4cc",
+      "working-jadegit-policy.js": "d22f32e608ae20ba999ba1debe1f8f6c79794c91b7e602be40436dc0a3732506"
+    }
+  },
+  "actualFlow": {
+    "totalTestMilliseconds": 37540,
+    "previewMilliseconds": 46,
+    "setupOneExtractionMilliseconds": 23595,
+    "unchangedTestMilliseconds": 2585,
+    "unchangedTestPassed": true,
+    "unchangedSourceUploaded": false,
+    "openEditorMilliseconds": 76,
+    "saveEditorMilliseconds": 478,
+    "changedTestIncludingUploadMilliseconds": 7145,
+    "changedOrigins": 1,
+    "changedSourceUploaded": true,
+    "changedSourceCompiled": true,
+    "changedNativeTestCode": 1,
+    "expectedChangedAssertionFailure": true,
+    "testsCompleted": true,
+    "cleanupComplete": true,
+    "nativePlatformVersion": "25.0.2"
+  },
+  "ownership": {
+    "nativeHelperGracefulReleaseConfirmed": true,
+    "stdioActualExit": true,
+    "ownedBrokerNaturalExit": true,
+    "ownedSubtreeNaturalExit": true,
+    "ownedSubtreeSettled": true,
+    "forcedCleanup": false,
+    "timedOut": false,
+    "supervisorExitCode": 0,
+    "approvedSeedIniUnchanged": true,
+    "nativeFixturesRetainedForRuntimeOwner": true
+  },
+  "proof": {
+    "packetSha256": "d18f29c72f5a9d994bab2178d4de277ee5f12baaa106ab6068844171ec7fe0e2",
+    "privateReceiptSha256": "68ca884062a7da164cb775e239782bc27d3c4c49ff93db64d2d1efb4c08204f6",
+    "supervisorSha256": "860fb487e4488cc436e03834a05c5809ee457042cb3523949ead189176d22c39",
+    "supervisorSourceSha256": "c58fec8db146c9780e194c20fc5caf1b27a33f463f6e1b320ae1fe1b578bf47a",
+    "nodeSha256": "c0b01496cf3da5cceca86eb6e1b2ef5d088cd46ad4e97cf502e2c937fa7f56b9"
+  },
+  "portableVsix": {
+    "exitCode": 0,
+    "milliseconds": 3292,
+    "outsideCheckout": true,
+    "nodeAbsentFromChildPath": true,
+    "semanticPrepareQueryOnly": true,
+    "databaseOpened": false,
+    "runtimeHashesVerified": 18,
+    "manifestBytesExact": true,
+    "ownedTemporaryStateCleaned": true
+  },
+  "declaredScope": {
+    "initialization": true,
+    "managedUpload": true,
+    "nativeTests": true,
+    "nativeScratch": false,
+    "standaloneBuildQualified": false,
+    "debuggerQualified": false,
+    "sourcePublicationQualified": false
+  },
+  "focusedControls": {
+    "packageAndPinControlsPassed": 22,
+    "legacyCleanupControlsPassed": 8,
+    "latestTypedJoxQualificationControlsPassed": 3,
+    "redEvidence": "Missing JOX components/qualification were accepted; legacy assets were incorrectly required; PowerShell accepted string true. Each has a recorded focused RED to GREEN."
+  },
+  "remainingGates": [
+    "Official CLI dependency asset and atomic pin/runtime/version commit; canonical official 0.10.17 pin remains unchanged.",
+    "Actual running UI capture remains outstanding: approved desktop tooling fails before application launch with OS error 3.",
+    "Root review, current-head hosted checks and automated review before Ready/owner review; no install, push or publication by worker."
+  ]
+}
