@@ -1,0 +1,58 @@
+{
+  "format": 1,
+  "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+  "characterSet": "unicode",
+  "loaderDiagnostics": false,
+  "observedProvider": false,
+  "files": {
+    "jade-jox-test-helper-unicode.exe": "6368be77ddfacf48df1b5946fad543f7fbbd1c4c4bb158b9366186caebcb9de7",
+    "jadegitscm.dll": "53bc4df596cb2874a0dba3cc9db3e9073cb9d4e47267256e8db38b53c943e531",
+    "jadegitdev.dll": "3942947c93ab976754ee6c2d5c74c4321e487fddc7b64d6e078e76a973369319"
+  },
+  "qualification": {
+    "managedUpload": true,
+    "nativeTests": true,
+    "initialization": true,
+    "nativeScratch": false
+  },
+  "sourceCommit": "2f536eed7be0f8218bc29be60cdd0988f143a971",
+  "source": "https://github.com/darrenhull/Jade-CLI/tree/jade-jox",
+  "build": {
+    "architecture": "x64",
+    "crt": "MT",
+    "compiler": "MSVC 14.44.35207",
+    "sdkRuntime": "25.0.2.12",
+    "cohortBuildProofSha256": "77fbd797fd4821d84f6b13e313103f766b17090503c29715eda376f9fd114007",
+    "diagnosticsOffTranslationUnits": [
+      "Loader.cpp",
+      "JoxManagedEntrypoint.cpp"
+    ],
+    "unchangedSourceAndSdkInputsReviewed": true,
+    "incrementalSyntaxRetryProofSha256": "9d7c288802590e1564b19dc3ef70e49d7c5fdf14d8153008e0cbb33d04167656"
+  },
+  "qualificationBasis": {
+    "controlledPublicSetupAndUnchangedTest": true,
+    "publicSaveAndNativeChangedAssertion": true,
+    "fullSignatureStableBodyEditAndPassingNativeTest": true,
+    "ordinaryHeaderChangeRefusedBeforeReorganisation": true,
+    "authoritativeMappedRuntimeRelease": "25.0.2",
+    "diagnosticsOffTransfer": "Reviewed identical sources/commands except removal of diagnostic definition in two translation units",
+    "portableConsumer": "Prior basic flow qualified; refreshed normal candidate public same-live syntax correction and warm no-upload run qualified",
+    "settledSyntaxRetry": {
+      "nativeSameLiveCorrectionQualified": true,
+      "nativeReconnectRefusalQualified": true,
+      "publicAdapterQualified": true,
+      "sourceCommit": "2f536eed7be0f8218bc29be60cdd0988f143a971",
+      "nativeProofSha256": "9d7c288802590e1564b19dc3ef70e49d7c5fdf14d8153008e0cbb33d04167656",
+      "scope": "One settled syntax correction in the continuously owned single-user helper; unrelated pending versions remain refused",
+      "publicReceiptSha256": "5305751a29e2b87ff4dc65fc802ad3cc8de754b691a4cf7e27efbc0380b6e33a",
+      "publicSourceProofSha256": "6b473457f59be87f55cc0ac32a1f798a693beeb7fbbaad99f56ed35e628ebf4c"
+    }
+  },
+  "unsupported": [
+    "standalone-project-build",
+    "native-scratch",
+    "structural-or-resource-changes",
+    "recovery-of-unknown-or-reconnected-pending-native-versions"
+  ]
+}

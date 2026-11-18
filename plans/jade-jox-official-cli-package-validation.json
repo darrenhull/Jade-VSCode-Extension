@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "passed": true,
+  "scope": "Official dependency pin, coherent extension release metadata, atomic updater and one final VSIX; no user installation, publication or new database flow.",
+  "extension": {
+    "version": "0.23.0",
+    "minimumCliVersion": "0.11.0",
+    "inspectionConfigurationCommit": "333cf5e6207e980a4f648b5489cd12f1dd2311a5",
+    "asyncFixtureCommit": "120dbe85b8e50174a4d9c54fc47024dfd8d6cf66"
+  },
+  "officialRelease": {
+    "url": "https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.0",
+    "tag": "v0.11.0",
+    "publishedAt": "2026-11-18T16:22:16Z",
+    "commit": "10f6854fff35400a2fd4949244ad29afec28d40e",
+    "workflowRun": 44340351374,
+    "zipSha256": "925b5d6a832e67a7eac7ad5877622bea83a53b002ffa44ffbfb9f267f41d5750",
+    "sumsSha256": "1227795bc3d41fd5cac5b32cee6cfb10f4a3e57630f7f1d1c36788ab8e79c63d",
+    "distributionSha256": "494ff4a41a3283986a75111a49a5b24bf1934979c1d5f420b527757ff4b53d54",
+    "cliSha256": "297192d5460e40a2041215d239d2457687712556c53ae10969fdcf1662ba8d83",
+    "apiAndSumsMatchDownloadedBytes": true,
+    "all19ArchiveMembersVerified": true,
+    "managedTrioMatchesReviewedGitBlobs": true
+  },
+  "nativeRuntime": {
+    "helperSha256": "6368be77ddfacf48df1b5946fad543f7fbbd1c4c4bb158b9366186caebcb9de7",
+    "scmSha256": "53bc4df596cb2874a0dba3cc9db3e9073cb9d4e47267256e8db38b53c943e531",
+    "providerSha256": "3942947c93ab976754ee6c2d5c74c4321e487fddc7b64d6e078e76a973369319",
+    "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+    "initialization": true,
+    "managedUpload": true,
+    "nativeTests": true,
+    "nativeScratch": false,
+    "sharedInspectors": 3
+  },
+  "atomicInstall": {
+    "updated": true,
+    "pinAndPayloadTogether": true,
+    "allManifestHashesVerified": true,
+    "unpublishedOverrideUsed": false
+  },
+  "vsix": {
+    "sha256": "d0fba45b151a65fb779e1b8542192d54994b3d17204a0821e8923b3692d0bf0e",
+    "bytes": 9162699,
+    "totalEntries": 196,
+    "stagedSourceAndSharedEntries": 175,
+    "officialRuntimeEntries": 19,
+    "allEntryContentEqualsStagedBytes": true,
+    "buildMilliseconds": 2955,
+    "portableSmokeMilliseconds": 3094,
+    "outsideCheckout": true,
+    "nodeAbsentFromChildPath": true,
+    "semanticPrepareAndQueryOnly": true,
+    "databaseOpened": false,
+    "ownedTemporaryStateCleaned": true
+  },
+  "sourceHashes": {
+    "extension/src/cli-client.js": "417be62754590259a4a8aa89f473e9e89be1426ca783a617182693b51f77aefb",
+    "extension/src/NativeSourceProvider.js": "1a7c5528381d36e2c25fe3c5b7abbcf12811912adb116bedbc47a9c16b47a4cc",
+    "extension/src/inspection-config.js": "45c7d1ce8083be0718ec20a2b44d3b7fbe7939c648aea8b20f8bcff2a6bbacff",
+    "scripts/update-native-cli.ps1": "5508a140b1dc223442095bc497db6ca0e547c4b984101bba89073e50082e0d56",
+    "tests/NativeReleaseUpdater/NativeReleaseUpdater_update_tests.ps1": "17470abcba20416a408ee238abeefd9578ad31ac166a08545457afb930b13a25"
+  },
+  "focusedControls": {
+    "packagePinMinimumBundleAndDistributionPassed": 25,
+    "asyncCharacterSetPassed": 16,
+    "asyncCharacterSetMilliseconds": 138,
+    "updaterActualRed": "Qualified JOX archive incorrectly rejected for missing retired jade-test-helper.exe",
+    "updaterGreenMilliseconds": 9590,
+    "updaterLegacyAndNewJoxPreservationControlsPassed": true,
+    "independentReview": "Clear for updater, official provenance/payload and async inspection fixture"
+  },
+  "connectedEvidence": {
+    "reusedWithoutReplay": [
+      "plans/jade-jox-consumer-package-validation.json",
+      "plans/jade-jox-public-syntax-retry-validation.json"
+    ],
+    "newNativeDatabaseFlows": 0
+  },
+  "remainingGates": [
+    "Actual running UI screenshots/syntax/Copilot verification remains outstanding: approved computer-use fails before application launch with kernel-assets OS error3.",
+    "Current-head hosted checks and automatic review after root pushes this coherent change; owner controls merge/publication."
+  ],
+  "unsupported": [
+    "Standalone build",
+    "Structural/resource editing",
+    "Scratch",
+    "Debugging",
+    "Source publication"
+  ]
+}

@@ -1,14 +1,13 @@
 {
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
-  "description": "Edit, build, test and explore Jade applications in Visual Studio Code.",
-  "version": "0.22.18",
+  "description": "Browse and edit JOX source and run local native Jade tests in Visual Studio Code.",
+  "version": "0.23.0",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Debuggers",
     "Programming Languages"
   ],
   "main": "./src/extension.js",
@@ -414,29 +413,9 @@
         "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
       },
       {
-        "command": "jadeNative.buildWorkspace",
-        "key": "f5",
-        "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
-      },
-      {
-        "command": "jadeNative.publishClass",
-        "key": "shift+f5",
-        "when": "editorTextFocus && resourceScheme == jade-source && !inDebugMode && !jadeNative.publishing"
-      },
-      {
         "command": "jadeNative.scratchpadCompileInfo",
         "key": "f5",
         "when": "!inDebugMode && (notebookType == jade-workspace || (editorTextFocus && (resourceExtname == .jade && resourceScheme != jade-source) && editorLangId == jade-nz))"
-      },
-      {
-        "command": "jadeNative.buildWorkspace",
-        "key": "f5",
-        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
-      },
-      {
-        "command": "jadeNative.publishClass",
-        "key": "shift+f5",
-        "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
       },
       {
         "command": "jadeNative.runLocalTests",
@@ -786,91 +765,6 @@
         }
       }
     },
-    "debuggers": [
-      {
-        "type": "jade-native-experimental",
-        "label": "Jade Native (Experimental)",
-        "languages": [
-          "jade-nz"
-        ],
-        "configurationAttributes": {
-          "launch": {
-            "required": [
-              "program"
-            ],
-            "properties": {
-              "launchMode": {
-                "type": "string",
-                "enum": [
-                  "method",
-                  "application"
-                ],
-                "default": "method",
-                "description": "Debug a selected method/test, or start a stored Jade application through its native lifecycle."
-              },
-              "application": {
-                "type": "string",
-                "description": "Stored native application name used when launchMode is application."
-              },
-              "applicationParameter": {
-                "type": "string",
-                "description": "Optional String startup parameter passed to Jade's native application initializer."
-              },
-              "schema": {
-                "type": "string",
-                "description": "Application schema. Empty infers the schema from the selected CLS."
-              },
-              "program": {
-                "type": "string",
-                "description": "CLS containing a parameterless instance method.",
-                "default": "${file}"
-              },
-              "method": {
-                "type": "string",
-                "description": "Method to execute directly on a new transient instance. Empty prompts for a method.",
-                "default": ""
-              }
-            }
-          }
-        },
-        "initialConfigurations": [
-          {
-            "type": "jade-native-experimental",
-            "request": "launch",
-            "name": "Jade: Debug Current Method (Experimental)",
-            "program": "${file}"
-          }
-        ],
-        "configurationSnippets": [
-          {
-            "label": "Jade: Debug Application",
-            "body": {
-              "type": "jade-native-experimental",
-              "request": "launch",
-              "name": "Jade: Debug Application",
-              "program": "${file}",
-              "launchMode": "application",
-              "application": "${1:MyApplication}",
-              "applicationParameter": ""
-            }
-          },
-          {
-            "label": "Jade: Debug Current Method (Experimental)",
-            "body": {
-              "type": "jade-native-experimental",
-              "request": "launch",
-              "name": "Jade: Debug Current Method (Experimental)",
-              "program": "${file}"
-            }
-          }
-        ]
-      }
-    ],
-    "breakpoints": [
-      {
-        "language": "jade-nz"
-      }
-    ],
     "notebooks": [
       {
         "type": "jade-workspace",
@@ -888,6 +782,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.10.17"
+    "minimumCliVersion": "0.11.0"
   }
 }

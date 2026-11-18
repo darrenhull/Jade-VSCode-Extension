@@ -1,3 +1,10 @@
+# 0.23.0 - JOX source workflow
+
+- Bundle verified [official Jade CLI 0.11.0](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.0), including the qualified Unicode JOX runtime and shared read-only inspection helpers.
+- Browse native JOX metadata, edit guarded method projections and run selected native tests against a private Working copy.
+- Create Working and extract sources once from the same owned generation. Upload saved changes; unchanged tests execute without another source upload.
+- Keep inspector/OID support and declare unsupported standalone build, structural, Scratch, debugger and Source-publication paths honestly. Running UI qualification remains outstanding.
+
 # 0.22.18 - Working source baselines and owned runtime cleanup
 
 - Bundle verified official Jade CLI 0.10.17 with matching native helpers.
