@@ -32,7 +32,7 @@ test('actual extracted extension adapters initialize, save, upload and execute t
  const database=child(owned,fs.realpathSync.native(child(owned,packet.sourceDatabasePath))),ini=child(owned,fs.realpathSync.native(child(owned,packet.sourceIniPath)));
  const seedMarker=child(owned,packet.seedMarker);assert.equal(sha(fs.readFileSync(seedMarker)),packet.seedMarkerSha256);
  assert.equal(JSON.parse(fs.readFileSync(seedMarker,'utf8')).identity,packet.seedIdentity);
- assert.ok(fs.statSync(path.join(database,'_control.dat')).isFile());const iniHash=sha(fs.readFileSync(ini));
+ assert.equal(path.dirname(database),path.dirname(seedMarker));assert.equal(path.basename(database),'system');assert.ok(fs.statSync(path.join(database,'_control.dat')).isFile());const iniHash=sha(fs.readFileSync(ini));assert.equal(iniHash,packet.sourceIniSha256);
  const state=child(owned,packet.brokerState);assert.equal(path.dirname(state),owned);assert.equal(fs.existsSync(state),false);
  const cli=path.join(vendor,'jade-cli.exe'),env={...process.env,JADE_TOOLS_STATE_DIRECTORY:state,JADE_TOOLS_CONNECTIONS_FILE:path.join(state,'connections.json')};delete env.ELECTRON_RUN_AS_NODE;
  const {CliWorkingSession}=require(path.join(extension,'src','cli-client.js')),{NativeSourceProvider}=require(path.join(extension,'src','NativeSourceProvider.js'));
@@ -57,7 +57,7 @@ test('actual extracted extension adapters initialize, save, upload and execute t
   const original=opened.projection.text;assert.ok(original.startsWith(packet.declarationPrefix));const at=original.indexOf(packet.before);assert.ok(at>=packet.declarationPrefix.length&&at===original.lastIndexOf(packet.before));assert.notEqual(packet.before,packet.after);
   const replacement=original.slice(0,at)+packet.after+original.slice(at+packet.before.length);assert.ok(replacement.startsWith(packet.declarationPrefix));
   const saved=await step('save-editor',()=>provider.applyEdit(opened,replacement,'projectionText'));assert.equal(saved.documentBinding.key,opened.documentBinding.key);opened=saved;
-  const changed=await run('changed-test');tested(changed,selected,false);assert.equal(changed.report.sourcePublication.uploaded,true);assert.equal(changed.report.sourcePublication.compiled,true);assert.equal(changed.report.sourcePublication.changedFiles.length,1);assert.equal(changed.report.nativePlatformVersion,packet.expectedPlatformVersion);assert.equal(changed.report.results[0].sourceHash,saved.revision.originByteHash);
+  const changed=await run('changed-test');tested(changed,selected,false);assert.equal(changed.report.sourcePublication.uploaded,true);assert.equal(changed.report.sourcePublication.compiled,true);assert.equal(changed.report.sourcePublication.changedFiles.length,1);assert.equal(changed.report.sourcePublication.nativePlatformVersion,packet.expectedPlatformVersion);assert.equal(changed.report.results[0].sourceHash,saved.revision.originByteHash);
   await provider.close(opened);opened=undefined;await provider.closeProject();await retire();await session.dispose();assert.equal(connection.closed,true);assert.equal((await connection.closePromise).code,0);
   receipt.stdioActualExit=true;receipt.manifestUnchanged=sha(fs.readFileSync(path.join(vendor,'distribution.json')))===packet.manifestSha256;assert.equal(receipt.manifestUnchanged,true);receipt.passed=true;
  }catch(error){primary=error;receipt.error=error.message;throw error;}
