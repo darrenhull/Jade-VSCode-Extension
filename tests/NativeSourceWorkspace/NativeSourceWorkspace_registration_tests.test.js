@@ -64,7 +64,15 @@ test('native test discovery and two actual UI runs use opaque identity without C
 });
 test('shipped activation uses one shared CLI and never loads legacy source index/parser registrations', async () => {
   const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-  const f = setup(), loaded = [], settings = { installPath: 'C:/Jade', databasePath: 'C:/Source/system', iniPath: 'C:/Source/source.ini' };
+  const loaded = [], settings = { installPath: 'C:/Jade', databasePath: 'C:/Source/system', iniPath: 'C:/Source/source.ini' };
+  const f = setup({ reply: (command, request) => {
+    if (command === 'prepare') {
+      assert.equal(request.operation, 'inspect.target'); assert.equal(request.cwd, f.folder.uri.fsPath); assert.deepEqual(request.argv, []);
+      return { passed: true, code: 0, prepared: { config: { ...settings, sourceFormat: 'jox', workspaceRoots: [f.folder.uri.fsPath] }, configFile: f.folder.uri.fsPath + '/jade.json' } };
+    }
+    if (command === 'inspect.target') return { passed: true, code: 0, config: { ...request.config, readOnly: true } };
+  } });
+  f.client.inspectionTarget = async (config, target) => (await f.client.request('inspect.target', { config, target }).promise).config;
   f.vscode.workspace.getConfiguration = () => ({ get: key => settings[key], inspect: () => ({}) });
   let inspection, disposed = false;
   f.client.dispose = async () => { disposed = true; };
@@ -82,9 +90,14 @@ test('shipped activation uses one shared CLI and never loads legacy source index
   vm.runInNewContext('(function(require,module,__dirname){' + source + '\n})', { process, Buffer, console })(require_, exported, path.resolve(__dirname, '../../extension/src'));
   const registered = exported.exports.activate({ ...f.context, extensionPath: 'C:/extension', workspaceState: { get: () => 'initial' } });
   assert.equal(registered.nativeTests, f.client); assert.equal(inspection.client, f.client);
-  const config = inspection.config(undefined, f.folder);
+  const config = await inspection.config(undefined, f.folder);
   assert.equal(config.databasePath, settings.databasePath); assert.equal(config.iniPath, settings.iniPath);
-  assert.equal(config.user, ''); assert.equal(config.password, '');
+  assert.equal(Object.hasOwn(config, 'user'), false); assert.equal(Object.hasOwn(config, 'password'), false);
+  const target = await inspection.inspectionTarget(config, 'source');
+  assert.equal(target.databasePath, settings.databasePath); assert.equal(target.iniPath, settings.iniPath);
+  assert.equal(target.user, ''); assert.equal(target.password, ''); assert.equal(target.readOnly, true);
+  assert.deepEqual(f.requests.map(request => request.command), ['prepare', 'inspect.target']);
+  assert.ok(f.requests.every(request => request.client === f.client.client), 'Configuration and target resolution must retain the one shared native connection');
   assert.equal(config.sourceFormat, 'jox');
   assert.deepEqual(Object.keys(registered.workspace.project(f.folder).provider.config), ['sourceFormat'], 'Built-in defaults must not override native jade.json/profile discovery');
   assert.ok(f.fileSystems.has('jade-source'));
