@@ -35,6 +35,13 @@
       "failed": 0,
       "skipped": 0,
       "durationMilliseconds": 135.3501
+    },
+    "importQualifiedFollowup": {
+      "redExitCode": 1,
+      "redReason": "Native imported type display name differs from its qualified type identity.",
+      "greenExitCode": 0,
+      "tests": 2,
+      "scope": "Exact ordinary and import-qualified type navigation; no additional full groups."
     }
   },
   "visualQualification": {

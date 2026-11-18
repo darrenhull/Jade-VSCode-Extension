@@ -289,3 +289,13 @@ test('class catalogue retains the native base class in the existing Base class c
   assert.equal(payload.page.items[0].parent, 'NativeBase');
   assert.ok(payload.columns.includes('parent'));
 });
+
+test('import-qualified native type navigation uses its qualified identity rather than display name', async () => {
+  const item = { id: 'imported-type', name: 'Widget', kind: 'class', qualifiedName: { schema: 'Example', type: 'Package::Widget' } };
+  const f = setup({ reply: (command, body) => command === 'source.semantic.query' ? { passed: true, code: 0, body: {
+    provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation,
+    items: [item], total: 1, offset: 0, limit: body.limit, nextOffset: null } } : undefined });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  const result = await registered.workspace.findClass('Package::Widget', 'Example', f.folder.uri.fsPath);
+  assert.equal(result?.entity.id, 'imported-type');
+});
