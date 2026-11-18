@@ -79,6 +79,17 @@
       "additionalMilliseconds": 138.7091,
       "contract": "Accept native sourceSnapshot only when provider/project/newRevision generation/hash bind exactly; no immediate prepare or hash synthesis; other dirty tabs retain original base",
       "qualification": "Controlled native ACK only; actual save handler capability remains unqualified until native roundtrip"
+    },
+    "sourceReplyOrdering": {
+      "redFailures": 2,
+      "affectedPassed": 36,
+      "milliseconds": 177.0307,
+      "controls": [
+        "Two deferred saves cannot publish a late earlier ACK over a later descriptor",
+        "Prepare waits for an active save before publishing its later observation",
+        "Both original per-document base hashes retained"
+      ],
+      "implementation": "One per-project provider promise chain for source-changing calls only; no ordering of opaque generations or second model/cache"
     }
   },
   "remainingQualification": [

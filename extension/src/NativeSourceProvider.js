@@ -83,7 +83,15 @@ class NativeSourceProvider {
     } finally { subscription?.dispose(); }
   }
 
-  async prepare(token) {
+  serializeSource(operation) {
+    const result = (this.sourceOperation || Promise.resolve()).then(operation);
+    this.sourceOperation = result.catch(() => {});
+    return result;
+  }
+
+  prepare(token) { return this.serializeSource(() => this.prepareSource(token)); }
+
+  async prepareSource(token) {
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
     this.validateContext();
     const capabilities = await this.capability();
@@ -180,7 +188,11 @@ class NativeSourceProvider {
     return this.retain(document);
   }
 
-  async applyEdit(opened, replacementText, editKind, token) {
+  applyEdit(opened, replacementText, editKind, token) {
+    return this.serializeSource(() => this.applySourceEdit(opened, replacementText, editKind, token));
+  }
+
+  async applySourceEdit(opened, replacementText, editKind, token) {
     const retained = this.documents.get(opened);
     if (!retained) throw Error('This document has no native editor binding.');
     this.assertConnection(retained.connection);
