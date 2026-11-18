@@ -1,12 +1,18 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const manifest=require('../extension/package.json');
-test('Jade declares gutter breakpoint support for its registered source language',()=>{
- assert.ok(manifest.contributes.breakpoints?.some(entry=>entry.language==='jade-nz'));
- assert.ok(manifest.contributes.debuggers.some(entry=>entry.type==='jade-native-experimental'&&entry.languages.includes('jade-nz')));
+const {registerNativeSourceCommands}=require('../extension/src/native-source-commands');
+const {setup}=require('../tests/NativeSourceWorkspace/fixtures/vscode.cjs');
+test('JOX keeps its source language without advertising an unqualified debugger or breakpoints',()=>{
+ assert.ok(manifest.contributes.languages.some(entry=>entry.id==='jade-nz'));
+ assert.deepEqual(manifest.contributes.breakpoints??[],[]);
+ assert.deepEqual(manifest.contributes.debuggers??[],[]);
+ assert.ok(!manifest.contributes.keybindings.some(entry=>['jadeNative.debugMethod','jadeNative.debugApplication'].includes(entry.command)));
 });
-test('native application launch exposes stored application and startup parameter settings',()=>{
- const debuggerType=manifest.contributes.debuggers.find(entry=>entry.type==='jade-native-experimental'),properties=debuggerType.configurationAttributes.launch.properties;
- assert.deepEqual(properties.launchMode.enum,['method','application']);assert.equal(properties.application.type,'string');assert.equal(properties.applicationParameter.type,'string');assert.equal(properties.schema.type,'string');
- assert.ok(debuggerType.configurationSnippets.some(snippet=>snippet.body.launchMode==='application'));
+test('the registered JOX method debug action refuses before native work',()=>{
+ const f=setup();
+ registerNativeSourceCommands(f.vscode,f.context,{},{});
+ assert.equal(typeof f.commands.get('jadeNative.debugMethod'),'function');
+ assert.throws(()=>f.commands.get('jadeNative.debugMethod')(),/JOX debugger source mapping is not yet supported/);
+ assert.deepEqual(f.requests,[]);
 });
