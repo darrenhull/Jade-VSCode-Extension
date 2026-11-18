@@ -13,6 +13,8 @@ class JadeSourceFileSystemProvider {
     this.opening = new Map();
     this.changes = new vscode.EventEmitter();
     this.onDidChangeFile = this.changes.event;
+    this.saves = new vscode.EventEmitter();
+    this.onDidFinishSave = this.saves.event;
   }
 
   async open(entityId, token) {
@@ -60,12 +62,14 @@ class JadeSourceFileSystemProvider {
     if (!options?.overwrite) throw this.vscode.FileSystemError.FileExists(uri);
     const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
     value.saving = true;
+    let saved = false;
     try {
       const document = await this.provider.applyEdit(value.document, text, value.document.projection.editKind);
       value.document = document;
+      saved = true;
       value.mtime = Math.max(Date.now(), value.mtime + 1);
       this.changes.fire([{ type: this.vscode.FileChangeType.Changed, uri: value.uri }]);
-    } finally { value.saving = false; }
+    } finally { value.saving = false; this.saves.fire({ uri, saved }); }
   }
 
   close(uri) {
@@ -98,7 +102,7 @@ class JadeSourceFileSystemProvider {
   createDirectory() { throw this.vscode.FileSystemError.NoPermissions('Creating derived source documents is not supported.'); }
   delete() { throw this.vscode.FileSystemError.NoPermissions('Deleting derived source documents is not supported.'); }
   rename() { throw this.vscode.FileSystemError.NoPermissions('Renaming derived source documents is not supported.'); }
-  dispose() { this.documents.clear(); this.entities.clear(); this.changes.dispose(); }
+  dispose() { this.documents.clear(); this.entities.clear(); this.changes.dispose(); this.saves.dispose(); }
 }
 
 module.exports = { JadeSourceFileSystemProvider };

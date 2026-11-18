@@ -29,7 +29,7 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
       const children = page.items.map(entity => ({ kind: 'entity', project, entity, generation,
         ...(kind === 'member' ? { typeEntity: row.typeEntity || row.entity } : {}),
         queryKind: entity.kind === 'schema' ? 'type' : ['class', 'interface', 'primitive', 'type'].includes(entity.kind) ? 'member' : undefined }));
-      if (page.nextOffset !== null) children.push({ kind: 'page', label: 'More…', project, generation, queryKind: kind,
+      if (page.nextOffset !== null) children.push({ kind: 'page', label: 'MoreÃ¢â‚¬Â¦', project, generation, queryKind: kind,
         parentId: row.parentId || row.entity?.id, offset: page.nextOffset,
         ...(kind === 'member' ? { typeEntity: row.typeEntity || row.entity } : {}) });
       return children;
@@ -48,11 +48,10 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
   context.subscriptions.push(vscode.commands.registerCommand('jadeNative.openClassWorkspace', row => classWorkspaces.open(row)));
   const refresh = async () => {
     for (const folder of workspace.folders()) await workspace.refresh(folder);
-    await classWorkspaces.refresh();
     events.fire();
   };
   context.subscriptions.push(vscode.commands.registerCommand('jadeNative.refreshClassView', refresh));
-  if (vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refresh));
-  return { provider, view, open, refresh };
+  if (vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => { void refresh().catch(error => workspace.reportError(error)); }));
+  return { provider, view, open, refresh, changed: async project => { await classWorkspaces.refresh(project); events.fire(); } };
 }
 module.exports = { registerNativeSourceExplorer };

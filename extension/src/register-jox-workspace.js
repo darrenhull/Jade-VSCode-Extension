@@ -14,6 +14,11 @@ function registerJoxWorkspace(vscode, context, options) {
   const classCatalogue = require('./native-source-catalogue').registerNativeSourceCatalogue(vscode, context, workspace, classWorkspaces);
   const language = registerNativeSourceLanguage(vscode, context, workspace);
   const testing = registerNativeSourceTesting(vscode, context, workspace);
+  const output = vscode.window.createOutputChannel('Jade Source');
+  context.subscriptions.push(output, workspace.onDidChangeSource(project => Promise.all([
+    classView.changed(project), classCatalogue.changed(project), testing.refreshProject?.(project)
+  ])));
+  workspace.reportError = error => output.appendLine(error.message);
   const commands = require('./native-source-commands').registerNativeSourceCommands(vscode, context, workspace, testing);
   const workspaces = vscode.notebooks && require('./native-source-workspaces').registerNativeSourceWorkspaces(vscode, context, workspace, options.client);
   return { workspace, classView: { ...classView, workspaces: classWorkspaces, catalogue: classCatalogue }, language, testing, workspaces, commands, nativeTests: options.client };

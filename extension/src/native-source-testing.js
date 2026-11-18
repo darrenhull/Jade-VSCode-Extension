@@ -6,12 +6,13 @@ function registerNativeSourceTesting(vscode, context, workspace) {
   const output = vscode.window.createOutputChannel('Jade Tests');
   context.subscriptions.push(controller, output);
   let discovering;
-  async function discover() {
+  async function discover({ project: selectedProject, prepare = true } = {}) {
     if (discovering) return discovering;
     discovering = (async () => {
       const roots = [];
-      for (const folder of workspace.folders()) {
-        const project = await workspace.prepare(folder);
+      for (const folder of selectedProject ? [selectedProject.folder] : workspace.folders()) {
+        const project = prepare ? await workspace.prepare(folder) : workspace.project(folder);
+        if (!project.provider.snapshot) continue;
         const root = controller.createTestItem(folder.uri.toString(), folder.name);
         roots.push(root);
         let offset = 0;
@@ -28,10 +29,16 @@ function registerNativeSourceTesting(vscode, context, workspace) {
           offset = page.nextOffset;
         } while (offset !== null);
       }
-      controller.items.replace(roots);
+      if (selectedProject) roots.forEach(root => controller.items.add(root)); else controller.items.replace(roots);
     })();
     try { return await discovering; } finally { discovering = undefined; }
   }
+  let refreshing = Promise.resolve();
+  const refreshProject = project => {
+    const operation = refreshing.then(async () => { if (discovering) await discovering; return discover({ project, prepare: false }); });
+    refreshing = operation.catch(() => {});
+    return operation;
+  };
   controller.resolveHandler = discover;
   controller.refreshHandler = discover;
   const leaves = request => {
@@ -117,6 +124,6 @@ function registerNativeSourceTesting(vscode, context, workspace) {
     if (!selected.length) throw Error('No runnable native tests were found for the selected source.');
     return run({ include: selected });
   };
-  return { controller, discover, run, runFile };
+  return { controller, discover, refreshProject, run, runFile };
 }
 module.exports = { registerNativeSourceTesting };

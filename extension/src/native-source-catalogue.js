@@ -3,7 +3,7 @@ const { registerClassCatalogue } = require('./class-catalogue');
 function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspaces) {
   let project;
   const catalogue = registerClassCatalogue(vscode, context, {
-    scope: 'workspace', label: 'Object Explorer — Classes',
+    scope: 'workspace', label: 'Object Explorer â€” Classes',
     getPage: async filter => {
       if (!project) throw Error('Choose a Jade source project.');
       workspace.project(project.folder);
@@ -21,7 +21,7 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
         name: entity.name, kind: entity.kind }));
       return { rows, generation: page.generation, page: { items: rows, total: page.total, offset: page.offset, limit: page.limit,
         hasMore: page.nextOffset !== null, nextOffset: page.nextOffset, hasPrevious: page.offset > 0,
-        previousOffset: Math.max(0, page.offset - page.limit), label: page.total ? (page.offset + 1) + '–' + (page.offset + rows.length) + ' of ' + page.total + ' types' : '0 types' } };
+        previousOffset: Math.max(0, page.offset - page.limit), label: page.total ? (page.offset + 1) + 'â€“' + (page.offset + rows.length) + ' of ' + page.total + ' types' : '0 types' } };
     },
     refreshPage: async () => { if (project) await workspace.refresh(project.folder); },
     openClass: (row, metadata) => {
@@ -45,6 +45,6 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
     const row = await workspace.findClass(name, schema, projectRoot);
     return row ? classWorkspaces.open(row) : { opened: false, reason: 'No matching native source declaration was found.' };
   }));
-  return { show, refresh: catalogue.refresh, snapshot: catalogue.snapshot, get panel() { return catalogue.panel; } };
+  return { show, changed: selected => selected === project ? catalogue.refresh() : undefined, refresh: catalogue.refresh, snapshot: catalogue.snapshot, get panel() { return catalogue.panel; } };
 }
 module.exports = { registerNativeSourceCatalogue };

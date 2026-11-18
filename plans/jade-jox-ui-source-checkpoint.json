@@ -90,6 +90,25 @@
         "Both original per-document base hashes retained"
       ],
       "implementation": "One per-project provider promise chain for source-changing calls only; no ordering of opaque generations or second model/cache"
+    },
+    "sourceEvents": {
+      "initialRedFailures": 4,
+      "closedProjectRedFailures": 1,
+      "affectedPassed": 40,
+      "milliseconds": 273.9314,
+      "controls": [
+        "One coalesced native prepare per external JOX change burst under native-returned source roots",
+        "No prepare for direct accepted-save query/discovery refresh",
+        "Ambiguous external event retains one conservative native preparation",
+        "Refresh waits for active execution and never dispatches another test",
+        "Dispose cancels original background request and preserves its terminal result",
+        "Project close retires owned watchers/queued work while retaining original editor data",
+        "Changed-project test discovery uses prepared model; no CLS index/baseline calls"
+      ],
+      "limits": [
+        "Filesystem events are hints, not content authority; no JS hashes or Git client",
+        "Actual UI/native saved roundtrip remains unqualified until backend and capture environment work"
+      ]
     }
   },
   "remainingQualification": [

@@ -102,6 +102,6 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
     catch (error) { pending.delete(row.file); throw error; }
     return { opened: true, uri: row.file };
   }
-  return { open, provider, refresh: () => shell.refresh() };
+  return { open, provider, refresh: project => Promise.all([...views.values()].filter(value => !project || value.row.project === project).map(value => value.view.refresh())) };
 }
 module.exports = { createNativeClassWorkspaceModel, registerNativeClassWorkspaces };

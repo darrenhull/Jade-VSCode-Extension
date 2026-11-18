@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
 const { configDto } = require('./cli-client');
+const { isManagedProjectPath } = require('./source-index-scope');
 const { NativeSourceProvider } = require('./NativeSourceProvider');
 const { JadeSourceFileSystemProvider } = require('./JadeSourceFileSystemProvider');
 
@@ -14,11 +15,17 @@ class NativeSourceWorkspace {
     this.events = new vscode.EventEmitter();
     this.forwarding = new Map();
     this.executing = false;
+    this.sourceListeners = new Set();
+    this.pendingChanges = new Map();
+    this.changing = new Map();
+    this.disposed = false;
+    this.reportError = error => console.error(error.message);
   }
 
   folders() { return (this.vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file'); }
 
   project(folder) {
+    if (this.disposed) throw Error('The native source workspace is closed.');
     const current = this.folders().find(value => value.uri.toString() === folder?.uri.toString());
     if (!current) throw Error('The selected Jade project is no longer open.');
     const supplied = { ...this.configFor(current), sourceFormat: 'jox' };
@@ -31,7 +38,8 @@ class NativeSourceWorkspace {
         validateContext: () => { if (this.project(current) !== project) throw Error('The selected source project changed.'); } });
       project = { folder: current, provider, files: new JadeSourceFileSystemProvider(this.vscode, provider) };
       this.projects.set(key, project);
-      this.forwarding.set(project, project.files.onDidChangeFile(changes => this.events.fire(changes)));
+      this.forwarding.set(project, [project.files.onDidChangeFile(changes => this.events.fire(changes)),
+        project.files.onDidFinishSave(({ saved }) => { if (saved || this.pendingChanges.has(project)) this.scheduleRefresh(project, saved); })]);
     } else if (JSON.stringify(project.provider.config) !== JSON.stringify(config)) {
       throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
     }
@@ -41,11 +49,13 @@ class NativeSourceWorkspace {
   async prepare(folder, token) {
     const project = this.project(folder);
     await project.provider.prepare(token);
+    this.project(folder);
+    this.observeSources(project);
     return project;
   }
 
-  async refresh(folder, token) {
-    const project = await this.prepare(folder, token);
+  async refresh(folder, token, { prepared = false } = {}) {
+    const project = prepared ? this.project(folder) : await this.prepare(folder, token);
     for (const value of project.files.documents.values()) {
       const currentState = () => {
         const document = (this.vscode.workspace.textDocuments || []).find(item => item.uri.toString() === value.uri.toString());
@@ -53,7 +63,59 @@ class NativeSourceWorkspace {
       };
       await project.files.refresh(value.uri, { currentState });
     }
+    await Promise.all([...this.sourceListeners].map(listener => Promise.resolve().then(() => listener(project))));
     return project;
+  }
+
+  onDidChangeSource(listener) { this.sourceListeners.add(listener); return { dispose: () => this.sourceListeners.delete(listener) }; }
+
+  observeSources(project) {
+    if (!this.vscode.workspace.createFileSystemWatcher || !this.vscode.RelativePattern) return;
+    const roots = new Set(project.provider.sourceRoots), watchers = project.watchers ||= new Map();
+    for (const [root, watcher] of watchers) if (!roots.has(root)) { watcher.dispose(); watchers.delete(root); }
+    for (const root of roots) if (!watchers.has(root)) {
+      const watcher = this.vscode.workspace.createFileSystemWatcher(new this.vscode.RelativePattern(this.vscode.Uri.file(root), '**/*.[jJ][oO][xX]'));
+      const changed = uri => { if (uri.scheme === 'file' && !isManagedProjectPath(uri.fsPath)) this.scheduleRefresh(project); };
+      watcher.onDidChange(changed); watcher.onDidCreate(changed); watcher.onDidDelete(changed);
+      watchers.set(root, watcher);
+    }
+  }
+
+  scheduleRefresh(project, prepared = false) {
+    if (this.disposed || !this.folders().some(folder => folder.uri.toString() === project.folder.uri.toString())) return;
+    const pending = this.pendingChanges.get(project) || { needsPrepare: false };
+    pending.needsPrepare ||= !prepared;
+    clearTimeout(pending.timer);
+    pending.timer = setTimeout(() => { void this.flushChanges(project).catch(error => { if (!this.disposed) this.reportError(error); }); }, 100);
+    this.pendingChanges.set(project, pending);
+  }
+
+  async flushChanges(project) {
+    if (this.changing.has(project)) return this.changing.get(project).promise;
+    const pending = this.pendingChanges.get(project);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    if (this.executing || [...project.files.documents.values()].some(value => value.saving)) return;
+    this.pendingChanges.delete(project);
+    if (this.disposed) return;
+    const source = this.vscode.CancellationTokenSource ? new this.vscode.CancellationTokenSource() : undefined;
+    const operation = this.refresh(project.folder, source?.token, { prepared: !pending.needsPrepare });
+    this.changing.set(project, { source, promise: operation });
+    try { return await operation; }
+    finally {
+      source?.dispose(); this.changing.delete(project);
+      if (this.pendingChanges.has(project)) this.scheduleRefresh(project, !this.pendingChanges.get(project).needsPrepare);
+    }
+  }
+
+  retireClosedProjects() {
+    const open = new Set(this.folders().map(folder => folder.uri.toString()));
+    for (const project of this.projects.values()) if (!open.has(project.folder.uri.toString())) {
+      const pending = this.pendingChanges.get(project); if (pending) clearTimeout(pending.timer);
+      this.pendingChanges.delete(project); this.changing.get(project)?.source?.cancel();
+      for (const watcher of project.watchers?.values() || []) watcher.dispose();
+      project.watchers?.clear();
+    }
   }
 
   projectForUri(uri) {
@@ -135,12 +197,17 @@ class NativeSourceWorkspace {
     if (this.executing) throw Error('Another Jade Working operation is running.');
     this.executing = true;
     try {
+      await this.changing.get(project)?.promise;
+      if (cancelled()) return cancellation();
       await this.beforeOperation?.();
       if (cancelled()) return cancellation();
       this.project(project.folder);
       await this.saveDirty(project);
       return await operation();
-    } finally { this.executing = false; }
+    } finally {
+      this.executing = false;
+      for (const [changed, pending] of this.pendingChanges) this.scheduleRefresh(changed, !pending.needsPrepare);
+    }
   }
 
   register(context) {
@@ -149,6 +216,7 @@ class NativeSourceWorkspace {
     for (const method of ['stat', 'readFile', 'writeFile', 'readDirectory', 'createDirectory', 'delete', 'rename'])
       provider[method] = (uri, ...args) => delegate(method, uri, ...args);
     context.subscriptions.push(this.vscode.workspace.registerFileSystemProvider('jade-source', provider, { isCaseSensitive: true }), this);
+    if (this.vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(this.vscode.workspace.onDidChangeWorkspaceFolders(() => this.retireClosedProjects()));
     if (this.vscode.workspace.onDidCloseTextDocument) context.subscriptions.push(this.vscode.workspace.onDidCloseTextDocument(document => {
       if (document.uri.scheme !== 'jade-source') return;
       for (const value of this.projects.values()) value.files.close(document.uri);
@@ -156,7 +224,13 @@ class NativeSourceWorkspace {
   }
 
   dispose() {
-    for (const listener of this.forwarding.values()) listener.dispose();
+    this.disposed = true;
+    for (const pending of this.pendingChanges.values()) clearTimeout(pending.timer);
+    this.pendingChanges.clear();
+    for (const { source } of this.changing.values()) source?.cancel();
+    for (const project of this.projects.values()) for (const watcher of project.watchers?.values() || []) watcher.dispose();
+    this.sourceListeners.clear();
+    for (const listeners of this.forwarding.values()) for (const listener of listeners) listener.dispose();
     for (const project of this.projects.values()) project.files.dispose();
     this.forwarding.clear(); this.projects.clear(); this.events.dispose();
   }
