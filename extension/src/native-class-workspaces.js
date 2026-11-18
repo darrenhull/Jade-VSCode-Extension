@@ -59,10 +59,18 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
       }
       if (row.project !== project || binding.entityId !== row.entity.id) throw Error('Open this class from the native source catalogue.');
       pending.delete(document.uri.toString());
-      let selectedDocument = document;
+      let selectedDocument, selectedSnapshot, selectedCurrent = () => false;
+      const currentDocument = () => !view.state().selectedId ? document :
+        selectedCurrent() && row.selectedMember?.id === view.state().selectedId ? selectedDocument : undefined;
+      const currentSnapshot = () => {
+        const value = currentDocument();
+        return value && selectedSnapshot ? { ...selectedSnapshot, uri: value.uri.toString(), text: value.getText(), version: value.version, dirty: value.isDirty } : undefined;
+      };
       const view = shell.attach({ document, panel, row, selectedId: row.selectedMember?.id, services: {
         async openMember(member, { openNative = false, isCurrent = () => true } = {}) {
+          if (!isCurrent()) return;
           row.selectedMember = member;
+          selectedCurrent = isCurrent; selectedDocument = undefined; selectedSnapshot = undefined;
           if (member.system) return { available: false, readOnly: true, editorMode: 'native', owner: member.owner, member: member.name,
             kind: member.kind, text: member.signature || member.detail || member.name, reason: 'System declarations are read-only.' };
           const uri = await sourceUri(row, member.id);
@@ -71,26 +79,36 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
           const native = row.project.files.binding(uri);
           if (!isCurrent()) return;
           selectedDocument = nextDocument;
-          if (member.inherited) return { available: false, readOnly: true, editorMode: 'native', owner: member.owner, member: member.name,
-            kind: member.kind, text: selectedDocument.getText(), reason: 'This inherited declaration is read-only here. Open Original Source to edit its declaration explicitly.' };
-          if (openNative) await original(row, member.id);
-          return { available: true, editorMode: 'native', readOnly: !row.project.files.editable(native),
-            owner: member.owner, member: member.name, kind: member.kind, uri: uri.toString(),
-            text: selectedDocument.getText(), version: selectedDocument.version, dirty: selectedDocument.isDirty };
+          selectedSnapshot = { available: !member.inherited, editorMode: 'native', readOnly: member.inherited || !row.project.files.editable(native),
+            owner: member.owner, member: member.name, kind: member.kind,
+            ...(member.inherited ? { reason: 'This inherited declaration is read-only here. Open Original Source to edit its declaration explicitly.' } : {}) };
+          if (openNative && !member.inherited) await original(row, member.id);
+          if (isCurrent()) return currentSnapshot();
         },
-        openOriginal: () => original(row, row.selectedMember?.id),
+        openOriginal: () => original(row, view.state().selectedId || undefined),
         save: () => {
-          if (row.selectedMember?.inherited || row.selectedMember?.system) throw Error('Save this declaration in its native source editor.');
-          return selectedDocument.save();
+          const value = currentDocument();
+          if (!value || view.state().selectedId && (row.selectedMember?.inherited || row.selectedMember?.system)) throw Error('Save this declaration in its native source editor.');
+          return value.save();
         },
-        currentDocument: () => selectedDocument,
-        build: () => vscode.commands.executeCommand('jadeNative.compileClass', selectedDocument.uri),
-        runTests: () => vscode.commands.executeCommand('jadeNative.runLocalTests', selectedDocument.uri),
-        publish: () => vscode.commands.executeCommand('jadeNative.publishClass', selectedDocument.uri)
+        currentDocument,
+        build: () => vscode.commands.executeCommand('jadeNative.compileClass', currentDocument()?.uri),
+        runTests: () => vscode.commands.executeCommand('jadeNative.runLocalTests', currentDocument()?.uri),
+        publish: () => vscode.commands.executeCommand('jadeNative.publishClass', currentDocument()?.uri)
       } });
       const key = keyFor(row);
       views.set(key, { panel, view, row });
-      panel.onDidDispose(() => { if (views.get(key)?.view === view) views.delete(key); view.dispose(); });
+      const changed = value => {
+        const active = currentDocument(), document = value.document || value;
+        if (!active || active.uri.toString() !== document.uri.toString() || !selectedCurrent()) return;
+        const snapshot = currentSnapshot();
+        if (snapshot) void view.updateDocument(snapshot, row.selectedMember.id).catch(error => workspace.reportError(error));
+      };
+      const subscriptions = [vscode.workspace.onDidChangeTextDocument?.(changed), vscode.workspace.onDidSaveTextDocument?.(changed)];
+      panel.onDidDispose(() => {
+        for (const subscription of subscriptions) subscription?.dispose();
+        if (views.get(key)?.view === view) views.delete(key); view.dispose();
+      });
     },
     dispose() { for (const { panel } of views.values()) panel.dispose(); views.clear(); shell.dispose(); }
   };

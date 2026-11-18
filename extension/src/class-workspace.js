@@ -45,6 +45,8 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     panel.webview.options = { ...panel.webview.options, enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")] };
     panel.webview.html = workspaceHtml({ nonce: crypto.randomBytes(18).toString("hex"), cspSource: panel.webview.cspSource, scriptUri: asset("class-workspace.js"), styleUri: asset("class-workspace.css"), editorScriptUri: services.editorScriptUri || asset("method-editor.js"), editorStyleUri: services.editorStyleUri });
     const current = revision => !disposed && !record.closed && record.revision === revision;
+    const sourceDocument = () => services.currentDocument ? services.currentDocument() : document;
+    const documentState = () => { const value = sourceDocument(); return { uri: value?.uri?.toString(), dirty: value?.isDirty === true }; };
     const send = async message => {
       if(message.command==="editorSnapshot"&&services.openOriginal&&message.snapshot?.available&&!message.snapshot.readOnly)
         message={...message,snapshot:{...message.snapshot,editorMode:"native"}};
@@ -88,7 +90,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           if (!current(revision)) return;
         }
         const retainedSelected = retainActive && record.state.selectedId === lastSelected?.id ? lastSelected : undefined;
-        record.snapshot = { ...snapshot, viewId: record.viewId, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { uri: document?.uri?.toString(), dirty: document?.isDirty || snapshot.identity?.dirty || false } };
+        record.snapshot = { ...snapshot, viewId: record.viewId, groups, selected: snapshot.selected || retainedSelected, state: { ...record.state }, document: { ...documentState(), dirty: sourceDocument()?.isDirty || snapshot.identity?.dirty || false } };
         if (!snapshot.inheritedAvailable) record.state.includeInherited = false;
         record.snapshot.state = { ...record.state };
         persist(record);
@@ -104,6 +106,15 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
         }
         return false;
       }
+    }
+    async function updateDocument(snapshot, id) {
+      const revision = record.revision, selection = record.selectionRevision;
+      if (!current(revision) || !record.snapshot || record.state.selectedId !== id) return;
+      const state = documentState(), changedPath = record.snapshot.document?.uri !== state.uri;
+      record.snapshot = { ...record.snapshot, document: state };
+      if (changedPath) await send({ command: "workspace", revision, snapshot: record.snapshot });
+      if (current(revision) && record.selectionRevision === selection && record.state.selectedId === id)
+        await send({ command: "editorSnapshot", revision, snapshot });
     }
     function selectedMember() {
       if (!record.state.selectedId) return undefined;
@@ -138,7 +149,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
       const member = selectedMember();
       if (member && services.openMember) {
         const snapshot = await services.openMember(member, { openNative: openNative && panel.active, isCurrent: selectedCurrent });
-        if (selectedCurrent() && snapshot) await send({ command: "editorSnapshot", snapshot });
+        if (selectedCurrent() && snapshot) await updateDocument(snapshot, id);
       } else if (member && binding && ["method", "typeMethod", "property", "reference"].includes(member.kind)) {
         const memberFile = String(member.file || ""), documentFile = document?.uri?.toString();
         const foreign = memberFile && documentFile && memberFile !== documentFile || member.system;
@@ -204,7 +215,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
           case "editorSave": {
             if(record.saving)break;
             record.saving=true;
-            const sourceDocument=()=>services.currentDocument?.()||document;
+
             await send({command:"saveState",status:"saving",dirty:sourceDocument()?.isDirty ?? true});
             try{
               if(typeof services.save!=="function"||await services.save()===false)throw Error("The current source file was not saved. Your edits remain in the document.");
@@ -251,7 +262,7 @@ function createClassWorkspaces(vscode, context, adapters = {}) {
     record.subscriptions.push(panel.onDidDispose(close));
     record.refresh = load;
     record.close = close;
-    return { dispose: close, isClosed: () => record.closed, refresh: load, viewId: record.viewId, flushPendingEdits: () => {
+    return { dispose: close, isClosed: () => record.closed, refresh: load, updateDocument, viewId: record.viewId, flushPendingEdits: () => {
       if (!record.ready || record.closed) return Promise.reject(Error("The method editor is not ready to flush its pending changes."));
       return new Promise((resolve, reject) => { const requestId = crypto.randomUUID(), timer = setTimeout(() => { record.flushes.delete(requestId); reject(Error("The method editor did not acknowledge its pending changes. Try again after resolving the draft.")); }, 15000); record.flushes.set(requestId, { resolve, reject, timer }); void send({ command: "flushPendingEdits", requestId }); });
     }, setOrigin: value => { record.origin = value; }, select: async id => {
