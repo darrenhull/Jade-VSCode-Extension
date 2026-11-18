@@ -70,6 +70,15 @@
         "Completed native assertion outcomes still dispatch the following class",
         "Original native code/error retained; queued methods get explicit not-executed error"
       ]
+    },
+    "acceptedSaveGeneration": {
+      "staleGenerationRedFailures": 1,
+      "providerAndDocumentPassed": 29,
+      "milliseconds": 146.2529,
+      "additionalMalformedAckAndTwoTabPassed": 5,
+      "additionalMilliseconds": 138.7091,
+      "contract": "Accept native sourceSnapshot only when provider/project/newRevision generation/hash bind exactly; no immediate prepare or hash synthesis; other dirty tabs retain original base",
+      "qualification": "Controlled native ACK only; actual save handler capability remains unqualified until native roundtrip"
     }
   },
   "remainingQualification": [

@@ -91,3 +91,31 @@ test("a save begun or completed during refresh cannot be overwritten by its stal
   assert.equal(f.files.binding(uri).revision.generation, "generation-2");
   assert.equal(Buffer.from(f.files.readFile(uri)).toString(), "new saved document");
 });
+
+test('accepted save in one open tab updates project queries while another dirty tab retains its original revision', async () => {
+  const f = await setup({ reply: (command, request) => {
+    if (command === 'source.semantic.read' && request.entityId === 'other-member') {
+      const other = structuredClone(f.document);
+      Object.assign(other, { entityId: 'other-member', documentId: 'other-document', generation: request.generation });
+      other.revision.generation = request.generation; other.origin.uri = 'file:///C:/project/Example/Other.jox';
+      other.projection.cacheUri = 'file:///C:/project/.jade/projections/other.jade';
+      return { passed: true, code: 0, body: other };
+    }
+    if (command === 'source.semantic.query') return { passed: true, code: 0, body: { provider: request.provider,
+      projectId: request.projectId, generation: request.generation, items: [], total: 0, offset: 0, limit: 100, nextOffset: null } };
+    if (command === 'source.semantic.applyEdit' && request.entityId === 'other-member')
+      return { passed: false, code: 409, report: { error: 'Retained native revision requires explicit reconciliation' } };
+  } });
+  const first = await f.files.open(f.document.entityId), dirty = await f.files.open('other-member');
+  const original = f.files.binding(dirty).revision;
+  await f.files.writeFile(first, Buffer.from('accepted first tab'), { overwrite: true });
+  await f.native.query({ kind: 'type' });
+  assert.equal(f.requests.at(-1).body.generation, 'generation-2');
+  assert.equal(await f.files.refresh(dirty, { currentState: () => ({ dirty: true, version: 2 }) }), false);
+  assert.deepEqual(f.files.binding(dirty).revision, original);
+  await assert.rejects(f.files.writeFile(dirty, Buffer.from('retained dirty text'), { overwrite: true }), /explicit reconciliation/);
+  assert.deepEqual(f.requests.at(-1).body.baseRevision, original);
+  assert.equal(f.files.binding(first).revision.generation, 'generation-2');
+  assert.equal(f.files.binding(dirty).revision.generation, 'generation-1');
+  assert.equal(f.requests.filter(value => value.command === 'source.semantic.prepare').length, 1);
+});

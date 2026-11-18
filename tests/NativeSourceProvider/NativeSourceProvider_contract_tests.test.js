@@ -110,3 +110,33 @@ test("cancel refusal after native completion preserves authoritative success", a
   assert.deepEqual(await operation, success);
   assert.equal(f.requests.filter(r => r.command === "cancel").length, 1);
 });
+
+test("accepted save publishes only the native snapshot descriptor for subsequent queries without another prepare", async () => {
+  const f = setup({ reply: (command, request) => command === "source.semantic.query" ? { passed: true, code: 0,
+    body: { provider: request.provider, projectId: request.projectId, generation: request.generation, items: [], total: 0, offset: request.offset, limit: request.limit, nextOffset: null } } : undefined });
+  await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId);
+  await f.provider.applyEdit(doc, "new saved source", "projectionText");
+  assert.equal(f.provider.binding().generation, "generation-2");
+  assert.equal(f.provider.snapshot.snapshotHash, f.hash("acceptedSavedSnapshot"));
+  await f.provider.query({ kind: "type" });
+  assert.equal(f.requests.at(-1).body.generation, "generation-2");
+  assert.equal(f.requests.filter(request => request.command === "source.semantic.prepare").length, 1);
+});
+
+for (const corruption of ['missing', 'project', 'generation', 'hash']) test('save ACK rejects ' + corruption + ' snapshot binding without updating the native project', async () => {
+  const f = setup(); await f.provider.prepare(); const doc = await f.provider.read(f.document.entityId), before = f.provider.snapshot;
+  const request = f.client.request.bind(f.client);
+  f.client.request = (...args) => {
+    const operation = request(...args);
+    if (args[0] === 'source.semantic.applyEdit') operation.promise = operation.promise.then(result => {
+      if (corruption === 'missing') delete result.body.sourceSnapshot;
+      else result.body.sourceSnapshot[corruption === 'project' ? 'projectId' : corruption === 'hash' ? 'snapshotHash' : 'generation'] = corruption === 'hash' ? 'invalid' : 'foreign';
+      return result;
+    });
+    return operation;
+  };
+  await assert.rejects(f.provider.applyEdit(doc, 'saved source', 'projectionText'), /saved.*snapshot/i);
+  assert.equal(f.provider.snapshot, before);
+  assert.equal(f.requests.filter(value => value.command === 'source.semantic.applyEdit').length, 1);
+  assert.equal(f.requests.filter(value => value.command === 'source.semantic.prepare').length, 1);
+});

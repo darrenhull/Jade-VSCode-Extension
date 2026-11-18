@@ -198,6 +198,12 @@ class NativeSourceProvider {
     const next = { ...document, generation: saved.newRevision?.generation, revision: saved.newRevision,
       origin: saved.origin, projection: saved.projection };
     this.validateDocument(next, { provider: document.provider, projectId: document.projectId, generation: saved.newRevision?.generation });
+    const snapshot = saved.sourceSnapshot;
+    if (!snapshot || snapshot.provider !== document.provider || snapshot.projectId !== document.projectId ||
+        typeof snapshot.generation !== 'string' || !snapshot.generation || snapshot.generation !== next.revision.generation)
+      throw Error('Invalid native saved source snapshot binding.');
+    hash(snapshot.snapshotHash, 'saved snapshot');
+    this.snapshot = clone(snapshot);
     return this.retain(next);
   }
 
