@@ -1,10 +1,27 @@
 'use strict';
 const path = require('node:path');
+const fs = require('node:fs');
 const { fileURLToPath } = require('node:url');
 const { configDto } = require('./cli-client');
 const { isManagedProjectPath } = require('./source-index-scope');
 const { NativeSourceProvider } = require('./NativeSourceProvider');
 const { JadeSourceFileSystemProvider } = require('./JadeSourceFileSystemProvider');
+
+function sourceContains(root, file) {
+  const relative = path.relative(root, file);
+  return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
+}
+function physicalSourcePath(file) {
+  let current = path.resolve(file);
+  const missing = [];
+  for (;;) {
+    try { return path.join(fs.realpathSync.native(current), ...missing); }
+    catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; }
+    const parent = path.dirname(current);
+    if (parent === current) throw Error('The dirty source path has no existing filesystem ancestor.');
+    missing.unshift(path.basename(current)); current = parent;
+  }
+}
 
 // Project handles and open documents only. Native owns the single source model.
 class NativeSourceWorkspace {
@@ -196,15 +213,26 @@ class NativeSourceWorkspace {
     return uri;
   }
 
-  async saveDirty(project) {
+  async saveDirty(project, token) {
     for (const document of this.vscode.workspace.textDocuments || []) {
       if (document.uri.scheme === 'jade-source' && project.files.documents.has(document.uri.toString()) && document.isDirty && !await document.save())
         throw Error('Save the source document before executing saved JOX changes.');
     }
-    // Never upload a different saved origin while its ordinary JOX file is dirty.
-    for (const document of this.vscode.workspace.textDocuments || []) {
-      if (document.uri.scheme === 'file' && document.isDirty && /\.jox$/i.test(document.uri.fsPath) &&
-          this.vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === project.folder.uri.toString())
+    // Native-returned roots own saved inputs, including roots outside the VS
+    // Code folder and roots covered by another nested workspace folder.
+    const dirtyJox = () => (this.vscode.workspace.textDocuments || []).filter(document =>
+      document.uri.scheme === 'file' && document.isDirty && /\.jox$/i.test(document.uri.fsPath));
+    if (!dirtyJox().length) return;
+    if (!project.provider.sourceRoots?.length) await this.prepare(project.folder, token);
+    if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+    const physical = file => {
+      try { return physicalSourcePath(file); }
+      catch (error) { throw Error('Cannot verify dirty JOX source ownership. Save or close the document before executing saved changes.', { cause: error }); }
+    };
+    const roots = project.provider.sourceRoots.map(physical);
+    for (const document of dirtyJox()) {
+      const file = physical(document.uri.fsPath);
+      if (!isManagedProjectPath(file) && roots.some(root => sourceContains(root, file)))
         throw Error('Save the JOX document before executing saved source changes.');
     }
   }
@@ -235,7 +263,7 @@ class NativeSourceWorkspace {
       await this.beforeOperation?.();
       if (cancelled()) return cancellation();
       this.project(project.folder);
-      await this.saveDirty(project);
+      await this.saveDirty(project, options?.token);
       return await operation();
     } finally {
       this.releaseExecution();
@@ -254,11 +282,15 @@ class NativeSourceWorkspace {
     if (this.vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(this.vscode.workspace.onDidChangeWorkspaceFolders(() => this.retireClosedProjects()));
     if (this.vscode.workspace.onDidCloseTextDocument) context.subscriptions.push(this.vscode.workspace.onDidCloseTextDocument(document => {
       if (document.uri.scheme !== 'jade-source') return;
-      // Dirty hot-exit recovery bindings survive host disposal. Explicit clean
-      // close is the only editor event that releases persisted native metadata.
+      // A language change also emits close/open while the URI remains open.
+      // Let membership settle before releasing a genuinely closed clean editor.
       if (this.disposed || document.isDirty) return;
-      for (const value of this.projects.values())
-        void Promise.resolve(value.files.close(document.uri)).catch(error => this.reportError(error));
+      setTimeout(() => {
+        if (this.disposed || document.isDirty || (this.vscode.workspace.textDocuments || [])
+          .some(open => open.uri.toString() === document.uri.toString())) return;
+        for (const value of this.projects.values())
+          void Promise.resolve(value.files.close(document.uri)).catch(error => this.reportError(error));
+      }, 0);
     }));
   }
 

@@ -41,7 +41,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
     async afterOperation() { prepared = undefined; activeRequest = undefined; workspace.releaseExecution(); },
     async prepareSource(config, _progress, token) {
       const project = projectFor(config);
-      await workspace.saveDirty(project);
+      await workspace.saveDirty(project, token);
       const snapshot = await project.provider.prepare(token);
       if (!project.provider.flags.deploymentFromSavedSnapshot || !project.provider.flags.nativeScratch)
         throw Error('This Jade CLI does not yet support Scratch Pad execution from saved JOX source.');
