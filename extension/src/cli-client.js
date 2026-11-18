@@ -53,6 +53,11 @@ class CliWorkingSession{
   return client;
  }
  request(command,body={},output,events,expectedClient){
+  if((command.startsWith('inspect.')||command==='working.location')&&body.config){
+   const {cwd,configFile,...config}=body.config;
+   body={...body,config,...(body.cwd===undefined&&cwd!==undefined?{cwd}:{}),
+    ...(body.configFile===undefined&&configFile!==undefined?{configFile}:{})};
+  }
   if(command.startsWith('source.')&&!command.startsWith('source.semantic.')&&body.config)body={...body,config:sourceConfiguration(body.config)};
   if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
   const client=expectedClient||this.connect(),id=++this.nextId;

@@ -155,7 +155,7 @@ function registerObjectExplorer(vscode, context, services) {
       const connectionConfig = { ...config };
       delete connectionConfig.user;
       delete connectionConfig.password;
-      Object.assign(connectionConfig, authentication);
+      Object.assign(connectionConfig, config.sourceFormat === 'jox' ? {user:'',password:'',...authentication} : authentication);
       operation?.report(selection === 'working' ? 'Preparing Working…' : 'Opening Source…');
       const target = await services.inspectionTarget(
         { ...connectionConfig, ...(operation ? { signal: operation.controller.signal } : {}) },
@@ -174,6 +174,7 @@ function registerObjectExplorer(vscode, context, services) {
       try {
         if (!ownsSignOn() || lockOwner !== owner) throw Error('Inspection connection was cancelled.');
         currentConfig = { ...config };
+        if(config.cwd)inspectionScope=config.cwd;
         delete currentConfig.user;
         delete currentConfig.password;
         currentTarget = { ...target, selection };
@@ -452,7 +453,7 @@ function registerObjectExplorer(vscode, context, services) {
       const absolute = path.resolve(value);
       return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
     };
-    const scope = configuredPath(config.workspaceRoots[0]);
+    const scope = configuredPath(config.cwd || config.workspaceRoots[0]);
     const key = JSON.stringify([scope, configuredPath(config.installPath), configuredPath(config.databasePath),
       configuredPath(config.iniPath), config.server || 'singleUser', config.schema || 'RootSchema',
       config.application || 'RootSchemaApp', config.characterSet || 'auto']);
@@ -1352,8 +1353,11 @@ function registerObjectExplorer(vscode, context, services) {
       if (event.affectsConfiguration("jadeNative")) return configurationChanged().catch(error => output.appendLine(error.message));
     }),
     vscode.workspace.onDidSaveTextDocument?.(document => {
-      if (document.uri.scheme === "file" && path.basename(document.uri.fsPath).toLowerCase() === "jade.json" &&
-          currentConfig?.workspaceRoots?.some(root => path.resolve(root, "jade.json") === path.resolve(document.uri.fsPath)))
+      const config = connectionOperation?.config || currentConfig;
+      if (document.uri.scheme === "file" &&
+          (config?.configFile && path.resolve(config.configFile) === path.resolve(document.uri.fsPath) ||
+           path.basename(document.uri.fsPath).toLowerCase() === "jade.json" &&
+           config?.workspaceRoots?.some(root => path.resolve(root, "jade.json") === path.resolve(document.uri.fsPath))))
         return configurationChanged().catch(error => output.appendLine(error.message));
     }),
   ]) if (subscription) context.subscriptions.push(subscription);

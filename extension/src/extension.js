@@ -130,28 +130,18 @@ function activate(context) {
   require('./cli-gateway').configure(nativeTests);
   context.subscriptions.push(nativeTests,{dispose:()=>require('./cli-gateway').configure(undefined)});
   const configFor = folder => ({sourceFormat:'jox',...Object.fromEntries(Object.entries(explicitDefaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]))});
-  const inspectionConfigFor = folder => {
-    const settings = Object.fromEntries(Object.entries(defaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]));
-    const installPath = settings.installPath || process.env.JADE_INSTALL || '';
-    const databasePath = settings.databasePath || (installPath ? path.join(installPath,'system') : '');
-    return {...settings,installPath,databasePath,iniPath:settings.iniPath||(databasePath?path.join(databasePath,'jade.ini'):''),
-      server:settings.server||'singleUser',schema:'RootSchema',sourceFormat:'jox',workspaceRoots:[folder.uri.fsPath],
-      user:'',password:'',workingDatabaseDirectory:resolveWorkingDirectory(settings.workingDatabaseDirectory,folder.uri.fsPath),
-      workingDatabaseGeneration:context.workspaceState.get('jadeNative.workingDatabaseGeneration','initial')};
-  };
+  const inspectionConfigFor = folder => require('./inspection-config').inspectionConfiguration(nativeTests,folder.uri.fsPath,configFor(folder));
   let objectExplorer;
   const source = require('./register-jox-workspace').registerJoxWorkspace(vscode,context,{client:nativeTests,configFor,instances:row=>objectExplorer?.browseInstances(row)});
   objectExplorer = require('./object-explorer').registerObjectExplorer(vscode,context,{
     client:nativeTests,isBusy:()=>source.workspace.executing,
     config:(_document,folder)=>{
       const selected=folder||source.workspace.projectForUri(_document?.uri).folder;
-      const config=inspectionConfigFor(selected);
-      if(!config.installPath)throw Object.assign(Error('Set jadeNative.installPath or use Detect Runtime Settings.'),{code:'JADE_RUNTIME_NOT_CONFIGURED'});
-      return config;
+      return inspectionConfigFor(vscode.workspace.getWorkspaceFolder(selected.uri)||selected);
     },
     workspaceFolder:uri=>uri?.scheme==='jade-source'?source.workspace.projectForUri(uri).folder:vscode.workspace.getWorkspaceFolder(uri),
     sourceContext:selection=>source.workspace.sourceContext(selection),
-    inspectionTarget:(config,target,output)=>nativeTests.inspectionTarget(config,target,output),
+    inspectionTarget:(config,target,output)=>nativeTests.inspectionTarget({user:'',password:'',...config},target,output),
     workingLocation:config=>nativeTests.workingLocation(config)
   });
   source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
