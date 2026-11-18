@@ -45,7 +45,10 @@ class JadeWorkspaceRunner {
         onProgress({stage:'received',message:'JADE response received'});
         return finish({...result,snapshot,stale:document.version!==version});
       } catch(error) {
-        return finish({...(error.result||{code:2,passed:false,report:{error:error.message}}),snapshot,stale:document.version!==version});
+        const result=error.result||(error.cancelled===true
+          ? {...cancelled(),report:{error:error.message||'Workspace execution cancelled.'}}
+          : {code:2,passed:false,report:{error:error.message}});
+        return finish({...result,snapshot,stale:document.version!==version});
       } finally {
         subscription?.dispose();
         if(acquired){

@@ -77,3 +77,41 @@ test('failed Scratch acquisition releases and automatically drains the original 
   assert.equal(f.requests.some(row=>row.command==='workspace.run'),false);assert.equal(project.provider.flags.nativeScratch,false);
  }finally{f.workspace.dispose();}
 });
+
+
+test('explicit cancellation from a pending source save stays Cancelled without a native result or execution',async()=>{
+ const f=fixture({supported:false});let reject;
+ const token={isCancellationRequested:false};
+ f.workspace.saveDirty=()=>new Promise((_resolve,fail)=>{reject=fail;});
+ try{
+  const operation=f.runner.run({document:document(),token});await until(()=>reject);token.isCancellationRequested=true;
+  reject(Object.assign(Error('Source save was cancelled'),{cancelled:true}));
+  const result=await operation;assert.equal(result.code,130);assert.equal(result.cancelled,true);assert.equal(result.passed,false);assert.equal(result.report.error,'Source save was cancelled');
+  assert.equal(f.workspace.executing,false);assert.equal(f.requests.some(row=>row.command==='workspace.run'||row.command==='source.semantic.prepare'),false);assert.equal(f.flags.nativeScratch,false);
+ }finally{f.workspace.dispose();}
+});
+
+test('cancellation while waiting for the native source queue stays Cancelled without sending preparation or execution',async()=>{
+ const f=fixture({supported:false}),project=f.workspace.project(f.folder);let release;
+ const held=project.provider.serializeSource(()=>new Promise(resolve=>{release=resolve;}));await until(()=>release);
+ const queued=project.provider.sourceOperation,token={isCancellationRequested:false};
+ try{
+  const operation=f.runner.run({document:document(),token});await until(()=>project.provider.sourceOperation!==queued);
+  token.isCancellationRequested=true;release();await held;
+  const result=await operation;assert.equal(result.code,130);assert.equal(result.cancelled,true);assert.equal(result.passed,false);assert.match(result.report.error,/Source operation cancelled/);
+  assert.equal(f.workspace.executing,false);assert.equal(f.requests.length,0);assert.equal(f.flags.nativeScratch,false);
+ }finally{release?.();f.workspace.dispose();}
+});
+
+for(const structured of [false,true])test('a late token cancellation cannot replace an actual preparation failure '+(structured?'6295':'without cancel marker'),async()=>{
+ const f=fixture({supported:false}),token={isCancellationRequested:false};let reject;
+ f.workspace.saveDirty=()=>new Promise((_resolve,fail)=>{reject=fail;});
+ try{
+  const operation=f.runner.run({document:document(),token});await until(()=>reject);token.isCancellationRequested=true;
+  const original={passed:false,code:6295,report:{compiled:false,executed:false,error:'Original native preparation6295',compilerOutput:'original native detail'}};
+  reject(structured?Object.assign(Error(original.report.error),{cancelled:true,result:original}):Error('Original source save failure'));
+  const result=await operation;assert.equal(result.code,structured?6295:2);assert.equal(result.cancelled,undefined);assert.equal(result.passed,false);
+  if(structured)assert.deepEqual(result.report,original.report);else assert.equal(result.report.error,'Original source save failure');
+  assert.equal(f.workspace.executing,false);assert.equal(f.requests.some(row=>row.command==='workspace.run'),false);
+ }finally{f.workspace.dispose();}
+});
