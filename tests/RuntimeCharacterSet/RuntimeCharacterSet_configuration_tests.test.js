@@ -17,8 +17,8 @@ function activation(inspectionField='workspaceFolderValue',override){
   if(name==='./language-tools')assert.fail('JOX activation must not register the legacy CLS language index');
   if(name==='./register-jox-workspace')return{registerJoxWorkspace:(_v,_c,value)=>{services.jox=value;return{workspace:{executing:false}};}};
   if(name==='./config'){const loaded={exports:{}};vm.runInNewContext('(function(require,module){'+fs.readFileSync(path.join(root,'extension/src/config.js'),'utf8')+'\n})',{process})((key)=>key==='node:fs'?{...fs,existsSync:()=>true}:require(key),loaded);return loaded.exports;}
-  if(name==='./cli-client')return{CliWorkingSession:class{}};
-  if(['./ProjectSkillInstaller','./WorkspaceOperationGuard','./working-directory','./source-index-scope'].includes(name))return localRequire(name);
+  if(name==='./cli-client')return{CliWorkingSession:class{request(command,{operation,cwd,argv}){assert.equal(command,'prepare');assert.equal(operation,'inspect.target');const install=argv.indexOf('--install');return{promise:Promise.resolve({code:0,passed:true,prepared:{config:{sourceFormat:'jox',installPath:install<0?'':argv[install+1],characterSet:'auto',workspaceRoots:[cwd]},configFile:null}})};}}};
+  if(['./ProjectSkillInstaller','./WorkspaceOperationGuard','./working-directory','./source-index-scope','./inspection-config'].includes(name))return localRequire(name);
   if(registrations[name])return{[registrations[name]]:(_v,_c,value)=>{services[name]=value;return{schemaFor(){},resourceFor(){}};}};
   return noop;
  },module);
@@ -32,32 +32,33 @@ test('character-set setting is optional, resource-scoped and defaults to automat
  const [major,minor]=manifest.jadeNative.minimumCliVersion.split('.').map(Number);assert.ok(major>0||major===0&&minor>=6,'Do not release the setting with a CLI older than the native character ABI support.');
  require('../../scripts/NativeCompatibility.cjs').requireNativeVersion(path.join(root,'packages/jade-cli-win-x64'),manifest.jadeNative.minimumCliVersion);
 });
-for(const [index,expected] of ['ansi','unicode',undefined,'auto'].entries())test('actual activation resolves '+(expected||'omitted native default')+' for native JOX execution and inspection without writing settings',()=>{
+for(const [index,expected] of ['ansi','unicode',undefined,'auto'].entries())test('actual activation resolves '+(expected||'omitted native default')+' for native JOX execution and inspection without writing settings',async()=>{
  const host=activation(),folder=host.folders[index],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
- const configurations=[host.source(folder),host.inspection(folder)];
- assert.ok(configurations.every(config=>config.characterSet===expected));if(expected===undefined)assert.ok(configurations.every(config=>!Object.hasOwn(config,'characterSet'))); assert.deepEqual(host.writes,[]);assert.ok(host.reads.every(resource=>resource.fsPath.startsWith(folder.uri.fsPath)));
+ const execution=host.source(folder),inspection=await host.inspection(folder);
+ assert.equal(execution.characterSet,expected);assert.equal(inspection.characterSet,expected===undefined?'auto':expected);
+ if(expected===undefined)assert.ok(!Object.hasOwn(execution,'characterSet'),'Automatic selection must remain omitted for native execution resolution'); assert.deepEqual(host.writes,[]);assert.ok(host.reads.every(resource=>resource.fsPath.startsWith(folder.uri.fsPath)));
 });
-for(const scope of ['globalValue','workspaceValue','workspaceFolderValue','globalLanguageValue','workspaceLanguageValue','workspaceFolderLanguageValue'])test('explicit character-set setting from '+scope+' is retained',()=>{
- const host=activation(scope),folder=host.folders[0];assert.equal(host.inspection(folder).characterSet,'ansi');assert.deepEqual(host.writes,[]);
+for(const scope of ['globalValue','workspaceValue','workspaceFolderValue','globalLanguageValue','workspaceLanguageValue','workspaceFolderLanguageValue'])test('explicit character-set setting from '+scope+' is retained',async()=>{
+ const host=activation(scope),folder=host.folders[0];assert.equal((await host.inspection(folder)).characterSet,'ansi');assert.deepEqual(host.writes,[]);
 });
-for(const characterSet of ['',null,17])test('explicit invalid '+JSON.stringify(characterSet)+' selection reaches native configuration validation unchanged',()=>{
+for(const characterSet of ['',null,17])test('explicit invalid '+JSON.stringify(characterSet)+' selection reaches native configuration validation unchanged',async()=>{
  const host=activation('workspaceFolderValue',{characterSet}),folder=host.folders[0],document={uri:{scheme:'file',fsPath:folder.uri.fsPath+'/Pet.cls'},getText:()=> 'schemaDefinition\nPets subschemaOf RootSchema partialDefinition;'};
- const configs=[host.source(folder),host.inspection(folder)];
+ const configs=[host.source(folder),await host.inspection(folder)];
  assert.ok(configs.every(config=>config.characterSet===characterSet));assert.deepEqual(host.writes,[]);
 });
 
 
-test('native JOX config retains relative overrides for native resolution while Working inspection binds the selected workspace',()=>{
+test('native JOX config retains relative overrides for native resolution while Working inspection binds the selected workspace',async()=>{
  const host=activation('workspaceFolderValue',{workingDatabaseDirectory:'.jade/working'}),folder=host.folders[0];
  assert.equal(host.source(folder).workingDatabaseDirectory,'.jade/working');
- assert.equal(host.inspection(folder).workingDatabaseDirectory,path.resolve(folder.uri.fsPath,'.jade/working'));
+ assert.equal((await host.inspection(folder)).workingDatabaseDirectory,path.resolve(folder.uri.fsPath,'.jade/working'));
  assert.equal(host.source(folder).sourceFormat,'jox');
  assert.equal(Object.hasOwn(host.source(folder),'workspaceRoots'),false);
  assert.deepEqual(host.writes,[]);
 });
 
-test('dedicated Working preparation limit reaches native JOX execution and inspection configuration',()=>{
+test('dedicated Working preparation limit reaches native JOX execution and inspection configuration',async()=>{
  const host=activation('workspaceFolderValue',{workingDatabaseTimeoutSeconds:7200,testTimeoutSeconds:30}),folder=host.folders[0];
- for(const config of [host.source(folder),host.inspection(folder)]){assert.equal(config.workingDatabaseTimeoutSeconds,7200);assert.equal(config.testTimeoutSeconds,30);}
+ for(const config of [host.source(folder),await host.inspection(folder)]){assert.equal(config.workingDatabaseTimeoutSeconds,7200);assert.equal(config.testTimeoutSeconds,30);}
  assert.deepEqual(host.writes,[]);
 });
