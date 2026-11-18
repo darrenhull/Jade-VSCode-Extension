@@ -1,5 +1,6 @@
 'use strict';
 const path = require('node:path');
+const { fileURLToPath } = require('node:url');
 const { configDto } = require('./cli-client');
 const { isManagedProjectPath } = require('./source-index-scope');
 const { NativeSourceProvider } = require('./NativeSourceProvider');
@@ -115,6 +116,7 @@ class NativeSourceWorkspace {
       this.pendingChanges.delete(project); this.changing.get(project)?.source?.cancel();
       for (const watcher of project.watchers?.values() || []) watcher.dispose();
       project.watchers?.clear();
+      void project.provider.closeProject().catch(error => this.reportError(error));
     }
   }
 
@@ -122,6 +124,14 @@ class NativeSourceWorkspace {
     if (uri?.scheme === 'jade-source') {
       for (const project of this.projects.values()) {
         if (project.files.documents.has(uri.toString())) return this.project(project.folder);
+      }
+      const query = new URLSearchParams(uri.query || '');
+      const selected = query.get('project');
+      if (selected) {
+        let root;
+        try { root = fileURLToPath(selected); } catch { throw Error('Invalid source editor project URI.'); }
+        const folder = this.folders().find(value => path.relative(value.uri.fsPath, root) === '');
+        if (folder) return this.project(folder);
       }
       throw Error('The native source editor has no open project binding.');
     }
@@ -211,7 +221,18 @@ class NativeSourceWorkspace {
   }
 
   register(context) {
-    const delegate = (method, uri, ...args) => this.projectForUri(uri).files[method](uri, ...args);
+    const delegate = async (method, uri, ...args) => {
+      const project = this.projectForUri(uri);
+      if (!project.files.documents.has(uri.toString())) {
+        if (!project.provider.snapshot) {
+          const operation = project.recoveryPreparation ||= this.prepare(project.folder);
+          try { await operation; }
+          finally { if (project.recoveryPreparation === operation) project.recoveryPreparation = undefined; }
+        }
+        await project.files.recover(uri);
+      }
+      return project.files[method](uri, ...args);
+    };
     const provider = { onDidChangeFile: this.events.event, watch: () => ({ dispose() {} }) };
     for (const method of ['stat', 'readFile', 'writeFile', 'readDirectory', 'createDirectory', 'delete', 'rename'])
       provider[method] = (uri, ...args) => delegate(method, uri, ...args);
@@ -219,7 +240,11 @@ class NativeSourceWorkspace {
     if (this.vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(this.vscode.workspace.onDidChangeWorkspaceFolders(() => this.retireClosedProjects()));
     if (this.vscode.workspace.onDidCloseTextDocument) context.subscriptions.push(this.vscode.workspace.onDidCloseTextDocument(document => {
       if (document.uri.scheme !== 'jade-source') return;
-      for (const value of this.projects.values()) value.files.close(document.uri);
+      // Dirty hot-exit recovery bindings survive host disposal. Explicit clean
+      // close is the only editor event that releases persisted native metadata.
+      if (this.disposed || document.isDirty) return;
+      for (const value of this.projects.values())
+        void Promise.resolve(value.files.close(document.uri)).catch(error => this.reportError(error));
     }));
   }
 
@@ -231,7 +256,10 @@ class NativeSourceWorkspace {
     for (const project of this.projects.values()) for (const watcher of project.watchers?.values() || []) watcher.dispose();
     this.sourceListeners.clear();
     for (const listeners of this.forwarding.values()) for (const listener of listeners) listener.dispose();
-    for (const project of this.projects.values()) project.files.dispose();
+    for (const project of this.projects.values()) {
+      void project.provider.closeProject().catch(error => this.reportError(error));
+      project.files.dispose();
+    }
     this.forwarding.clear(); this.projects.clear(); this.events.dispose();
   }
 }

@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { TextDecoder } = require('node:util');
+const { pathToFileURL } = require('node:url');
 
 // This is open-editor state, not another source index. Saves are acknowledged by
 // the native provider against the exact revision originally opened in the tab.
@@ -21,8 +22,10 @@ class JadeSourceFileSystemProvider {
     if (this.entities.has(entityId)) return this.entities.get(entityId);
     if (this.opening.has(entityId)) return this.opening.get(entityId);
     const operation = (async () => {
-      const document = await this.provider.read(entityId, token);
-      const uri = this.vscode.Uri.from({ scheme: 'jade-source', path: '/.jade/projections/' + crypto.randomUUID() + '.jade' });
+      const document = await this.provider.read(entityId, token, undefined, { editor: true });
+      const recovery = document.documentBinding;
+      const uri = this.vscode.Uri.from({ scheme: 'jade-source', path: '/.jade/projections/' + (recovery?.key || crypto.randomUUID()) + '.jade',
+        ...(recovery ? { query: new URLSearchParams({ project: pathToFileURL(this.provider.root).toString(), binding: document.projectId }).toString() } : {}) });
       const now = Date.now();
       this.documents.set(uri.toString(), { uri, document, ctime: now, mtime: now, saving: false });
       this.entities.set(entityId, uri);
@@ -31,6 +34,26 @@ class JadeSourceFileSystemProvider {
     this.opening.set(entityId, operation);
     try { return await operation; }
     finally { if (this.opening.get(entityId) === operation) this.opening.delete(entityId); }
+  }
+
+  async recover(uri, token) {
+    if (this.documents.has(uri.toString())) return;
+    const identity = 'recovery:' + uri.toString();
+    if (this.opening.has(identity)) return this.opening.get(identity);
+    const operation = (async () => {
+      const match = /^\/\.jade\/projections\/([a-f0-9]{32})\.jade$/.exec(uri.path);
+      const query = new URLSearchParams(uri.query || '');
+      if (!match || query.get('binding') !== this.provider.snapshot?.projectId ||
+          query.get('project') !== pathToFileURL(this.provider.root).toString())
+        throw this.vscode.FileSystemError.Unavailable('This restored source editor has no matching native project binding. Keep its unsaved text.');
+      const document = await this.provider.reopen(match[1], token);
+      const now = Date.now();
+      this.documents.set(uri.toString(), { uri, document, ctime: now, mtime: now, saving: false });
+      this.entities.set(document.entityId, uri);
+    })();
+    this.opening.set(identity, operation);
+    try { return await operation; }
+    finally { if (this.opening.get(identity) === operation) this.opening.delete(identity); }
   }
 
   record(uri) {
@@ -77,6 +100,7 @@ class JadeSourceFileSystemProvider {
     if (!value || value.saving) return;
     this.documents.delete(uri.toString());
     this.entities.delete(value.document.entityId);
+    return this.provider.close?.(value.document);
   }
 
   async refresh(uri, { currentState } = {}) {
@@ -84,7 +108,7 @@ class JadeSourceFileSystemProvider {
     const value = this.record(uri);
     const before = currentState(), original = value.document;
     if (before.dirty || value.saving) return false;
-    const document = await this.provider.read(value.document.entityId);
+    const document = await this.provider.read(value.document.entityId, undefined, value.document);
     const after = currentState();
     if (after.dirty || value.saving || this.documents.get(uri.toString()) !== value || value.document !== original ||
         before.version !== after.version || before.document !== after.document) return false;

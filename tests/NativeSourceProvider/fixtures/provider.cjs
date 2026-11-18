@@ -22,6 +22,7 @@ function fixture(options = {}) {
           const revision = { generation: "generation-2", originByteHash: hash("updatedJOX"), memberHash: hash(body.replacementText) };
           return { passed: true, code: 0, body: { provider: "jox", projectId: snapshot.projectId, documentId: document.documentId, entityId: document.entityId, saved: true, newRevision: revision, sourceSnapshot: { provider: "jox", projectId: snapshot.projectId, generation: revision.generation, snapshotHash: hash("acceptedSavedSnapshot") }, origin: { ...document.origin, originByteHash: revision.originByteHash }, projection: { ...document.projection, text: body.replacementText, contentHash: hash(body.replacementText) }, changedEntityIds: [document.entityId] } };
         }
+        if (command === "source.semantic.closeProject") return { passed: true, code: 0, body: { closed: true } };
         if (command === "cancel") return { passed: true, code: 0, cancelled: true };
         throw Error("Unexpected legacy/native operation: " + command);
       };

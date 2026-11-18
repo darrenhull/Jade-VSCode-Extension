@@ -53,7 +53,7 @@ class CliWorkingSession{
   return client;
  }
  request(command,body={},output,events,expectedClient){
-  if(command.startsWith('source.')&&body.config)body={...body,config:sourceConfiguration(body.config)};
+  if(command.startsWith('source.')&&!command.startsWith('source.semantic.')&&body.config)body={...body,config:sourceConfiguration(body.config)};
   if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
   const client=expectedClient||this.connect(),id=++this.nextId;
   const promise=new Promise((resolve,reject)=>{

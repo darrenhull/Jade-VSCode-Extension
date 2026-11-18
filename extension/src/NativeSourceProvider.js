@@ -107,7 +107,7 @@ class NativeSourceProvider {
       return fileURLToPath(value);
     });
     this.snapshot = clone(snapshot);
-    this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch']
+    this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen']
       .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     return clone(snapshot);
   }
@@ -166,6 +166,15 @@ class NativeSourceProvider {
     if (typeof document.projection.text !== 'string' ||
         crypto.createHash('sha256').update(document.projection.text, 'utf8').digest('hex') !== hash(document.projection.contentHash, 'projection'))
       throw Error('Native projection text hash does not match.');
+    if (document.documentBinding) {
+      if (!this.flags?.documentReopen) throw Error("Native editor recovery capability is unavailable.");
+      const binding = document.documentBinding;
+      if (binding?.format !== 1 || !/^[a-f0-9]{32}$/.test(binding.key || ''))
+        throw Error('Missing native open-document recovery binding.');
+      const project = new URL(binding.projectUri);
+      if (project.protocol !== 'file:' || project.search || project.hash || path.relative(this.root, fileURLToPath(project)) !== '')
+        throw Error('The native editor recovery binding belongs to another project.');
+    }
     if (!Array.isArray(document.supportedEdits)) throw Error('Missing native supported edit kinds.');
     if (document.supportedEdits.length && (!this.flags?.projectionEdit || document.projection.editKind !== 'projectionText' ||
         !document.supportedEdits.includes('projectionText')))
@@ -179,12 +188,52 @@ class NativeSourceProvider {
     return value;
   }
 
-  async read(entityId, token) {
+  async read(entityId, token, opened, { editor = false } = {}) {
     const binding = this.binding();
     if (!this.flags.projectionRead) throw Error('This native provider does not support source projection reads.');
-    const document = await this.request('source.semantic.read', { ...binding, entityId: required(entityId, 'entity identity') }, token);
+    const document = await this.request('source.semantic.read', { ...binding, entityId: required(entityId, 'entity identity'),
+      ...(opened?.documentBinding ? { documentBinding: opened.documentBinding.key } : {}),
+      ...(editor && this.flags.documentReopen ? { openDocument: true } : {}) }, token);
     this.validateDocument(document, binding);
     if (document.entityId !== entityId) throw Error('Invalid native document entity binding.');
+    if (editor && this.flags.documentReopen && !document.documentBinding) throw Error('Missing native editor recovery binding.');
+    return this.retain(document);
+  }
+
+  closeProject() {
+    return this.serializeSource(async () => {
+      const snapshot = this.snapshot, connection = this.connection;
+      if (!snapshot || !connection || this.client.client !== connection || connection.closed) return;
+      // Scope may already be closed in VS Code. Cleanup uses only the captured
+      // authenticated channel; it neither rediscovers config nor spawns a client.
+      const request = this.client.request('source.semantic.closeProject', {
+        provider: snapshot.provider, projectId: snapshot.projectId
+      }, undefined, undefined, connection);
+      const result = await request.promise;
+      if (result?.passed !== true || result.code !== 0)
+        throw Error(result?.report?.error || 'The native source project could not be closed.');
+      if (this.snapshot === snapshot) this.snapshot = undefined;
+    });
+  }
+
+  async close(opened) {
+    const retained = this.documents.get(opened);
+    if (!retained?.document.documentBinding || !this.flags?.documentReopen) return;
+    // Disposal/restart must never spawn another client to clean an old binding.
+    if (retained.connection !== this.client.client || retained.connection.closed) return;
+    const document = retained.document;
+    await this.request('source.semantic.closeDocument', { ...this.binding(), documentId: document.documentId,
+      entityId: document.entityId, documentBinding: document.documentBinding.key });
+    this.documents.delete(opened);
+  }
+
+  async reopen(key, token) {
+    if (!this.flags?.documentReopen || !/^[a-f0-9]{32}$/.test(key || ''))
+      throw Error('This source editor cannot be restored by the native runtime. Keep unsaved text and reopen the saved member.');
+    const binding = this.binding();
+    const document = await this.request('source.semantic.reopen', { ...binding, documentBinding: key }, token);
+    this.validateDocument(document, binding);
+    if (document.documentBinding.key !== key) throw Error('The native runtime returned a different editor recovery binding.');
     return this.retain(document);
   }
 
@@ -202,13 +251,17 @@ class NativeSourceProvider {
     if (typeof replacementText !== 'string') throw Error('Native source replacement must be text.');
     const saved = await this.request('source.semantic.applyEdit', {
       provider: document.provider, projectId: document.projectId, documentId: document.documentId, entityId: document.entityId,
-      baseRevision: clone(document.revision), editKind, replacementText
+      baseRevision: clone(document.revision), editKind, replacementText,
+      ...(document.documentBinding ? { documentBinding: document.documentBinding.key } : {})
     }, token);
     if (saved.saved !== true || saved.provider !== document.provider || saved.projectId !== document.projectId ||
         saved.documentId !== document.documentId || saved.entityId !== document.entityId || saved.origin?.uri !== document.origin.uri)
       throw Error('Invalid native saved document binding.');
     const next = { ...document, generation: saved.newRevision?.generation, revision: saved.newRevision,
-      origin: saved.origin, projection: saved.projection };
+      origin: saved.origin, projection: saved.projection,
+      ...(saved.documentBinding ? { documentBinding: saved.documentBinding } : {}) };
+    if (document.documentBinding && saved.documentBinding?.key !== document.documentBinding.key)
+      throw Error('The saved document changed its native recovery binding.');
     this.validateDocument(next, { provider: document.provider, projectId: document.projectId, generation: saved.newRevision?.generation });
     const snapshot = saved.sourceSnapshot;
     if (!snapshot || snapshot.provider !== document.provider || snapshot.projectId !== document.projectId ||

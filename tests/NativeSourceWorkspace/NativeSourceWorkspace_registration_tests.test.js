@@ -42,7 +42,7 @@ test('one FileSystemProvider routes two native projects without accepting a fore
   const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: folder => ({ ...f.config, workspaceRoots: [folder.uri.fsPath] }) });
   const first = registered.workspace.project(f.folder), second = registered.workspace.project(other);
   assert.notEqual(first.provider, second.provider); assert.equal(f.fileSystems.size, 1);
-  assert.throws(() => f.fileSystems.get('jade-source').readFile(f.vscode.Uri.from({ scheme: 'jade-source', path: '/foreign.jade' })), /binding|owned|found/);
+  await assert.rejects(f.fileSystems.get('jade-source').readFile(f.vscode.Uri.from({ scheme: 'jade-source', path: '/foreign.jade' })), /binding|owned|found/);
 });
 test('native test discovery and two actual UI runs use opaque identity without CLS discovery or result reuse', async () => {
   const f = setup({ testing: true, reply: (command, request) => {
