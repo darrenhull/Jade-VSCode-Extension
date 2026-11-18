@@ -25,7 +25,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const folder=vscode.workspace.getWorkspaceFolder(resource);
     if(!folder)throw Error('Choose an open Jade project.');
     if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
-    return initialization.initialize(resource);
+    return initialization.initialize(resource,{notify:false});
   };
   async function targets(folder,{initialization:creating=false}={}) {
     const project=projectFor(folder),capability=await project.provider.capability();projectFor(folder);
@@ -60,20 +60,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,
-    initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>{
-      const result=await project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write);
-      if (result.viewRefreshRequired) { output.appendLine(result.warning); return result; }
-      try {
-        projectFor(folder);workspace.observeSources(project);
-        // A committed native result remains authoritative even if Stop was too
-        // late or the project/view closed while native work was completing.
-        await workspace.refresh(folder,undefined,{prepared:true});
-      } catch(error) {
-        output.appendLine('Working and saved source files were created. Refresh Object Explorer when the project is open.');
-        output.appendLine(error.message);
-      }
-      return result;
-    }),
+    initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
+      project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
+    refreshProject:async(folder,{prepared})=>{
+      const project=projectFor(folder);
+      await workspace.refresh(folder,undefined,{prepared});
+      projectFor(folder);workspace.observeSources(project);
+    },
+    openExplorer:()=>vscode.commands.executeCommand('jadeNative.classes.focus'),
     connectWorking:(folder,reviewed)=>working(folder,'Preparing the private Working copy',async(project,token,write)=>{
       await project.provider.request('working.prepare',{cwd:project.provider.root,config:{...project.provider.config},expectedWorkingIdentity:reviewed.working.identity},token,write);
       return{selection:'working',readOnly:true};

@@ -6,7 +6,7 @@ function fixture(t,{picks=[],warnings=[],inputs=[],folderOpen=true,git=true,init
  const api={git:{path:'C:/Git/git.exe'},openRepository:async value=>{calls.push(['repository',value.fsPath]);return{pull:async()=>calls.push(['pull'])};},clone:async(value,options)=>{calls.push(['clone',value.toString(),options]);fs.mkdirSync(path.join(root,'cloned'));return uri(path.join(root,'cloned'));}};
  const vscode={Uri:{file:uri,parse:value=>{const parsed=new URL(value);return{scheme:parsed.protocol.slice(0,-1),fsPath:parsed.protocol==='file:'?require('node:url').fileURLToPath(parsed):'',authority:parsed.host,toString:()=>value};}},ProgressLocation:{Notification:15},commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return{dispose(){}};},executeCommand:async(...args)=>{calls.push(['command',...args]);}},extensions:{getExtension:()=>git?{activate:async()=>({enabled:true,getAPI:()=>api})}:undefined},env:{openExternal:async value=>{calls.push(['external',value.toString()]);return true;}},workspace:{workspaceFolders:folderOpen?[folder]:[],getWorkspaceFolder:value=>folderOpen&&path.resolve(value.fsPath)===root?folder:undefined},window:{createOutputChannel:()=>({show(){},appendLine:line=>logs.push(line),dispose(){}}),showQuickPick:async(rows,options)=>{calls.push(['pick',options?.title]);const selected=picks.shift();return typeof selected==='string'?rows.find(row=>row.kind===selected||row.label===selected):selected;},showInputBox:async()=>inputs.shift(),showOpenDialog:async()=>[uri(root)],showWarningMessage:async(message,...actions)=>{calls.push(['warning',message,actions]);return warnings.shift();},showInformationMessage:async(message,...actions)=>{calls.push(['info',message,actions]);return warnings.shift();},showErrorMessage:async message=>calls.push(['error',message])}};
  const context={subscriptions:[],globalState:{get:key=>state.get(key),update:async(key,value)=>{value===undefined?state.delete(key):state.set(key,value);}}};
- const services={initialize:async value=>{calls.push(['initialize',value.fsPath]);return initialize;},targets:async value=>({config:{installPath:'C:/Jade',databasePath:'C:/Source/system',iniPath:'C:/Source/jade.ini',server:'singleUser',workspaceRoots:[value.uri.fsPath]},working:{databasePath:path.join(root,'.jade/working/system')}}),connectWorking:async(value,config)=>{calls.push(['working',value.uri.fsPath,config]);return{selection:'working',readOnly:true};},extract:async value=>{calls.push(['extract',value.fsPath]);return{passed:true};}};
+ const services={initialize:async value=>{calls.push(['initialize',value.fsPath]);return initialize;},targets:async value=>({config:{installPath:'C:/Jade',databasePath:'C:/Source/system',iniPath:'C:/Source/jade.ini',server:'singleUser',workspaceRoots:[value.uri.fsPath]},working:{databasePath:path.join(root,'.jade/working/system'),identity:'native-working'},destination:path.join(root,'sources')}),connectWorking:async(value,config)=>{calls.push(['working',value.uri.fsPath,config]);return{selection:'working',readOnly:true};},extract:async value=>{calls.push(['extract',value.fsPath]);return{passed:true};}};
  const controller=registerWorkspaceOnboarding(vscode,context,services);return{root,folder,uri,vscode,context,api,services,controller,calls,logs,state,commands};
 }
 test('existing project delegates initialization and reports Working not prepared',async t=>{const f=fixture(t,{picks:['folder','existing','later']});const result=await f.controller.setup();assert.equal(result.configurationReady,true);assert.equal(result.workingPrepared,false);assert.equal(f.calls.filter(c=>c[0]==='initialize').length,1);assert.equal(f.calls.filter(c=>['working','extract','pull'].includes(c[0])).length,0);});
@@ -87,10 +87,11 @@ test('combined setup activation delegates to the one shared SourcePull Working s
 
 test('JOX setup creates Working and extracts once without legacy baseline or a second connection',async t=>{
  const f=fixture(t,{picks:['folder','extract','working'],warnings:['Create Working and extract']});f.services.jox=true;
- const target={config:{installPath:'C:/Runtime',databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},working:{databasePath:'C:/Project/.jade/working/system',identity:'native-target'},destination:'C:/Project/sources'};
+ const target={config:{installPath:'C:/Runtime',databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},working:{databasePath:path.join(f.root,'.jade/working/system'),identity:'native-target'},destination:path.join(f.root,'sources')};
  f.services.targets=async()=>target;
  const snapshot={provider:'jox',projectId:'opaque-project',generation:'native-generation',snapshotHash:'native-hash'};
  f.services.initializeWorkingSources=async(folder,reviewed)=>{assert.equal(reviewed,target);f.calls.push(['joxInitialize']);return{sourceSnapshot:snapshot,extractedFiles:7};};
+ f.services.refreshProject=async()=>f.calls.push(['refresh']);f.services.openExplorer=async()=>f.calls.push(['reveal']);
  const value=await f.controller.setup();assert.equal(value.workingPrepared,true);assert.deepEqual(value.sourceSnapshot,snapshot);
  assert.equal(f.calls.filter(c=>c[0]==='joxInitialize').length,1);assert.ok(!f.calls.some(c=>['extract','working','sync'].includes(c[0])));
  assert.ok(!f.logs.some(line=>/source index|verified|baseline|connected\./i.test(line)));
@@ -100,41 +101,23 @@ test('JOX setup declined at target review never starts restore or export',async 
  f.services.initializeWorkingSources=async()=>{f.calls.push(['joxInitialize']);};
  assert.equal((await f.controller.setup()).cancelled,true);assert.ok(!f.calls.some(c=>['extract','working','sync','joxInitialize'].includes(c[0])));
 });
-test('JOX extraction deferred with Working never falls back to Source export',async t=>{
+test('JOX single-command target cancellation never falls back to Source export',async t=>{
  const f=fixture(t,{picks:['folder','extract','later']});f.services.jox=true;
- const value=await f.controller.setup();assert.equal(value.deferred,true);assert.equal(value.workingPrepared,false);
+ const value=await f.controller.setup();assert.equal(value.cancelled,true);assert.equal(value.completed,false);assert.equal(value.stage,'review');assert.equal(value.workingPrepared,false);
  assert.ok(!f.calls.some(c=>['extract','working','sync'].includes(c[0])));
 });
 
-test('JOX activation registers the actual setup action with one reviewed native request and no extra prepare',async t=>{
- const f=fixture(t,{picks:['extract','working'],warnings:['Create Working and extract']});f.commands.clear();
- f.vscode.window.withProgress=async(_options,run)=>run({report(){}},{isCancellationRequested:false});
- f.vscode.window.showInformationMessage=async()=>undefined;
- const requests=[],body={sourceSnapshot:{provider:'jox',projectId:'native',generation:'g',snapshotHash:'h'},extractedFiles:7};
- const project={folder:f.folder,provider:{config:{sourceFormat:'jox',workingJadeGitPolicy:'inherit'},connection:{},root:f.root,
-  capability:async()=>({catalogue:true,initialization:true}),request:async(command,args)=>{requests.push([command,args]);return{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:'C:/Runtime',identity:'reviewed-working'},source:{databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},initialization:{destination:path.join(f.root,'sources')}};},
-  initialize:async(args)=>{requests.push(['working.initialize',args]);return body;}}};
- const workspace={executing:false,projects:new Map([[f.folder.uri.toString(),project]]),project:()=>project,changing:new Map(),pendingChanges:new Map(),beforeOperation:async()=>requests.push(['release-own-inspection']),observeSources:()=>requests.push(['watch']),refresh:async(_folder,_token,options)=>{requests.push(['refresh',options]);throw Error('synthetic view refresh cancelled after native commit');}};
- const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true}]}}),request:(command,args)=>{requests.push([command,args]);return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})}}};
- const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor:()=>({sourceFormat:'jox'}),detect:async()=>undefined});
- assert.ok(f.commands.has('jadeNative.setupProject')&&f.commands.has('jadeNative.initializeWorkspace'));
- const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.workingPrepared,true,JSON.stringify(result));
- const start=requests.find(row=>row[0]==='working.initialize');assert.deepEqual(start[1],{destination:path.join(f.root,'sources'),expectedWorkingIdentity:'reviewed-working'});
- assert.equal(requests.filter(row=>row[0]==='working.initialize').length,1);assert.ok(requests.some(row=>row[0]==='refresh'&&row[1].prepared===true));
- assert.ok(!requests.some(row=>['source.semantic.prepare','source.extract','working.sync','source.index.prepare'].includes(row[0])));
- let choice=0;f.vscode.window.showQuickPick=async rows=>{const kind=choice++===0?'existing':'working';return rows.find(row=>row.kind===kind);};
- f.vscode.window.showWarningMessage=async()=> 'Prepare Working';
- const existing=await setup.onboarding.setup(f.folder.uri);assert.equal(existing.workingPrepared,true,JSON.stringify(existing));
- const prepare=requests.find(row=>row[0]==='working.prepare');assert.equal(prepare[1].expectedWorkingIdentity,'reviewed-working');
- assert.deepEqual(prepare[1].config,project.provider.config);assert.equal(requests.filter(row=>row[0]==='working.initialize').length,1);
- choice=0;f.vscode.window.showQuickPick=async rows=>{const kind=choice++===0?'extract':'working';return rows.find(row=>row.kind===kind);};
- f.vscode.window.showWarningMessage=async()=> 'Create Working and extract';
- project.provider.initialize=async args=>{requests.push(['working.initialize',args]);return{...body,viewRefreshRequired:true,warning:'Working and source creation completed; reconnect the view.'};};
- const refreshes=requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length;
- const closed=await setup.onboarding.setup(f.folder.uri);assert.equal(closed.workingPrepared,true,JSON.stringify(closed));
- assert.equal(requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length,refreshes,'Completed setup reconnected/refreshed a replaced runtime');
- const before=requests.length;client.sourceCapabilities=async()=>{throw Error('Update the Jade CLI: JOX unsupported');};
- const old=await f.commands.get('jadeNative.initializeWorkspace')(f.folder.uri);assert.equal(old.passed,false);assert.match(old.error,/JOX unsupported/);assert.equal(requests.length,before,'Direct setup silently used the old CLI init');
+test('JOX native commit remains visible when awaited view refresh fails',async t=>{
+ const f=completeJoxFixture(t,{configured:true});f.workspace.onDidChangeSource(async()=>{throw Error('synthetic view refresh failure after native commit');});
+ const result=await f.run();assert.equal(result.workingPrepared,true);assert.equal(result.sourceReady,true);assert.equal(result.completed,false);assert.equal(result.viewsReady,false);assert.equal(result.stage,'refresh');assert.equal(result.passed,false);assert.match(result.error,/synthetic view refresh failure/);
+ const start=f.requests.find(row=>row.command==='working.initialize');assert.deepEqual(start.args.destination,f.destination);assert.equal(start.args.expectedWorkingIdentity,'native-reviewed-target');
+ assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,1);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,0);assert.ok(!f.calls.some(row=>row[0]==='command'&&row[1]==='jadeNative.classes.focus'));
+});
+
+test('JOX connection replacement after accepted extraction never reconnects or claims complete views',async t=>{
+ const f=completeJoxFixture(t,{configured:true,replaceAfterExtraction:true});const result=await f.run();
+ assert.equal(result.workingPrepared,true);assert.ok(result.sourceSnapshot);assert.equal(result.viewRefreshRequired,true);assert.equal(result.completed,false);assert.equal(result.passed,false);assert.equal(result.stage,'refresh');
+ assert.equal(f.explorerRefreshes(),0);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare'||row.command==='source.semantic.query').length,0);
 });
 
 test('JOX setup preserves committed native outcome when its project closes after extraction',async t=>{
@@ -160,7 +143,7 @@ test('real JOX setup defers its project binding until native-first runtime detec
  }};
  const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});
  const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor,detect:async()=>{detects++;selected=true;return settings;}});
- const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.configurationReady,true,JSON.stringify(result));assert.equal(result.workingPrepared,false);
+ const result=await setup.initialization.initialize(f.folder.uri);assert.equal(result.passed,true,JSON.stringify(result));
  assert.equal(detects,1);assert.equal(initializations,2);
  const project=workspace.project(f.folder);assert.equal(project.provider.config.installPath,settings.installPath);
  assert.equal(workspace.projects.size,1);assert.equal(project.files.documents.size,0);
@@ -184,7 +167,7 @@ test('Explorer-enumerated cold project survives Detect handoff and reaches nativ
    return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
   }
   assert.equal(command,'working.location');targets++;assert.equal(args.config.installPath,settings.installPath);
-  return{promise:Promise.resolve({passed:true,code:0,body:{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:settings.installPath,identity:'native-target'},source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server}}})};
+  return{promise:Promise.resolve({passed:true,code:0,body:{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:settings.installPath,identity:'native-target'},source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server},initialization:{destination:path.join(f.root,'sources')}}})};
  }};
  const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});
  const explorer=require('../../extension/src/native-source-explorer').registerNativeSourceExplorer(f.vscode,f.context,workspace,{});
@@ -240,4 +223,86 @@ test('ordinary callers retain the cold configuration guard and unrelated recover
  const f=coldSetupProject(t);f.vscode.workspace.textDocuments=[{isDirty:true,uri:{scheme:'jade-source',query:new URLSearchParams({project:f.uri(path.join(f.root,'other')).toString(),binding:'other-native-project'}).toString()}}];f.select();
  assert.throws(()=>f.workspace.project(f.folder),/settings changed/);
  assert.equal(f.workspace.project(f.folder,{allowColdConfiguration:true}),f.project);assert.equal(f.project.provider.config.installPath,'C:/Chosen Jade');
+});
+
+
+function completeJoxFixture(t,{configured=false,cancelDetect=false,cancelReview=false,cancelWorking=false,failInitialization=false,replaceAfterExtraction=false,failReuse=false}={}){
+ const f=fixture(t,{warnings:cancelReview?[]:['Create Working and extract']}),{NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ const requests=[],connection={closed:false},destination=path.join(f.root,'sources');let detected=configured,detects=0,failed=false,explorerRefreshes=0;
+ class Emitter{constructor(){this.listeners=new Set();this.event=listener=>{this.listeners.add(listener);return{dispose:()=>this.listeners.delete(listener)};};}fire(value){for(const listener of this.listeners)listener(value);}dispose(){this.listeners.clear();}}
+ const collection=()=>{const values=new Map();return{add:item=>values.set(item.id,item),replace:items=>{values.clear();for(const item of items)values.set(item.id,item);},forEach:fn=>values.forEach(fn),get:id=>values.get(id),get size(){return values.size;}};};
+ const controller={items:collection(),createTestItem:(id,label)=>({id,label,children:collection()}),createRunProfile(){},dispose(){}};
+ f.vscode.EventEmitter=Emitter;f.vscode.TestRunProfileKind={Run:1};f.vscode.tests={createTestController:()=>controller};f.vscode.window.createTreeView=()=>({dispose(){}});
+ f.vscode.window.withProgress=async(options,run)=>run({report(){}},{isCancellationRequested:cancelWorking&&/Creating Working/.test(options.title),onCancellationRequested:()=>({dispose(){}})});
+ const settings={installPath:'C:/Chosen Jade',databasePath:'C:/Chosen Source/system',iniPath:'C:/Chosen Source/source.ini',server:'singleUser'};
+ const capabilities={id:'jox',catalogue:true,initialization:true,nativeTests:true,projectionRead:true,projectionEdit:true,documentReopen:true};
+ const snapshot={provider:'jox',projectId:'native-project',generation:'native-generation',snapshotHash:'a'.repeat(64)};
+ const bound={...snapshot,projectRoot:f.folder.uri.toString(),sourceRoots:[f.uri(destination).toString()],capabilities};
+ const working={root:path.join(f.root,'.jade/working'),databasePath:path.join(f.root,'.jade/working/system'),installPath:settings.installPath,identity:'native-reviewed-target'};
+ const reply=body=>({promise:Promise.resolve({passed:true,code:0,body})});
+ const client={client:connection,connect:()=>connection,sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[capabilities]}}),request(command,args){
+  requests.push({command,args});
+  if(command==='cli'){
+   assert.equal(args.operation,'init');
+   if(!detected)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Jade connection setup is required. Run jade-cli init --install <Jade folder> or choose --profile <name>; noninteractive commands never prompt.'}})};
+   fs.writeFileSync(path.join(f.root,'jade.json'),'{"connection":"native-profile","sourceFormat":"jox"}');
+   return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
+  }
+  if(command==='working.location')return reply({working,source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server},initialization:{destination}});
+  if(command==='working.initialize'){
+   if(failInitialization&&!failed){failed=true;return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native restore stopped; existing owned outputs preserved'}})};}
+   fs.mkdirSync(destination,{recursive:true});fs.writeFileSync(path.join(destination,'saved-origin.jox'),'native saved source');
+   if(replaceAfterExtraction)client.client={closed:false};
+   return reply({...bound,sourceSnapshot:snapshot,working,extractedFiles:1});
+  }
+  if(command==='working.prepare'){if(failReuse)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Initialize the owned JOX Working copy before execution; no database was created'}})};return reply({working});}
+  if(command==='source.semantic.prepare')return reply(bound);
+  if(command==='source.semantic.query')return reply({...snapshot,items:[{id:'native-test',kind:'method',name:'checkValue',testIdentity:{schema:'NativeSchema',class:'NativeTests',method:'checkValue'}}],offset:args.offset,limit:args.limit,total:1,nextOffset:null});
+  assert.fail('Unexpected native request '+command);
+ }};
+ const configFor=()=>({sourceFormat:'jox',...(detected&&!configured?settings:{})});
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});
+ const explorer=require('../../extension/src/native-source-explorer').registerNativeSourceExplorer(f.vscode,f.context,workspace,{refresh:async()=>{explorerRefreshes++;}});
+ const testing=require('../../extension/src/native-source-testing').registerNativeSourceTesting(f.vscode,f.context,workspace);
+ workspace.onDidChangeSource(project=>Promise.all([explorer.changed(project),testing.refreshProject(project)]));
+ const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor,detect:async()=>{detects++;if(cancelDetect)return;detected=true;return settings;}});
+ return{...f,workspace,explorer,testing,requests,controller,destination,resume:()=>setup.onboarding.resume(),run:()=>f.commands.get('jadeNative.setupProject')(f.folder.uri),detects:()=>detects,explorerRefreshes:()=>explorerRefreshes};
+}
+for(const configured of [false,true])test('one registered Set Up Project completes native configuration, extraction, Explorer and tests: profile='+configured,async t=>{
+ const f=completeJoxFixture(t,{configured});await f.explorer.provider.getChildren();
+ const result=await f.run();assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.workingPrepared,true);assert.equal(result.viewsReady,true);assert.equal(result.stage,'complete');
+ assert.equal(f.detects(),configured?0:1);assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,1);
+ const review=f.calls.find(row=>row[0]==='warning'&&row[2][0]?.modal);assert.match(review[2][0].detail,/\nServer: singleUser\n/);
+ assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,0,'Accepted initialization snapshot must not be prepared again');
+ assert.equal(f.explorerRefreshes(),1);assert.equal(f.controller.items.get(f.folder.uri.toString()).children.size,1);
+ assert.ok(f.calls.some(row=>row[0]==='command'&&row[1]==='jadeNative.classes.focus'));
+ assert.ok(!f.calls.some(row=>row[0]==='pick'),'Already-open folder needs no source/Working command-hop choices');
+});
+for(const stop of ['detect','review','working'])test('single-command cancellation stops at '+stop+' before later native work',async t=>{
+ const f=completeJoxFixture(t,{cancelDetect:stop==='detect',cancelReview:stop==='review',cancelWorking:stop==='working'});
+ const result=await f.run();assert.equal(result.cancelled,true,JSON.stringify(result));assert.equal(result.completed,false);assert.equal(result.stage,stop==='detect'?'configuration':stop==='review'?'review':'working');
+ assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,0);assert.equal(f.explorerRefreshes(),0);assert.equal(f.controller.items.size,0);
+});
+test('single-command retry preserves native failure then reuses completed sources and Working',async t=>{
+ const f=completeJoxFixture(t,{configured:true,failInitialization:true});
+ const first=await f.run();assert.equal(first.passed,false);assert.equal(first.code,6295);assert.equal(first.stage,'working');assert.equal(first.completed,false);assert.equal(f.explorerRefreshes(),0);
+ f.vscode.window.showWarningMessage=async()=> 'Create Working and extract';const second=await f.run();assert.equal(second.completed,true,JSON.stringify(second));
+ const saved=fs.readFileSync(path.join(f.destination,'saved-origin.jox'));f.vscode.window.showWarningMessage=async()=> 'Prepare Working';
+ const third=await f.run();assert.equal(third.completed,true,JSON.stringify(third));assert.deepEqual(fs.readFileSync(path.join(f.destination,'saved-origin.jox')),saved);
+ assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,2,'Retry must never re-extract completed sources');assert.equal(f.requests.filter(row=>row.command==='working.prepare').length,1);
+ assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,1,'Existing sources need one normal native capture');
+});
+
+test('verified JOX folder continuation automatically completes once without a second command',async t=>{
+ const f=completeJoxFixture(t,{configured:true}),nonce=require('node:crypto').randomUUID();fs.mkdirSync(path.join(f.root,'.jade'));
+ const marker=path.join(f.root,'.jade/project-setup.pending');fs.writeFileSync(marker,JSON.stringify({format:'jade-project-setup/1',nonce}));f.state.set('jadeNative.pendingProjectSetup',{uri:f.folder.uri.toString(),nonce});
+ const result=await f.resume();assert.equal(result.completed,true,JSON.stringify(result));assert.equal(f.state.size,0);assert.equal(fs.existsSync(marker),false);
+ assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,1);assert.ok(!f.calls.some(row=>row[0]==='info'&&row[2]?.includes('Continue Project Setup')));
+ const requests=f.requests.length;assert.equal(await f.resume(),undefined);assert.equal(f.requests.length,requests);
+});
+test('existing sources without native-owned Working stop safely and never fall back to re-extraction',async t=>{
+ const f=completeJoxFixture(t,{configured:true,failReuse:true});fs.mkdirSync(f.destination);const file=path.join(f.destination,'user-source.jox'),bytes=Buffer.from('existing saved user bytes');fs.writeFileSync(file,bytes);
+ f.vscode.window.showWarningMessage=async()=> 'Prepare Working';const result=await f.run();
+ assert.equal(result.passed,false);assert.equal(result.code,2);assert.equal(result.completed,false);assert.equal(result.stage,'working');assert.match(result.error,/Initialize the owned JOX Working copy/);
+ assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,0);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,0);assert.equal(f.explorerRefreshes(),0);
 });

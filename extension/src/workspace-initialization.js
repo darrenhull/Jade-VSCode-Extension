@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),{randomUUID}=require('node
 // Native CLI owns Git/ignore and project/profile setup; this command presents progress.
 function registerWorkspaceInitialization(vscode,context,services){
  const output=vscode.window.createOutputChannel('Jade Setup'),pending=new Map();
- async function initialize(resource){
+ async function initialize(resource,{notify=true}={}){
   let folder=resource&&vscode.workspace.getWorkspaceFolder(resource);
   if(resource&&!folder)throw Error('The selected project is not open in this workspace.');
   const folders=vscode.workspace.workspaceFolders||[];
@@ -93,7 +93,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    progress.report({message:'Native project configuration is ready.'});
    output.appendLine((result.created?'Created ':'Preserved existing ')+configFile+'. Configuration step complete.');
    if(services.refreshSourceIndex){progress.report({message:'Initialising the shared Git source index…'});await services.refreshSourceIndex(folder);output.appendLine('Shared source index is ready.');}
-   if(sameFolder())void vscode.window.showInformationMessage(services.nativeDiscovery?'Jade project configuration is ready. Use Set Up Project to create Working and extract sources.':'Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
+   if(notify&&sameFolder())void vscode.window.showInformationMessage(services.nativeDiscovery?'Jade project configuration is ready. Use Set Up Project to create Working and extract sources.':'Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
    return result;
   }).finally(()=>{if(pending.get(key)===run)pending.delete(key);});
   pending.set(key,run);return run;

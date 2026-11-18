@@ -62,6 +62,53 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const name=await vscode.window.showInputBox({title:'Name the new project folder',validateInput:validate});if(name===undefined)return;if(validate(name))throw Error(validate(name));
   const directory=path.join(parent.fsPath,name);await fs.promises.mkdir(directory);return{uri:vscode.Uri.file(directory)};
  }
+ async function runJox(folder){
+  const status={gitReady:false,configurationReady:false,workingPrepared:false,sourceReady:false,viewsReady:false,completed:false};
+  let stage='configuration';
+  try{
+   const initialized=await services.initialize(folder.uri);requireFolder(folder);
+   if(initialized?.cancelled)return{...status,passed:false,code:130,cancelled:true,stage};
+   if(initialized?.passed!==true||initialized.code!==0)throw Object.assign(Error(initialized?.report?.error||initialized?.error||'Native project configuration did not complete.'),{result:initialized});
+   status.gitReady=true;status.configurationReady=true;stage='review';
+   const target=await services.targets(folder,{initialization:true});requireFolder(folder);
+   if(typeof target.destination!=='string'||!path.isAbsolute(target.destination))throw Error('Native setup did not return an absolute source destination.');
+   let existing=false;
+   try{
+    const stat=fs.lstatSync(target.destination);
+    if(!stat.isDirectory()||stat.isSymbolicLink())throw Error('The source destination must be an ordinary directory. Existing files were preserved.');
+    const directory=fs.opendirSync(target.destination);try{existing=directory.readSync()!==null;}finally{directory.closeSync();}
+   }catch(error){if(error.code!=='ENOENT')throw error;}
+   const action=existing?'Prepare Working':'Create Working and extract',c=target.config;
+   const confirm=await vscode.window.showWarningMessage(existing?'Prepare this project using its existing sources?':'Create Working copy and extract sources?',{modal:true,detail:'Project: '+folder.uri.fsPath+'\nJade installation: '+c.installPath+'\nSource: '+c.databasePath+'\nSource INI: '+c.iniPath+'\nServer: '+c.server+'\nWorking: '+target.working.databasePath+'\nSaved sources: '+target.destination+'\n\n'+(existing?'Existing source files are preserved. Native setup reuses an owned Working copy; it never resets or overwrites existing data.':'Native setup backs up Source, creates its private Working copy and extracts JOX sources once. Existing data and source files are preserved.')+' No test or Source publication is started.'},action);
+   requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
+   stage='working';
+   if(existing){
+    const connected=await services.connectWorking(folder,target);requireFolder(folder);
+    if(connected?.cancelled)return{...status,cancelled:true,stage};
+    if(connected?.selection!=='working'||connected?.readOnly!==true)throw Error(connected?.error||'Native Working preparation was not confirmed.');
+    status.workingPrepared=true;
+   }else{
+    const extracted=await services.initializeWorkingSources(folder,target);
+    if(extracted?.cancelled)return{...status,...extracted,passed:false,code:extracted.code||130,cancelled:true,completed:false,stage};
+    if(!extracted?.sourceSnapshot)throw Error('Native setup did not return its saved source snapshot.');
+    status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=extracted.sourceSnapshot;
+    stage='refresh';
+    if(extracted.viewRefreshRequired)throw Object.assign(Error(extracted.warning||'Working and source files were created, but their view connection changed.'),{result:{...extracted,passed:false,code:2}});
+    if(!openFolder(folder.uri))return{...status,passed:false,code:2,projectClosed:true,stage};
+   }
+   stage='refresh';requireFolder(folder);
+   await services.refreshProject(folder,{prepared:!existing});requireFolder(folder);
+   status.sourceReady=true;status.viewsReady=true;stage='explorer';
+   await services.openExplorer(folder);requireFolder(folder);
+   log('Jade project is ready. Working and saved sources are prepared; Object Explorer and tests are refreshed.');
+   return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:existing?'existing':'extract'};
+  }catch(error){
+   const native=error.result,cancelled=native?native.cancelled===true:error.cancelled===true;
+   error.result={...status,...native,passed:false,completed:false,stage,code:native?.code??(cancelled?130:2),...(cancelled?{cancelled:true}:{})};
+   error.message='Jade setup stopped during '+stage+': '+error.message;
+   throw error;
+  }
+ }
  async function run(resource){
   const selected=await selectProject(resource);if(!selected)return{cancelled:true};if(selected.gitReady===false)return{gitReady:false,configurationReady:false,workingPrepared:false};
   const {uri}=selected;if(uri.scheme!=='file')throw Error('Choose a local project folder.');
@@ -69,8 +116,9 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const folder=openFolder(uri);
   if(!folder)return continueAfterOpen(uri);
   requireFolder(folder);const repository=await api.openRepository(folder.uri);requireFolder(folder);
-  if(repository?.state?.remotes?.length){const choice=await vscode.window.showQuickPick([{label:'Use the current checkout',kind:'current'},{label:'Pull changes with Git',kind:'pull'}],{title:'Repository sources · '+folder.name,placeHolder:repository.rootUri?.fsPath||folder.uri.fsPath});if(!choice)return{cancelled:true};if(choice.kind==='pull'){log('Pulling through VS Code Git; conflicts and local edits remain under Git control.');await repository.pull();requireFolder(folder);}}
+  if(!services.jox&&repository?.state?.remotes?.length){const choice=await vscode.window.showQuickPick([{label:'Use the current checkout',kind:'current'},{label:'Pull changes with Git',kind:'pull'}],{title:'Repository sources · '+folder.name,placeHolder:repository.rootUri?.fsPath||folder.uri.fsPath});if(!choice)return{cancelled:true};if(choice.kind==='pull'){log('Pulling through VS Code Git; conflicts and local edits remain under Git control.');await repository.pull();requireFolder(folder);}}
   log('Initialising project configuration and Git ignore'+(services.jox?'':' and the shared source index')+' in '+folder.uri.fsPath+'.');
+  if(services.jox)return runJox(folder);
   const initialized=await services.initialize(folder.uri);requireFolder(folder);
   if(initialized?.cancelled)return{cancelled:true,configurationReady:false,workingPrepared:false};
   if(initialized?.passed!==true||initialized.code!==0)throw Error(initialized?.report?.error||initialized?.error||'Native workspace initialization did not complete.');
@@ -118,14 +166,15 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const result={...base,sourceChoice:source.kind};log('Project configuration ready. Source route: '+source.kind+'. Working: '+workingStatus);
   void vscode.window.showInformationMessage('Jade project configuration is ready. Working '+(base.sourceSnapshot?'is prepared with saved JOX sources.':base.workingBaseline?'is prepared with its native source baseline.':base.workingPrepared?(services.jox?'is prepared.':'is prepared and connected.'):'has not been prepared.'));return result;
  }
- function setup(resource){if(pending)return pending;pending=run(resource).catch(error=>{log(error.message);void vscode.window.showErrorMessage(error.message);return{...error.result,passed:false,error:error.message};}).finally(()=>{pending=undefined;});return pending;}
+ function setup(resource){if(pending)return pending;pending=run(resource).catch(error=>{log(error.message);if(!error.result?.cancelled)void vscode.window.showErrorMessage(error.message);return{...error.result,passed:false,error:error.message};}).finally(()=>{pending=undefined;});return pending;}
  async function resume(){
   const intent=context.globalState.get(CONTINUATION);if(intent===undefined)return;
   if(!intent||typeof intent.uri!=='string'||typeof intent.nonce!=='string'||!/^[0-9a-f-]{36}$/i.test(intent.nonce)){await context.globalState.update(CONTINUATION,undefined);return;}
   let uri;try{uri=vscode.Uri.parse(intent.uri);}catch{await context.globalState.update(CONTINUATION,undefined);return;}
   if(uri.scheme!=='file'){await context.globalState.update(CONTINUATION,undefined);return;}const folder=openFolder(uri);if(!folder)return;
   if(!ownsMarker(intent,uri)){await context.globalState.update(CONTINUATION,undefined);void vscode.window.showWarningMessage('The project setup continuation could not be verified. Existing files were preserved. Run Set Up Project explicitly to retry.');return{cancelled:true};}
-  await clearContinuation(intent,uri);const choice=await vscode.window.showInformationMessage('Continue setting up Jade in '+folder.uri.fsPath+'?','Continue Project Setup');if(choice==='Continue Project Setup'&&openFolder(uri))return setup(uri);return{cancelled:true};
+  await clearContinuation(intent,uri);if(services.jox)return setup(uri);
+  const choice=await vscode.window.showInformationMessage('Continue setting up Jade in '+folder.uri.fsPath+'?','Continue Project Setup');if(choice==='Continue Project Setup'&&openFolder(uri))return setup(uri);return{cancelled:true};
  }
  context.subscriptions.push(output,vscode.commands.registerCommand('jadeNative.setupProject',setup));return{setup,resume};
 }
