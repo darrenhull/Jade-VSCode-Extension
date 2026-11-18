@@ -8,7 +8,8 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
       const label = row.label || row.entity?.name || row.project.folder.name;
       const expandable = row.queryKind || row.kind === 'project';
       const item = new vscode.TreeItem(label, expandable ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-      item.id = JSON.stringify([row.project.folder.uri.toString(), row.entity?.id || '', row.kind, row.offset || 0]);
+      item.id = JSON.stringify([row.project.folder.uri.toString(), row.entity?.id || row.parentId || '', row.kind, row.offset || 0,
+        ...(row.kind === 'page' ? [row.queryKind] : [])]);
       item.description = row.entity?.signature || row.entity?.qualifiedName?.schema;
       item.contextValue = !row.entity ? 'jadeSourceProject' : row.entity.kind === 'schema' ? 'jadeSourceSchema'
         : ['class', 'interface', 'primitive', 'type'].includes(row.entity.kind) ? 'jadeSourceClass'
