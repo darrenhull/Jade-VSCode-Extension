@@ -1,18 +1,31 @@
 "use strict";
 const { registerWorkspaceInitialization }=require('./workspace-initialization');
 const { registerWorkspaceOnboarding }=require('./workspace-onboarding');
+const { NativeSourceProvider }=require('./NativeSourceProvider');
 /** Existing setup presentation over native config, targets and one fresh extraction. */
 function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect}) {
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const projectFor=folder=>workspace.project(folder);
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
-    validateRuntime:async folder=>{await projectFor(folder).provider.capability();projectFor(folder);}
+    runtimeSettingsReady:folder=>{
+      if(workspace.projects.has(folder.uri.toString()))workspace.project(folder,{allowColdConfiguration:true});
+    },
+    validateRuntime:async folder=>{
+      if(workspace.disposed)throw Error('The native source workspace is closed.');
+      if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+      // Probe without attaching a native connection to an Explorer-only row.
+      const provider=new NativeSourceProvider({client,config:configFor(folder),projectRoot:folder.uri.fsPath});
+      await provider.capability();
+      if(workspace.disposed)throw Error('The native source workspace is closed.');
+      if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+    }
   });
   const initialize=async resource=>{
     const folder=vscode.workspace.getWorkspaceFolder(resource);
     if(!folder)throw Error('Choose an open Jade project.');
-    projectFor(folder);return initialization.initialize(resource);
+    if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+    return initialization.initialize(resource);
   };
   async function targets(folder,{initialization:creating=false}={}) {
     const project=projectFor(folder),capability=await project.provider.capability();projectFor(folder);

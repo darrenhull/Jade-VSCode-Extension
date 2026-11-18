@@ -42,7 +42,7 @@ class NativeSourceWorkspace {
 
   folders() { return (this.vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file'); }
 
-  project(folder) {
+  project(folder, { allowColdConfiguration = false } = {}) {
     if (this.disposed) throw Error('The native source workspace is closed.');
     const current = this.folders().find(value => value.uri.toString() === folder?.uri.toString());
     if (!current) throw Error('The selected Jade project is no longer open.');
@@ -59,7 +59,26 @@ class NativeSourceWorkspace {
       this.forwarding.set(project, [project.files.onDidChangeFile(changes => this.events.fire(changes)),
         project.files.onDidFinishSave(({ saved }) => { if (saved || this.pendingChanges.has(project)) this.scheduleRefresh(project, saved); })]);
     } else if (JSON.stringify(project.provider.config) !== JSON.stringify(config)) {
-      throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      let cold = allowColdConfiguration && !this.executing && !this.pendingChanges.has(project) && !this.changing.has(project) &&
+        !project.provider.connection && !project.provider.probe && !project.provider.sourceOperation &&
+        !project.provider.snapshot && !project.provider.sourceRoots?.length && !project.watchers?.size &&
+        !project.files.documents.size && !project.files.entities.size && !project.files.opening.size;
+      if (cold) {
+        // Restored tabs may precede files.recover(), and native open bindings may
+        // exist on disk even when this process has not populated its editor maps.
+        cold = !(this.vscode.workspace.textDocuments || []).some(document => {
+          if (document.uri.scheme !== 'jade-source') return false;
+          const selected = new URLSearchParams(document.uri.query || '').get('project');
+          if (!selected) return true;
+          try { return path.relative(project.provider.root, fileURLToPath(selected)) === ''; }
+          catch { return true; }
+        });
+        try { fs.lstatSync(path.join(project.provider.root, '.jade', 'projections')); cold = false; }
+        catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; }
+      }
+      if (!cold) throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      // Explicit setup only; retain the same Explorer row and never reset a model.
+      project.provider.config = config;
     }
     return project;
   }

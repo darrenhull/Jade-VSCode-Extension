@@ -114,8 +114,8 @@ test('JOX activation registers the actual setup action with one reviewed native 
  const project={folder:f.folder,provider:{config:{sourceFormat:'jox',workingJadeGitPolicy:'inherit'},connection:{},root:f.root,
   capability:async()=>({catalogue:true,initialization:true}),request:async(command,args)=>{requests.push([command,args]);return{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:'C:/Runtime',identity:'reviewed-working'},source:{databasePath:'C:/Source',iniPath:'C:/Source/source.ini',server:'singleUser'},initialization:{destination:path.join(f.root,'sources')}};},
   initialize:async(args)=>{requests.push(['working.initialize',args]);return body;}}};
- const workspace={executing:false,project:()=>project,changing:new Map(),pendingChanges:new Map(),beforeOperation:async()=>requests.push(['release-own-inspection']),observeSources:()=>requests.push(['watch']),refresh:async(_folder,_token,options)=>{requests.push(['refresh',options]);throw Error('synthetic view refresh cancelled after native commit');}};
- const client={request:(command,args)=>{requests.push([command,args]);return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})}}};
+ const workspace={executing:false,projects:new Map([[f.folder.uri.toString(),project]]),project:()=>project,changing:new Map(),pendingChanges:new Map(),beforeOperation:async()=>requests.push(['release-own-inspection']),observeSources:()=>requests.push(['watch']),refresh:async(_folder,_token,options)=>{requests.push(['refresh',options]);throw Error('synthetic view refresh cancelled after native commit');}};
+ const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true}]}}),request:(command,args)=>{requests.push([command,args]);return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})}}};
  const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor:()=>({sourceFormat:'jox'}),detect:async()=>undefined});
  assert.ok(f.commands.has('jadeNative.setupProject')&&f.commands.has('jadeNative.initializeWorkspace'));
  const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.workingPrepared,true,JSON.stringify(result));
@@ -133,7 +133,7 @@ test('JOX activation registers the actual setup action with one reviewed native 
  const refreshes=requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length;
  const closed=await setup.onboarding.setup(f.folder.uri);assert.equal(closed.workingPrepared,true,JSON.stringify(closed));
  assert.equal(requests.filter(row=>row[0]==='refresh'||row[0]==='watch').length,refreshes,'Completed setup reconnected/refreshed a replaced runtime');
- const before=requests.length;project.provider.capability=async()=>{throw Error('Update the Jade CLI: JOX unsupported');};
+ const before=requests.length;client.sourceCapabilities=async()=>{throw Error('Update the Jade CLI: JOX unsupported');};
  const old=await f.commands.get('jadeNative.initializeWorkspace')(f.folder.uri);assert.equal(old.passed,false);assert.match(old.error,/JOX unsupported/);assert.equal(requests.length,before,'Direct setup silently used the old CLI init');
 });
 
@@ -142,4 +142,102 @@ test('JOX setup preserves committed native outcome when its project closes after
  const snapshot={provider:'jox',projectId:'native',generation:'g',snapshotHash:'h'};
  f.services.initializeWorkingSources=async()=>{f.vscode.workspace.workspaceFolders=[];return{sourceSnapshot:snapshot};};
  const value=await f.controller.setup();assert.equal(value.workingPrepared,true);assert.deepEqual(value.sourceSnapshot,snapshot);assert.equal(value.projectClosed,true);
+});
+
+
+test('real JOX setup defers its project binding until native-first runtime detection has settled',async t=>{
+ const f=fixture(t,{picks:['existing','later']}),{NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ f.vscode.EventEmitter=class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}};
+ f.vscode.window.withProgress=async(_options,run)=>run({report(){}});
+ let selected=false,detects=0,initializations=0;
+ const settings={installPath:'C:/Chosen Jade',databasePath:'C:/Chosen Source/system',iniPath:'C:/Chosen Source/source.ini',server:'singleUser'};
+ const configFor=()=>({sourceFormat:'jox',...(selected?settings:{})});
+ const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true}]}}),request(command,args){
+  assert.equal(command,'cli');assert.equal(args.operation,'init');initializations++;
+  if(initializations===1){assert.deepEqual(args.argv,['--config',path.join(f.root,'jade.json')]);return{promise:Promise.resolve({passed:false,code:2,report:{error:'Jade connection setup is required. Run jade-cli init --install <Jade folder> or choose --profile <name>; noninteractive commands never prompt.'}})};}
+  assert.equal(args.argv[args.argv.indexOf('--install')+1],settings.installPath);
+  return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
+ }};
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});
+ const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor,detect:async()=>{detects++;selected=true;return settings;}});
+ const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.configurationReady,true,JSON.stringify(result));assert.equal(result.workingPrepared,false);
+ assert.equal(detects,1);assert.equal(initializations,2);
+ const project=workspace.project(f.folder);assert.equal(project.provider.config.installPath,settings.installPath);
+ assert.equal(workspace.projects.size,1);assert.equal(project.files.documents.size,0);
+ // A later unrelated settings change must still refuse rebinding this project.
+ project.files.documents.set('owned-editor',{document:{entityId:'opaque'},dirty:true});selected=false;
+ assert.throws(()=>workspace.project(f.folder),/settings changed/);assert.equal(workspace.projects.get(f.folder.uri.toString()),project);assert.equal(project.files.documents.size,1);
+});
+
+
+test('Explorer-enumerated cold project survives Detect handoff and reaches native target review',async t=>{
+ const f=fixture(t,{picks:['existing','working']}),{NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ f.vscode.EventEmitter=class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}};
+ f.vscode.window.createTreeView=()=>({dispose(){}});f.vscode.window.withProgress=async(_options,run)=>run({report(){}});
+ let selected=false,initializations=0,targets=0;
+ const settings={installPath:'C:/Chosen Jade',databasePath:'C:/Chosen Source/system',iniPath:'C:/Chosen Source/source.ini',server:'singleUser'};
+ const configFor=()=>({sourceFormat:'jox',...(selected?settings:{})});
+ const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true}]}}),request(command,args){
+  if(command==='cli'){
+   assert.equal(args.operation,'init');initializations++;
+   if(initializations===1)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Jade connection setup is required. Run jade-cli init --install <Jade folder> or choose --profile <name>; noninteractive commands never prompt.'}})};
+   return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
+  }
+  assert.equal(command,'working.location');targets++;assert.equal(args.config.installPath,settings.installPath);
+  return{promise:Promise.resolve({passed:true,code:0,body:{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:settings.installPath,identity:'native-target'},source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server}}})};
+ }};
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});
+ const explorer=require('../../extension/src/native-source-explorer').registerNativeSourceExplorer(f.vscode,f.context,workspace,{});
+ const [row]=await explorer.provider.getChildren();assert.equal(workspace.projects.size,1);assert.equal(initializations,0);assert.equal(row.project.provider.connection,undefined);
+ const setup=require('../../extension/src/jox-project-setup').registerJoxProjectSetup(f.vscode,f.context,workspace,{client,configFor,detect:async()=>{selected=true;return settings;}});
+ const result=await setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.configurationReady,true,JSON.stringify(result));assert.equal(result.cancelled,true,'Target review was deliberately declined');
+ assert.equal(initializations,2);assert.equal(targets,1);assert.equal(workspace.project(f.folder),row.project,'Explorer root identity must remain valid');
+ assert.equal(row.project.provider.config.installPath,settings.installPath);assert.equal(row.project.files.documents.size,0);
+});
+
+
+function coldSetupProject(t){
+ const f=fixture(t),{NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ f.vscode.EventEmitter=class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}};
+ let changed=false;
+ const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true}]}})};
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor:()=>({sourceFormat:'jox',...(changed?{installPath:'C:/Chosen Jade'}:{})})});
+ const project=workspace.project(f.folder);return{...f,workspace,project,client,select:()=>{changed=true;}};
+}
+test('explicit setup cannot rebind an in-flight or settled capability-probed project',async t=>{
+ const f=coldSetupProject(t);let release;f.client.sourceCapabilities=()=>new Promise(resolve=>release=resolve);
+ const probe=f.project.provider.capability();f.select();
+ assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);
+ release({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true}]}});await probe;
+ assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);assert.equal(f.project.provider.config.installPath,undefined);
+});
+test('explicit setup cannot rebind a queued source operation',async t=>{
+ const f=coldSetupProject(t);let release;const held=new Promise(resolve=>release=resolve);
+ const operation=f.project.provider.serializeSource(()=>held);f.select();
+ assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);
+ release();await operation;assert.equal(f.project.provider.config.installPath,undefined);
+});
+test('explicit setup cannot rebind a prepared snapshot or a live editor',async t=>{
+ const f=coldSetupProject(t),uri=f.uri(f.root).toString();
+ f.project.provider.adoptSnapshot({provider:'jox',projectId:'opaque-project',generation:'opaque-generation',snapshotHash:'1'.repeat(64),projectRoot:uri,sourceRoots:[f.uri(path.join(f.root,'sources')).toString()]},{});
+ f.project.files.documents.set('owned-editor',{document:{entityId:'opaque-member'},dirty:true});f.select();
+ assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);
+ assert.equal(f.project.files.documents.size,1);assert.equal(f.project.provider.snapshot.projectId,'opaque-project');assert.equal(f.project.provider.config.installPath,undefined);
+});
+test('restored dirty native URI blocks setup rebinding before editor maps are recovered',t=>{
+ const f=coldSetupProject(t);f.vscode.workspace.textDocuments=[{isDirty:true,uri:{scheme:'jade-source',query:new URLSearchParams({project:f.folder.uri.toString(),binding:'old-native-project'}).toString()}}];
+ assert.equal(f.project.files.documents.size,0);f.select();assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);
+ assert.equal(f.project.provider.config.installPath,undefined);assert.equal(f.vscode.workspace.textDocuments[0].isDirty,true);
+});
+test('persisted native projection recovery state blocks cold handoff without parsing or modifying it',t=>{
+ const f=coldSetupProject(t),directory=path.join(f.root,'.jade/projections/old-project/open');fs.mkdirSync(directory,{recursive:true});
+ const file=path.join(directory,'retained.json'),bytes=Buffer.from('{"retained":"native-owned recovery state"}\n');fs.writeFileSync(file,bytes);f.select();
+ assert.equal(f.project.files.documents.size,0);assert.throws(()=>f.workspace.project(f.folder,{allowColdConfiguration:true}),/settings changed/);
+ assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(f.project.provider.config.installPath,undefined);
+});
+test('ordinary callers retain the cold configuration guard and unrelated recovered tabs remain separate',t=>{
+ const f=coldSetupProject(t);f.vscode.workspace.textDocuments=[{isDirty:true,uri:{scheme:'jade-source',query:new URLSearchParams({project:f.uri(path.join(f.root,'other')).toString(),binding:'other-native-project'}).toString()}}];f.select();
+ assert.throws(()=>f.workspace.project(f.folder),/settings changed/);
+ assert.equal(f.workspace.project(f.folder,{allowColdConfiguration:true}),f.project);assert.equal(f.project.provider.config.installPath,'C:/Chosen Jade');
 });
