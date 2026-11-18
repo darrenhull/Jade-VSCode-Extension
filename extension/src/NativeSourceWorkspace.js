@@ -152,7 +152,7 @@ class NativeSourceWorkspace {
     if (folders.length !== 1) throw Error('Choose the originating Jade project before opening source.');
     const project = this.project(folders[0]);
     if (!project.provider.snapshot) await this.prepare(project.folder);
-    const page = await project.provider.query({ kind: 'type', search: name, offset: 0, limit: 100 });
+    const page = await project.provider.query({ kind: 'type', qualifiedName: { schema, type: name }, offset: 0, limit: 100 });
     const matches = page.items.filter(entity => entity.name === name && entity.qualifiedName?.schema === schema);
     if (matches.length > 1) throw Error('Several native declarations share this display name. Select the exact declaration in Object Explorer.');
     return matches.length ? { project, entity: matches[0], generation: page.generation } : undefined;

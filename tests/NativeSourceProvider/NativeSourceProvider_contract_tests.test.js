@@ -140,3 +140,21 @@ for (const corruption of ['missing', 'project', 'generation', 'hash']) test('sav
   assert.equal(f.requests.filter(value => value.command === 'source.semantic.applyEdit').length, 1);
   assert.equal(f.requests.filter(value => value.command === 'source.semantic.prepare').length, 1);
 });
+
+test("exact qualified native lookup is forwarded without a search-page fallback", async () => {
+  const f = setup(); await f.provider.prepare();
+  await f.provider.query({ kind: "type", qualifiedName: { schema: "ExactSchema", type: "RepeatedType" }, limit: 1 });
+  assert.deepEqual(f.requests.at(-1).body.qualifiedName, { schema: "ExactSchema", type: "RepeatedType" });
+  assert.equal(f.requests.at(-1).body.search, undefined);
+  const count = f.requests.length;
+  await assert.rejects(f.provider.query({ kind: "type", qualifiedName: { schema: "ExactSchema", type: "" } }), /qualified|identity/i);
+  assert.equal(f.requests.length, count);
+});
+test("an old or invalid native backend cannot silently ignore exact qualified lookup", async () => {
+  const f = setup({ reply: (command, body) => command === "source.semantic.query" ? {
+    passed: true, code: 0, body: { provider: "jox", projectId: "native-project-A", generation: "generation-1",
+      items: [{ id: "foreign-type", name: "RepeatedType", qualifiedName: { schema: "OtherSchema", type: "RepeatedType" } }],
+      offset: body.offset, limit: body.limit, total: 1, nextOffset: null } } : undefined });
+  await f.provider.prepare();
+  await assert.rejects(f.provider.query({ kind: "type", qualifiedName: { schema: "ExactSchema", type: "RepeatedType" } }), /qualified|identity/i);
+});

@@ -162,12 +162,20 @@ class NativeSourceProvider {
       if (value[key] !== expected[key]) throw Error('Invalid native source ' + key + ' binding.');
   }
 
-  async query({ kind, parentId, search, memberKind, includeInherited, offset = 0, limit = 100 }, token) {
+  async query({ kind, parentId, search, qualifiedName, memberKind, includeInherited, offset = 0, limit = 100 }, token) {
     if (!['schema', 'type', 'member', 'test'].includes(kind)) throw Error('Unsupported native source query kind.');
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100)
       throw Error('Native source query limit is outside its bounds.');
+    let exact;
+    if (qualifiedName !== undefined) {
+      if (!qualifiedName || typeof qualifiedName !== 'object' || Array.isArray(qualifiedName) || Object.keys(qualifiedName).length !== 2 ||
+          !['schema', 'type'].every(key => typeof qualifiedName[key] === 'string' && qualifiedName[key].length > 0 &&
+            qualifiedName[key].length <= 1024 && !qualifiedName[key].includes('\0')))
+        throw Error('Invalid exact qualified native type identity.');
+      exact = { schema: qualifiedName.schema, type: qualifiedName.type };
+    }
     const binding = this.binding();
-    const body = { ...binding, kind, ...(parentId === undefined ? {} : { parentId: required(parentId, 'parent identity') }),
+    const body = { ...binding, kind, ...(exact ? { qualifiedName: exact } : {}), ...(parentId === undefined ? {} : { parentId: required(parentId, 'parent identity') }),
       ...(search === undefined ? {} : { search: String(search) }),
       ...(memberKind === undefined ? {} : { memberKind: required(memberKind, 'member kind') }),
       ...(includeInherited === undefined ? {} : { includeInherited: includeInherited === true }), offset, limit };
@@ -177,7 +185,11 @@ class NativeSourceProvider {
         !Number.isSafeInteger(page.total) || page.total < offset + page.items.length ||
         !(page.nextOffset === null || Number.isSafeInteger(page.nextOffset) && page.nextOffset > offset && page.nextOffset <= page.total))
       throw Error('Invalid native source page bounds.');
-    for (const item of page.items) required(item.id, 'entity identity');
+    for (const item of page.items) {
+      required(item.id, 'entity identity');
+      if (exact && (item.qualifiedName?.schema !== exact.schema || item.qualifiedName?.type !== exact.type))
+        throw Error('Native reply did not preserve the exact qualified type identity. Update the Jade CLI.');
+    }
     return clone(page);
   }
 

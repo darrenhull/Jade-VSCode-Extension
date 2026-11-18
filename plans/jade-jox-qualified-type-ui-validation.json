@@ -1,0 +1,47 @@
+{
+  "scope": "Thin native JOX UI adapters; no XML/Jade parser, source index, database call or package update",
+  "result": "SOURCE-CONTROLS-PASS",
+  "nativePrerequisite": "Jade-CLI b322e9c2d690f117a7b728ebd8e9a0288996a9d9",
+  "behavior": [
+    "findClass forwards native qualifiedName schema/type before pagination in one query; foreign qualified replies and invalid filter inputs are refused.",
+    "Class Workspace shows maintained base-class name and property type/access; unsupported base-source navigation and property editing remain native-owned/read-only.",
+    "Existing Object Explorer class catalogue receives the maintained base-class name in its existing column."
+  ],
+  "validation": {
+    "initialOwningRed": {
+      "exitCode": 1,
+      "tests": 4,
+      "failed": 4,
+      "reason": "Missing exact-filter forwarding/validation, first-page-only class lookup, missing native base/property view fields."
+    },
+    "affectedGroupsGreen": {
+      "exitCode": 0,
+      "tests": 51,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "durationMilliseconds": 350.6704
+    },
+    "additionalCatalogueRed": {
+      "exitCode": 1,
+      "tests": 1,
+      "failed": 1,
+      "reason": "Existing class catalogue dropped native base-class metadata."
+    },
+    "additionalCatalogueGreen": {
+      "exitCode": 0,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMilliseconds": 135.3501
+    }
+  },
+  "visualQualification": {
+    "status": "OUTSTANDING",
+    "actualAttempt": "Approved computer-use node_repl initialization failed before import or app selection: failed to write kernel assets; OS error 3.",
+    "workaround": false,
+    "screenshotClaimed": false
+  },
+  "limits": "Adapter controls and native owning model controls are separate evidence. No actual running UI/native upload/compilation/test execution or release qualification claimed."
+}

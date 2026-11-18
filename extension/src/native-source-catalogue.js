@@ -18,7 +18,7 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
       const page = await project.provider.query({ kind: 'type', parentId, search: filter.query || '', offset: filter.offset || 0, limit: 100 });
       const rows = page.items.map(entity => ({ provider: 'jox', entityId: entity.id, nativeEntity: entity,
         projectId: page.projectId, projectName: project.folder.name, schema: entity.qualifiedName?.schema,
-        name: entity.name, kind: entity.kind }));
+        name: entity.name, kind: entity.kind, superclass: entity.metadata?.baseClass?.name }));
       return { rows, generation: page.generation, page: { items: rows, total: page.total, offset: page.offset, limit: page.limit,
         hasMore: page.nextOffset !== null, nextOffset: page.nextOffset, hasPrevious: page.offset > 0,
         previousOffset: Math.max(0, page.offset - page.limit), label: page.total ? (page.offset + 1) + 'â€“' + (page.offset + rows.length) + ' of ' + page.total + ' types' : '0 types' } };

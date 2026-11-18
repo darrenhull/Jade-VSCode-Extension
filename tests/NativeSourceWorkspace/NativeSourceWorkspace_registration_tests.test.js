@@ -258,3 +258,34 @@ for (const failure of ['shared-compile', 'unknown-cleanup', 'transport']) test(f
   assert.equal(result.report.error, failure === 'transport' ? 'Original native channel failure' : primary.report.error);
   assert.equal(registered.workspace.executing, false);
 });
+
+test('class navigation selects exact schema and type before the native first page', async () => {
+  const target = { id: 'target-type', name: 'RepeatedType', kind: 'class', qualifiedName: { schema: 'TargetSchema', type: 'RepeatedType' } };
+  const f = setup({ reply: (command, request) => {
+    if (command !== 'source.semantic.query') return;
+    const exact = request.qualifiedName?.schema === 'TargetSchema' && request.qualifiedName?.type === 'RepeatedType';
+    const items = exact ? [target] : Array.from({ length: 100 }, (_, i) => ({ ...target, id: 'other-' + i,
+      qualifiedName: { schema: 'Other' + i, type: 'RepeatedType' } }));
+    return { passed: true, code: 0, body: { provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation,
+      items, total: exact ? 1 : 151, offset: 0, limit: request.limit, nextOffset: exact ? null : 100 } };
+  } });
+  const registered = registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  const found = await registered.workspace.findClass('RepeatedType', 'TargetSchema', f.folder.uri.fsPath);
+  assert.equal(found?.entity.id, target.id);
+  const queries = f.requests.filter(value => value.command === 'source.semantic.query');
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0].body.qualifiedName, target.qualifiedName);
+});
+
+test('class catalogue retains the native base class in the existing Base class column', async () => {
+  const f = setup({ reply: (command, request) => command === 'source.semantic.query' ? { passed: true, code: 0, body: {
+    provider: 'jox', projectId: f.snapshot.projectId, generation: f.snapshot.generation, offset: 0, limit: request.limit, total: 1, nextOffset: null,
+    items: [{ id: 'type', kind: 'class', name: 'Generic', qualifiedName: { schema: 'Example', type: 'Generic' },
+      metadata: { baseClass: { name: 'NativeBase' } } }] } } : undefined });
+  registerJoxWorkspace(f.vscode, f.context, { client: f.client, configFor: () => f.config });
+  await f.commands.get('jadeNative.browseSourceClasses')();
+  const panel = f.panels.at(-1); await panel.receive({ command: 'ready' });
+  const payload = panel.sent.filter(value => value.command === 'catalogue').at(-1);
+  assert.equal(payload.page.items[0].parent, 'NativeBase');
+  assert.ok(payload.columns.includes('parent'));
+});

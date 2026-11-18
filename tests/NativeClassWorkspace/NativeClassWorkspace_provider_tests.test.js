@@ -36,3 +36,20 @@ test('shared class catalogue keeps two native entities with identical display na
   assert.notEqual(browser.rows[0].browserId, browser.rows[1].browserId);
   for (const row of browser.rows) assert.equal(browser.findBrowserId(row.browserId).entityId, row.entityId);
 });
+
+test('Class Workspace shows native base and property metadata while unsupported editing stays native-owned', async () => {
+  const property = { id: 'property-id', kind: 'property', name: 'title', qualifiedName: { schema: 'Example', type: 'Generic' },
+    metadata: { type: { name: 'String' }, length: 80, access: 'readonly' }, flags: { readOnly: true } };
+  const row = { project: { folder: { name: 'Generic', uri: { fsPath: 'C:/project' } }, provider: {
+    binding: () => ({ provider: 'jox', projectId: 'project', generation: 'g' }),
+    query: async () => ({ items: [property], total: 1, offset: 0, nextOffset: null }) } },
+    entity: { id: 'type-id', name: 'Generic', qualifiedName: { schema: 'Example', type: 'Generic' },
+      metadata: { baseClass: { id: 'base-id', name: 'NativeBase', qualifiedName: { schema: 'Example', type: 'NativeBase' } } } }, file: 'jade-source:/class.jade' };
+  const result = await createNativeClassWorkspaceModel().load(row);
+  assert.equal(result.identity.superclass, 'NativeBase');
+  assert.equal(result.overview.superclass, 'NativeBase');
+  assert.match(result.groups[0].items[0].detail, /String/);
+  assert.match(result.groups[0].items[0].detail, /readonly/);
+  assert.equal(result.groups[0].items[0].nativeEntity.flags.readOnly, true);
+  assert.equal(result.overview.superclassIdentity, undefined);
+});

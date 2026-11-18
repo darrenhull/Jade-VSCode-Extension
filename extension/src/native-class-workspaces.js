@@ -4,7 +4,7 @@ const groupNames = { property: 'Properties', reference: 'References', method: 'M
 
 function nativeMember(entity, owner = entity.qualifiedName?.type) {
   return { ...entity, nativeEntity: entity, owner, schema: entity.qualifiedName?.schema,
-    kind: entity.flags?.typeMethod === true ? 'typeMethod' : entity.kind, detail: entity.signature,
+    kind: entity.flags?.typeMethod === true ? 'typeMethod' : entity.kind, detail: entity.signature || [entity.metadata?.type?.name, entity.metadata?.access].filter(Boolean).join(' · '),
     inherited: entity.flags?.inherited === true, system: entity.flags?.system === true };
 }
 
@@ -25,12 +25,12 @@ function createNativeClassWorkspaceModel({ workspace } = {}) {
       }
       const schema = row.entity.qualifiedName?.schema;
       return { identity: { provider: binding.provider, projectId: binding.projectId, entityId: row.entity.id,
-        name: row.entity.name, owner: row.entity.name, schema, qualifiedName: [schema, row.entity.name].filter(Boolean).join('::'),
+        name: row.entity.name, owner: row.entity.name, schema, superclass: row.entity.metadata?.baseClass?.name, qualifiedName: [schema, row.entity.name].filter(Boolean).join('::'),
         projectRoot: row.project.folder.uri.fsPath, projectName: row.project.folder.name, file: row.file },
         groups: [...groups.values()], total: page.total, offset: page.offset, hasMore: page.nextOffset !== null,
         selected: members.find(member => member.id === state.selectedId) || (row.selectedMember?.id === state.selectedId ? row.selectedMember : undefined),
         inheritedAvailable: page.inheritedAvailable === true, inheritedReason: page.inheritedReason || 'Inherited metadata has not been qualified by the native source provider.',
-        overview: { source: row.file, description: row.entity.signature || '', counts: [{ label: 'Members', count: page.total }] } };
+        overview: { source: row.file, superclass: row.entity.metadata?.baseClass?.name, superclassReason: 'Base class source navigation is not available here.', description: row.entity.signature || '', counts: [{ label: 'Members', count: page.total }] } };
     }
   };
 }
