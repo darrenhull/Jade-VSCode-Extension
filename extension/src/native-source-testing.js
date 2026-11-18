@@ -1,5 +1,6 @@
 'use strict';
-function registerNativeSourceTesting(vscode, context, workspace) {
+const {diagnosticLines}=require('./compiler-diagnostic-presentation');
+function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnostic = () => {} } = {}) {
   if (!vscode.tests) return {};
   const controller = vscode.tests.createTestController('jadeNative.tests', 'Jade Local Tests');
   const details = new WeakMap();
@@ -52,6 +53,16 @@ function registerNativeSourceTesting(vscode, context, workspace) {
     if (running) throw Error('A Jade test operation is already running.');
     running = true;
     const run = controller.createTestRun(request);
+    token ||= run.token;
+    const reported = new Set();
+    const report = (project, result) => {
+      if(reported.has(result))return;
+      reported.add(result);reportDiagnostic(project,result);
+      for(const entry of Array.isArray(result.report?.diagnostics)?result.report.diagnostics:[]) {
+        if(!entry||typeof entry!=='object')continue;
+        for(const line of diagnosticLines(entry)){run.appendOutput(line+'\r\n');output.appendLine(line);}
+      }
+    };
     const selected = leaves(request);
     let lastResult;
     selected.forEach(item => run.enqueued(item));
@@ -86,10 +97,12 @@ function registerNativeSourceTesting(vscode, context, workspace) {
           if (entry?.error || !entry?.result) {
             const error = entry?.error || Error('Native test operation did not return a result.');
             lastResult = error.result || { passed: false, code: 2, report: { error: error.message } };
+            report(project, lastResult);
             items.forEach(item => run.errored(item, new vscode.TestMessage(error.message)));
             continue;
           }
           const result = lastResult = entry.result;
+          report(project, result);
           for (const item of items) {
             const identity = details.get(item).entity.testIdentity;
             const outcome = result.report?.results?.find(value => value.method === identity.method &&
