@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "scope": "Opt-in consumer package validation; synthetic runtime bytes only",
+  "red": {"tests": 3, "passed": 1, "failed": 2, "cause": "Unqualified flags and incomplete JOX tuples were accepted"},
+  "green": {"tests": 15, "passed": 15, "failed": 0, "milliseconds": 597},
+  "contracts": [
+    "Requires native CLI 0.11.0 or newer and the owner-declared format-1 Unicode JOX descriptor.",
+    "Requires qualified initialization, upload and native-test flags; Scratch may remain unsupported.",
+    "Requires hash-listed helper, SCM and provider trio alongside existing inspector/debugger/OID assets.",
+    "All existing path, checksum, manifest and official pin validation remains in force before replacing a bundle.",
+    "Preserves exact manifest bytes and qualification flags; no runtime asset or pin is changed by this checkpoint."
+  ],
+  "remaining": [
+    "Receive the genuinely qualified native artifact, provenance and exact hashes.",
+    "Update canonical pin, runtime, minimum CLI and extension 0.23 version/lockfiles together.",
+    "Enable the JOX gate in the canonical package invocation and verify one extracted VSIX and packaged-JS to real-CLI flow.",
+    "Actual running UI verification remains blocked by the previously recorded OS error 3; no retry or visual claim."
+  ]
+}

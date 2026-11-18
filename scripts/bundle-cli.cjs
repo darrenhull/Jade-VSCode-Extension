@@ -7,6 +7,15 @@ function bundleCli(options={}){
  if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
  require('../extension/src/NativeObjectIdentity').requireNativeOidDistribution(manifest);
  for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'])if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
+ if(options.requireJox){
+  require('./NativeCompatibility.cjs').requireNativeVersion(source,'0.11.0');
+  const jox=manifest.joxRuntime;
+  if(jox?.format!==1||jox.characterSet!=='unicode'||!/^[a-f0-9]{40}$/.test(jox.engineCommit||'')||
+     !['managedUpload','nativeTests','initialization'].every(name=>jox[name]===true))
+   throw Error('A qualified JOX setup, upload and native-test distribution is required.');
+  for(const name of ['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'])
+   if(!Object.hasOwn(manifest.runtimeFiles||{},'native/jox/'+name))throw Error('Required JOX runtime asset is missing: '+name);
+ }
  const pinFile=options.pinFile||(!(options.source||process.env.JADE_CLI_DISTRIBUTION)?path.join(root,'packages/jade-cli-pin.json'):undefined);
  if(pinFile)require('./NativePin.cjs').verifyNativePin(source,pinFile,manifestBytes);
  if(options.minimumVersion)require('./NativeCompatibility.cjs').requireNativeVersion(source,options.minimumVersion);
