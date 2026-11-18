@@ -23,7 +23,7 @@
   "remaining": [
     "Receive the genuinely qualified native artifact, provenance and exact hashes.",
     "Update canonical pin, runtime, minimum CLI and extension 0.23 version/lockfiles together.",
-    "Enable the JOX gate in the canonical package invocation and verify one extracted VSIX and packaged-JS to real-CLI flow.",
+    "Verify one extracted qualified VSIX and the prepared actual packaged-JS to real-CLI owned-fixture flow; no such artifact run has occurred yet.",
     "Actual running UI verification remains blocked by the previously recorded OS error 3; no retry or visual claim."
   ],
   "reachableComponents": {
@@ -51,5 +51,23 @@
     "artifactExecuted": false,
     "uses": "Actual extracted extension NativeSourceProvider and CliWorkingSession over the ordinary CLI service; no private binding or capability substitution.",
     "cleanup": "Existing exclusive authenticated broker retirement plus actual stdio/owned-job exit; refusal or forced settlement is failure."
+  },
+  "postPackageJoxMode": {
+    "selectedBy": "Actual joxRuntime manifest or explicit RequireJox; legacy 0.10.17 branch unchanged",
+    "packageControlsPassed": 22,
+    "packageControlsMilliseconds": 6571,
+    "legacyCleanupControlsPassed": 8,
+    "legacyCleanupControlsMilliseconds": 8641,
+    "booleanQualificationRed": "PowerShell previously accepted the string true as a boolean qualification flag.",
+    "latestFocusedJoxControls": {
+      "passed": 3,
+      "failed": 0,
+      "milliseconds": 3508
+    },
+    "preserved": "Exact archive/manifest receipt, all runtime hashes, OID descriptor, path validation and rejection before payload execution.",
+    "portableJoxSourcePrepared": true,
+    "portableJoxSyntaxChecked": true,
+    "actualPortableJoxArtifactExecuted": false,
+    "portableMetadata": "One normal native semantic prepare/query using a static synthetic JOX fixture, with no Node on child PATH, no Jade database, no CLS parsing or shared source-index refresh."
   }
 }

@@ -4,11 +4,12 @@ function bundleCli(options={}){
  const root=path.resolve(__dirname,'..'),source=path.resolve(options.source||process.env.JADE_CLI_DISTRIBUTION||path.join(root,'packages/jade-cli-win-x64')),destination=path.resolve(options.destination||path.join(root,'extension/vendor/jade-tools-cli'));
  const manifestBytes=fs.readFileSync(path.join(source,'distribution.json'));
  const manifest=JSON.parse(manifestBytes.toString('utf8'));
+ const requireJox=options.requireJox===true||Object.hasOwn(manifest,'joxRuntime');
  if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
  require('../extension/src/NativeObjectIdentity').requireNativeOidDistribution(manifest);
- const requiredRuntime=options.requireJox?['jade-inspect-helper.exe','jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe']:['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'];
+ const requiredRuntime=requireJox?['jade-inspect-helper.exe','jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe']:['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'];
  for(const name of requiredRuntime)if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
- if(options.requireJox){
+ if(requireJox){
   require('./NativeCompatibility.cjs').requireNativeVersion(source,'0.11.0');
   const jox=manifest.joxRuntime;
   if(jox?.format!==1||jox.characterSet!=='unicode'||!/^[a-f0-9]{40}$/.test(jox.engineCommit||'')||
