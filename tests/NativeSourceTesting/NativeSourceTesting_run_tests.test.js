@@ -76,3 +76,49 @@ test('compiler Problems retain independent project ownership and ignore late res
  store.report(first,{report:{compiled:true,diagnostics:{invalid:true}}});assert.equal(h.problems.size,1,'Malformed optional diagnostics must not mask the native result');
  store.dispose();h.collections[0].dispose();store.report(first,failed('C:/late.jox',6027));assert.equal(h.problems.size,0);
 });
+
+
+test('closing one workspace folder prunes its tests and Run All retains only live native project identities',async()=>{
+ const {NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ const {registerNativeSourceTesting}=require('../../extension/src/native-source-testing');
+ let f;
+ f=setup({testing:true,reply:(command,request)=>{
+  if(command==='source.semantic.prepare'){
+   const root=f.vscode.Uri.file(request.cwd).toString();
+   return{passed:true,code:0,body:{...structuredClone(f.snapshot),projectId:request.cwd,projectRoot:root,sourceRoots:[root]}};
+  }
+  if(command==='source.semantic.query')return{passed:true,code:0,body:{provider:'jox',projectId:request.projectId,generation:request.generation,
+   items:[{id:request.projectId+'-test',name:'value',kind:'method',testIdentity:{schema:'Example',class:'Tests',method:'value'}}],total:1,offset:0,limit:100,nextOffset:null}};
+  if(command==='test')return{passed:true,code:0,report:{compiled:false,tests_completed:true,cleanup_complete:true,results:[{method:'value',status:'passed'}]}};
+ }});
+ const second={name:'Second',uri:f.vscode.Uri.file('C:/second')};f.vscode.workspace.workspaceFolders.push(second);
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:folder=>({...f.config,workspaceRoots:[folder.uri.fsPath]})});workspace.register(f.context);
+ const listenersBefore=f.changed.listeners.size;
+ const testing=registerNativeSourceTesting(f.vscode,f.context,workspace),controller=testing.controller;
+ try{
+  await testing.discover();assert.equal(controller.items.size,2);
+  const removedRoot=controller.items.get(f.folder.uri.toString()),retainedRoot=controller.items.get(second.uri.toString()),removedProject=workspace.project(f.folder);
+  const removedId=removedProject.provider.binding().projectId,retainedId=workspace.project(second).provider.binding().projectId;
+  const retainedItems=[];retainedRoot.children.forEach(item=>retainedItems.push(item.id));
+  const before=f.requests.length;f.vscode.workspace.workspaceFolders=[second];f.changed.fire({removed:[f.folder],added:[]});
+  assert.equal(controller.items.get(f.folder.uri.toString()),undefined,'Closed workspace folder retained a TestController root');
+  assert.equal(controller.items.get(second.uri.toString()),retainedRoot);await turn();
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.closeProject'&&row.body.projectId===removedId).length,1);
+  const result=await testing.run({});assert.equal(result.passed,true);
+  const requests=f.requests.slice(before);
+  assert.equal(requests.some(row=>row.command==='source.semantic.query'&&row.body.projectId===removedId),false);
+  assert.equal(requests.some(row=>['test','source.semantic.prepare'].includes(row.command)&&row.body.cwd===removedId),false);
+  assert.deepEqual(requests.filter(row=>row.command==='test').map(row=>row.body.semanticSelection.entityIds),[[retainedId+'-test']]);
+  assert.equal(f.testRuns.at(-1).some(event=>event.name==='errored'),false);
+  // Captured selections can outlive the visible tree: they must not revive a
+  // removed project or send native work when Run is invoked again.
+  const calls=f.requests.length;await testing.run({include:[removedRoot]});await testing.refreshProject(removedProject);assert.equal(f.requests.length,calls);
+  assert.equal(controller.items.get(f.folder.uri.toString()),undefined,'Queued refresh revived a closed project');
+  const added={name:'Added',uri:f.vscode.Uri.file('C:/added')};f.vscode.workspace.workspaceFolders.push(added);f.changed.fire({removed:[],added:[added]});
+  const addedProject=workspace.project(added);await testing.discover({project:addedProject});
+  assert.equal(controller.items.size,2);assert.ok(controller.items.get(added.uri.toString()));assert.equal(controller.items.get(second.uri.toString()),retainedRoot);
+  const now=[];retainedRoot.children.forEach(item=>now.push(item.id));assert.deepEqual(now,retainedItems);
+  assert.equal(f.changed.listeners.size,listenersBefore+1,'Testing membership handler was not lifecycle-owned');
+ }finally{for(const subscription of [...f.context.subscriptions].reverse())subscription.dispose?.();}
+ assert.equal(f.changed.listeners.size,0,'Disposed testing retained workspace membership listeners');
+});

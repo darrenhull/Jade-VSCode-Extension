@@ -6,12 +6,18 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
   const details = new WeakMap();
   const output = vscode.window.createOutputChannel('Jade Tests');
   context.subscriptions.push(controller, output);
+  const openFolderIds = () => new Set(workspace.folders().map(folder => folder.uri.toString()));
+  if (vscode.workspace.onDidChangeWorkspaceFolders) context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    const open = openFolderIds();
+    controller.items.forEach(root => { if (!open.has(root.id)) controller.items.delete(root.id); });
+  }));
   let discovering;
   async function discover({ project: selectedProject, prepare = true } = {}) {
     if (discovering) return discovering;
     discovering = (async () => {
       const roots = [];
-      for (const folder of selectedProject ? [selectedProject.folder] : workspace.folders()) {
+      const folders = workspace.folders();
+      for (const folder of selectedProject ? folders.filter(folder => folder.uri.toString() === selectedProject.folder.uri.toString()) : folders) {
         const project = prepare ? await workspace.prepare(folder) : workspace.project(folder);
         if (!project.provider.snapshot) continue;
         const root = controller.createTestItem(folder.uri.toString(), folder.name);
@@ -30,7 +36,8 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
           offset = page.nextOffset;
         } while (offset !== null);
       }
-      if (selectedProject) roots.forEach(root => controller.items.add(root)); else controller.items.replace(roots);
+      const open = openFolderIds(), current = roots.filter(root => open.has(root.id));
+      if (selectedProject) current.forEach(root => controller.items.add(root)); else controller.items.replace(current);
     })();
     try { return await discovering; } finally { discovering = undefined; }
   }
@@ -44,7 +51,10 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
   controller.refreshHandler = discover;
   const leaves = request => {
     const selected = new Map(), excluded = new Set((request.exclude || []).map(item => item.id));
-    const visit = item => { if (excluded.has(item.id)) return; if (details.has(item)) selected.set(item.id, item); else item.children.forEach(visit); };
+    const open = openFolderIds();
+    const visit = item => { if (excluded.has(item.id)) return; if (details.has(item)) {
+      if (open.has(details.get(item).project.folder.uri.toString())) selected.set(item.id, item);
+    } else item.children.forEach(visit); };
     if (request.include) request.include.forEach(visit); else controller.items.forEach(visit);
     return [...selected.values()];
   };
