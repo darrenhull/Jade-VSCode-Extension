@@ -53,5 +53,18 @@
     "node --test tests/WorkspaceInitialization/WorkspaceInitialization_command_tests.test.js",
     "node --test tests/RuntimeCharacterSet/RuntimeCharacterSet_configuration_tests.test.js tests/WorkspaceContext/WorkspaceContext_activation_tests.test.js"
   ],
-  "lineEndings": "Original unchanged-line endings retained; normalized UTF-8 content before/after restoration is identical. No source/UI rerun for EOL-only correction."
+  "lineEndings": "Original unchanged-line endings retained; normalized UTF-8 content before/after restoration is identical. No source/UI rerun for EOL-only correction.",
+  "reviewFollowup": {
+    "problem": "Confirmed native initialization could be masked by connection closure/replacement before view delivery",
+    "red": [
+      "Closed reply boundary lost confirmed result",
+      "Replacement reply boundary lost confirmed result",
+      "Replacement-process capability probe retained an older source descriptor"
+    ],
+    "green": {
+      "completionAndStrictReadEditControls": 5,
+      "actualSetupNoAutomaticReconnectControl": 1
+    },
+    "behavior": "Only confirmed working.initialize preserves its native body plus a view-refresh warning. It validates but never retains the old snapshot on a replaced process; no automatic reconnect/query follows. Ordinary source read/save connection guards stay strict."
+  }
 }

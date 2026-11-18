@@ -49,6 +49,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     jox:true,initialize,targets,
     initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>{
       const result=await project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write);
+      if (result.viewRefreshRequired) { output.appendLine(result.warning); return result; }
       try {
         projectFor(folder);workspace.observeSources(project);
         // A committed native result remains authoritative even if Stop was too

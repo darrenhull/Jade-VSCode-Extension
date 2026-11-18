@@ -78,6 +78,10 @@ class NativeSourceProvider {
       const result = await request.promise;
       if (result?.passed !== true || result.code !== 0 || !result.body || typeof result.body !== 'object')
         throw Object.assign(Error(result?.report?.error || 'Native source operation failed.'), { result });
+      if (command === 'working.initialize' && (this.client.client !== connection || connection.closed)) {
+        return { ...clone(result.body), viewRefreshRequired: true,
+          warning: 'Working and source creation completed. The native connection changed; refresh Object Explorer when the project is open.' };
+      }
       this.assertConnection(connection);
       return result.body;
     } finally { subscription?.dispose(); }
@@ -99,7 +103,7 @@ class NativeSourceProvider {
     return this.adoptSnapshot(snapshot, capabilities);
   }
 
-  adoptSnapshot(snapshot, capabilities) {
+  adoptSnapshot(snapshot, capabilities, retain = true) {
     if (snapshot.provider !== 'jox') throw Error('Invalid native provider binding.');
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
@@ -111,15 +115,18 @@ class NativeSourceProvider {
     if (context === '..' || context.startsWith('..' + path.sep) || path.isAbsolute(context))
       throw Error('Native project root does not contain the selected project context.');
     if (!Array.isArray(snapshot.sourceRoots) || !snapshot.sourceRoots.length) throw Error('Missing native source root binding.');
-    this.sourceRoots = snapshot.sourceRoots.map(uri => {
+    const sourceRoots = snapshot.sourceRoots.map(uri => {
       const value = new URL(uri);
       if (value.search || value.hash || value.protocol !== 'file:') throw Error('Invalid native source root URI.');
       return fileURLToPath(value);
     });
-    this.projectRoot = projectRoot;
-    this.snapshot = clone(snapshot);
-    this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen']
-      .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
+    if (retain) {
+      this.sourceRoots = sourceRoots;
+      this.projectRoot = projectRoot;
+      this.snapshot = clone(snapshot);
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen']
+        .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
+    }
     return clone(snapshot);
   }
 
@@ -136,7 +143,9 @@ class NativeSourceProvider {
       if (!Array.isArray(result.sourceRoots) || result.sourceRoots.length !== 1 ||
           path.relative(path.resolve(destination), fileURLToPath(result.sourceRoots[0])) !== '')
         throw Error('Native initialization returned another source destination.');
-      this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities);
+      const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
+      this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
+      if (!retained) this.snapshot = undefined;
       return clone(result);
     });
   }

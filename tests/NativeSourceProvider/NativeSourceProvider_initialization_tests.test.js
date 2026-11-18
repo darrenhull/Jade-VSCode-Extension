@@ -71,3 +71,30 @@ test("foreign native project root is rejected without adopting a snapshot",async
   const f=setup();f.snapshot.projectRoot="file:///C:/unrelated";
   await assert.rejects(f.provider.prepare(),/project.*root|context|binding/i);assert.equal(f.provider.snapshot,undefined);
 });
+
+for(const state of ['closed','replaced'])test('confirmed initialization survives terminal '+state+' connection without retaining a stale source binding',async()=>{
+ const f=setup();f.reply=()=>{if(state==='closed')f.client.client.closed=true;else f.client.client={};return{passed:true,code:0,body:clone(f.initialized)};};
+ const result=await f.provider.initialize({destination:'C:/project/sources'});
+ assert.equal(result.extractedFiles,7);assert.deepEqual(result.sourceSnapshot,f.initialized.sourceSnapshot);
+ assert.equal(result.viewRefreshRequired,true);assert.match(result.warning,/completed|created/i);
+ assert.equal(f.provider.snapshot,undefined);assert.equal(f.requests.length,1);
+ assert.throws(()=>f.provider.binding(),/connection|closed|changed/i);
+});
+test('terminal connection loss still refuses ordinary document reads',async()=>{
+ let f;f=fixture({reply:command=>{if(command==='source.semantic.read'){f.client.client.closed=true;return{passed:true,code:0,body:clone(f.document)};}}});
+ const provider=new NativeSourceProvider({client:f.client,config:f.config});await provider.prepare();
+ await assert.rejects(provider.read(f.document.entityId),/connection|closed|changed/i);
+});
+
+test('terminal connection loss cannot rebase an ordinary dirty editor after save acknowledgement',async()=>{
+ let f;f=fixture({reply:command=>{if(command==='source.semantic.applyEdit')f.client.client.closed=true;}});
+ const provider=new NativeSourceProvider({client:f.client,config:f.config});await provider.prepare();const opened=await provider.read(f.document.entityId),before=clone(opened.revision),snapshot=provider.snapshot;
+ await assert.rejects(provider.applyEdit(opened,'saved changed text','projectionText'),/connection|closed|changed/i);
+ assert.deepEqual(opened.revision,before);assert.equal(provider.snapshot,snapshot);
+});
+
+test('a capability probe on the replacement process cannot adopt the older initialization reply',async()=>{
+ const f=setup();f.reply=async()=>{f.client.client={};await f.provider.capability();return{passed:true,code:0,body:clone(f.initialized)};};
+ const result=await f.provider.initialize({destination:'C:/project/sources'});
+ assert.equal(result.viewRefreshRequired,true);assert.equal(result.extractedFiles,7);assert.equal(f.provider.snapshot,undefined);
+});
