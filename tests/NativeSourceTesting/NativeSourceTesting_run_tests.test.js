@@ -43,6 +43,55 @@ test('command-created TestRun Stop cancels the captured native request and skips
  assert.equal(h.testRuns[0].at(-1).name,'end');assert.equal(stop.listeners.size,0);assert.equal(h.registered.workspace.executing,false);
 });
 
+test('native preparation cancellation skips every selected test without dispatching a class',async()=>{
+ let cancelled=false;
+ const native={passed:false,code:130,cancelled:true,report:{error:'Native preparation cancelled'}};
+ const h=host(command=>cancelled&&command==='source.semantic.prepare'?native:undefined);
+ await h.registered.testing.discover();const before=h.requests.length;cancelled=true;
+ const result=await h.registered.testing.run({});
+ assert.equal(result,native);assert.equal(h.requests.slice(before).some(row=>row.command==='test'),false);
+ assert.equal(h.testRuns[0].filter(row=>row.name==='skipped').length,2);assert.equal(h.testRuns[0].filter(row=>row.name==='errored'||row.name==='failed'||row.name==='passed').length,0);
+ assert.equal(h.testRuns[0].at(-1).name,'end');assert.equal(h.registered.workspace.executing,false);
+});
+
+test('cancellation while preparation waits in the native source queue skips tests and sends no native work',async()=>{
+ const h=host(),stop=cancellation();await h.registered.testing.discover();const project=h.registered.workspace.project(h.folder);
+ let release,queued=false;const gate=new Promise(resolve=>release=resolve);
+ const blocked=project.provider.serializeSource(()=>gate),prepare=project.provider.prepare.bind(project.provider);
+ project.provider.prepare=token=>{queued=true;return prepare(token);};
+ const before=h.requests.length,pending=h.registered.testing.run({},stop.token);
+ while(!queued)await turn();stop.cancel();release();await blocked;
+ const result=await pending;
+ assert.equal(result.code,130);assert.equal(result.cancelled,true);assert.equal(h.requests.length,before,'Cancelled queued preparation must not dispatch prepare/test/cancel');
+ assert.equal(h.testRuns[0].filter(row=>row.name==='skipped').length,2);assert.equal(h.testRuns[0].filter(row=>row.name==='errored'||row.name==='passed').length,0);
+ assert.equal(h.testRuns[0].filter(row=>row.name==='end').length,1);assert.equal(h.registered.workspace.executing,false);
+});
+
+test('a genuine native preparation error retains original code and test errors',async()=>{
+ let failing=false;const native={passed:false,code:6295,report:{error:'Original native preparation failure'}},stop=cancellation();
+ const h=host(command=>{if(failing&&command==='source.semantic.prepare'){stop.cancel();return native;}});
+ await h.registered.testing.discover();failing=true;const result=await h.registered.testing.run({},stop.token);
+ assert.equal(stop.token.isCancellationRequested,true,'Exercise cancellation racing a genuine native failure');
+ assert.equal(result,native);assert.equal(h.testRuns[0].filter(row=>row.name==='errored').length,2);
+ assert.equal(h.testRuns[0].filter(row=>row.name==='skipped'||row.name==='passed').length,0);assert.equal(h.requests.some(row=>row.command==='test'),false);assert.equal(h.testRuns[0].at(-1).name,'end');
+});
+
+for(const source of ['C:/project/Example/Type.jox','Example/Type.jox'])test('completed assertion failure retains exact native source location: '+source,async()=>{
+ const h=host(command=>command==='test'?{passed:false,code:1,report:{tests_completed:true,cleanup_complete:true,results:[{method:'value',status:'failed',message:'Original assertion',source,line:17,column:4}]}}:undefined);
+ h.vscode.Location=class{constructor(uri,range){Object.assign(this,{uri,range});}};
+ await h.registered.testing.discover();const result=await h.registered.testing.run({}),messages=h.testRuns[0].filter(row=>row.name==='failed').map(row=>row.args[1]);
+ assert.equal(result.code,1);assert.equal(messages.length,2);
+ for(const message of messages){assert.equal(message.message,'Original assertion');assert.equal(message.location?.uri.toString(),h.vscode.Uri.file('C:/project/Example/Type.jox').toString());assert.deepEqual(message.location.range.args,[16,3,16,3]);}
+ assert.equal(h.testRuns[0].filter(row=>row.name==='passed'||row.name==='errored').length,0);assert.equal(h.testRuns[0].at(-1).name,'end');
+});
+
+test('unmapped assertion failures do not invent projection positions',async()=>{
+ const h=host(command=>command==='test'?{passed:false,code:1,report:{tests_completed:true,cleanup_complete:true,results:[{method:'value',status:'failed',message:'No original mapping',source:'C:/untrusted/stale.jox',line:1,diagnostic_context_unavailable:true}]}}:undefined);
+ h.vscode.Location=class{constructor(uri,range){Object.assign(this,{uri,range});}};
+ await h.registered.testing.discover();await h.registered.testing.run({});
+ const messages=h.testRuns[0].filter(row=>row.name==='failed').map(row=>row.args[1]);assert.equal(messages.length,2);assert.ok(messages.every(message=>message.location===undefined));
+});
+
 test('active JOX tests publish exact mapped compiler Problems and clear them only on confirmed compilation',async()=>{
  const mapped='C:/project/Example/Type.jox',generated='C:/private/package/Example.scm';
  let result={passed:false,code:8510,report:{compiled:false,tests_completed:false,cleanup_complete:true,error:'Original native compile failure',diagnostics:[

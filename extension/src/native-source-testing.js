@@ -1,5 +1,6 @@
 'use strict';
-const {diagnosticLines}=require('./compiler-diagnostic-presentation');
+const path=require('node:path');
+const {diagnosticLines,diagnosticLocation}=require('./compiler-diagnostic-presentation');
 function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnostic = () => {} } = {}) {
   if (!vscode.tests) return {};
   const controller = vscode.tests.createTestController('jadeNative.tests', 'Jade Local Tests');
@@ -106,9 +107,10 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
           const items = batches[index], entry = results[index];
           if (entry?.error || !entry?.result) {
             const error = entry?.error || Error('Native test operation did not return a result.');
-            lastResult = error.result || { passed: false, code: 2, report: { error: error.message } };
+            const cancelled = error.cancelled === true || error.result?.cancelled === true;
+            lastResult = error.result || { passed: false, code: cancelled ? 130 : 2, ...(cancelled ? { cancelled: true } : {}), report: { error: error.message } };
             report(project, lastResult);
-            items.forEach(item => run.errored(item, new vscode.TestMessage(error.message)));
+            items.forEach(item => cancelled ? run.skipped(item) : run.errored(item, new vscode.TestMessage(error.message)));
             continue;
           }
           const result = lastResult = entry.result;
@@ -122,7 +124,16 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
               run.errored(item, new vscode.TestMessage(result.report?.error || 'Native test completion and cleanup were not confirmed.'));
             else if (outcome.status === 'passed') run.passed(item);
             else if (outcome.status === 'skipped') run.skipped(item);
-            else run.failed(item, new vscode.TestMessage(outcome.message || 'Native Jade test failed.'));
+            else {
+              const message = new vscode.TestMessage(outcome.message || 'Native Jade test failed.');
+              const location = diagnosticLocation(outcome);
+              if (location && (path.isAbsolute(location.source) || project.provider.projectRoot)) {
+                const source = path.isAbsolute(location.source) ? location.source : path.resolve(project.provider.projectRoot, location.source);
+                const line = location.line - 1, column = location.column - 1;
+                message.location = new vscode.Location(vscode.Uri.file(source), new vscode.Range(line, column, line, column));
+              }
+              run.failed(item, message);
+            }
           }
         }
       }
