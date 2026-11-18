@@ -1,6 +1,6 @@
 'use strict';
 const { jadeSourceUri } = require('./active-jade-source');
-function registerNativeSourceCommands(vscode, context, workspace, testing) {
+function registerNativeSourceCommands(vscode, context, workspace, testing, { reportDiagnostic = () => {} } = {}) {
   const output = vscode.window.createOutputChannel('Jade Compile');
   context.subscriptions.push(output);
   const source = value => {
@@ -18,6 +18,7 @@ function registerNativeSourceCommands(vscode, context, workspace, testing) {
     output.show(true);
     return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Building saved Jade changes', cancellable: true }, async (_progress, token) => {
       const result = await workspace.execute(selected.project, 'build', { entityIds: [selected.entityId] }, { token, output: text => output.append(text) });
+      reportDiagnostic(selected.project, result);
       if (result.report?.error) output.appendLine(result.report.error);
       return result;
     });
