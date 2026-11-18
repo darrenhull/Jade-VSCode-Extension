@@ -57,14 +57,19 @@ class NativeSourceWorkspace {
 
   async refresh(folder, token, { prepared = false } = {}) {
     const project = prepared ? this.project(folder) : await this.prepare(folder, token);
+    const errors = [];
     for (const value of project.files.documents.values()) {
       const currentState = () => {
         const document = (this.vscode.workspace.textDocuments || []).find(item => item.uri.toString() === value.uri.toString());
         return { document, dirty: document?.isDirty === true, version: document?.version };
       };
-      await project.files.refresh(value.uri, { currentState });
+      try { await project.files.refresh(value.uri, { currentState }); }
+      catch (error) { errors.push(error); }
     }
-    await Promise.all([...this.sourceListeners].map(listener => Promise.resolve().then(() => listener(project))));
+    const listeners = await Promise.allSettled([...this.sourceListeners].map(listener => Promise.resolve().then(() => listener(project))));
+    for (const result of listeners) if (result.status === 'rejected') errors.push(result.reason);
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('\n'));
     return project;
   }
 
@@ -139,6 +144,19 @@ class NativeSourceWorkspace {
     if (folder) return this.project(folder);
     if (this.folders().length === 1) return this.project(this.folders()[0]);
     throw Error('Choose the Jade project before this operation.');
+  }
+
+  async recover(uri) {
+    const project = this.projectForUri(uri);
+    if (!project.files.documents.has(uri.toString())) {
+      if (!project.provider.snapshot) {
+        const operation = project.recoveryPreparation ||= this.prepare(project.folder);
+        try { await operation; }
+        finally { if (project.recoveryPreparation === operation) project.recoveryPreparation = undefined; }
+      }
+      await project.files.recover(uri);
+    }
+    return project;
   }
 
   record(uri) {
@@ -222,15 +240,7 @@ class NativeSourceWorkspace {
 
   register(context) {
     const delegate = async (method, uri, ...args) => {
-      const project = this.projectForUri(uri);
-      if (!project.files.documents.has(uri.toString())) {
-        if (!project.provider.snapshot) {
-          const operation = project.recoveryPreparation ||= this.prepare(project.folder);
-          try { await operation; }
-          finally { if (project.recoveryPreparation === operation) project.recoveryPreparation = undefined; }
-        }
-        await project.files.recover(uri);
-      }
+      const project = await this.recover(uri);
       return project.files[method](uri, ...args);
     };
     const provider = { onDidChangeFile: this.events.event, watch: () => ({ dispose() {} }) };

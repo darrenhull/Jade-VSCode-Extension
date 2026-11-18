@@ -47,8 +47,17 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
   });
   const provider = {
     async resolveCustomTextEditor(document, panel) {
-      const row = pending.get(document.uri.toString());
-      if (!row || workspace.record(document.uri).document.entityId !== row.entity.id) throw Error('Open this class from the native source catalogue.');
+      const project = await workspace.recover(document.uri);
+      const binding = project.files.binding(document.uri);
+      let row = pending.get(document.uri.toString());
+      if (!row) {
+        const entity = binding.entity;
+        if (!['class', 'interface', 'primitive', 'type'].includes(entity?.kind) || entity.id !== binding.entityId)
+          throw Error('This restored Class Workspace has no matching native class identity. Keep unsaved text and reopen the class from Object Explorer.');
+        const native = project.provider.binding();
+        row = { project, provider: native.provider, projectId: native.projectId, entityId: entity.id, entity, file: document.uri.toString() };
+      }
+      if (row.project !== project || binding.entityId !== row.entity.id) throw Error('Open this class from the native source catalogue.');
       pending.delete(document.uri.toString());
       let selectedDocument = document;
       const view = shell.attach({ document, panel, row, selectedId: row.selectedMember?.id, services: {

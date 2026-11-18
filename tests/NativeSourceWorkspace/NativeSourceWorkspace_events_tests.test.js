@@ -138,3 +138,31 @@ test("closing a project retires its watcher and queued refresh while keeping ori
     assert.equal(f.requests.filter(row => row.command === 'source.semantic.prepare').length, 1);
   } finally { f.registered.workspace.dispose(); }
 });
+
+
+test('a deleted clean source editor cannot block healthy editors and next-generation discovery while dirty bases remain intact', async () => {
+ let removed=false;
+ const f=watched((command,request,context)=>{
+  if(command!=='source.semantic.read')return;
+  if(removed&&request.entityId===context.document.entityId)return{passed:false,code:2,report:{error:'Native entity was deleted externally'}};
+  const document=structuredClone(context.document);document.entityId=document.documentId=request.entityId;
+  document.generation=document.revision.generation=request.generation;
+  document.projection.text='native '+request.entityId+' '+request.generation;document.projection.contentHash=context.hash(document.projection.text);
+  return{passed:true,code:0,body:document};
+ });
+ try{
+  await f.registered.testing.discover();const workspace=f.registered.workspace,project=workspace.project(f.folder);
+  const deleted=await project.files.open(f.document.entityId),healthy=await project.files.open('healthy-native-id'),dirty=await project.files.open('dirty-native-id');
+  const dirtyText='user unsaved text';
+  for(const [uri,isDirty]of[[deleted,false],[healthy,false],[dirty,true]])f.documents.push({uri,isDirty,version:1,getText:()=>isDirty?dirtyText:'saved source'});
+  const dirtyBase=project.files.binding(dirty).revision,seen=[];workspace.onDidChangeSource(value=>seen.push(value.provider.binding().generation));
+  removed=true;f.snapshot.generation='generation-2';f.state.methods.push('two');
+  await assert.rejects(workspace.refresh(f.folder),/deleted externally/);
+  assert.equal(project.files.binding(healthy).revision.generation,'generation-2');
+  assert.equal(project.files.binding(deleted).revision.generation,'generation-1');
+  assert.deepEqual(project.files.binding(dirty).revision,dirtyBase);assert.equal(f.documents.find(doc=>doc.uri===dirty).getText(),dirtyText);
+  assert.deepEqual(seen,['generation-2']);assert.equal(f.registered.testing.controller.items.get(f.folder.uri.toString()).children.size,2);
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.read'&&row.body.entityId==='dirty-native-id').length,1);
+  assert.equal(f.requests.some(row=>row.command==='source.semantic.applyEdit'),false);
+ }finally{f.registered.workspace.dispose();}
+});

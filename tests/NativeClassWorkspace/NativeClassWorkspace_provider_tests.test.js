@@ -53,3 +53,33 @@ test('Class Workspace shows native base and property metadata while unsupported 
   assert.equal(result.groups[0].items[0].nativeEntity.flags.readOnly, true);
   assert.equal(result.overview.superclassIdentity, undefined);
 });
+
+
+test('restored Class Workspace reconstructs exact native class context without open or pending state and preserves dirty text', async () => {
+ const {setup}=require('../NativeSourceWorkspace/fixtures/vscode.cjs');
+ const {NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+ const {registerNativeClassWorkspaces}=require('../../extension/src/native-class-workspaces');
+ const f=setup({flags:{documentReopen:true},reply(command,request){
+  if(command==='source.semantic.reopen')return{passed:true,code:0,body:structuredClone(f.document)};
+  if(command==='source.semantic.query')return{passed:true,code:0,body:{provider:'jox',projectId:f.snapshot.projectId,generation:request.generation,items:[],offset:0,limit:100,total:0,nextOffset:null}};
+ }});
+ f.document.entityId=f.document.documentId='opaque-restored-type';
+ f.document.entity={id:f.document.entityId,kind:'class',name:'RepeatedName',qualifiedName:{schema:'ExactNativeSchema',type:'RepeatedName'}};
+ f.document.documentBinding={format:1,key:'a'.repeat(32),projectUri:'file:///C:/project'};
+ const uri={scheme:'jade-source',path:'/.jade/projections/'+f.document.documentBinding.key+'.jade',query:new URLSearchParams({project:'file:///C:/project',binding:f.snapshot.projectId}).toString(),toString(){return this.scheme+':'+this.path+'?'+this.query;}};
+ const dirtyText='unsaved restored text';const document={uri,isDirty:true,version:7,getText:()=>dirtyText,save:()=>assert.fail('Restoring a class must not save its document')};f.documents.push(document);
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:()=>f.config});workspace.register(f.context);
+ const classes=registerNativeClassWorkspaces(f.vscode,f.context,workspace);const panel=f.vscode.window.createWebviewPanel();
+ try{
+  await classes.provider.resolveCustomTextEditor(document,panel);await panel.receive({command:'ready'});
+  const snapshot=panel.sent.find(message=>message.command==='workspace').snapshot;
+  assert.equal(snapshot.identity.entityId,'opaque-restored-type');assert.equal(snapshot.identity.schema,'ExactNativeSchema');
+  assert.equal(snapshot.identity.qualifiedName,'ExactNativeSchema::RepeatedName');
+  assert.deepEqual(workspace.record(uri).document.revision,f.document.revision);
+  assert.equal(document.getText(),dirtyText);assert.equal(document.isDirty,true);
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,1);
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.reopen').length,1);
+  assert.equal(f.requests.find(row=>row.command==='source.semantic.query').body.parentId,'opaque-restored-type');
+  assert.equal(f.requests.some(row=>row.command==='source.semantic.applyEdit'||row.command==='source.semantic.read'),false);
+ }finally{classes.provider.dispose();workspace.dispose();}
+});
