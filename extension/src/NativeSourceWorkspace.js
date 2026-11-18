@@ -218,6 +218,11 @@ class NativeSourceWorkspace {
       () => operations.map(() => ({ result: { passed: false, code: 130, cancelled: true } })));
   }
 
+  releaseExecution() {
+    this.executing = false;
+    for (const [changed, pending] of this.pendingChanges) this.scheduleRefresh(changed, !pending.needsPrepare);
+  }
+
   async withExecution(project, options, operation, cancellation = () => ({ passed: false, code: 130, cancelled: true })) {
     const cancelled = () => options?.token?.isCancellationRequested;
     if (cancelled()) return cancellation();
@@ -233,8 +238,7 @@ class NativeSourceWorkspace {
       await this.saveDirty(project);
       return await operation();
     } finally {
-      this.executing = false;
-      for (const [changed, pending] of this.pendingChanges) this.scheduleRefresh(changed, !pending.needsPrepare);
+      this.releaseExecution();
     }
   }
 

@@ -36,9 +36,9 @@ function createSemanticWorkspaceTransport(workspace, client) {
       if (workspace.executing) throw Error('Another Jade Working operation is running.');
       workspace.executing = true;
       try { await workspace.beforeOperation?.(); }
-      catch (error) { workspace.executing = false; throw error; }
+      catch (error) { workspace.releaseExecution(); throw error; }
     },
-    async afterOperation() { prepared = undefined; activeRequest = undefined; workspace.executing = false; },
+    async afterOperation() { prepared = undefined; activeRequest = undefined; workspace.releaseExecution(); },
     async prepareSource(config, _progress, token) {
       const project = projectFor(config);
       await workspace.saveDirty(project);

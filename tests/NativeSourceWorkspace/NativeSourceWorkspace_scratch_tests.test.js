@@ -40,3 +40,40 @@ test('lost original Scratch channel never spawns a cancellation on a replacement
   const failed = { passed: false, code: 2, report: { error: 'Original channel closed' } }; complete(failed);
   assert.equal((await operation).code, 2); assert.equal(f.requests.some(request => request.command === 'cancel'), false);
 });
+
+
+const turn=()=>new Promise(resolve=>setImmediate(resolve));
+async function until(predicate){for(let n=0;n<50&&!predicate();n++)await turn();assert.ok(predicate(),'Expected pending source refresh to finish automatically');}
+for(const outcome of [{passed:true,code:0,report:{executed:true}},{passed:false,code:130,cancelled:true,report:{error:'Original cancellation'}},{passed:false,code:2,report:{error:'Original native failure'}}])test('Scratch release automatically drains expired source debounce and preserves native outcome '+outcome.code,async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let complete;
+ const f=fixture({reply:()=>new Promise(resolve=>{complete=resolve;})});
+ try{
+  const project=await f.workspace.prepare(f.folder),seen=[];f.workspace.onDidChangeSource(value=>seen.push(value.provider.binding().generation));
+  const operation=f.runner.run({document:document()});await until(()=>complete);
+  const before=f.requests.filter(row=>row.command==='source.semantic.prepare').length;
+  f.snapshot.generation='generation-2';f.workspace.scheduleRefresh(project);
+  t.mock.timers.tick(100);await turn();assert.equal(f.workspace.executing,true);assert.equal(f.workspace.pendingChanges.has(project),true);assert.deepEqual(seen,[]);
+  complete(outcome);const result=await operation;assert.equal(result.code,outcome.code);assert.equal(result.passed,outcome.passed);assert.equal(result.cancelled,outcome.cancelled);
+  t.mock.timers.tick(100);await until(()=>seen.length===1);
+  assert.deepEqual(seen,['generation-2']);assert.equal(f.workspace.pendingChanges.size,0);
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,before+1);
+  assert.equal(f.requests.filter(row=>row.command==='workspace.run').length,1);assert.equal(f.workspace.executing,false);
+ }finally{f.workspace.dispose();}
+});
+
+test('failed Scratch acquisition releases and automatically drains the original pending source change without native execution',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let reject;
+ const f=fixture({supported:false});
+ try{
+  const project=await f.workspace.prepare(f.folder),seen=[];f.workspace.onDidChangeSource(value=>seen.push(value.provider.binding().generation));
+  f.workspace.beforeOperation=()=>new Promise((_resolve,fail)=>{reject=fail;});
+  const operation=f.runner.run({document:document()});await until(()=>reject);
+  f.snapshot.generation='generation-2';f.workspace.scheduleRefresh(project);t.mock.timers.tick(100);await turn();
+  assert.equal(f.workspace.pendingChanges.has(project),true);reject(Error('Original acquisition failure'));
+  const result=await operation;assert.equal(result.passed,false);assert.match(result.report.error,/Original acquisition failure/);
+  t.mock.timers.tick(100);await until(()=>seen.length===1);
+  assert.deepEqual(seen,['generation-2']);assert.equal(f.workspace.executing,false);assert.equal(f.workspace.pendingChanges.size,0);
+  assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,2);
+  assert.equal(f.requests.some(row=>row.command==='workspace.run'),false);assert.equal(project.provider.flags.nativeScratch,false);
+ }finally{f.workspace.dispose();}
+});
