@@ -24,6 +24,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    }
   }
   const run=vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Initialising Jade workspace',cancellable:false},async progress=>{
+   await services.validateRuntime?.(folder);requireFolder();
    if(services.isBusy())throw Error('Wait for the current Jade operation before initialising this workspace.');
    const configFile=path.join(key,'jade.json'),original=fs.existsSync(configFile)?fs.readFileSync(configFile):undefined;
    function requireUnchanged(){
@@ -34,12 +35,12 @@ function registerWorkspaceInitialization(vscode,context,services){
     if(vscode.workspace.textDocuments?.some(document=>document.isDirty&&document.uri?.fsPath&&path.resolve(document.uri.fsPath).toLowerCase()===path.resolve(configFile).toLowerCase()))
      throw Error('Save the pending jade.json edits before initialising this workspace.');
    }
-   const argumentsFor=config=>['--install',config.installPath,'--database',config.databasePath,'--ini',config.iniPath,'--server',config.server];
+   const argumentsFor=config=>services.nativeDiscovery?Object.entries({install:config.installPath,database:config.databasePath,ini:config.iniPath,server:config.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([key,value])=>['--'+key,value]):['--install',config.installPath,'--database',config.databasePath,'--ini',config.iniPath,'--server',config.server];
    const argv=['--config',configFile];let initialConfig;
    if(!original){
     const config=await runtimeConfig();if(!config)return{cancelled:true};initialConfig=config;
     // Unique native profile avoids replacing another project's shared profile.
-    argv.push('--profile','vscode-'+randomUUID(),...argumentsFor(config));
+    if(!services.nativeDiscovery||config.installPath)argv.push('--profile','vscode-'+randomUUID(),...argumentsFor(config));
    }
    output.show(true);output.appendLine('Initialising Git and configuration in '+key+'. This does not extract, back up, build or publish.');
    async function invoke(args,expectedConfig=initialConfig){
@@ -73,7 +74,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    progress.report({message:'Native project configuration is ready.'});
    output.appendLine((result.created?'Created ':'Preserved existing ')+configFile+'. Configuration step complete.');
    if(services.refreshSourceIndex){progress.report({message:'Initialising the shared Git source index…'});await services.refreshSourceIndex(folder);output.appendLine('Shared source index is ready.');}
-   if(sameFolder())void vscode.window.showInformationMessage('Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
+   if(sameFolder())void vscode.window.showInformationMessage(services.nativeDiscovery?'Jade project configuration is ready. Use Set Up Project to create Working and extract sources.':'Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
    return result;
   }).finally(()=>{if(pending.get(key)===run)pending.delete(key);});
   pending.set(key,run);return run;

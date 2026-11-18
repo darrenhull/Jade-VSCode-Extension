@@ -155,8 +155,10 @@ function activate(context) {
     workingLocation:config=>nativeTests.workingLocation(config)
   });
   source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
+  const setup=require('./jox-project-setup').registerJoxProjectSetup(vscode,context,source.workspace,{client:nativeTests,configFor,detect:detectSettings});
+  void setup.onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
   context.subscriptions.push(vscode.commands.registerCommand('jadeNative.discover',detectSettingsCommand));
-  return {...source,objectExplorer};
+  return {...source,objectExplorer,setup};
 }
 
 // Retained only while the JOX path is being qualified; the jade-cls backup is

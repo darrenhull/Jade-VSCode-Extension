@@ -62,12 +62,12 @@ class NativeSourceProvider {
       throw Error('The native source connection changed. Prepare the project again.');
   }
 
-  async request(command, body, token) {
+  async request(command, body, token, output) {
     this.assertConnection();
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
     this.validateContext();
     const connection = this.connection;
-    const request = this.client.request(command, body, undefined, undefined, connection);
+    const request = this.client.request(command, body, output, undefined, connection);
     const cancel = () => {
       try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
       catch { /* The original request still owns the terminal connection result. */ }
@@ -96,20 +96,49 @@ class NativeSourceProvider {
     this.validateContext();
     const capabilities = await this.capability();
     const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token);
+    return this.adoptSnapshot(snapshot, capabilities);
+  }
+
+  adoptSnapshot(snapshot, capabilities) {
     if (snapshot.provider !== 'jox') throw Error('Invalid native provider binding.');
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
     hash(snapshot.snapshotHash, 'snapshot');
+    const project = new URL(required(snapshot.projectRoot, 'project root'));
+    if (project.protocol !== 'file:' || project.search || project.hash) throw Error('Invalid native project root URI.');
+    const projectRoot = path.resolve(fileURLToPath(project));
+    const context = path.relative(projectRoot, this.root);
+    if (context === '..' || context.startsWith('..' + path.sep) || path.isAbsolute(context))
+      throw Error('Native project root does not contain the selected project context.');
     if (!Array.isArray(snapshot.sourceRoots) || !snapshot.sourceRoots.length) throw Error('Missing native source root binding.');
     this.sourceRoots = snapshot.sourceRoots.map(uri => {
       const value = new URL(uri);
       if (value.search || value.hash || value.protocol !== 'file:') throw Error('Invalid native source root URI.');
       return fileURLToPath(value);
     });
+    this.projectRoot = projectRoot;
     this.snapshot = clone(snapshot);
     this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen']
       .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     return clone(snapshot);
+  }
+
+  initialize({ destination, schemas, expectedWorkingIdentity }, token, output) {
+    return this.serializeSource(async () => {
+      if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+      this.validateContext();
+      if (!path.isAbsolute(required(destination, 'source destination'))) throw Error('Choose an absolute source destination.');
+      const capabilities = await this.capability();
+      if (capabilities.initialization !== true) throw Error('Update the Jade CLI: this runtime does not support creating Working and extracting JOX sources.');
+      const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), destination,
+        ...(schemas === undefined ? {} : { schemas: clone(schemas) }),
+        ...(expectedWorkingIdentity === undefined ? {} : { expectedWorkingIdentity: required(expectedWorkingIdentity, 'reviewed Working target') }) }, token, output);
+      if (!Array.isArray(result.sourceRoots) || result.sourceRoots.length !== 1 ||
+          path.relative(path.resolve(destination), fileURLToPath(result.sourceRoots[0])) !== '')
+        throw Error('Native initialization returned another source destination.');
+      this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities);
+      return clone(result);
+    });
   }
 
   binding() {
@@ -158,7 +187,7 @@ class NativeSourceProvider {
       try { origin = contained(root, document.origin.uri, 'origin'); break; } catch { /* Try only the native-returned configured roots. */ }
     }
     if (!origin) throw Error('Native origin is outside its configured source roots.');
-    const managed = path.join(this.root, '.jade');
+    const managed = path.join(this.projectRoot, '.jade');
     const relative = path.relative(managed, origin);
     if (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))
       throw Error('Native origin cannot be a derived cache projection.');
@@ -172,7 +201,7 @@ class NativeSourceProvider {
       if (binding?.format !== 1 || !/^[a-f0-9]{32}$/.test(binding.key || ''))
         throw Error('Missing native open-document recovery binding.');
       const project = new URL(binding.projectUri);
-      if (project.protocol !== 'file:' || project.search || project.hash || path.relative(this.root, fileURLToPath(project)) !== '')
+      if (project.protocol !== 'file:' || project.search || project.hash || path.relative(this.projectRoot, fileURLToPath(project)) !== '')
         throw Error('The native editor recovery binding belongs to another project.');
     }
     if (!Array.isArray(document.supportedEdits)) throw Error('Missing native supported edit kinds.');
