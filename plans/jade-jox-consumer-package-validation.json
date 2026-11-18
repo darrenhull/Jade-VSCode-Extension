@@ -1,12 +1,22 @@
 {
   "format": 1,
   "scope": "Opt-in consumer package validation; synthetic runtime bytes only",
-  "red": {"tests": 3, "passed": 1, "failed": 2, "cause": "Unqualified flags and incomplete JOX tuples were accepted"},
-  "green": {"tests": 15, "passed": 15, "failed": 0, "milliseconds": 597},
+  "red": {
+    "tests": 3,
+    "passed": 1,
+    "failed": 2,
+    "cause": "Unqualified flags and incomplete JOX tuples were accepted"
+  },
+  "green": {
+    "tests": 15,
+    "passed": 15,
+    "failed": 0,
+    "milliseconds": 597
+  },
   "contracts": [
     "Requires native CLI 0.11.0 or newer and the owner-declared format-1 Unicode JOX descriptor.",
     "Requires qualified initialization, upload and native-test flags; Scratch may remain unsupported.",
-    "Requires hash-listed helper, SCM and provider trio alongside existing inspector/debugger/OID assets.",
+    "JOX requires its three reachable inspector helpers, OID descriptor and helper/SCM/provider trio; the legacy default still requires its original debugger/CLS assets.",
     "All existing path, checksum, manifest and official pin validation remains in force before replacing a bundle.",
     "Preserves exact manifest bytes and qualification flags; no runtime asset or pin is changed by this checkpoint."
   ],
@@ -15,5 +25,31 @@
     "Update canonical pin, runtime, minimum CLI and extension 0.23 version/lockfiles together.",
     "Enable the JOX gate in the canonical package invocation and verify one extracted VSIX and packaged-JS to real-CLI flow.",
     "Actual running UI verification remains blocked by the previously recorded OS error 3; no retry or visual claim."
-  ]
+  ],
+  "reachableComponents": {
+    "red": "The initial JOX gate incorrectly demanded the retired CLS test helper.",
+    "green": {
+      "tests": 17,
+      "passed": 16,
+      "skipped": 1,
+      "failed": 0,
+      "milliseconds": 732
+    },
+    "requiredSharedRuntime": [
+      "jade-inspect-helper.exe",
+      "jade-inspect-helper-ansi.exe",
+      "jade-inspect-helper-unicode.exe"
+    ],
+    "oidFormat": "jade-native",
+    "legacyActivation": "activateLegacyCls has no caller and is not exported; the active entry always registers the native JOX workspace.",
+    "legacyDefaultRequirementsUnchanged": true
+  },
+  "portableAdapterSmoke": {
+    "sourcePrepared": true,
+    "syntaxChecked": true,
+    "default": "one explicit skip",
+    "artifactExecuted": false,
+    "uses": "Actual extracted extension NativeSourceProvider and CliWorkingSession over the ordinary CLI service; no private binding or capability substitution.",
+    "cleanup": "Existing exclusive authenticated broker retirement plus actual stdio/owned-job exit; refusal or forced settlement is failure."
+  }
 }

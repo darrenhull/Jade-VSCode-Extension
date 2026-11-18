@@ -34,6 +34,7 @@ function joxFixture(t){
   const bytes=Buffer.from('synthetic packaging fixture '+name);fs.writeFileSync(path.join(f.source,relative),bytes);
   f.manifest.runtimeFiles[relative]=crypto.createHash('sha256').update(bytes).digest('hex');
  }
+ for(const name of ['jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe']){const bytes=Buffer.from('synthetic inspector '+name);fs.writeFileSync(path.join(f.source,'native',name),bytes);f.manifest.runtimeFiles['native/'+name]=crypto.createHash('sha256').update(bytes).digest('hex');}
  f.save=()=>fs.writeFileSync(path.join(f.source,'distribution.json'),JSON.stringify(f.manifest));f.save();return f;
 }
 test('JOX packaging refuses unqualified initial-flow flags before replacing the existing bundle',t=>{
@@ -54,4 +55,13 @@ test('JOX packaging preserves shared runtime assets and explicit unsupported Scr
  assert.equal(JSON.parse(original).joxRuntime.nativeScratch,false);
  fs.writeFileSync(path.join(f.source,'native/jox/jadegitscm.dll'),'tampered');assert.throws(()=>bundleCli({...f,requireJox:true}),/checksum/i);
  assert.deepEqual(fs.readFileSync(path.join(f.destination,'distribution.json')),original);
+});
+
+test('JOX basic package needs its reachable inspector trio and does not require retired debugger or CLS helpers',t=>{
+ const f=joxFixture(t);
+ for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-native-helper.exe','debugger-abi.json']){delete f.manifest.runtimeFiles['native/'+name];fs.unlinkSync(path.join(f.source,'native',name));}
+ f.save();assert.doesNotThrow(()=>bundleCli({...f,requireJox:true}));
+ for(const name of ['jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe','jade-inspect-helper.exe']){
+  const missing=joxFixture(t);delete missing.manifest.runtimeFiles['native/'+name];missing.save();assert.throws(()=>bundleCli({...missing,requireJox:true}),/required native/i);
+ }
 });

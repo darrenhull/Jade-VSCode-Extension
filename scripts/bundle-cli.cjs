@@ -6,7 +6,8 @@ function bundleCli(options={}){
  const manifest=JSON.parse(manifestBytes.toString('utf8'));
  if(manifest.formatVersion!==2||manifest.runtime!=='native-cpp'||manifest.platform!=='win32'||manifest.arch!=='x64'||manifest.executable!=='jade-cli.exe')throw Error('A native C++ Windows x64 CLI distribution is required.');
  require('../extension/src/NativeObjectIdentity').requireNativeOidDistribution(manifest);
- for(const name of ['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'])if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
+ const requiredRuntime=options.requireJox?['jade-inspect-helper.exe','jade-inspect-helper-ansi.exe','jade-inspect-helper-unicode.exe']:['jade-test-helper.exe','jade-debug-helper.exe','jade-inspect-helper.exe','jade-native-helper.exe','debugger-abi.json'];
+ for(const name of requiredRuntime)if(!Object.hasOwn(manifest.runtimeFiles||{},'native/'+name))throw Error('Required native runtime asset is missing from the manifest: '+name);
  if(options.requireJox){
   require('./NativeCompatibility.cjs').requireNativeVersion(source,'0.11.0');
   const jox=manifest.joxRuntime;
