@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Browse and edit JOX source and run local native Jade tests in Visual Studio Code.",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -78,6 +78,7 @@
       {
         "command": "jadeNative.setupProject",
         "title": "Set Up Project",
+        "icon": "$(folder-open)",
         "category": "Jade"
       },
       {
@@ -264,7 +265,8 @@
       },
       {
         "command": "jadeNative.discover",
-        "title": "Jade: Detect Runtime Settings"
+        "title": "Jade: Detect Runtime Settings",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "jadeNative.checkFile",
@@ -545,12 +547,12 @@
           "group": "navigation@2"
         },
         {
-          "command": "jadeNative.extractAllSources",
+          "command": "jadeNative.setupProject",
           "when": "view == jadeNative.tools",
           "group": "navigation@1"
         },
         {
-          "command": "jadeNative.publishChangedFiles",
+          "command": "jadeNative.discover",
           "when": "view == jadeNative.tools",
           "group": "navigation@2"
         }
@@ -782,6 +784,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.11.0"
+    "minimumCliVersion": "0.11.1"
   }
 }

@@ -1,16 +1,16 @@
 # Jade Tools
 
-Bundles [official Jade CLI 0.11.0](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.0) with its verified Unicode JOX runtime and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.1](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.1) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
-Requires Visual Studio Code on Windows and a compatible installed Unicode Jade runtime for database operations. The Jade IDE is not required.
+Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The native CLI detects its character mode and rejects an explicit mismatch. The Jade IDE is not required.
 
 Browse JOX schemas, classes and members in Object Explorer and Class Workspace. Open a method to edit its Jade source in a normal VS Code text editor. Native source identities and revision bindings map accepted saves back to the authoritative `.jox` file; `.jade/` contains ignored, regenerable projections and private runtime state.
 
-Run **Jade: Set Up Project**, then choose **Create Working copy and extract sources**. Review Source and Working once. Native setup creates a fresh private Working copy and extracts sources once from that same copy. It preserves existing source files and Working data on conflicts. Source remains separate and is not published by setup or local testing.
+Run **Jade: Set Up Project** from Jade Tools or the Command Palette. The same command handles project configuration, runtime detection when needed, Source/Working review, private Working creation and one source extraction, then refreshes Object Explorer and tests automatically. It preserves existing source files and Working data on conflicts. Source remains separate and is not published by setup or local testing.
 
 Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved before execution. The native provider uploads saved Git changes to Working and compiles them before running the selected native tests. Unchanged runs still execute tests without uploading the same source again. Normal Git commit/push remains available through VS Code Source Control; database publication is separate.
 
-The current qualified flow covers original method-body edits and selected native tests on a Unicode Jade runtime. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.
+The current qualified flow covers original method-body edits and selected native tests on matching ANSI or Unicode Jade runtimes. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.
 
 Standalone builds, structural editing, Scratch execution, debugging and Source publication are not qualified by this release. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
 

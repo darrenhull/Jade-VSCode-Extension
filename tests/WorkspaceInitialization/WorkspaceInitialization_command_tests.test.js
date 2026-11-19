@@ -141,3 +141,106 @@ test('JOX config-only setup leaves private-profile discovery native and forwards
  assert.deepEqual(s.calls[0].argv,['--config',path.join(s.root,'jade.json')]);
  assert.ok(!s.messages.some(value=>typeof value==='string'&&/Extract All Sources/.test(value)));
 });
+
+
+const nativeMissingConnection='Jade connection setup is required. Run jade-cli init --install <Jade folder> or choose --profile <name>; noninteractive commands never prompt.';
+const selectedRuntime={installPath:'C:/Selected Jade',databasePath:'C:/Selected Source/system',iniPath:'C:/Selected Source/source.ini',server:'singleUser'};
+function nativeDiscovery(s,{cancel=false}={}){
+ let selected=false,detects=0;
+ s.services.nativeDiscovery=true;s.services.configFor=()=>selected?{sourceFormat:'jox',...selectedRuntime}:{sourceFormat:'jox'};
+ s.services.detect=async uri=>{assert.equal(uri,s.folder.uri);detects++;if(cancel)return;selected=true;return{...selectedRuntime};};
+ return()=>detects;
+}
+test('native missing-connection diagnosis hands fresh JOX setup to detection then retries explicit settings once',async t=>{
+ const s=setup(t,{results:[{passed:false,code:2,report:{error:nativeMissingConnection}},{passed:true,code:0,created:true}]}),detects=nativeDiscovery(s);
+ const result=await s.initialize(s.folder.uri);
+ assert.equal(result.passed,true);assert.equal(detects(),1);assert.equal(s.calls.length,2);
+ assert.deepEqual(s.calls[0].argv,['--config',path.join(s.root,'jade.json')]);
+ const retry=s.calls[1].argv;assert.match(retry[retry.indexOf('--profile')+1],/^vscode-/);
+ for(const [option,key] of [['install','installPath'],['database','databasePath'],['ini','iniPath'],['server','server']])assert.equal(retry[retry.indexOf('--'+option)+1],selectedRuntime[key]);
+ assert.equal(retry.includes(undefined),false);
+});
+test('cancelling native-first detection stops before retry without a failure notification',async t=>{
+ const s=setup(t,{result:{passed:false,code:2,report:{error:nativeMissingConnection}}}),detects=nativeDiscovery(s,{cancel:true});
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);
+ assert.equal(result.cancelled,true);assert.equal(detects(),1);assert.equal(s.calls.length,1);
+ assert.ok(!s.messages.includes(nativeMissingConnection));
+});
+test('a genuine native configuration error never offers runtime detection',async t=>{
+ const error='Connection profile is locked; preserve existing settings';const s=setup(t,{result:{passed:false,code:2,report:{error}}}),detects=nativeDiscovery(s);
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);
+ assert.equal(result.error,error);assert.equal(detects(),0);assert.equal(s.calls.length,1);
+});
+test('a repeated native missing-connection failure preserves the cause without another detection loop',async t=>{
+ const s=setup(t,{result:{passed:false,code:2,report:{error:nativeMissingConnection}}}),detects=nativeDiscovery(s);
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);
+ assert.equal(result.error,nativeMissingConnection);assert.equal(detects(),1);assert.equal(s.calls.length,2);
+});
+test('runtime settings changed after detection cannot be sent as a stale retry',async t=>{
+ const s=setup(t,{result:{passed:false,code:2,report:{error:nativeMissingConnection}}});nativeDiscovery(s);
+ let detected=false,reads=0;s.services.detect=async()=>{detected=true;return selectedRuntime;};
+ s.services.configFor=()=>!detected?{sourceFormat:'jox'}:{sourceFormat:'jox',...selectedRuntime,...(++reads>1?{databasePath:'C:/Changed/system'}:{})};
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);
+ assert.match(result.error,/runtime settings changed/);assert.equal(s.calls.length,1);
+});
+test('existing native private-profile discovery succeeds without requiring explicit installation settings',async t=>{
+ const s=setup(t,{existing:true}),detects=nativeDiscovery(s),bytes=fs.readFileSync(path.join(s.root,'jade.json'));
+ const result=await s.initialize(s.folder.uri);
+ assert.equal(result.passed,true);assert.equal(detects(),0);assert.equal(s.calls.length,1);assert.equal(s.prompts.length,0);
+ assert.deepEqual(s.calls[0].argv,['--config',path.join(s.root,'jade.json')]);assert.deepEqual(fs.readFileSync(path.join(s.root,'jade.json')),bytes);
+});
+test('native missing-profile repair detects real settings before reviewing or creating that same alias',async t=>{
+ const error="Unknown Jade connection profile 'keep-me'. Run jade-cli init --profile \"keep-me\" --install <Jade folder>.";
+ const s=setup(t,{existing:true,results:[{passed:false,code:2,report:{error}},{passed:true,code:0,created:false}],choices:['Configure This Machine','Create Machine Profile']}),detects=nativeDiscovery(s);
+ const bytes=fs.readFileSync(path.join(s.root,'jade.json'));const result=await s.initialize(s.folder.uri);
+ assert.equal(result.passed,true);assert.equal(detects(),1);assert.equal(s.calls.length,2);assert.equal(s.calls[1].argv.includes('--profile'),false);
+ assert.equal(s.calls[1].argv[s.calls[1].argv.indexOf('--install')+1],selectedRuntime.installPath);
+ const review=s.prompts.find(row=>row.options?.modal);assert.ok(review);assert.ok(!review.options.detail.includes('undefined'));
+ for(const value of Object.values(selectedRuntime))assert.ok(review.options.detail.includes(value));
+ assert.deepEqual(fs.readFileSync(path.join(s.root,'jade.json')),bytes);
+});
+test('cancelling native missing-profile detection does not review undefined settings or create a profile',async t=>{
+ const s=setup(t,{existing:true,result:{passed:false,code:2,report:{error:"Unknown Jade connection profile 'keep-me'."}},choices:['Configure This Machine']}),detects=nativeDiscovery(s,{cancel:true});
+ const result=await s.initialize(s.folder.uri);assert.equal(result.cancelled,true);assert.equal(detects(),1);assert.equal(s.calls.length,1);assert.equal(s.prompts.length,1);
+});
+test('a cancelled native result cannot be reinterpreted as a request to detect settings',async t=>{
+ const s=setup(t,{result:{passed:false,code:130,cancelled:true,report:{error:nativeMissingConnection}}}),detects=nativeDiscovery(s);
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);assert.equal(result.passed,false);assert.equal(detects(),0);assert.equal(s.calls.length,1);
+});
+test('configuration created during native-first detection is preserved without retrying another project',async t=>{
+ const s=setup(t,{result:{passed:false,code:2,report:{error:nativeMissingConnection}}});nativeDiscovery(s);
+ s.services.detect=async()=>{fs.writeFileSync(path.join(s.root,'jade.json'),'{"connection":"other"}');s.services.configFor=()=>({sourceFormat:'jox',...selectedRuntime});return selectedRuntime;};
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);assert.match(result.error,/jade.json changed/);assert.equal(s.calls.length,1);
+ assert.equal(fs.readFileSync(path.join(s.root,'jade.json'),'utf8'),'{"connection":"other"}');
+});
+
+test('native unresolved existing connection detects settings without selecting a different profile',async t=>{
+ const error='Jade connection is not configured. Run jade-cli init --install <Jade folder> or choose --profile <name>.';
+ const s=setup(t,{existing:true,results:[{passed:false,code:2,report:{error}},{passed:true,code:0,created:false}]}),detects=nativeDiscovery(s),bytes=fs.readFileSync(path.join(s.root,'jade.json'));
+ const result=await s.initialize(s.folder.uri);assert.equal(result.passed,true);assert.equal(detects(),1);assert.equal(s.calls.length,2);
+ assert.equal(s.calls[1].argv.includes('--profile'),false);assert.equal(s.calls[1].argv[s.calls[1].argv.indexOf('--install')+1],selectedRuntime.installPath);assert.deepEqual(fs.readFileSync(path.join(s.root,'jade.json')),bytes);
+});
+test('detection without selected installation settings never creates an undefined machine profile',async t=>{
+ const s=setup(t,{existing:true,result:{passed:false,code:2,report:{error:"Unknown Jade connection profile 'keep-me'."}},choices:['Configure This Machine']});nativeDiscovery(s);
+ s.services.detect=async()=>({});const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);
+ assert.match(result.error,/did not provide a Jade installation/);assert.equal(s.calls.length,1);assert.equal(s.prompts.length,1);
+});
+test('a similar but different native diagnostic retains its original cause',async t=>{
+ const error='Jade connection setup is required for a newer unsupported server protocol.';
+ const s=setup(t,{result:{passed:false,code:2,report:{error}}}),detects=nativeDiscovery(s);
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);assert.equal(result.error,error);assert.equal(detects(),0);assert.equal(s.calls.length,1);
+});
+
+test('explicit installation-only profile repair reviews native defaults without inventing paths',async t=>{
+ const s=setup(t,{existing:true,results:[{passed:false,code:2,report:{error:"Unknown Jade connection profile 'keep-me'."}},{passed:true,code:0,created:false}],choices:['Configure This Machine','Create Machine Profile']});nativeDiscovery(s);
+ s.services.configFor=()=>({sourceFormat:'jox',installPath:selectedRuntime.installPath});s.services.detect=async()=>{assert.fail('Explicit installation settings should reach native defaults');};
+ const result=await s.initialize(s.folder.uri);assert.equal(result.passed,true);
+ const detail=s.prompts.find(row=>row.options?.modal).options.detail;assert.ok(!detail.includes('undefined'));assert.match(detail,/Source: Native default\nINI: Native default\nServer: Native default/);
+ assert.deepEqual(s.calls[1].argv,['--config',path.join(s.root,'jade.json'),'--install',selectedRuntime.installPath]);
+});
+
+for(const proof of ['native-failure','git-failure'])test('detected settings handoff waits for confirmed native configuration and Git: '+proof,async t=>{
+ const s=setup(t,{gitProof:proof!=='git-failure',results:[{passed:false,code:2,report:{error:nativeMissingConnection}},proof==='native-failure'?{passed:false,code:2,report:{error:'Profile ownership conflict'}}:{passed:true,code:0,created:true}]});nativeDiscovery(s);
+ let handedOff=0;s.services.runtimeSettingsReady=async()=>{handedOff++;};
+ const result=await s.commands.get('jadeNative.initializeWorkspace')(s.folder.uri);assert.equal(result.passed,false);assert.equal(handedOff,0);assert.equal(s.calls.length,2);
+});

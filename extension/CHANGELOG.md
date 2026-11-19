@@ -1,3 +1,10 @@
+# 0.23.1 - Project setup and ANSI JOX
+
+- Restore Jade Tools with Set Up Project, Detect Runtime Settings, Refresh Object Explorer and Refresh Tests, including windows with no configured project.
+- Complete project configuration, reviewed Working creation, one source extraction and automatic Explorer/test refresh through a single Set Up Project command. Native project/private-profile discovery runs first; Detect Runtime Settings is requested only for a known missing connection.
+- Bundle Jade CLI 0.11.1 with matching ANSI and Unicode JOX runtimes. The native CLI detects the configured runtime and refuses an explicit character-mode mismatch; it does not convert databases or replace installed Jade DLLs.
+- Preserve existing sources, Working data and active editor/recovery bindings. Cancellation and partial setup failures remain visible; standalone build, structural editing, Scratch, debugging and Source publication remain unsupported.
+
 # 0.23.0 - JOX source workflow
 
 - Bundle verified [official Jade CLI 0.11.0](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.0), including the qualified Unicode JOX runtime and shared read-only inspection helpers.
