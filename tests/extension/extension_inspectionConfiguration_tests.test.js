@@ -7,7 +7,7 @@ function setup(explicit={},nativeFailure){
  const resolved={sourceFormat:'jox',connection:'private-profile',installPath:path.join(root,'selected-install'),databasePath:path.join(root,'selected-database'),iniPath:path.join(root,'selected.ini'),server:'multiUser',schema:'SelectedSchema',workspaceRoots:[path.join(root,'sources')],workingDatabaseDirectory:path.join(root,'.jade','working'),workingDatabaseGeneration:'native-generation',characterSet:'unicode',user:'profile-user',password:'profile-secret'};
  const configFile=path.join(root,'jade.json'),requests=[],targetCalls=[],locationCalls=[];
  const settings={get:key=>Object.hasOwn(explicit,key)?explicit[key]:({server:'singleUser',schema:'',workingDatabaseDirectory:''})[key],inspect:key=>Object.hasOwn(explicit,key)?{workspaceFolderValue:explicit[key]}:{}};
- const vscode={workspace:{getConfiguration:()=>settings,getWorkspaceFolder:()=>folder},commands:{registerCommand:()=>({dispose(){}})},window:{showErrorMessage:message=>assert.fail(message)}};
+ const vscode={workspace:{getConfiguration:()=>settings,getWorkspaceFolder:()=>folder},commands:{registerCommand:()=>({dispose(){}})},window:{createTreeView:()=>({dispose(){}}),showErrorMessage:message=>assert.fail(message)}};
  const client={request(command,body){requests.push({command,body:plain(body)});return{promise:Promise.resolve(nativeFailure||{code:0,passed:true,prepared:{config:resolved,configFile}})};},inspectionTarget(...args){targetCalls.push(args);return args[0];},workingLocation(config){locationCalls.push(config);return config;},dispose(){}};
  let inspection;
  const workspace={executing:false,projectForUri:()=>({folder}),sourceContext(){}};
