@@ -4,6 +4,8 @@
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.
 
+The JOX engine is pinned to JadeGit v0.18.1. Native JOX operations require matching packaged components and qualification for the installed Jade character mode. A publication cursor from a different engine is not replayed or deleted; existing source files and Working data are preserved.
+
 ## Project Working files
 
 New configured workspaces default their managed Working database in the first selected workspace root under `.jade/working`. This is persistent unpublished state, separate from disposable `.jade/source-index` metadata. An explicit `workingDatabaseDirectory` still selects an external or dedicated project Working directory. Relative explicit paths in `jade.json` resolve against that configuration file. The automatic default follows the configured workspace root, not process cwd. Recreate generations use separate descendants and preserve previous data.

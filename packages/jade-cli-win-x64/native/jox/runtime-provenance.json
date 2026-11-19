@@ -1,13 +1,18 @@
 {
   "format": 1,
-  "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+  "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e",
   "characterSet": "unicode",
+  "characterBytes": 2,
+  "componentCharacterBytes": {
+    "jadegitscm.dll": 2,
+    "jadegitdev.dll": 2
+  },
   "loaderDiagnostics": false,
   "observedProvider": false,
   "files": {
-    "jade-jox-test-helper-unicode.exe": "6368be77ddfacf48df1b5946fad543f7fbbd1c4c4bb158b9366186caebcb9de7",
-    "jadegitscm.dll": "53bc4df596cb2874a0dba3cc9db3e9073cb9d4e47267256e8db38b53c943e531",
-    "jadegitdev.dll": "3942947c93ab976754ee6c2d5c74c4321e487fddc7b64d6e078e76a973369319"
+    "jade-jox-test-helper-unicode.exe": "94136237065f465d44809e6adf254ff5606c53ceac4a4c637c6b78b6bd05922d",
+    "jadegitscm.dll": "d4e497c60017b6e95b3b158908693042d7eda6c9dc1f5984017adb2776639d7c",
+    "jadegitdev.dll": "808334b89a68ca12fb3ba7c6aeff8dc2674fb2334f91065ae09dfefa57e1677c"
   },
   "qualification": {
     "managedUpload": true,
@@ -15,44 +20,33 @@
     "initialization": true,
     "nativeScratch": false
   },
-  "sourceCommit": "2f536eed7be0f8218bc29be60cdd0988f143a971",
-  "source": "https://github.com/darrenhull/Jade-CLI/tree/jade-jox",
+  "source": {
+    "release": "v0.18.1",
+    "archiveSha256": "58ff20e95b0bc660329f6efc40c0add95d0d718b8cdf178d5c52cfece4743f98"
+  },
   "build": {
-    "architecture": "x64",
     "crt": "MT",
-    "compiler": "MSVC 14.44.35207",
-    "sdkRuntime": "25.0.2.12",
-    "cohortBuildProofSha256": "77fbd797fd4821d84f6b13e313103f766b17090503c29715eda376f9fd114007",
-    "diagnosticsOffTranslationUnits": [
-      "Loader.cpp",
-      "JoxManagedEntrypoint.cpp"
-    ],
-    "unchangedSourceAndSdkInputsReviewed": true,
-    "incrementalSyntaxRetryProofSha256": "9d7c288802590e1564b19dc3ef70e49d7c5fdf14d8153008e0cbb33d04167656"
+    "arch": "x64",
+    "cliVersion": "0.11.2"
   },
   "qualificationBasis": {
-    "controlledPublicSetupAndUnchangedTest": true,
-    "publicSaveAndNativeChangedAssertion": true,
-    "fullSignatureStableBodyEditAndPassingNativeTest": true,
-    "ordinaryHeaderChangeRefusedBeforeReorganisation": true,
-    "authoritativeMappedRuntimeRelease": "25.0.2",
-    "diagnosticsOffTransfer": "Reviewed identical sources/commands except removal of diagnostic definition in two translation units",
-    "portableConsumer": "Prior basic flow qualified; refreshed normal candidate public same-live syntax correction and warm no-upload run qualified",
-    "settledSyntaxRetry": {
-      "nativeSameLiveCorrectionQualified": true,
-      "nativeReconnectRefusalQualified": true,
-      "publicAdapterQualified": true,
-      "sourceCommit": "2f536eed7be0f8218bc29be60cdd0988f143a971",
-      "nativeProofSha256": "9d7c288802590e1564b19dc3ef70e49d7c5fdf14d8153008e0cbb33d04167656",
-      "scope": "One settled syntax correction in the continuously owned single-user helper; unrelated pending versions remain refused",
-      "publicReceiptSha256": "5305751a29e2b87ff4dc65fc802ad3cc8de754b691a4cf7e27efbc0380b6e33a",
-      "publicSourceProofSha256": "6b473457f59be87f55cc0ac32a1f798a693beeb7fbbaad99f56ed35e628ebf4c"
-    }
-  },
-  "unsupported": [
-    "standalone-project-build",
-    "native-scratch",
-    "structural-or-resource-changes",
-    "recovery-of-unknown-or-reconnected-pending-native-versions"
-  ]
+    "candidateManifestSha256": "991437d89c283bb4cecbeb4c428a88e763e744e25ec880e56d2be491f65be11b",
+    "candidateExecutableSha256": "36806b66741520a525539f3a8c4a0ce7d6cd16f17aa86311d8cac41adcc07b3f",
+    "reviewedPacketSha256": "f42f977addff405786f789504fc7a9e2ed6e424407149d28244cba7657afbe8f",
+    "connectedReceiptSha256": "b58df3704861b475bab0918453f3c5d3806c8acb245c26566c6bdf38c6d0100a",
+    "ownedSupervisorNaturalExit": true,
+    "nativeHelperCloseConfirmed": true,
+    "nativePlatformVersion": "25.0.2",
+    "extractedFiles": 8,
+    "savedSourceBaselineEstablished": true,
+    "unchangedNoUploadCode": 0,
+    "changedSingleOriginExpectedFailureCode": 1,
+    "correctedSingleOriginPassCode": 0,
+    "warmNoUploadCode": 0,
+    "historicalWorkingByteSnapshotUnchanged": true,
+    "disposableSeedIniUnchanged": true,
+    "disposableSeedChangedFiles": [
+      "system\\_control.dat"
+    ]
+  }
 }

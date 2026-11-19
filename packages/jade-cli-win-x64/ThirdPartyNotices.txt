@@ -22,6 +22,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-JadeJox uses maintained JadeGit v0.19.0 and pinned dependencies. Full notices are in licenses/.
-Corresponding application source and reproducible pinned bootstrap: https://github.com/darrenhull/Jade-CLI/tree/jade-jox ; upstream https://gitlab.com/jadelab/jadegit/-/tree/450639947cfe1407fdc0dd6f62889104d57b2420 .
+JadeJox uses maintained JadeGit v0.18.1 and pinned dependencies. Full notices are in licenses/.
+Corresponding application source and reproducible pinned bootstrap: https://github.com/darrenhull/Jade-CLI/tree/main ; upstream https://gitlab.com/jadelab/jadegit/-/tree/f61e1802d430bdea41bada9b10d333e69f85eb9e .
 No licensed Jade runtime DLL or SDK is included; native connected execution requires the compatible installed Jade runtime.
