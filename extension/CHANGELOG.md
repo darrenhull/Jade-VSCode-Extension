@@ -1,3 +1,7 @@
+# 0.23.2 - Jade CLI 0.11.2
+
+- Bundles [Jade CLI 0.11.2](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.2) for local Jade operations.
+
 # 0.23.1 - Project setup and ANSI JOX
 
 - Restore Jade Tools with Set Up Project, Detect Runtime Settings, Refresh Object Explorer and Refresh Tests, including windows with no configured project.

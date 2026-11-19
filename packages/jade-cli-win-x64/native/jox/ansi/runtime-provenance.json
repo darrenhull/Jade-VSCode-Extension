@@ -1,65 +1,52 @@
 {
   "format": 1,
-  "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+  "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e",
   "characterSet": "ansi",
   "characterBytes": 1,
   "componentCharacterBytes": {
-    "jadegitdev.dll": 1,
-    "jadegitscm.dll": 1
+    "jadegitscm.dll": 1,
+    "jadegitdev.dll": 1
   },
   "loaderDiagnostics": false,
   "observedProvider": false,
   "files": {
-    "jade-jox-test-helper-ansi.exe": "851971dd5d1b1724a064917eabccb3ec0841e29829cf2553fe86dd54960ffd91",
-    "jadegitscm.dll": "7405cbb75e74a9b62145149a25e0ada2056ade2baf310ae4bc23ead9b0a6601d",
-    "jadegitdev.dll": "d0d90944b32770eb149c7e85ab784a18d8ffe4c9ed12755177ff0daad9926f20"
+    "jade-jox-test-helper-ansi.exe": "de82fad797b8e5fc1f836636367a71713f76f1acf68458f02d4a5cf7b0cd0f11",
+    "jadegitscm.dll": "3f5cfd128a58cd1fc09b9dcdbbdf6d92731dde780e2cb68d90e88c8a0745304c",
+    "jadegitdev.dll": "c7d94e5ff919e407b82e20993102f32f7b5f2a2225d8bb65c660a22a97790248"
   },
   "qualification": {
-    "nativeTests": true,
-    "nativeScratch": false,
     "managedUpload": true,
-    "initialization": true
+    "nativeTests": true,
+    "initialization": true,
+    "nativeScratch": false
   },
-  "sourceCommit": "7a77705edccb07c8c70e1550ee9a64effbc3592a",
-  "source": "https://github.com/darrenhull/Jade-CLI/tree/7a77705edccb07c8c70e1550ee9a64effbc3592a",
+  "source": {
+    "release": "v0.18.1",
+    "archiveSha256": "58ff20e95b0bc660329f6efc40c0add95d0d718b8cdf178d5c52cfece4743f98"
+  },
   "build": {
-    "unicodeDefinitionsOnAnsiSdkRows": 0,
-    "unicodeEngineOrPrecompiledObjectsReused": false,
-    "cohortBuildProofSha256": "76a60b2ff0f4e997f7f6b54b526abac82d7bd0cc6c2266439b190b50970d62be",
-    "compiler": "MSVC 14.44.35207",
-    "architecture": "x64",
-    "sourceEolEquivalenceProofSha256": "6933e66bbd1152f173f62f683e8297d6968f364bb1b220d03659c8fc542483d0",
     "crt": "MT",
-    "sdkRuntime": "25.0.1.24",
-    "ansiSdkFacingGraphCompileRows": 398
+    "arch": "x64",
+    "cliVersion": "0.11.2"
   },
   "qualificationBasis": {
-    "correctedBodyMilliseconds": 5202,
-    "activePatchHookCallbackQualified": false,
-    "componentAbiExportsCheckedAfterSignOnBeforeJoxApply": true,
-    "correctedBodyCode": 0,
-    "warmNoUploadMilliseconds": 1734,
-    "registeredCommandReceiptSha256": "fd17f26b8c7b8ad6d3220bb73a24fa9c2f50eca4f0e26a579b948eabd3780761",
-    "nativeBootstrapProofSha256": "33bcafa06572da9c7615b40ed798826a6f389b7b278f859a2199f15dd70f139e",
-    "scope": "Owned ANSI fixture, actual registered extension command with automated UI choices, real public CLI/native adapters; not a VSIX or Code GUI qualification",
-    "authoritativeMappedRuntimeRelease": "25.0.1",
-    "falseBodyCode": 1,
-    "changedOriginsPerUpload": 1,
-    "warmUpload": false,
-    "registeredCommandCount": 1,
-    "publicBodyAndWarmReceiptSha256": "a69b59ec509d7a98fbc6b6136a95f0991ed7954bb5563b180687d4fb7712033e",
-    "activeCurrentLatestAndCompilationChecked": true,
-    "originalSourceAllElevenHashesUnchanged": true,
-    "registeredCommandMilliseconds": 20330,
-    "nativeAssertionFailureThenCorrectionReceiptSha256": "0a88171cf330e1d9ebf7f725cc0f5ae2d0b148c9f72b2ea01922afddad70d6bd",
-    "helperRuntimeCharacterSet": "ansi",
-    "nativeSubtreesNaturalExit": true,
-    "falseBodyMilliseconds": 6198
-  },
-  "unsupported": [
-    "standalone-project-build",
-    "native-scratch",
-    "structural-or-resource-changes",
-    "recovery-of-unknown-or-reconnected-pending-native-versions"
-  ]
+    "candidateManifestSha256": "991437d89c283bb4cecbeb4c428a88e763e744e25ec880e56d2be491f65be11b",
+    "candidateExecutableSha256": "36806b66741520a525539f3a8c4a0ce7d6cd16f17aa86311d8cac41adcc07b3f",
+    "reviewedPacketSha256": "6d187cf9dfb9e3fe02d04ca42e43684c6bb90e87df6d349623e9b888b5eef02f",
+    "connectedReceiptSha256": "41c71c311fc096df11a4b8aa80914632d7f83376fa73a0cb9c4314f2a5e5620b",
+    "ownedSupervisorNaturalExit": true,
+    "nativeHelperCloseConfirmed": true,
+    "nativePlatformVersion": "25.0.1",
+    "extractedFiles": 8,
+    "savedSourceBaselineEstablished": true,
+    "unchangedNoUploadCode": 0,
+    "changedSingleOriginExpectedFailureCode": 1,
+    "correctedSingleOriginPassCode": 0,
+    "warmNoUploadCode": 0,
+    "historicalWorkingByteSnapshotUnchanged": true,
+    "disposableSeedIniUnchanged": true,
+    "disposableSeedChangedFiles": [
+      "system\\_control.dat"
+    ]
+  }
 }
