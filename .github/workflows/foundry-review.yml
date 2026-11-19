@@ -9,7 +9,10 @@ permissions: {}
 
 jobs:
   review:
-    if: github.ref == 'refs/heads/main' && !github.event.pull_request.draft && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
+    if: >-
+      github.ref == 'refs/heads/main' && !github.event.pull_request.draft &&
+      (github.event.action != 'edited' || github.event.changes.base.ref.from != null) &&
+      (github.event.action != 'synchronize' || github.event.pull_request.head.repo.full_name == github.repository)
     concurrency:
       group: foundry-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -37,28 +40,39 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
               --jq 'select(.state == "open" and (.draft | not) and .base.ref == "main") | [.base.sha, .head.sha] | join(" ")'
           }
-          revision=$(snapshot)
-          if [[ ! "$revision" =~ ^[0-9a-f]{40}\ $HEAD_SHA$ ]]; then
-            exit 0
-          fi
           diff_path="$RUNNER_TEMP/foundry-review.diff"
-          set +e
-          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
-            -H 'Accept: application/vnd.github.diff' | head -c 100001 > "$diff_path"
-          diff_status=("${PIPESTATUS[@]}")
-          set -e
-          partial=false
-          if (( $(wc -c < "$diff_path") > 100000 )); then
-            partial=true
-            truncate -s 100000 "$diff_path"
-          fi
-          if (( diff_status[1] != 0 )) || { (( diff_status[0] != 0 )) && [[ "${diff_status[0]}:$partial" != 141:true ]]; }; then
-            echo 'GitHub did not return a readable PR diff.' >&2
-            exit 1
-          fi
-          if [[ -s "$diff_path" && "$(snapshot)" == "$revision" ]]; then
-            printf 'revision=%s\npartial=%s\n' "$revision" "$partial" >> "$GITHUB_OUTPUT"
-          fi
+          for attempt in 1 2; do
+            revision=$(snapshot)
+            if [[ ! "$revision" =~ ^[0-9a-f]{40}\ $HEAD_SHA$ ]]; then
+              echo 'Skipped: the triggering head is no longer review-ready on main.'
+              exit 0
+            fi
+            set +e
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+              -H 'Accept: application/vnd.github.diff' | head -c 100001 > "$diff_path"
+            diff_status=("${PIPESTATUS[@]}")
+            set -e
+            partial=false
+            if (( $(wc -c < "$diff_path") > 100000 )); then
+              partial=true
+              truncate -s 100000 "$diff_path"
+            fi
+            if (( diff_status[1] != 0 )) || { (( diff_status[0] != 0 )) && [[ "${diff_status[0]}:$partial" != 141:true ]]; }; then
+              echo 'GitHub did not return a readable PR diff.' >&2
+              exit 1
+            fi
+            current=$(snapshot)
+            if [[ "$current" == "$revision" ]]; then
+              if [[ -s "$diff_path" ]]; then
+                printf 'revision=%s\npartial=%s\n' "$revision" "$partial" >> "$GITHUB_OUTPUT"
+              else
+                echo 'Skipped: there is no text diff to review.'
+              fi
+              exit 0
+            fi
+            printf 'PR revision changed during collection attempt %s.\n' "$attempt"
+          done
+          echo 'Skipped: the PR revision did not stabilize during diff collection.'
 
       - name: Review the diff with Foundry
         id: foundry
@@ -125,10 +139,12 @@ jobs:
           revision=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
             --jq 'select(.state == "open" and (.draft | not) and .base.ref == "main") | [.base.sha, .head.sha] | join(" ")')
           if [[ "$revision" != "$REVISION" ]]; then
+            echo 'Skipped publication: the PR changed while Foundry was reviewing it.'
             exit 0
           fi
           {
             printf 'Foundry PR review\n\nPrepared by Codex on behalf of @darrenhull.\n\n'
+            printf 'Reviewed revision:\n\n- Base: %s\n- Head: %s\n\n' "${REVISION%% *}" "$HEAD_SHA"
             if [[ "$PARTIAL" == true ]]; then
               printf 'Partial review: Foundry received only the first 100 KB of the diff.\n\n'
             fi
