@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "engineCommit": "450639947cfe1407fdc0dd6f62889104d57b2420",
+  "characterSet": "ansi",
+  "characterBytes": 1,
+  "componentCharacterBytes": {
+    "jadegitdev.dll": 1,
+    "jadegitscm.dll": 1
+  },
+  "loaderDiagnostics": false,
+  "observedProvider": false,
+  "files": {
+    "jade-jox-test-helper-ansi.exe": "851971dd5d1b1724a064917eabccb3ec0841e29829cf2553fe86dd54960ffd91",
+    "jadegitscm.dll": "7405cbb75e74a9b62145149a25e0ada2056ade2baf310ae4bc23ead9b0a6601d",
+    "jadegitdev.dll": "d0d90944b32770eb149c7e85ab784a18d8ffe4c9ed12755177ff0daad9926f20"
+  },
+  "qualification": {
+    "nativeTests": true,
+    "nativeScratch": false,
+    "managedUpload": true,
+    "initialization": true
+  },
+  "sourceCommit": "7a77705edccb07c8c70e1550ee9a64effbc3592a",
+  "source": "https://github.com/darrenhull/Jade-CLI/tree/7a77705edccb07c8c70e1550ee9a64effbc3592a",
+  "build": {
+    "unicodeDefinitionsOnAnsiSdkRows": 0,
+    "unicodeEngineOrPrecompiledObjectsReused": false,
+    "cohortBuildProofSha256": "76a60b2ff0f4e997f7f6b54b526abac82d7bd0cc6c2266439b190b50970d62be",
+    "compiler": "MSVC 14.44.35207",
+    "architecture": "x64",
+    "sourceEolEquivalenceProofSha256": "6933e66bbd1152f173f62f683e8297d6968f364bb1b220d03659c8fc542483d0",
+    "crt": "MT",
+    "sdkRuntime": "25.0.1.24",
+    "ansiSdkFacingGraphCompileRows": 398
+  },
+  "qualificationBasis": {
+    "correctedBodyMilliseconds": 5202,
+    "activePatchHookCallbackQualified": false,
+    "componentAbiExportsCheckedAfterSignOnBeforeJoxApply": true,
+    "correctedBodyCode": 0,
+    "warmNoUploadMilliseconds": 1734,
+    "registeredCommandReceiptSha256": "fd17f26b8c7b8ad6d3220bb73a24fa9c2f50eca4f0e26a579b948eabd3780761",
+    "nativeBootstrapProofSha256": "33bcafa06572da9c7615b40ed798826a6f389b7b278f859a2199f15dd70f139e",
+    "scope": "Owned ANSI fixture, actual registered extension command with automated UI choices, real public CLI/native adapters; not a VSIX or Code GUI qualification",
+    "authoritativeMappedRuntimeRelease": "25.0.1",
+    "falseBodyCode": 1,
+    "changedOriginsPerUpload": 1,
+    "warmUpload": false,
+    "registeredCommandCount": 1,
+    "publicBodyAndWarmReceiptSha256": "a69b59ec509d7a98fbc6b6136a95f0991ed7954bb5563b180687d4fb7712033e",
+    "activeCurrentLatestAndCompilationChecked": true,
+    "originalSourceAllElevenHashesUnchanged": true,
+    "registeredCommandMilliseconds": 20330,
+    "nativeAssertionFailureThenCorrectionReceiptSha256": "0a88171cf330e1d9ebf7f725cc0f5ae2d0b148c9f72b2ea01922afddad70d6bd",
+    "helperRuntimeCharacterSet": "ansi",
+    "nativeSubtreesNaturalExit": true,
+    "falseBodyMilliseconds": 6198
+  },
+  "unsupported": [
+    "standalone-project-build",
+    "native-scratch",
+    "structural-or-resource-changes",
+    "recovery-of-unknown-or-reconnected-pending-native-versions"
+  ]
+}

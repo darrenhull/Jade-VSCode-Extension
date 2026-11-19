@@ -1,18 +1,31 @@
 "use strict";
 const { registerWorkspaceInitialization }=require('./workspace-initialization');
 const { registerWorkspaceOnboarding }=require('./workspace-onboarding');
+const { NativeSourceProvider }=require('./NativeSourceProvider');
 /** Existing setup presentation over native config, targets and one fresh extraction. */
 function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect}) {
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const projectFor=folder=>workspace.project(folder);
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
-    validateRuntime:async folder=>{await projectFor(folder).provider.capability();projectFor(folder);}
+    runtimeSettingsReady:folder=>{
+      if(workspace.projects.has(folder.uri.toString()))workspace.project(folder,{allowColdConfiguration:true});
+    },
+    validateRuntime:async folder=>{
+      if(workspace.disposed)throw Error('The native source workspace is closed.');
+      if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+      // Probe without attaching a native connection to an Explorer-only row.
+      const provider=new NativeSourceProvider({client,config:configFor(folder),projectRoot:folder.uri.fsPath});
+      await provider.capability();
+      if(workspace.disposed)throw Error('The native source workspace is closed.');
+      if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+    }
   });
   const initialize=async resource=>{
     const folder=vscode.workspace.getWorkspaceFolder(resource);
     if(!folder)throw Error('Choose an open Jade project.');
-    projectFor(folder);return initialization.initialize(resource);
+    if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
+    return initialization.initialize(resource,{notify:false});
   };
   async function targets(folder,{initialization:creating=false}={}) {
     const project=projectFor(folder),capability=await project.provider.capability();projectFor(folder);
@@ -47,20 +60,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,
-    initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>{
-      const result=await project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write);
-      if (result.viewRefreshRequired) { output.appendLine(result.warning); return result; }
-      try {
-        projectFor(folder);workspace.observeSources(project);
-        // A committed native result remains authoritative even if Stop was too
-        // late or the project/view closed while native work was completing.
-        await workspace.refresh(folder,undefined,{prepared:true});
-      } catch(error) {
-        output.appendLine('Working and saved source files were created. Refresh Object Explorer when the project is open.');
-        output.appendLine(error.message);
-      }
-      return result;
-    }),
+    initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
+      project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
+    refreshProject:async(folder,{prepared})=>{
+      const project=projectFor(folder);
+      await workspace.refresh(folder,undefined,{prepared});
+      projectFor(folder);workspace.observeSources(project);
+    },
+    openExplorer:()=>vscode.commands.executeCommand('jadeNative.classes.focus'),
     connectWorking:(folder,reviewed)=>working(folder,'Preparing the private Working copy',async(project,token,write)=>{
       await project.provider.request('working.prepare',{cwd:project.provider.root,config:{...project.provider.config},expectedWorkingIdentity:reviewed.working.identity},token,write);
       return{selection:'working',readOnly:true};
