@@ -1,6 +1,6 @@
 function Test-JoxCheckoutSeed($Seed){
- if($Seed -isnot [Collections.IDictionary] -or $Seed.Count -ne 4 -or $Seed.platform -isnot [string] -or $Seed.platform -cnotmatch '^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$'){return $false}
- foreach($key in @('jomSha256','controlSha256','monitorSha256')){if($Seed[$key] -isnot [string] -or $Seed[$key] -cnotmatch '^[a-f0-9]{64}$'){return $false}}
+ if($Seed -isnot [Collections.IDictionary] -or $Seed.Count -ne 4 -or $Seed.platform -isnot [string] -or $Seed.platform -cnotmatch '^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}\z'){return $false}
+ foreach($key in @('jomSha256','controlSha256','monitorSha256')){if($Seed[$key] -isnot [string] -or $Seed[$key] -cnotmatch '^[a-f0-9]{64}\z'){return $false}}
  return $true
 }
 function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Collections.IDictionary]$Manifest){
@@ -16,7 +16,7 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
   if($Producer -isnot [Collections.IDictionary] -or ($Producer.format -isnot [int] -and $Producer.format -isnot [long]) -or $Producer.format -ne 1 -or
      $Producer.characterSet -isnot [string] -or $Producer.characterSet -cne $Runtime.characterSet -or $Producer.engineCommit -isnot [string] -or $Producer.engineCommit -cne $Runtime.engineCommit -or
      $Producer.files -isnot [Collections.IDictionary] -or $Producer.files.Count -ne 3){throw 'JOX sync qualification does not match the exact managed runtime.'}
-  foreach($name in $names){if($Producer.files[$name] -isnot [string] -or $Producer.files[$name] -cnotmatch '^[a-f0-9]{64}$' -or $Producer.files[$name] -cne $Manifest.runtimeFiles[$prefix+$name]){throw 'JOX sync qualification does not match the exact managed runtime.'}}
+  foreach($name in $names){if($Producer.files[$name] -isnot [string] -or $Producer.files[$name] -cnotmatch '^[a-f0-9]{64}\z' -or $Producer.files[$name] -cne $Manifest.runtimeFiles[$prefix+$name]){throw 'JOX sync qualification does not match the exact managed runtime.'}}
  }
  if(($qualification -is [Collections.IDictionary] -and $qualification.Contains('checkoutInitialization') -and $qualification.checkoutInitialization -isnot [bool]) -or
     $enabled -ne ($qualification.checkoutInitialization -is [bool] -and $qualification.checkoutInitialization) -or
@@ -25,8 +25,8 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
  foreach($flag in @('managedUpload','nativeTests','sync')){if($Runtime[$flag] -isnot [bool] -or !$Runtime[$flag]){throw 'Git-first checkout requires qualified upload, sync and native tests.'}}
  $seed=$Runtime.checkoutSeed;$proof=$Producer.checkoutProof
  if($Producer -isnot [Collections.IDictionary] -or $qualification -isnot [Collections.IDictionary] -or $qualification.sync -isnot [bool] -or !$qualification.sync -or !(Test-JoxCheckoutSeed $seed) -or $proof -isnot [Collections.IDictionary] -or $proof.Count -ne 6 -or
-    ($proof.format -isnot [int] -and $proof.format -isnot [long]) -or $proof.format -ne 1 -or $proof.cliSha256 -isnot [string] -or $proof.cliSha256 -cnotmatch '^[a-f0-9]{64}$' -or
-    $proof.cliSha256 -cne $Manifest.executableSha256.ToLowerInvariant() -or $proof.receiptSha256 -isnot [string] -or $proof.receiptSha256 -cnotmatch '^[a-f0-9]{64}$' -or !(Test-JoxCheckoutSeed $proof.seed)){throw 'Git-first connected proof does not match the CLI or seed.'}
+    ($proof.format -isnot [int] -and $proof.format -isnot [long]) -or $proof.format -ne 1 -or $proof.cliSha256 -isnot [string] -or $proof.cliSha256 -cnotmatch '^[a-f0-9]{64}\z' -or
+    $proof.cliSha256 -cne $Manifest.executableSha256.ToLowerInvariant() -or $proof.receiptSha256 -isnot [string] -or $proof.receiptSha256 -cnotmatch '^[a-f0-9]{64}\z' -or !(Test-JoxCheckoutSeed $proof.seed)){throw 'Git-first connected proof does not match the CLI or seed.'}
  if($proof.files -isnot [Collections.IDictionary] -or $proof.files.Count -ne 3){throw 'Git-first proof does not match the exact managed runtime.'}
  foreach($name in $names){
   if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cne $Producer.files[$name]){throw 'Git-first proof does not match the exact managed runtime.'}
@@ -67,6 +67,6 @@ function Assert-JoxAnsiVariant([Collections.IDictionary]$Manifest,[string]$Direc
  Assert-JoxCheckoutProof $ansi $proof $Manifest
  foreach($name in $names){
   $expected=$Manifest.runtimeFiles[$prefix+$name];$unicode='native/jox/'+$(if($name -eq 'jade-jox-test-helper-ansi.exe'){'jade-jox-test-helper-unicode.exe'}else{$name})
-  if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cnotmatch '^[a-f0-9]{64}$' -or $proof.files[$name] -cne $expected -or ($Manifest.runtimeFiles.Contains($unicode) -and $expected -ieq $Manifest.runtimeFiles[$unicode])){throw 'ANSI producer fingerprints differ or reuse Unicode payloads.'}
+  if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cnotmatch '^[a-f0-9]{64}\z' -or $proof.files[$name] -cne $expected -or ($Manifest.runtimeFiles.Contains($unicode) -and $expected -ieq $Manifest.runtimeFiles[$unicode])){throw 'ANSI producer fingerprints differ or reuse Unicode payloads.'}
  }
 }

@@ -58,6 +58,11 @@ test('Git-first package checks bind each enabled mode to its seed and exact CLI'
  const unicodeProof={format:1,characterSet:jox.characterSet,engineCommit:jox.engineCommit,qualification:{},files:Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]))};qualify(jox,unicodeProof);qualify(ansi,f.proof);
  const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(unicodeProof));f.save();};save();
  bundleCli(f);const valid=f.verify();assert.equal(valid.status,0,valid.stderr);
+ for(const [target,key] of [[f.proof.checkoutProof,'receiptSha256'],[ansi.checkoutSeed,'platform'],[ansi.checkoutSeed,'jomSha256']]){
+  const original=target[key];target[key]+='\n';save();
+  assert.throws(()=>bundleCli(f),/Git-first/i);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,/Git-first/i);
+  target[key]=original;
+ }
  for(const [target,key,bad] of [[f.proof.checkoutProof,'cliSha256',sha],[f.proof.checkoutProof.seed,'monitorSha256','b'.repeat(64)],[unicodeProof.checkoutProof.checks,'restart',false],[f.proof.checkoutProof.files,'jadegitdev.dll',sha],[unicodeProof.files,'jadegitscm.dll',sha],[jox,'sync','true']]){
   const original=target[key],diagnostic=key==='sync'||target===unicodeProof.files?/Git-first|sync qualification/i:/Git-first/i;
   target[key]=bad;save();assert.throws(()=>bundleCli(f),diagnostic);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,diagnostic);target[key]=original;
