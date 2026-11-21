@@ -66,6 +66,35 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const status={gitReady:false,configurationReady:false,workingPrepared:false,sourceReady:false,viewsReady:false,completed:false};
   let stage='configuration';
   try{
+   const checkout=await services.checkoutTargets?.(folder);requireFolder(folder);
+   if(checkout){
+    status.gitReady=true;status.configurationReady=true;stage='review';
+    const creating=checkout.workingState==='new';
+    const action=creating?'Create Working from checkout':'Reopen Git-first Working';
+    const savedRoot=require('node:url').fileURLToPath(checkout.sourceRoots[0]);
+    const confirm=await vscode.window.showWarningMessage(action+'?',{modal:true,detail:'Jade installation: '+checkout.working.installPath+
+     '\nWorking: '+checkout.working.databasePath+'\nSaved JOX: '+savedRoot+'\n\nNo application Source database is used. '+
+     (creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Reopen only the accepted generation. Run Sync to Working to load newer saved changes.')},action);
+    requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
+    stage='working';
+    if(creating){
+     const result=await services.initializeCheckout(folder,checkout);
+     if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
+     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
+     stage='refresh';
+     if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
+    }else{
+     const result=await services.connectWorking(folder,checkout);
+     if(result?.selection!=='working'||result?.readOnly!==true)throw Error('Native Git-first Working reopen was not confirmed.');
+     status.workingPrepared=true;
+    }
+    stage='refresh';requireFolder(folder);
+    await services.refreshProject(folder,{prepared:creating});requireFolder(folder);
+    status.sourceReady=true;status.viewsReady=true;stage='explorer';
+    await services.openExplorer(folder);requireFolder(folder);
+    log(creating?'Git-first Working is ready for the saved checkout.':'The accepted Git-first Working database is ready.');
+    return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:'git-first'};
+   }
    const initialized=await services.initialize(folder.uri);requireFolder(folder);
    if(initialized?.cancelled)return{...status,passed:false,code:130,cancelled:true,stage};
    if(initialized?.passed!==true||initialized.code!==0)throw Object.assign(Error(initialized?.report?.error||initialized?.error||'Native project configuration did not complete.'),{result:initialized});

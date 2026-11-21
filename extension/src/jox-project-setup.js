@@ -40,6 +40,22 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
+  async function checkoutTargets(folder) {
+    const probe=new NativeSourceProvider({client,config:configFor(folder),projectRoot:folder.uri.fsPath});
+    const capability=await probe.capability();
+    if(!Object.hasOwn(capability,'checkoutInitialization'))return;
+    const target=await probe.request('working.location',{
+      cwd:probe.root,config:{...probe.config},checkoutOnly:true
+    });
+    if(target.checkoutConfigured===false)return;
+    if(target.checkoutConfigured!==true||target.workingMode!=='git-first'||target.source||!target.working?.identity||
+        !target.working.databasePath||!target.working.installPath||!['new','existing'].includes(target.workingState)||
+        !Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
+      throw Error('Native setup did not return the reviewed Git-first Working location.');
+    if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
+    projectFor(folder);
+    return target;
+  }
   async function working(folder,title,operation) {
     const project=projectFor(folder);
     if(workspace.executing)throw Error('Another Jade Working operation is running.');
@@ -59,7 +75,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     }
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
-    jox:true,initialize,targets,
+    jox:true,initialize,targets,checkoutTargets,
+    initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
+      project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write)),
     initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
       project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
     refreshProject:async(folder,{prepared})=>{

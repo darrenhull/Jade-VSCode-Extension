@@ -27,12 +27,24 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
       return await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification,
         title: `Syncing ${project.folder.name} to Working`, cancellable: true }, async (_progress, token) => {
         const result = await workspace.sync(project, { token, output: text => output.append(text) });
-        if (result.cancelled || result.code === 130) {
+        const report = result.report;
+        if (report?.publicationBlocked === true) {
+          const error = report.error || report.deployment?.message || 'Jade sync did not complete.';
+          throw Error(`${error} Working may be partially updated. Recover the owned Working database before retrying.`);
+        } else if (result.cancelled || result.code === 130) {
           void vscode.window.showInformationMessage('Jade sync cancelled. Check Jade Sync output before retrying.');
         } else if (result.passed === true && result.code === 0 && result.report?.inSync === true) {
-          void vscode.window.showInformationMessage(`Working is up to date with the saved JOX snapshot for ${project.folder.name}.`);
+          const { repositoryHead, savedOverlayFiles } = result.report;
+          let message = `Working is up to date with the saved JOX snapshot for ${project.folder.name}.`;
+          if (typeof repositoryHead === 'string' && /^[0-9a-f]{40}$/.test(repositoryHead) &&
+              Number.isSafeInteger(savedOverlayFiles) && savedOverlayFiles >= 0) {
+            const overlay = savedOverlayFiles === 0 ? '' :
+              ` plus ${savedOverlayFiles} saved file ${savedOverlayFiles === 1 ? 'change' : 'changes'}`;
+            message = `Working matches commit ${repositoryHead.slice(0, 8)}${overlay} for ${project.folder.name}.`;
+          }
+          void vscode.window.showInformationMessage(message);
         } else {
-          throw Error(result.report?.error || 'The Jade CLI did not confirm that Working is in sync.');
+          throw Error(report?.error || report?.deployment?.message || 'The Jade CLI did not confirm that Working is in sync.');
         }
         return result;
       });

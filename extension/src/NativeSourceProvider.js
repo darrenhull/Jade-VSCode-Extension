@@ -79,8 +79,9 @@ class NativeSourceProvider {
       if (result?.passed !== true || result.code !== 0 || !result.body || typeof result.body !== 'object')
         throw Object.assign(Error(result?.report?.error || 'Native source operation failed.'), { result });
       if (command === 'working.initialize' && (this.client.client !== connection || connection.closed)) {
+        const completed = result.body.report?.workingMode === 'git-first' ? 'Git-first Working setup' : 'Working and source creation';
         return { ...clone(result.body), viewRefreshRequired: true,
-          warning: 'Working and source creation completed. The native connection changed; refresh Object Explorer when the project is open.' };
+          warning: `${completed} completed. The native connection changed; refresh Object Explorer when the project is open.` };
       }
       this.assertConnection(connection);
       return result.body;
@@ -143,11 +144,30 @@ class NativeSourceProvider {
       if (!Array.isArray(result.sourceRoots) || result.sourceRoots.length !== 1 ||
           path.relative(path.resolve(destination), fileURLToPath(result.sourceRoots[0])) !== '')
         throw Error('Native initialization returned another source destination.');
-      const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
-      this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
-      if (!retained) this.snapshot = undefined;
-      return clone(result);
+      return this.adoptInitialization(result, capabilities);
     });
+  }
+
+  initializeCheckout({ expectedWorkingIdentity }, token, output) {
+    return this.serializeSource(async () => {
+      if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+      this.validateContext();
+      const identity = required(expectedWorkingIdentity, 'reviewed Working target');
+      const capabilities = await this.capability();
+      if (capabilities.checkoutInitialization !== true) throw Error('Update the Jade CLI: Git-first Working setup is unavailable.');
+      const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), expectedWorkingIdentity: identity }, token, output);
+      if (result.working?.identity !== identity || !path.isAbsolute(result.working?.root ?? '') || Object.hasOwn(result.working, 'sourceDatabasePath') ||
+          result.report?.workingMode !== 'git-first' || result.report.workingPrepared !== true || result.report.publicationEstablished !== true)
+        throw Error('Native setup did not confirm the reviewed Working database and saved checkout baseline.');
+      return this.adoptInitialization(result, capabilities);
+    });
+  }
+
+  adoptInitialization(result, capabilities) {
+    const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
+    this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
+    if (!retained) this.snapshot = undefined;
+    return clone(result);
   }
 
   binding() {

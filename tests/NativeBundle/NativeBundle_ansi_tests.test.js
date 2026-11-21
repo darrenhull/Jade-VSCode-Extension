@@ -30,6 +30,21 @@ test('ANSI bundle and post-package verifier preserve every nested payload/proof 
  const result=f.verify();assert.equal(result.status,0,result.stderr);
  fs.writeFileSync(path.join(f.source,'native/jox/ansi/jadegitdev.dll'),'tamper');assert.throws(()=>bundleCli(f),/checksum/i);assert.notEqual(f.verify().status,0);
 });
+test('Git-first package checks bind each enabled mode to its seed and exact CLI',t=>{
+ const f=fixture(t),jox=f.manifest.joxRuntime,ansi=jox.variants.ansi,sha='a'.repeat(64);
+ const qualify=(mode,proof)=>{
+  const seed={platform:'25.0.1',jomSha256:sha,controlSha256:sha,monitorSha256:sha};
+  Object.assign(mode,{sync:true,checkoutInitialization:true,checkoutSeed:seed});
+  Object.assign(proof.qualification,{sync:true,checkoutInitialization:true});
+  proof.checkoutProof={format:1,cliSha256:f.manifest.executableSha256,receiptSha256:sha,seed:{...seed},files:{...proof.files},checks:Object.fromEntries(['sourceFreeSetup','restart','branchRoundTrip','savedEditRoundTrip','noOp','isolation','unsupportedChangeRefused'].map(key=>[key,true]))};
+ };
+ const unicodeProof={qualification:{},files:Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]))};qualify(jox,unicodeProof);qualify(ansi,f.proof);
+ const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(unicodeProof));f.save();};save();
+ bundleCli(f);const valid=f.verify();assert.equal(valid.status,0,valid.stderr);
+ for(const [target,key,bad] of [[f.proof.checkoutProof,'cliSha256',sha],[f.proof.checkoutProof.seed,'monitorSha256','b'.repeat(64)],[unicodeProof.checkoutProof.checks,'restart',false],[f.proof.checkoutProof.files,'jadegitdev.dll',sha],[unicodeProof.files,'jadegitscm.dll',sha],[jox,'sync','true']]){
+  const original=target[key];target[key]=bad;save();assert.throws(()=>bundleCli(f),/Git-first/i);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,/Git-first/i);target[key]=original;
+ }
+});
 test('ANSI proof, descriptor, DLL-width and per-mode qualification mismatches are rejected in bundle and verifier',t=>{
  for(const mutate of [f=>f.manifest.joxRuntime.variants=null,f=>f.manifest.joxRuntime.variants.ansi=null,f=>f.proof.build=[{crt:'MT'}],f=>f.proof.characterBytes='1',f=>f.proof.componentCharacterBytes['jadegitdev.dll']=2,f=>f.proof.componentCharacterBytes.extra=1,f=>f.proof.build.crt='MD',f=>f.proof.loaderDiagnostics=true,f=>f.proof.qualification.nativeTests=false,f=>f.proof.files['jadegitscm.dll']='0'.repeat(64),f=>delete f.manifest.joxRuntime.variants,f=>f.manifest.joxRuntime.variants.ansi.nativeScratch=true]){
   const f=fixture(t);mutate(f);f.save();assert.throws(()=>bundleCli(f),/ANSI/i);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,/ANSI/i);

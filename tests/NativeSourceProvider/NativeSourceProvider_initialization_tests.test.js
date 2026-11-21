@@ -32,6 +32,26 @@ test("old runtime refuses setup without legacy extraction or backup fallback",as
   await assert.rejects(f.provider.initialize({destination:"C:/project/sources"}),/update|initialization|support/i);
   assert.equal(f.requests.length,0);
 });
+test("Git-first setup uses the reviewed Working identity without requesting extraction or Source",async()=>{
+  const f=setup({flags:{checkoutInitialization:true,initialization:false}});
+  f.initialized.working={identity:"reviewed-working",root:"C:/private/generation-work"};
+  f.initialized.report={workingMode:"git-first",workingPrepared:true,publicationEstablished:true};
+  const value=await f.provider.initializeCheckout({expectedWorkingIdentity:"reviewed-working"});
+  assert.deepEqual(f.requests.map(x=>x.command),["working.initialize"]);
+  assert.deepEqual(f.requests[0].body,{cwd:"C:\\project",config:f.config,expectedWorkingIdentity:"reviewed-working"});
+  assert.equal(value.working.identity,"reviewed-working");
+  assert.equal(f.provider.binding().generation,f.initialized.sourceSnapshot.generation);
+});
+test("Git-first setup refuses an old package or a different returned Working owner",async()=>{
+  const old=setup();
+  await assert.rejects(old.provider.initializeCheckout({expectedWorkingIdentity:"reviewed-working"}),/does not support|unavailable/i);
+  assert.equal(old.requests.length,0);
+  const f=setup({flags:{checkoutInitialization:true}});
+  f.initialized.working={identity:"another-working",root:"C:/private/generation-other"};
+  f.initialized.report={workingMode:"git-first",workingPrepared:true,publicationEstablished:true};
+  await assert.rejects(f.provider.initializeCheckout({expectedWorkingIdentity:"reviewed-working"}),/reviewed Working/i);
+  assert.equal(f.provider.snapshot,undefined);
+});
 test("pre-cancelled setup neither probes nor starts native work",async()=>{
   const f=setup();await assert.rejects(f.provider.initialize({destination:"C:/project/sources"},{isCancellationRequested:true}),/cancel/i);
   assert.equal(f.requests.length,0);assert.equal(f.client.probes,0);

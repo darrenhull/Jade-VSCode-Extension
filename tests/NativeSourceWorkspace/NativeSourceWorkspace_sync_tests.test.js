@@ -5,7 +5,8 @@ const { setup } = require('./fixtures/vscode.cjs');
 const { NativeSourceWorkspace } = require('../../extension/src/NativeSourceWorkspace');
 
 function fixture(options = {}) {
-  const result = { passed: true, code: 0, report: { inSync: true, changedFiles: [] } };
+  const result = { passed: true, code: 0, report: { inSync: true, changedFiles: [],
+    repositoryHead: 'a42b5c9e'.padEnd(40, '0'), savedOverlayFiles: 2 } };
   const state = setup({ flags: { sync: true, deploymentFromSavedSnapshot: false, nativeTests: false, ...options.flags },
     reply: (command, body, request) => options.reply?.(command, body, request) ?? (command === 'sync' ? result : undefined) });
   const workspace = new NativeSourceWorkspace({ vscode: state.vscode, client: state.client, configFor: () => state.config });
