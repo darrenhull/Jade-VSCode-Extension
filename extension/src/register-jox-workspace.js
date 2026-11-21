@@ -24,6 +24,7 @@ function registerJoxWorkspace(vscode, context, options) {
   ])));
   workspace.reportError = error => output.appendLine(error.message);
   const commands = require('./native-source-commands').registerNativeSourceCommands(vscode, context, workspace, testing, { reportDiagnostic });
+  require('./jox-workspace-sync').registerJoxWorkspaceSync(vscode, context, workspace);
   const workspaces = vscode.notebooks && require('./native-source-workspaces').registerNativeSourceWorkspaces(vscode, context, workspace, options.client);
   return { workspace, classView: { ...classView, workspaces: classWorkspaces, catalogue: classCatalogue }, language, testing, workspaces, commands, nativeTests: options.client };
 }

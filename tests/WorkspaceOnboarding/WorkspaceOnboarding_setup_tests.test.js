@@ -10,6 +10,18 @@ function fixture(t,{picks=[],warnings=[],inputs=[],folderOpen=true,git=true,init
  const controller=registerWorkspaceOnboarding(vscode,context,services);return{root,folder,uri,vscode,context,api,services,controller,calls,logs,state,commands};
 }
 test('existing project delegates initialization and reports Working not prepared',async t=>{const f=fixture(t,{picks:['folder','existing','later']});const result=await f.controller.setup();assert.equal(result.configurationReady,true);assert.equal(result.workingPrepared,false);assert.equal(f.calls.filter(c=>c[0]==='initialize').length,1);assert.equal(f.calls.filter(c=>['working','extract','pull'].includes(c[0])).length,0);});
+test('configured Git-first onboarding reviews saved JOX and never initializes Git or extracts Source',async t=>{
+ const f=fixture(t,{warnings:['Create Working from checkout']});
+ const source=path.join(f.root,'sources'),working={identity:'native-review',databasePath:path.join(f.root,'private','system'),installPath:'C:/Jade'};
+ const target={working,workingState:'new',sourceRoots:[f.uri(source).toString()]};
+ Object.assign(f.services,{jox:true,checkoutTargets:async()=>target,initializeCheckout:async(folder,review)=>{assert.equal(review,target);f.calls.push(['checkout']);return{sourceSnapshot:{projectId:'project'}};},
+  refreshProject:async(folder,options)=>assert.deepEqual(options,{prepared:true}),openExplorer:async()=>{}});
+ const result=await f.controller.setup(f.folder.uri);
+ assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.sourceChoice,'git-first');
+ assert.equal(f.calls.filter(row=>row[0]==='checkout').length,1);
+ assert.ok(!f.calls.some(row=>['initialize','working','extract','pull'].includes(row[0])));
+ const review=f.calls.find(row=>row[0]==='warning');assert.ok(review[2][0].detail.includes(source));assert.match(review[2][0].detail,/no application Source/i);
+});
 test('explicit Working preparation reviews exact targets and uses the existing scoped connection',async t=>{const f=fixture(t,{picks:['folder','existing','working'],warnings:['Prepare Working']});const result=await f.controller.setup();assert.equal(result.workingPrepared,true);assert.equal(f.calls.find(c=>c[0]==='working')[1],f.root);assert.ok(f.calls.findIndex(c=>c[0]==='initialize')<f.calls.findIndex(c=>c[0]==='working'));assert.ok(f.calls.some(c=>c[0]==='warning'&&c[1].includes('Working')));});
 test('failed initialization retains its error and cannot start extraction or Working',async t=>{const f=fixture(t,{picks:['folder'],initialize:{passed:false,code:2,error:'Native profile conflict'}});const result=await f.controller.setup();assert.equal(result.passed,false);assert.match(result.error,/Native profile conflict/);assert.ok(!f.calls.some(c=>['working','extract'].includes(c[0])));});
 test('cancelled initial choice starts no Git or native operation',async t=>{const f=fixture(t);assert.equal((await f.controller.setup()).cancelled,true);assert.ok(!f.calls.some(c=>['repository','initialize','working'].includes(c[0])));});

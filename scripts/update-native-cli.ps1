@@ -85,7 +85,7 @@ function Test-NativeDistribution([string]$Directory){
   if($expected[$relative] -isnot [string] -or $expected[$relative] -notmatch '^[a-fA-F0-9]{64}$' -or !(Test-Path -LiteralPath $file -PathType Leaf) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $expected[$relative]){throw "Native CLI checksum mismatch: $relative"}
  }
  foreach($file in Get-ChildItem -LiteralPath $Directory -Force -Recurse){Assert-NativeDataPath $file;if(!$file.PSIsContainer){$relative=[IO.Path]::GetRelativePath($Directory,$file.FullName).Replace('\','/');if($relative -ne 'distribution.json' -and !$expected.ContainsKey($relative)){throw "Unlisted native runtime file: $relative"}}}
- if($joxMode){Assert-JoxAnsiVariant $manifest $Directory}
+ if($joxMode){Assert-JoxRuntimeVariants $manifest $Directory}
  return $manifest
 }
 function Expand-NativeRelease([string]$Archive,[string]$Destination,[string]$ExpectedHash,[long]$MaxExpandedBytes=268435456,[long]$MaxMemberBytes=134217728){
