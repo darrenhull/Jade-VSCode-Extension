@@ -22,5 +22,6 @@ In the same fixture, the packaged CLI applied a checked-out commit from another 
 - [Sync a checked-out commit](08-git-first-branch.png).
 - [Sync one saved edit on top of the commit](09-git-first-saved-edit.png).
 - [Show the reason an unsupported resource was refused](10-git-first-refusal.png).
+- [Return to the original commit after removing the unsupported resource](11-git-first-recovered.png). After the previous isolated test broker released Working, a fresh extension host uploaded the restored checkout and confirmed the original commit with zero saved overlays.
 
 These captures are connected release-candidate evidence for issue #136, not proof for the current public CLI pin or a future hosted binary.
