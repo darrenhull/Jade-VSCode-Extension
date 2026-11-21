@@ -7,6 +7,7 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
  $enabled=$Runtime.checkoutInitialization -is [bool] -and $Runtime.checkoutInitialization
  if(($Runtime.Contains('checkoutInitialization') -and $Runtime.checkoutInitialization -isnot [bool]) -or (!$enabled -and $Runtime.Contains('checkoutSeed'))){throw 'Invalid Git-first checkout declaration or vendor seed.'}
  $qualification=$Producer.qualification
+ if($qualification -isnot [Collections.IDictionary]){$qualification=$null}
  foreach($mode in @($Runtime,$qualification)){if($mode -is [Collections.IDictionary] -and $mode.Contains('sync') -and $mode.sync -isnot [bool]){throw 'JOX sync qualification must be Boolean.'}}
  if(($Runtime.sync -eq $true) -ne ($qualification.sync -eq $true)){throw 'JOX sync qualification differs from its producer declaration.'}
  if(($qualification -is [Collections.IDictionary] -and $qualification.Contains('checkoutInitialization') -and $qualification.checkoutInitialization -isnot [bool]) -or

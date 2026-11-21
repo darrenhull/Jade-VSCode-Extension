@@ -25,6 +25,7 @@ test('Primary sync requires an explicit matching producer flag without checkout 
  reject();
  for(const flag of [undefined,false,'true']){proof.qualification.sync=flag;save();reject();}
  proof.qualification.sync=true;save();bundleCli(f);assert.equal(f.verify().status,0);
+  proof.qualification=[{sync:true}];save();reject();
  jox.sync='true';save();reject();
 });
 test('ANSI bundle rejects malformed or unqualified variants before replacing a prior payload',t=>{
