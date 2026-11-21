@@ -14,6 +14,8 @@ function assertCheckoutProof(runtime,producer,manifest){
  if((has(runtime,'checkoutInitialization')&&typeof runtime.checkoutInitialization!=='boolean')||(!enabled&&has(runtime,'checkoutSeed'))||
     (enabled&&(!['managedUpload','nativeTests','sync'].every(key=>runtime[key]===true)||!validSeed(seed))))throw Error('Invalid Git-first checkout declaration or vendor seed.');
  const qualification=producer?.qualification,proof=producer?.checkoutProof;
+ if([runtime,qualification].some(mode=>has(mode,'sync')&&typeof mode.sync!=='boolean')||
+    (runtime.sync===true)!==(qualification?.sync===true))throw Error(`${runtime.characterSet} sync qualification differs from its producer declaration.`);
  if((has(qualification,'checkoutInitialization')&&typeof qualification.checkoutInitialization!=='boolean')||
     enabled!==(qualification?.checkoutInitialization===true)||(!enabled&&has(producer,'checkoutProof')))throw Error('Git-first producer qualification differs from its declaration.');
  if(!enabled)return;
@@ -39,7 +41,6 @@ function assertAnsiVariant(manifest,files){
  let proof;try{proof=JSON.parse(bytes.toString('utf8'));}catch{throw Error('ANSI producer proof is invalid JSON.');}
  if(!object(proof)||proof.format!==1||proof.characterSet!=='ansi'||proof.engineCommit!==ansi.engineCommit||proof.characterBytes!==1||!object(proof.componentCharacterBytes)||Object.keys(proof.componentCharacterBytes).length!==2||!['jadegitscm.dll','jadegitdev.dll'].every(name=>proof.componentCharacterBytes[name]===1)||proof.build?.crt!=='MT'||proof.loaderDiagnostics!==false||proof.observedProvider!==false||!object(proof.files)||Object.keys(proof.files).length!==3||!object(proof.qualification)||!flags.every(key=>proof.qualification[key]===ansi[key]))throw Error('ANSI producer ABI, build or qualification differs from its declaration.');
  assertCheckoutProof(ansi,proof,manifest);
- if([ansi,proof.qualification].some(mode=>has(mode,'sync')&&typeof mode.sync!=='boolean')||(ansi.sync===true)!==(proof.qualification.sync===true))throw Error('ANSI sync qualification differs from its declaration.');
  for(const name of names){
   const expected=manifest.runtimeFiles[prefix+name],unicode='native/jox/'+(name==='jade-jox-test-helper-ansi.exe'?'jade-jox-test-helper-unicode.exe':name);
   if(!/^[a-f0-9]{64}$/.test(proof.files[name]||'')||proof.files[name]!==expected||expected===manifest.runtimeFiles[unicode])throw Error('ANSI producer fingerprints differ or reuse Unicode payloads.');

@@ -7,6 +7,8 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
  $enabled=$Runtime.checkoutInitialization -is [bool] -and $Runtime.checkoutInitialization
  if(($Runtime.Contains('checkoutInitialization') -and $Runtime.checkoutInitialization -isnot [bool]) -or (!$enabled -and $Runtime.Contains('checkoutSeed'))){throw 'Invalid Git-first checkout declaration or vendor seed.'}
  $qualification=$Producer.qualification
+ foreach($mode in @($Runtime,$qualification)){if($mode -is [Collections.IDictionary] -and $mode.Contains('sync') -and $mode.sync -isnot [bool]){throw 'JOX sync qualification must be Boolean.'}}
+ if(($Runtime.sync -eq $true) -ne ($qualification.sync -eq $true)){throw 'JOX sync qualification differs from its producer declaration.'}
  if(($qualification -is [Collections.IDictionary] -and $qualification.Contains('checkoutInitialization') -and $qualification.checkoutInitialization -isnot [bool]) -or
     $enabled -ne ($qualification.checkoutInitialization -is [bool] -and $qualification.checkoutInitialization) -or
     (!$enabled -and $Producer -is [Collections.IDictionary] -and $Producer.Contains('checkoutProof'))){throw 'Git-first producer qualification differs from its declaration.'}
@@ -55,8 +57,6 @@ function Assert-JoxAnsiVariant([Collections.IDictionary]$Manifest,[string]$Direc
  foreach($name in @('jadegitscm.dll','jadegitdev.dll')){if(($proof.componentCharacterBytes[$name] -isnot [int] -and $proof.componentCharacterBytes[$name] -isnot [long]) -or $proof.componentCharacterBytes[$name] -ne 1){throw 'ANSI producer component Character width is invalid.'}}
  foreach($flag in $flags){if($proof.qualification[$flag] -isnot [bool] -or $proof.qualification[$flag] -ne $ansi[$flag]){throw 'ANSI producer qualification differs from its declaration.'}}
  Assert-JoxCheckoutProof $ansi $proof $Manifest
- foreach($mode in @($ansi,$proof.qualification)){if($mode.Contains('sync') -and $mode.sync -isnot [bool]){throw 'ANSI sync qualification must be Boolean.'}}
- if(($ansi.sync -eq $true) -ne ($proof.qualification.sync -eq $true)){throw 'ANSI sync qualification differs from its declaration.'}
  foreach($name in $names){
   $expected=$Manifest.runtimeFiles[$prefix+$name];$unicode='native/jox/'+$(if($name -eq 'jade-jox-test-helper-ansi.exe'){'jade-jox-test-helper-unicode.exe'}else{$name})
   if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cnotmatch '^[a-f0-9]{64}$' -or $proof.files[$name] -cne $expected -or ($Manifest.runtimeFiles.Contains($unicode) -and $expected -ieq $Manifest.runtimeFiles[$unicode])){throw 'ANSI producer fingerprints differ or reuse Unicode payloads.'}

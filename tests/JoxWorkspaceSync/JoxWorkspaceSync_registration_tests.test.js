@@ -10,8 +10,9 @@ test('Only a trusted, selected project with explicit sync capability exposes the
   const context = new Map(), sync = 'jadeNative.syncWorkspaceToWorking', key = 'jadeNative.workspaceSyncAvailable';
   state.commands.set('setContext', (name, value) => context.set(name, value));
   state.vscode.workspace.isTrusted = true;
-  let advertised, change;
+  let advertised, change, configurationChanged;
   state.vscode.window.onDidChangeActiveTextEditor = fn => { change = fn; return { dispose() {} }; };
+  state.vscode.workspace.onDidChangeConfiguration = fn => { configurationChanged = fn; return { dispose() {} }; };
   const project = { folder: state.folder, provider: { capability: async () => ({ sync: advertised }) } };
   registerJoxWorkspaceSync(state.vscode, state.context, { projectForUri: () => project });
   const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -20,7 +21,7 @@ test('Only a trusted, selected project with explicit sync capability exposes the
   assert.equal(manifest.contributes.commands.find(row => row.command === sync).enablement, key);
   assert.equal(manifest.contributes.menus.commandPalette.find(row => row.command === sync).when, key);
   advertised = true;
-  change(); await settle();
+  configurationChanged(); await settle();
   assert.equal(context.get(key), true);
   state.vscode.workspace.isTrusted = false;
   change(); await settle();

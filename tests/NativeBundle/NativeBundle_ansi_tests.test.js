@@ -17,6 +17,16 @@ function fixture(t){
  const verify=()=>spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve(__dirname,'../../scripts/VerifyNativeDistribution.ps1'),'-Directory',source,'-ExpectedDistribution',source],{encoding:'utf8',windowsHide:true});
  return {root,source,destination,manifest,proof,save,put,verify};
 }
+test('Primary sync requires an explicit matching producer flag without checkout initialization',t=>{
+ const f=fixture(t),jox=f.manifest.joxRuntime,proof={qualification:{}};
+ const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(proof));f.save();};
+ jox.sync=true;f.save();
+ const reject=()=>{assert.throws(()=>bundleCli(f),/sync qualification/i);assert.notEqual(f.verify().status,0);};
+ reject();
+ for(const flag of [undefined,false,'true']){proof.qualification.sync=flag;save();reject();}
+ proof.qualification.sync=true;save();bundleCli(f);assert.equal(f.verify().status,0);
+ jox.sync='true';save();reject();
+});
 test('ANSI bundle rejects malformed or unqualified variants before replacing a prior payload',t=>{
  for(const mutate of [f=>f.manifest.joxRuntime.variants.ansi.nativeTests='true',f=>f.manifest.joxRuntime.variants.ansi.initialization=false,f=>f.manifest.joxRuntime.variants.ansi.characterSet='unicode',f=>f.manifest.joxRuntime.variants.ansi.engineCommit='b'.repeat(40),f=>delete f.manifest.runtimeFiles['native/jox/ansi/jadegitscm.dll'],f=>delete f.manifest.runtimeFiles['native/jox/ansi/runtime-provenance.json']]){
   const f=fixture(t);f.save();mutate(f);fs.writeFileSync(path.join(f.source,'distribution.json'),JSON.stringify(f.manifest));
@@ -42,7 +52,8 @@ test('Git-first package checks bind each enabled mode to its seed and exact CLI'
  const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(unicodeProof));f.save();};save();
  bundleCli(f);const valid=f.verify();assert.equal(valid.status,0,valid.stderr);
  for(const [target,key,bad] of [[f.proof.checkoutProof,'cliSha256',sha],[f.proof.checkoutProof.seed,'monitorSha256','b'.repeat(64)],[unicodeProof.checkoutProof.checks,'restart',false],[f.proof.checkoutProof.files,'jadegitdev.dll',sha],[unicodeProof.files,'jadegitscm.dll',sha],[jox,'sync','true']]){
-  const original=target[key];target[key]=bad;save();assert.throws(()=>bundleCli(f),/Git-first/i);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,/Git-first/i);target[key]=original;
+  const original=target[key],diagnostic=key==='sync'?/Git-first|sync qualification/i:/Git-first/i;
+  target[key]=bad;save();assert.throws(()=>bundleCli(f),diagnostic);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,diagnostic);target[key]=original;
  }
 });
 test('ANSI proof, descriptor, DLL-width and per-mode qualification mismatches are rejected in bundle and verifier',t=>{

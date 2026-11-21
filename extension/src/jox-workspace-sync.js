@@ -58,7 +58,8 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
       if (action === 'Show Output') output.show(true);
     }
   }), { dispose() { disposed = true; ++revision; void setAvailable(false); } });
-  for (const event of [vscode.window.onDidChangeActiveTextEditor, vscode.workspace.onDidChangeWorkspaceFolders, vscode.workspace.onDidGrantWorkspaceTrust])
+  for (const event of [vscode.window.onDidChangeActiveTextEditor, vscode.workspace.onDidChangeWorkspaceFolders,
+    vscode.workspace.onDidGrantWorkspaceTrust, vscode.workspace.onDidChangeConfiguration])
     if (event) context.subscriptions.push(event(refresh));
   refresh();
 }
