@@ -27,3 +27,7 @@ In the same fixture, the packaged CLI applied a checked-out commit from another 
 These captures are connected release-candidate evidence for issue #136, not proof for the current public CLI pin or a future hosted binary.
 
 A second private VSIX (SHA-256 `bed0ef975a6f491e81d9c73087ef0010f8e5e588694fe47e8837fa55b422a6c5`) bundled the exact local CLI build from `583e763`. The installed package [reviewed and created its own Source-free Working generation](12-exact-candidate-setup.png), then [confirmed the saved commit with no upload](13-exact-candidate-sync.png). This also passed portable VSIX smoke with Node absent from `PATH`. The public pin remains unchanged.
+
+## Sync availability after changing settings
+
+An installed private VSIX built from extension commit `b082651` (SHA-256 `cfceecdffa8e8cc55700581279422dabac290de3c04928c28feb54b6895d21ea`) used the actual CLI 0.11.3 candidate capability, without a database connection. The Command Palette [offered Sync with the current settings](14-sync-palette-available.png) and [hid Sync after the server mode changed](15-sync-palette-settings-changed.png). Restoring the setting made Sync reappear without reloading VS Code. This verifies the settings-change refresh; it does not change the public CLI pin.
