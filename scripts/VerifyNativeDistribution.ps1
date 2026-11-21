@@ -34,5 +34,5 @@ foreach($entry in $runtime.GetEnumerator()){
  if(!$file.StartsWith($directoryRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or !(Test-Path -LiteralPath $file -PathType Leaf)){throw "Invalid native runtime path: $relative"}
  if((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $entry.Value){throw "Native runtime checksum mismatch: $relative"}
 }
-if($joxMode){Assert-JoxAnsiVariant $manifest $directoryRoot}
+if($joxMode){Assert-JoxRuntimeVariants $manifest $directoryRoot}
 if($ExpectedDistribution){'PASS explicit candidate manifest bytes and runtime hashes (not an official release pin)'}else{'PASS native distribution receipt and runtime hashes'}

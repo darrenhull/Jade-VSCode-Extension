@@ -79,8 +79,9 @@ class NativeSourceProvider {
       if (result?.passed !== true || result.code !== 0 || !result.body || typeof result.body !== 'object')
         throw Object.assign(Error(result?.report?.error || 'Native source operation failed.'), { result });
       if (command === 'working.initialize' && (this.client.client !== connection || connection.closed)) {
+        const completed = result.body.report?.workingMode === 'git-first' ? 'Git-first Working setup' : 'Working and source creation';
         return { ...clone(result.body), viewRefreshRequired: true,
-          warning: 'Working and source creation completed. The native connection changed; refresh Object Explorer when the project is open.' };
+          warning: `${completed} completed. The native connection changed; refresh Object Explorer when the project is open.` };
       }
       this.assertConnection(connection);
       return result.body;
@@ -124,7 +125,7 @@ class NativeSourceProvider {
       this.sourceRoots = sourceRoots;
       this.projectRoot = projectRoot;
       this.snapshot = clone(snapshot);
-      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen']
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen', 'sync']
         .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     }
     return clone(snapshot);
@@ -143,11 +144,30 @@ class NativeSourceProvider {
       if (!Array.isArray(result.sourceRoots) || result.sourceRoots.length !== 1 ||
           path.relative(path.resolve(destination), fileURLToPath(result.sourceRoots[0])) !== '')
         throw Error('Native initialization returned another source destination.');
-      const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
-      this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
-      if (!retained) this.snapshot = undefined;
-      return clone(result);
+      return this.adoptInitialization(result, capabilities);
     });
+  }
+
+  initializeCheckout({ expectedWorkingIdentity }, token, output) {
+    return this.serializeSource(async () => {
+      if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+      this.validateContext();
+      const identity = required(expectedWorkingIdentity, 'reviewed Working target');
+      const capabilities = await this.capability();
+      if (capabilities.checkoutInitialization !== true) throw Error('Update the Jade CLI: Git-first Working setup is unavailable.');
+      const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), expectedWorkingIdentity: identity }, token, output);
+      if (result.working?.identity !== identity || !path.isAbsolute(result.working?.root ?? '') || Object.hasOwn(result.working, 'sourceDatabasePath') ||
+          result.report?.workingMode !== 'git-first' || result.report.workingPrepared !== true || result.report.publicationEstablished !== true)
+        throw Error('Native setup did not confirm the reviewed Working database and saved checkout baseline.');
+      return this.adoptInitialization(result, capabilities);
+    });
+  }
+
+  adoptInitialization(result, capabilities) {
+    const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
+    this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
+    if (!retained) this.snapshot = undefined;
+    return clone(result);
   }
 
   binding() {
@@ -328,6 +348,29 @@ class NativeSourceProvider {
     return entry.result;
   }
 
+  async requireSync() {
+    if ((await this.capability()).sync !== true)
+      throw Error('The bundled Jade CLI does not support JOX sync. Install a Jade Tools update with a runtime qualified for sync.');
+  }
+
+  async sync({ token, output, beforeRequest } = {}) {
+    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
+    const snapshot = await this.prepare(token);
+    if (!this.flags.sync) throw Error('This Jade CLI does not support sync for the selected JOX project.');
+    const connection = this.connection;
+    if (this.config.workingJadeGitPolicy && this.config.workingJadeGitPolicy !== 'inherit')
+      await require('./working-jadegit-policy').requireWorkingJadeGitPolicy(this.client, this.config);
+    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
+    this.validateContext();
+    this.assertConnection(connection);
+    this.assertBinding(snapshot);
+    if (snapshot.snapshotHash !== this.snapshot.snapshotHash) throw Error('The saved JOX snapshot changed. Retry sync.');
+    beforeRequest?.();
+    const { provider, projectId, generation, snapshotHash } = snapshot;
+    return this.requestExecution('sync', { cwd: this.root, config: clone(this.config),
+      sourceSnapshot: { provider, projectId, generation, snapshotHash } }, { token, output }, connection);
+  }
+
   async executeBatch(command, operations, { token, output } = {}) {
     if (!['build', 'test', 'workspace.run'].includes(command)) throw Error('Unsupported semantic execution command.');
     if (!Array.isArray(operations) || !operations.length) throw Error('Select native source operations before execution.');
@@ -371,10 +414,14 @@ class NativeSourceProvider {
     const connection = this.connection;
     const { methods, schema, ...arguments_ } = settings;
     if (Object.hasOwn(arguments_, 'config')) throw Error('Native project configuration cannot be replaced by execution arguments.');
-    const request = this.client.request(command, { ...arguments_, cwd: this.root, config: { ...clone(this.config),
+    return this.requestExecution(command, { ...arguments_, cwd: this.root, config: { ...clone(this.config),
       ...(schema !== undefined ? { schema } : settings.testIdentity ? { schema: settings.testIdentity.schema } : {}), ...(methods === undefined ? {} : { methods }) },
       sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId, generation: snapshot.generation, snapshotHash: snapshot.snapshotHash },
-      semanticSelection: clone(selection) }, output, undefined, connection);
+      semanticSelection: clone(selection) }, { token, output }, connection);
+  }
+
+  async requestExecution(command, body, { token, output }, connection) {
+    const request = this.client.request(command, body, output, undefined, connection);
     const cancel = () => {
       try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
       catch { /* Preserve the terminal result from this captured request. */ }

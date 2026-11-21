@@ -71,6 +71,12 @@
     },
     "commands": [
       {
+        "command": "jadeNative.syncWorkspaceToWorking",
+        "title": "Sync Workspace to Working",
+        "category": "Jade",
+        "enablement": "jadeNative.workspaceSyncAvailable"
+      },
+      {
         "command": "jadeNative.verifyWorkingSourceBaseline",
         "title": "Verify Working Source Baseline",
         "category": "Jade"
@@ -426,6 +432,12 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "jadeNative.syncWorkspaceToWorking",
+          "when": "jadeNative.workspaceSyncAvailable"
+        }
+      ],
       "view/item/context": [
         {
           "command": "jadeNative.filterObjectInstances",

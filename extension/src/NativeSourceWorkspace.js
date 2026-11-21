@@ -239,21 +239,45 @@ class NativeSourceWorkspace {
     }
     // Native-returned roots own saved inputs, including roots outside the VS
     // Code folder and roots covered by another nested workspace folder.
-    const dirtyJox = () => (this.vscode.workspace.textDocuments || []).filter(document =>
-      document.uri.scheme === 'file' && document.isDirty && /\.jox$/i.test(document.uri.fsPath));
-    if (!dirtyJox().length) return;
+    if (!this.dirtyJox().length) return;
     if (!project.provider.sourceRoots?.length) await this.prepare(project.folder, token);
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
+    this.assertCleanRawJox(project);
+  }
+
+  dirtyJox() {
+    return (this.vscode.workspace.textDocuments || []).filter(document =>
+      document.uri.scheme === 'file' && document.isDirty && /\.jox$/i.test(document.uri.fsPath));
+  }
+
+  assertCleanRawJox(project) {
+    const dirty = this.dirtyJox();
+    if (!dirty.length) return;
     const physical = file => {
       try { return physicalSourcePath(file); }
       catch (error) { throw Error('Cannot verify dirty JOX source ownership. Save or close the document before executing saved changes.', { cause: error }); }
     };
     const roots = project.provider.sourceRoots.map(physical);
-    for (const document of dirtyJox()) {
+    for (const document of dirty) {
       const file = physical(document.uri.fsPath);
       if (!isManagedProjectPath(file) && roots.some(root => sourceContains(root, file)))
         throw Error('Save the JOX document before executing saved source changes.');
     }
+  }
+
+  async sync(project, options = {}) {
+    if (options.token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
+    await project.provider.requireSync();
+    return this.withExecution(project, options, () => project.provider.sync({ ...options, beforeRequest: () => {
+      this.assertCleanRawJox(project);
+      for (const document of this.vscode.workspace.textDocuments || []) {
+        if (!document.isDirty || document.uri.scheme !== 'jade-source') continue;
+        let owner;
+        try { owner = this.projectForUri(document.uri); }
+        catch (cause) { throw Error('Cannot verify which project owns an unsaved Jade editor. Save or close it before syncing.', { cause }); }
+        if (!owner || owner === project) throw Error('Save the source document before syncing saved JOX changes.');
+      }
+    } }));
   }
 
   async execute(project, command, selection, options) {

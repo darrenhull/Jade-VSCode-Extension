@@ -17,6 +17,23 @@ function fixture(t){
  const verify=()=>spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve(__dirname,'../../scripts/VerifyNativeDistribution.ps1'),'-Directory',source,'-ExpectedDistribution',source],{encoding:'utf8',windowsHide:true});
  return {root,source,destination,manifest,proof,save,put,verify};
 }
+test('Primary sync requires an explicit matching producer flag without checkout initialization',t=>{
+ const f=fixture(t),jox=f.manifest.joxRuntime,proof={qualification:{}};
+ const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(proof));f.save();};
+ jox.sync=true;f.save();
+ const reject=()=>{assert.throws(()=>bundleCli(f),/sync qualification/i);assert.notEqual(f.verify().status,0);};
+ reject();
+ for(const flag of [undefined,false,'true']){proof.qualification.sync=flag;save();reject();}
+ proof.qualification.sync=true;save();reject();
+ const files=Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]));
+ Object.assign(proof,{format:1,characterSet:'unicode',engineCommit:jox.engineCommit,files});
+ save();bundleCli(f);assert.equal(f.verify().status,0);
+ proof.files={...files,'jadegitdev.dll':'0'.repeat(64)};save();reject();
+ proof.files=files;proof.engineCommit='b'.repeat(40);save();reject();
+ proof.engineCommit=jox.engineCommit;
+  proof.qualification=[{sync:true}];save();reject();
+ jox.sync='true';save();reject();
+});
 test('ANSI bundle rejects malformed or unqualified variants before replacing a prior payload',t=>{
  for(const mutate of [f=>f.manifest.joxRuntime.variants.ansi.nativeTests='true',f=>f.manifest.joxRuntime.variants.ansi.initialization=false,f=>f.manifest.joxRuntime.variants.ansi.characterSet='unicode',f=>f.manifest.joxRuntime.variants.ansi.engineCommit='b'.repeat(40),f=>delete f.manifest.runtimeFiles['native/jox/ansi/jadegitscm.dll'],f=>delete f.manifest.runtimeFiles['native/jox/ansi/runtime-provenance.json']]){
   const f=fixture(t);f.save();mutate(f);fs.writeFileSync(path.join(f.source,'distribution.json'),JSON.stringify(f.manifest));
@@ -29,6 +46,27 @@ test('ANSI bundle and post-package verifier preserve every nested payload/proof 
  for(const relative of Object.keys(f.manifest.runtimeFiles))assert.deepEqual(fs.readFileSync(path.join(f.destination,relative)),fs.readFileSync(path.join(f.source,relative)));
  const result=f.verify();assert.equal(result.status,0,result.stderr);
  fs.writeFileSync(path.join(f.source,'native/jox/ansi/jadegitdev.dll'),'tamper');assert.throws(()=>bundleCli(f),/checksum/i);assert.notEqual(f.verify().status,0);
+});
+test('Git-first package checks bind each enabled mode to its seed and exact CLI',t=>{
+ const f=fixture(t),jox=f.manifest.joxRuntime,ansi=jox.variants.ansi,sha='a'.repeat(64);
+ const qualify=(mode,proof)=>{
+  const seed={platform:'25.0.1',jomSha256:sha,controlSha256:sha,monitorSha256:sha};
+  Object.assign(mode,{sync:true,checkoutInitialization:true,checkoutSeed:seed});
+  Object.assign(proof.qualification,{sync:true,checkoutInitialization:true});
+  proof.checkoutProof={format:1,cliSha256:f.manifest.executableSha256,receiptSha256:sha,seed:{...seed},files:{...proof.files},checks:Object.fromEntries(['sourceFreeSetup','restart','branchRoundTrip','savedEditRoundTrip','noOp','isolation','unsupportedChangeRefused'].map(key=>[key,true]))};
+ };
+ const unicodeProof={format:1,characterSet:jox.characterSet,engineCommit:jox.engineCommit,qualification:{},files:Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]))};qualify(jox,unicodeProof);qualify(ansi,f.proof);
+ const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(unicodeProof));f.save();};save();
+ bundleCli(f);const valid=f.verify();assert.equal(valid.status,0,valid.stderr);
+ for(const [target,key] of [[f.proof.checkoutProof,'receiptSha256'],[ansi.checkoutSeed,'platform'],[ansi.checkoutSeed,'jomSha256']]){
+  const original=target[key];target[key]+='\n';save();
+  assert.throws(()=>bundleCli(f),/Git-first/i);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,/Git-first/i);
+  target[key]=original;
+ }
+ for(const [target,key,bad] of [[f.proof.checkoutProof,'cliSha256',sha],[f.proof.checkoutProof.seed,'monitorSha256','b'.repeat(64)],[unicodeProof.checkoutProof.checks,'restart',false],[f.proof.checkoutProof.files,'jadegitdev.dll',sha],[unicodeProof.files,'jadegitscm.dll',sha],[jox,'sync','true']]){
+  const original=target[key],diagnostic=key==='sync'||target===unicodeProof.files?/Git-first|sync qualification/i:/Git-first/i;
+  target[key]=bad;save();assert.throws(()=>bundleCli(f),diagnostic);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,diagnostic);target[key]=original;
+ }
 });
 test('ANSI proof, descriptor, DLL-width and per-mode qualification mismatches are rejected in bundle and verifier',t=>{
  for(const mutate of [f=>f.manifest.joxRuntime.variants=null,f=>f.manifest.joxRuntime.variants.ansi=null,f=>f.proof.build=[{crt:'MT'}],f=>f.proof.characterBytes='1',f=>f.proof.componentCharacterBytes['jadegitdev.dll']=2,f=>f.proof.componentCharacterBytes.extra=1,f=>f.proof.build.crt='MD',f=>f.proof.loaderDiagnostics=true,f=>f.proof.qualification.nativeTests=false,f=>f.proof.files['jadegitscm.dll']='0'.repeat(64),f=>delete f.manifest.joxRuntime.variants,f=>f.manifest.joxRuntime.variants.ansi.nativeScratch=true]){
