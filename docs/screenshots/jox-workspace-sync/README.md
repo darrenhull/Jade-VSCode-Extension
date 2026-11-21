@@ -25,3 +25,5 @@ In the same fixture, the packaged CLI applied a checked-out commit from another 
 - [Return to the original commit after removing the unsupported resource](11-git-first-recovered.png). After the previous isolated test broker released Working, a fresh extension host uploaded the restored checkout and confirmed the original commit with zero saved overlays.
 
 These captures are connected release-candidate evidence for issue #136, not proof for the current public CLI pin or a future hosted binary.
+
+A second private VSIX (SHA-256 `bed0ef975a6f491e81d9c73087ef0010f8e5e588694fe47e8837fa55b422a6c5`) bundled the exact local CLI build from `583e763`. The installed package [reviewed and created its own Source-free Working generation](12-exact-candidate-setup.png), then [confirmed the saved commit with no upload](13-exact-candidate-sync.png). This also passed portable VSIX smoke with Node absent from `PATH`. The public pin remains unchanged.
