@@ -10,6 +10,14 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
  if($qualification -isnot [Collections.IDictionary]){$qualification=$null}
  foreach($mode in @($Runtime,$qualification)){if($mode -is [Collections.IDictionary] -and $mode.Contains('sync') -and $mode.sync -isnot [bool]){throw 'JOX sync qualification must be Boolean.'}}
  if(($Runtime.sync -eq $true) -ne ($qualification.sync -eq $true)){throw 'JOX sync qualification differs from its producer declaration.'}
+ $prefix=if($Runtime.characterSet -ceq 'ansi'){'native/jox/ansi/'}else{'native/jox/'}
+ $names=@("jade-jox-test-helper-$($Runtime.characterSet).exe",'jadegitscm.dll','jadegitdev.dll')
+ if($Runtime.sync -eq $true){
+  if($Producer -isnot [Collections.IDictionary] -or ($Producer.format -isnot [int] -and $Producer.format -isnot [long]) -or $Producer.format -ne 1 -or
+     $Producer.characterSet -isnot [string] -or $Producer.characterSet -cne $Runtime.characterSet -or $Producer.engineCommit -isnot [string] -or $Producer.engineCommit -cne $Runtime.engineCommit -or
+     $Producer.files -isnot [Collections.IDictionary] -or $Producer.files.Count -ne 3){throw 'JOX sync qualification does not match the exact managed runtime.'}
+  foreach($name in $names){if($Producer.files[$name] -isnot [string] -or $Producer.files[$name] -cnotmatch '^[a-f0-9]{64}$' -or $Producer.files[$name] -cne $Manifest.runtimeFiles[$prefix+$name]){throw 'JOX sync qualification does not match the exact managed runtime.'}}
+ }
  if(($qualification -is [Collections.IDictionary] -and $qualification.Contains('checkoutInitialization') -and $qualification.checkoutInitialization -isnot [bool]) -or
     $enabled -ne ($qualification.checkoutInitialization -is [bool] -and $qualification.checkoutInitialization) -or
     (!$enabled -and $Producer -is [Collections.IDictionary] -and $Producer.Contains('checkoutProof'))){throw 'Git-first producer qualification differs from its declaration.'}
@@ -19,10 +27,9 @@ function Assert-JoxCheckoutProof([Collections.IDictionary]$Runtime,$Producer,[Co
  if($Producer -isnot [Collections.IDictionary] -or $qualification -isnot [Collections.IDictionary] -or $qualification.sync -isnot [bool] -or !$qualification.sync -or !(Test-JoxCheckoutSeed $seed) -or $proof -isnot [Collections.IDictionary] -or $proof.Count -ne 6 -or
     ($proof.format -isnot [int] -and $proof.format -isnot [long]) -or $proof.format -ne 1 -or $proof.cliSha256 -isnot [string] -or $proof.cliSha256 -cnotmatch '^[a-f0-9]{64}$' -or
     $proof.cliSha256 -cne $Manifest.executableSha256.ToLowerInvariant() -or $proof.receiptSha256 -isnot [string] -or $proof.receiptSha256 -cnotmatch '^[a-f0-9]{64}$' -or !(Test-JoxCheckoutSeed $proof.seed)){throw 'Git-first connected proof does not match the CLI or seed.'}
- if($proof.files -isnot [Collections.IDictionary] -or $proof.files.Count -ne 3 -or $Producer.files -isnot [Collections.IDictionary] -or $Producer.files.Count -ne 3){throw 'Git-first proof does not match the exact managed runtime.'}
- $prefix=if($Runtime.characterSet -ceq 'ansi'){'native/jox/ansi/'}else{'native/jox/'}
- foreach($name in @("jade-jox-test-helper-$($Runtime.characterSet).exe",'jadegitscm.dll','jadegitdev.dll')){
-  if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cnotmatch '^[a-f0-9]{64}$' -or $proof.files[$name] -cne $Producer.files[$name] -or $proof.files[$name] -cne $Manifest.runtimeFiles[$prefix+$name]){throw 'Git-first proof does not match the exact managed runtime.'}
+ if($proof.files -isnot [Collections.IDictionary] -or $proof.files.Count -ne 3){throw 'Git-first proof does not match the exact managed runtime.'}
+ foreach($name in $names){
+  if($proof.files[$name] -isnot [string] -or $proof.files[$name] -cne $Producer.files[$name]){throw 'Git-first proof does not match the exact managed runtime.'}
  }
  foreach($key in @('platform','jomSha256','controlSha256','monitorSha256')){if($seed[$key] -cne $proof.seed[$key]){throw 'Git-first connected proof does not match the seed.'}}
  $checks=@('sourceFreeSetup','restart','branchRoundTrip','savedEditRoundTrip','noOp','isolation','unsupportedChangeRefused')

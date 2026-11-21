@@ -16,6 +16,10 @@ function assertCheckoutProof(runtime,producer,manifest){
  const qualification=producer?.qualification,proof=producer?.checkoutProof;
  if([runtime,qualification].some(mode=>has(mode,'sync')&&typeof mode.sync!=='boolean')||
     (runtime.sync===true)!==(qualification?.sync===true))throw Error(`${runtime.characterSet} sync qualification differs from its producer declaration.`);
+ const prefix=runtime.characterSet==='ansi'?'native/jox/ansi/':'native/jox/';
+ const names=[`jade-jox-test-helper-${runtime.characterSet}.exe`,'jadegitscm.dll','jadegitdev.dll'];
+ if(runtime.sync===true&&(!record(producer)||producer.format!==1||producer.characterSet!==runtime.characterSet||producer.engineCommit!==runtime.engineCommit||
+    !record(producer.files)||Object.keys(producer.files).length!==3||!names.every(name=>sha256(producer.files[name])&&producer.files[name]===manifest.runtimeFiles[prefix+name])))throw Error('JOX sync qualification does not match the exact managed runtime.');
  if((has(qualification,'checkoutInitialization')&&typeof qualification.checkoutInitialization!=='boolean')||
     enabled!==(qualification?.checkoutInitialization===true)||(!enabled&&has(producer,'checkoutProof')))throw Error('Git-first producer qualification differs from its declaration.');
  if(!enabled)return;
@@ -23,9 +27,7 @@ function assertCheckoutProof(runtime,producer,manifest){
  if(!record(producer)||!record(qualification)||!record(proof)||Object.keys(proof).length!==6||proof.format!==1||!sha256(proof.cliSha256)||proof.cliSha256!==manifest.executableSha256||!sha256(proof.receiptSha256)||
     qualification.sync!==true||!validSeed(proof.seed)||!['platform',...hashKeys].every(key=>seed[key]===proof.seed[key])||
     !record(proof.checks)||Object.keys(proof.checks).length!==checks.length||!checks.every(key=>proof.checks[key]===true))throw Error('Git-first connected proof does not match the CLI, seed or required checks.');
- const prefix=runtime.characterSet==='ansi'?'native/jox/ansi/':'native/jox/';
- const names=[`jade-jox-test-helper-${runtime.characterSet}.exe`,'jadegitscm.dll','jadegitdev.dll'];
- if(!record(proof.files)||Object.keys(proof.files).length!==3||!record(producer.files)||Object.keys(producer.files).length!==3||!names.every(name=>sha256(proof.files[name])&&proof.files[name]===producer.files[name]&&proof.files[name]===manifest.runtimeFiles[prefix+name]))throw Error('Git-first proof does not match the exact managed runtime.');
+ if(!record(proof.files)||Object.keys(proof.files).length!==3||!names.every(name=>proof.files[name]===producer.files[name]))throw Error('Git-first proof does not match the exact managed runtime.');
 }
 function assertAnsiVariant(manifest,files){
  const jox=manifest.joxRuntime,variants=jox?.variants,prefix='native/jox/ansi/';

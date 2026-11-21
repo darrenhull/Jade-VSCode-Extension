@@ -171,14 +171,19 @@ test('Explorer-enumerated cold project survives Detect handoff and reaches nativ
  f.vscode.window.createTreeView=()=>({dispose(){}});f.vscode.window.withProgress=async(_options,run)=>run({report(){}});
  let selected=false,initializations=0,targets=0;
  const settings={installPath:'C:/Chosen Jade',databasePath:'C:/Chosen Source/system',iniPath:'C:/Chosen Source/source.ini',server:'singleUser'};
- const configFor=()=>({sourceFormat:'jox',...(selected?settings:{})});
- const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async()=>({sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true}]}}),request(command,args){
+ const configFor=()=>({sourceFormat:'jox',...(selected?settings:{installPath:''})});
+ const client={client:{closed:false},connect(){return this.client;},sourceCapabilities:async config=>{
+  if(!selected&&Object.hasOwn(config,'installPath'))throw Error('Runtime selection has not completed');
+  return {sourceSemantic:{format:1,providers:[{id:'jox',catalogue:true,initialization:true,checkoutInitialization:true}]}};
+ },request(command,args){
   if(command==='cli'){
    assert.equal(args.operation,'init');initializations++;
    if(initializations===1)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Jade connection setup is required. Run jade-cli init --install <Jade folder> or choose --profile <name>; noninteractive commands never prompt.'}})};
    return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
   }
-  assert.equal(command,'working.location');targets++;assert.equal(args.config.installPath,settings.installPath);
+  assert.equal(command,'working.location');
+  if(args.checkoutOnly){assert.equal(initializations,0);return{promise:Promise.resolve({passed:true,code:0,body:{checkoutConfigured:false}})};}
+  targets++;assert.equal(args.config.installPath,settings.installPath);
   return{promise:Promise.resolve({passed:true,code:0,body:{working:{databasePath:path.join(f.root,'.jade/working/system'),installPath:settings.installPath,identity:'native-target'},source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server},initialization:{destination:path.join(f.root,'sources')}}})};
  }};
  const workspace=new NativeSourceWorkspace({vscode:f.vscode,client,configFor});

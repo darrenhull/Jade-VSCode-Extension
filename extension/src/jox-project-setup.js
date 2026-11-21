@@ -2,10 +2,12 @@
 const { registerWorkspaceInitialization }=require('./workspace-initialization');
 const { registerWorkspaceOnboarding }=require('./workspace-onboarding');
 const { NativeSourceProvider }=require('./NativeSourceProvider');
+const { configDto }=require('./cli-client');
 /** Existing setup presentation over native config, targets and one fresh extraction. */
 function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect}) {
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const projectFor=folder=>workspace.project(folder);
+  const packageProbe=folder=>new NativeSourceProvider({client,config:{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
     runtimeSettingsReady:folder=>{
@@ -15,8 +17,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(workspace.disposed)throw Error('The native source workspace is closed.');
       if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
       // Probe without attaching a native connection to an Explorer-only row.
-      const provider=new NativeSourceProvider({client,config:configFor(folder),projectRoot:folder.uri.fsPath});
-      await provider.capability();
+      await packageProbe(folder).capability();
       if(workspace.disposed)throw Error('The native source workspace is closed.');
       if(workspace.projects.has(folder.uri.toString()))projectFor(folder);
     }
@@ -41,11 +42,11 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
   async function checkoutTargets(folder) {
-    const probe=new NativeSourceProvider({client,config:configFor(folder),projectRoot:folder.uri.fsPath});
+    const probe=packageProbe(folder);
     const capability=await probe.capability();
     if(!Object.hasOwn(capability,'checkoutInitialization'))return;
     const target=await probe.request('working.location',{
-      cwd:probe.root,config:{...probe.config},checkoutOnly:true
+      cwd:probe.root,config:configDto(configFor(folder)),checkoutOnly:true
     });
     if(target.checkoutConfigured===false)return;
     if(target.checkoutConfigured!==true||target.workingMode!=='git-first'||target.source||!target.working?.identity||

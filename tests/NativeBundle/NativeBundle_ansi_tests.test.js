@@ -24,7 +24,13 @@ test('Primary sync requires an explicit matching producer flag without checkout 
  const reject=()=>{assert.throws(()=>bundleCli(f),/sync qualification/i);assert.notEqual(f.verify().status,0);};
  reject();
  for(const flag of [undefined,false,'true']){proof.qualification.sync=flag;save();reject();}
- proof.qualification.sync=true;save();bundleCli(f);assert.equal(f.verify().status,0);
+ proof.qualification.sync=true;save();reject();
+ const files=Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]));
+ Object.assign(proof,{format:1,characterSet:'unicode',engineCommit:jox.engineCommit,files});
+ save();bundleCli(f);assert.equal(f.verify().status,0);
+ proof.files={...files,'jadegitdev.dll':'0'.repeat(64)};save();reject();
+ proof.files=files;proof.engineCommit='b'.repeat(40);save();reject();
+ proof.engineCommit=jox.engineCommit;
   proof.qualification=[{sync:true}];save();reject();
  jox.sync='true';save();reject();
 });
@@ -49,11 +55,11 @@ test('Git-first package checks bind each enabled mode to its seed and exact CLI'
   Object.assign(proof.qualification,{sync:true,checkoutInitialization:true});
   proof.checkoutProof={format:1,cliSha256:f.manifest.executableSha256,receiptSha256:sha,seed:{...seed},files:{...proof.files},checks:Object.fromEntries(['sourceFreeSetup','restart','branchRoundTrip','savedEditRoundTrip','noOp','isolation','unsupportedChangeRefused'].map(key=>[key,true]))};
  };
- const unicodeProof={qualification:{},files:Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]))};qualify(jox,unicodeProof);qualify(ansi,f.proof);
+ const unicodeProof={format:1,characterSet:jox.characterSet,engineCommit:jox.engineCommit,qualification:{},files:Object.fromEntries(['jade-jox-test-helper-unicode.exe','jadegitscm.dll','jadegitdev.dll'].map(name=>[name,f.manifest.runtimeFiles['native/jox/'+name]]))};qualify(jox,unicodeProof);qualify(ansi,f.proof);
  const save=()=>{f.put('native/jox/runtime-provenance.json',JSON.stringify(unicodeProof));f.save();};save();
  bundleCli(f);const valid=f.verify();assert.equal(valid.status,0,valid.stderr);
  for(const [target,key,bad] of [[f.proof.checkoutProof,'cliSha256',sha],[f.proof.checkoutProof.seed,'monitorSha256','b'.repeat(64)],[unicodeProof.checkoutProof.checks,'restart',false],[f.proof.checkoutProof.files,'jadegitdev.dll',sha],[unicodeProof.files,'jadegitscm.dll',sha],[jox,'sync','true']]){
-  const original=target[key],diagnostic=key==='sync'?/Git-first|sync qualification/i:/Git-first/i;
+  const original=target[key],diagnostic=key==='sync'||target===unicodeProof.files?/Git-first|sync qualification/i:/Git-first/i;
   target[key]=bad;save();assert.throws(()=>bundleCli(f),diagnostic);const result=f.verify();assert.notEqual(result.status,0);assert.match(result.stderr,diagnostic);target[key]=original;
  }
 });
