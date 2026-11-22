@@ -243,8 +243,10 @@ function registerDebugger(vscode, context, services) {
               debugMethods(fs.readFileSync(file, "utf8"), file, false),
             );
             const projection=sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
-            this.modelSources.set(sourceKey(editorSource),projection);
-            this.editorSources.set(sourceKey(projection),editorSource);
+            for(const mapping of prepared?.sourceMappings||[{editor:editorSource,projection}]){
+              this.modelSources.set(sourceKey(mapping.editor),mapping.projection);
+              this.editorSources.set(sourceKey(mapping.projection),mapping.editor);
+            }
             const directory = path.join(working.root, "debug-sessions");
             fs.mkdirSync(directory, { recursive: true });
             const file = path.join(directory, crypto.randomUUID() + ".json");
@@ -581,14 +583,23 @@ function registerDebugger(vscode, context, services) {
         this.nativeHandles.clear();
         this.sourceSnapshots.clear();
         const native = await this.native.request("stack");
-        this.frames = (native.frames || [message.method]).map(
-          (frame, index) => {
-            const local = this.models.find(
+        this.frames=[];
+        for(const [index,frame] of (native.frames || [message.method]).entries()){
+            let local = this.models.find(
               (m) =>
                 m.schema === frame.schema &&
                 m.owner === frame.owner &&
                 m.name === frame.method,
             );
+            if(!local&&services.resolveDebugSource){
+              const resolved=await services.resolveDebugSource(frame);
+              if(resolved){
+                this.modelSources.set(sourceKey(resolved.editor),resolved.projection);
+                this.editorSources.set(sourceKey(resolved.projection),resolved.editor);
+                const added=debugMethods(resolved.text,resolved.projection,false);this.models.push(...added);
+                local=added.find(m=>m.schema===frame.schema&&m.owner===frame.owner&&m.name===frame.method);
+              }
+            }
             const value = {
               ...(local || {}),
               ...frame,
@@ -605,9 +616,8 @@ function registerDebugger(vscode, context, services) {
               this.sourceSnapshots.set(value.sourceReference, frame.source);
             }
             this.variableHandles.set(value.id, { frame: value });
-            return value;
-          },
-        );
+            this.frames.push(value);
+        }
         this.frame = this.frames[0];
         if (this.configured) await this.presentStop();
       } else if (message.event === "error") {

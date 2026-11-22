@@ -20,7 +20,10 @@ async function prepareSemanticDebugLaunch(workspace,client,document,output,signa
   throw Error('Native debugging requires the accepted Source-free Git-first Working generation and its detected character mode.');
  const projection=native.projection?.cacheUri;
  if(typeof projection!=='string'||!path.isAbsolute(projection))throw Error('Native debugger source projection is unavailable.');
- return {working,config:{...project.provider.config,sourceFormat:'jox',characterSet:working.characterSet,files:[projection]}};
+ const mappings=[...project.files.documents.values()].map(value=>({editor:value.uri.toString(),projection:value.document.projection?.cacheUri}))
+  .filter(value=>typeof value.projection==='string'&&path.isAbsolute(value.projection));
+ if(!mappings.some(value=>value.editor===document.uri.toString()))mappings.push({editor:document.uri.toString(),projection});
+ return {working,sourceMappings:mappings,config:{...project.provider.config,sourceFormat:'jox',characterSet:working.characterSet,files:[...new Set(mappings.map(value=>value.projection))]}};
 }
 
 function registerNativeSourceDebugger(vscode,context,workspace,client){
@@ -29,7 +32,13 @@ function registerNativeSourceDebugger(vscode,context,workspace,client){
  return registerDebugger(vscode,context,{
   beforeOperation:()=>workspace.beforeOperation?.(),isBusy:()=>workspace.executing||debugging,setBusy:async value=>{debugging=value;},
   supportsSource:uri=>uri?.scheme==='jade-source',parseSourceUri:value=>vscode.Uri.parse(value),
-  resolveSource:uri=>vscode.workspace.openTextDocument(uri),sourcePath:document=>record(document).document.projection.cacheUri,
+  resolveSource:uri=>uri?vscode.workspace.openTextDocument(uri):vscode.window.activeTextEditor?.document,sourcePath:document=>record(document).document.projection.cacheUri,
+  resolveDebugSource:async frame=>{
+   const row=await workspace.findClass(frame.owner,frame.schema);
+   if(!row)return;
+   const uri=await row.project.files.open(row.entity.id),binding=row.project.files.binding(uri);
+   return{editor:uri.toString(),projection:binding.projection.cacheUri,text:binding.projection.text};
+  },
   config:document=>({...record(document).project.provider.config,sourceFormat:'jox'}),
   prepareLaunch:async(document,selected,output,signal)=>{
    const prepared=await prepareSemanticDebugLaunch(workspace,client,document,text=>output.append(text),signal);

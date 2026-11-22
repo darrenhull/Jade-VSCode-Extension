@@ -4,7 +4,8 @@ const {prepareSemanticDebugLaunch}=require('../../extension/src/native-source-de
 
 function fixture({capable=true,workingMode='git-first',sourceDatabasePath}={}){
  const root=path.resolve('project'),projection=path.join(root,'.jade','projections','Demo.cls'),document={uri:{scheme:'jade-source',toString:()=> 'jade-source:/Demo.cls'}};
- const project={folder:{uri:{fsPath:root}},provider:{root,config:{sourceFormat:'jox'},flags:{nativeDebug:capable}},files:{binding:()=>({projection:{cacheUri:projection}})}};
+ const other={uri:{toString:()=> 'jade-source:/Other.cls'},document:{projection:{cacheUri:path.join(root,'.jade','projections','Other.cls')}}};
+ const project={folder:{uri:{fsPath:root}},provider:{root,config:{sourceFormat:'jox'},flags:{nativeDebug:capable}},files:{documents:new Map([['other',other]]),binding:()=>({projection:{cacheUri:projection}})}};
  const calls=[];
  const workspace={record:()=>({project,document:{projection:{cacheUri:projection}}}),sync:async(value,options)=>{calls.push(['sync',value,options]);return{passed:true,code:0,report:{inSync:true}};}};
  const working={root:path.join(root,'.jade','working'),databasePath:path.join(root,'.jade','working','system'),workingMode,characterSet:'ansi',...(sourceDatabasePath?{sourceDatabasePath}:{})};
@@ -17,7 +18,8 @@ test('semantic debug preparation syncs saved JOX and reuses exact Source-free Wo
  const result=await prepareSemanticDebugLaunch(f.workspace,f.client,f.document,output,signal);
  assert.deepEqual(f.calls.map(value=>value[0]),['sync','prepare']);assert.strictEqual(f.calls[0][1],f.project);
  assert.equal(f.calls[1][3].cwd,f.root);assert.strictEqual(f.calls[1][1].signal,signal);assert.equal(result.working,f.working);assert.equal(result.config.sourceFormat,'jox');
- assert.equal(result.config.characterSet,'ansi');assert.deepEqual(result.config.files,[f.projection]);assert.equal(result.config.databasePath,undefined);
+ assert.equal(result.config.characterSet,'ansi');assert.deepEqual(result.config.files,[path.join(f.root,'.jade','projections','Other.cls'),f.projection]);
+ assert.deepEqual(result.sourceMappings.map(value=>value.editor),['jade-source:/Other.cls',f.document.uri.toString()]);assert.equal(result.config.databasePath,undefined);
 });
 
 test('semantic debug preparation stops before Working preparation when sync is cancelled',async()=>{
