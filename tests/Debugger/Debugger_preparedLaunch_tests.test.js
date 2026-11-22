@@ -8,11 +8,11 @@ test('prepared semantic launch reuses accepted Working without legacy compilatio
  fs.writeFileSync(projection,source);fs.mkdirSync(path.join(root,'vendor','jade-tools-cli','native'),{recursive:true});
  fs.writeFileSync(path.join(root,'vendor','jade-tools-cli','native','debugger-abi.json'),JSON.stringify({libraries:{}}));
  const uri={scheme:'jade-source',fsPath:'/TestSchema/DebugTest.cls',toString:()=> 'jade-source:/TestSchema/DebugTest.cls'};
- const document={isDirty:false,uri,getText:()=>source},disposable={dispose(){}};let adapter,captured,prepared=0;
+ const document={isDirty:false,uri,getText:()=>source},disposable={dispose(){}};let adapter,captured,native,prepared=0;
  class Emitter{constructor(){this.events=new EventEmitter();this.event=listener=>{this.events.on('message',listener);return disposable;};}fire(value){this.events.emit('message',value);}dispose(){this.events.removeAllListeners();}}
  const vscode={Uri:{file:value=>({scheme:'file',fsPath:value,toString:()=>value}),parse:value=>uri},EventEmitter:Emitter,DebugAdapterInlineImplementation:class{constructor(value){this.adapter=value;}},window:{activeTextEditor:{document,selection:{active:{}}},createOutputChannel:()=>({clear(){},show(){},append(){},appendLine(){}}),showInformationMessage:async()=>{}},workspace:{openTextDocument:async()=>document},commands:{registerCommand:()=>disposable},languages:{registerCodeLensProvider:()=>disposable},debug:{registerDebugAdapterDescriptorFactory:(_type,factory)=>{adapter=factory.createDebugAdapterDescriptor().adapter;return disposable;},registerDebugConfigurationProvider:()=>disposable}};
  const filename=path.resolve(__dirname,'../../extension/src/debugger.js'),localRequire=createRequire(filename),module={exports:{}};
- class NativeDebugger extends EventEmitter{constructor(_executable,session){super();captured=JSON.parse(fs.readFileSync(session,'utf8'));}stop(){}}
+ class NativeDebugger extends EventEmitter{constructor(_executable,session){super();native=this;captured=JSON.parse(fs.readFileSync(session,'utf8'));}async request(command,body){if(command==='breakpoints')return{positions:body.positions};if(command==='stack')return{frames:[{schema:'SJetSchema',owner:'DebugDemo',method:'calculate',source:'calculate() : Integer;\nbegin\nreturn 42;\nend;',position:30}]};return{};}stop(){}}
  vm.runInNewContext('(function(require,module){'+fs.readFileSync(filename,'utf8')+'\n})',{AbortController,Buffer,console,process})((name)=>name==='./debug-transport'?{NativeDebugger}:localRequire(name),module);
  module.exports.registerDebugger(vscode,{subscriptions:[],extensionPath:root},{
   isBusy:()=>false,setBusy:async()=>{},supportsSource:value=>value?.scheme==='jade-source',resolveSource:async()=>document,config:()=>({}),
@@ -24,5 +24,12 @@ test('prepared semantic launch reuses accepted Working without legacy compilatio
   await adapter.handleMessage({seq:1,command:'launch',arguments:{program:uri.toString(),method:'calculate'}});
   assert.equal(prepared,1,JSON.stringify(messages));assert.equal(captured.sourceFormat,'jox');assert.equal(captured.characterSet,'ansi');assert.equal(captured.workingMode,'git-first');
   assert.equal(captured.sourceDatabasePath,undefined);assert.equal(captured.schema,'SJetSchema');assert.equal(captured.owner,'DebugDemo');assert.equal(captured.method,'calculate');
+  native.emit('message',{event:'ready',method:{schema:'SJetSchema',owner:'DebugDemo',method:'calculate',source:'calculate() : Integer;\nbegin\nreturn 42;\nend;'}});await new Promise(resolve=>setImmediate(resolve));
+  await adapter.handleMessage({seq:2,command:'setBreakpoints',arguments:{source:{path:uri.toString()},breakpoints:[{line:20}]}});
+  native.emit('message',{event:'stopped',reason:'breakpoint',method:{schema:'SJetSchema',owner:'DebugDemo',method:'calculate',source:'calculate() : Integer;\nbegin\nreturn 42;\nend;',position:30}});await new Promise(resolve=>setImmediate(resolve));
+  await adapter.handleMessage({seq:3,command:'stackTrace',arguments:{threadId:1}});
+  const breakpoint=messages.find(value=>value.type==='response'&&value.command==='setBreakpoints'),stack=messages.find(value=>value.type==='response'&&value.command==='stackTrace');
+  assert.equal(breakpoint.success,true,JSON.stringify(breakpoint));assert.equal(breakpoint.body.breakpoints[0].verified,true);
+  assert.equal(stack.body.stackFrames[0].source.path,uri.toString());
  }finally{adapter.dispose();await adapter.finish();fs.rmSync(root,{recursive:true,force:true});}
 });

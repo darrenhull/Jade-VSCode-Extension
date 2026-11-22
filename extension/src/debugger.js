@@ -23,6 +23,10 @@ function registerDebugger(vscode, context, services) {
   const supportsSource=uri=>services.supportsSource?services.supportsSource(uri):uri?.scheme==='file'&&/\.cls$/i.test(uri.fsPath||'');
   const sourcePrompt=services.supportsSource?'Open a supported Jade source member before starting the debugger.':'Open a Jade CLS source file before starting the debugger.';
   const sourcePath=document=>services.sourcePath?.(document)||document.uri.fsPath;
+  const sourceKey=value=>{
+    if(typeof value!=='string')return '';
+    return (!/^[a-z]:[\\/]/i.test(value)&&/^[a-z][a-z0-9+.-]*:/i.test(value)?value:path.resolve(value)).toLowerCase();
+  };
   const resolveSource=selected=>services.resolveSource
     ? services.resolveSource(sourceUri(selected))
     : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
@@ -82,6 +86,8 @@ function registerDebugger(vscode, context, services) {
       this.nativeHandles = new Map();
       this.nextVariableHandle = 1000;
       this.sourceSnapshots = new Map();
+      this.modelSources = new Map();
+      this.editorSources = new Map();
     }
     send(message) {
       if (this.disposed) return;
@@ -236,6 +242,9 @@ function registerDebugger(vscode, context, services) {
             this.models = (config.files||[sourcePath(document)]).flatMap((file) =>
               debugMethods(fs.readFileSync(file, "utf8"), file, false),
             );
+            const projection=sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
+            this.modelSources.set(sourceKey(editorSource),projection);
+            this.editorSources.set(sourceKey(projection),editorSource);
             const directory = path.join(working.root, "debug-sessions");
             fs.mkdirSync(directory, { recursive: true });
             const file = path.join(directory, crypto.randomUUID() + ".json");
@@ -296,9 +305,10 @@ function registerDebugger(vscode, context, services) {
             break;
           }
           case "setBreakpoints": {
-            const file = a.source?.path;
-            if (typeof file !== "string" || !file)
+            const requestedFile = a.source?.path;
+            if (typeof requestedFile !== "string" || !requestedFile)
               throw Error("A breakpoint needs a source file path.");
+            const file=this.modelSources.get(sourceKey(requestedFile))||requestedFile;
             if (
               (a.breakpoints || []).some(
                 (b) => !Number.isInteger(b.line) || b.line < 1,
@@ -364,7 +374,7 @@ function registerDebugger(vscode, context, services) {
                   name: f.owner + "::" + f.name,
                   source: {
                     ...(f.file
-                      ? { name: path.basename(f.file), path: f.file }
+                      ? { name: path.basename(f.file), path: this.editorSources.get(sourceKey(f.file))||f.file }
                       : {
                           name: f.owner + "::" + f.name,
                           sourceReference: f.sourceReference,
@@ -676,7 +686,7 @@ function registerDebugger(vscode, context, services) {
           breakpoint: {
             id: b.id,
             verified: true,
-            source: { path: b.file },
+            source: { path: this.editorSources.get(sourceKey(b.file))||b.file },
             line: b.line,
           },
         });
