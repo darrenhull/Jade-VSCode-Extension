@@ -16,8 +16,15 @@ test('semantic debug preparation syncs saved JOX and reuses exact Source-free Wo
  const f=fixture(),output=()=>{},signal=new AbortController().signal;
  const result=await prepareSemanticDebugLaunch(f.workspace,f.client,f.document,output,signal);
  assert.deepEqual(f.calls.map(value=>value[0]),['sync','prepare']);assert.strictEqual(f.calls[0][1],f.project);
- assert.equal(f.calls[1][3].cwd,f.root);assert.equal(result.working,f.working);assert.equal(result.config.sourceFormat,'jox');
+ assert.equal(f.calls[1][3].cwd,f.root);assert.strictEqual(f.calls[1][1].signal,signal);assert.equal(result.working,f.working);assert.equal(result.config.sourceFormat,'jox');
  assert.equal(result.config.characterSet,'ansi');assert.deepEqual(result.config.files,[f.projection]);assert.equal(result.config.databasePath,undefined);
+});
+
+test('semantic debug preparation stops before Working preparation when sync is cancelled',async()=>{
+ const f=fixture(),controller=new AbortController();
+ f.workspace.sync=async()=>{controller.abort();return{passed:true,code:0,report:{inSync:true}};};
+ await assert.rejects(prepareSemanticDebugLaunch(f.workspace,f.client,f.document,()=>{},controller.signal),error=>error.cancelled===true&&/cancelled/i.test(error.message));
+ assert.equal(f.calls.some(value=>value[0]==='prepare'),false);
 });
 
 test('semantic debug preparation refuses unqualified or Source-backed targets',async()=>{

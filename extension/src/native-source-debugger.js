@@ -14,7 +14,8 @@ async function prepareSemanticDebugLaunch(workspace,client,document,output,signa
  if(project.provider.flags?.nativeDebug!==true)throw Error('Native debugging is not qualified for this JOX runtime.');
  const token=cancellationToken(signal),synced=await workspace.sync(project,{token,output});
  if(!synced?.passed)throw Error(synced?.report?.error||'Saved JOX changes did not sync to Working.');
- const working=await client.prepareWorking({...project.provider.config,sourceFormat:'jox'},output,{cwd:project.provider.root});
+ if(signal?.aborted)throw Object.assign(Error('Native debugging cancelled.'),{cancelled:true});
+ const working=await client.prepareWorking({...project.provider.config,sourceFormat:'jox',signal},output,{cwd:project.provider.root});
  if(working?.workingMode!=='git-first'||working.sourceDatabasePath!==undefined||!['ansi','unicode'].includes(working.characterSet))
   throw Error('Native debugging requires the accepted Source-free Git-first Working generation and its detected character mode.');
  const projection=native.projection?.cacheUri;
