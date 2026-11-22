@@ -41,7 +41,6 @@ function registerNativeSourceCommands(vscode, context, workspace, testing, { rep
     ['jadeNative.pullSelectedClassFromSource', 'JOX extraction is not yet supported by the bundled native provider.'],
     ['jadeNative.extractAllSources', 'JOX extraction is not yet supported by the bundled native provider.'],
     ['jadeNative.verifyWorkingSourceBaseline', 'JOX uploads saved changes directly; the legacy CLS baseline verification action is unavailable.'],
-    ['jadeNative.debugMethod', 'JOX debugger source mapping is not yet supported by the bundled native provider.'],
     ['jadeNative.showCallHierarchy', 'Project call hierarchy is not yet supplied by the native source provider.'],
     ['jadeNative.showReferences', 'Project references are not yet supplied by the native source provider.']
   ]);

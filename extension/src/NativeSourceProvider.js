@@ -125,7 +125,7 @@ class NativeSourceProvider {
       this.sourceRoots = sourceRoots;
       this.projectRoot = projectRoot;
       this.snapshot = clone(snapshot);
-      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'documentReopen', 'sync']
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'documentReopen', 'sync']
         .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     }
     return clone(snapshot);

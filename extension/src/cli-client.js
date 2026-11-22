@@ -105,7 +105,7 @@ class CliWorkingSession{
   }finally{config?.signal?.removeEventListener('abort',abort);}
  }
  workingLocation(config){return this.resolveNative('working.location',config,'working');}
- prepareWorking(config,output){return this.resolveNative('working.prepare',config,'working',{},output);}
+ prepareWorking(config,output,options={}){return this.resolveNative('working.prepare',config,'working',options,output);}
  inspectionTarget(config,target,output){return this.resolveNative('inspect.target',target==='source'?sourceConfiguration(config):config,'config',{target},output);}
  async runNative(executable,args,options={},output=()=>{}){
   const config=configDto({...options,installPath:options.installPath||path.dirname(path.dirname(executable))});
