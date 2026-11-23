@@ -9,10 +9,9 @@ test('JOX keeps its source language without advertising an unqualified debugger 
  assert.deepEqual(manifest.contributes.debuggers??[],[]);
  assert.ok(!manifest.contributes.keybindings.some(entry=>['jadeNative.debugMethod','jadeNative.debugApplication'].includes(entry.command)));
 });
-test('the registered JOX method debug action refuses before native work',()=>{
+test('legacy JOX commands do not register an unqualified debugger',()=>{
  const f=setup();
  registerNativeSourceCommands(f.vscode,f.context,{},{});
- assert.equal(typeof f.commands.get('jadeNative.debugMethod'),'function');
- assert.throws(()=>f.commands.get('jadeNative.debugMethod')(),/JOX debugger source mapping is not yet supported/);
+ assert.equal(f.commands.has('jadeNative.debugMethod'),false);
  assert.deepEqual(f.requests,[]);
 });

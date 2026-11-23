@@ -14,11 +14,25 @@ const {
 function registerDebugger(vscode, context, services) {
   const output = vscode.window.createOutputChannel("Jade Debug");
   context.subscriptions.push(output);
+  const sourceUri=selected=>{
+    if(typeof selected!=='string')return selected;
+    if(services.parseSourceUri)return services.parseSourceUri(selected);
+    if(!/^[a-z]:[\\/]/i.test(selected)&&/^[a-z][a-z0-9+.-]*:/i.test(selected)&&vscode.Uri?.parse)return vscode.Uri.parse(selected);
+    return vscode.Uri?.file?vscode.Uri.file(selected):{scheme:'file',fsPath:selected,toString:()=>selected};
+  };
+  const supportsSource=uri=>services.supportsSource?services.supportsSource(uri):uri?.scheme==='file'&&/\.cls$/i.test(uri.fsPath||'');
+  const sourcePrompt=services.supportsSource?'Open a supported Jade source member before starting the debugger.':'Open a Jade CLS source file before starting the debugger.';
+  const sourcePath=document=>services.sourcePath?.(document)||document.uri.fsPath;
+  const sourceKey=value=>{
+    if(typeof value!=='string')return '';
+    return (!/^[a-z]:[\\/]/i.test(value)&&/^[a-z][a-z0-9+.-]*:/i.test(value)?value:path.resolve(value)).toLowerCase();
+  };
   const resolveSource=selected=>services.resolveSource
-    ? services.resolveSource(typeof selected==='string'?vscode.Uri.file(selected):selected)
+    ? services.resolveSource(sourceUri(selected))
     : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
   async function select(document, methodName) {
-    const methods = debugMethods(document.getText(), document.uri.fsPath);
+    if (services.selectMethod) return services.selectMethod(document, methodName);
+    const methods = debugMethods(document.getText(), sourcePath(document));
     if (!methods.length)
       throw Error(
         "Select a concrete CLS with a parameterless instance method.",
@@ -73,6 +87,8 @@ function registerDebugger(vscode, context, services) {
       this.nativeHandles = new Map();
       this.nextVariableHandle = 1000;
       this.sourceSnapshots = new Map();
+      this.modelSources = new Map();
+      this.editorSources = new Map();
     }
     send(message) {
       if (this.disposed) return;
@@ -132,7 +148,7 @@ function registerDebugger(vscode, context, services) {
             this.busy = true;
             await services.setBusy(true);
             const selected=a.program||jadeSourceUri(vscode);
-            if(!a.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||'')))throw Error('Open a Jade CLS source file before starting the debugger.');
+            if(!supportsSource(sourceUri(selected)))throw Error(sourcePrompt);
             const document = await resolveSource(selected);
             if(!document)throw Error('Open a Jade CLS source file before starting the debugger.');
             output.clear();
@@ -141,7 +157,7 @@ function registerDebugger(vscode, context, services) {
             if (document.isDirty && !(await document.save()))
               throw Error("Save the CLS before debugging.");
             this.assertActive();
-            const config = {
+            let config = {
               ...services.config(document),
               signal: this.abort.signal,
             };
@@ -165,8 +181,6 @@ function registerDebugger(vscode, context, services) {
             } else this.selected = await select(document, a.method);
             this.assertActive();
             if (!this.selected) throw Error("No method selected.");
-            await services.workingFiles(config);
-            this.assertActive();
             output.appendLine(
               "Experimental native debugger: " +
                 this.selected.owner +
@@ -180,10 +194,21 @@ function registerDebugger(vscode, context, services) {
                   ? "Runs the selected test through JadeTestRunner, including native test setup and teardown. No Jade IDE is started; changes stay in the private working database."
                   : "Runs this method directly on a new transient instance. No Jade IDE is started; changes stay in the private working database.",
             );
-            const abi = path.join(
+            const defaultAbi = path.join(
                 context.extensionPath,
                 "vendor/jade-tools-cli/native/debugger-abi.json",
-              ),
+              );
+            let working,prepared;
+            if(services.prepareLaunch){
+              const preparation=Promise.resolve(services.prepareLaunch(document,this.selected,output,this.abort.signal));
+              this.preparing=preparation;
+              try{prepared=await preparation;}finally{if(this.preparing===preparation)this.preparing=undefined;}
+              config={...config,...prepared.config,signal:this.abort.signal};working=prepared.working;
+            }else{
+              await services.workingFiles(config);
+              this.assertActive();
+            }
+            const abi=prepared?.abi||defaultAbi,
               manifest = JSON.parse(fs.readFileSync(abi, "utf8"));
             for (const [name, digest] of Object.entries(manifest.libraries))
               if (
@@ -198,30 +223,35 @@ function registerDebugger(vscode, context, services) {
                   "Experimental debugging does not support this Jade DLL build: " +
                     name,
                 );
-            this.operation = services.startWorking(
-              config,
-              "compile",
-              (text) => output.append(text),
-              services.reportDiagnostic,
-            );
-            const compiled = await this.operation.completion;
-            const compilerLines=(compiled.report?.diagnostics||[]).flatMap(diagnosticLines);
-            for(const line of compilerLines)output.appendLine(line);
-            if (!compiled.passed)
-              throw Error(
-                compiled.report?.error || compilerLines.join('\n') || "Native compilation failed.",
-              );
-            this.assertActive();
-            this.preparing =
-              services.prepareWorking(
+            if(!working){
+              this.operation = services.startWorking(
                 config,
+                "compile",
                 (text) => output.append(text),
+                services.reportDiagnostic,
               );
-            const working = await this.preparing;
+              const compiled = await this.operation.completion;
+              const compilerLines=(compiled.report?.diagnostics||[]).flatMap(diagnosticLines);
+              for(const line of compilerLines)output.appendLine(line);
+              if (!compiled.passed)
+                throw Error(
+                  compiled.report?.error || compilerLines.join('\n') || "Native compilation failed.",
+                );
+              this.assertActive();
+              this.preparing = services.prepareWorking(config,(text) => output.append(text));
+              working = await this.preparing;
+            }
             this.assertActive();
-            this.models = config.files.flatMap((file) =>
+            this.models = (config.files||[sourcePath(document)]).flatMap((file) =>
               debugMethods(fs.readFileSync(file, "utf8"), file, false),
             );
+            const projection=this.selected.file||sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
+            if(services.selectMethod&&!this.models.some(model=>model.schema===this.selected.schema&&model.owner===this.selected.owner&&model.name===this.selected.name))
+              this.models.push({...this.selected,file:projection,line:1,body:document.getText(),variables:sourceVariables(document.getText())});
+            for(const mapping of prepared?.sourceMappings||[{editor:editorSource,projection}]){
+              this.modelSources.set(sourceKey(mapping.editor),mapping.projection);
+              this.editorSources.set(sourceKey(mapping.projection),mapping.editor);
+            }
             const directory = path.join(working.root, "debug-sessions");
             fs.mkdirSync(directory, { recursive: true });
             const file = path.join(directory, crypto.randomUUID() + ".json");
@@ -232,7 +262,7 @@ function registerDebugger(vscode, context, services) {
                 ...working,
                 ...(config.characterSet === undefined ? {} : { characterSet: config.characterSet }),
                 workingWrites: true,
-                sourceDatabasePath: config.databasePath,
+                ...(config.sourceFormat==='jox'?{sourceFormat:'jox'}:{sourceDatabasePath: config.databasePath}),
                 launchMode: this.applicationMode ? "application" : "method",
                 ...(this.applicationMode
                   ? {
@@ -282,9 +312,10 @@ function registerDebugger(vscode, context, services) {
             break;
           }
           case "setBreakpoints": {
-            const file = a.source?.path;
-            if (typeof file !== "string" || !file)
+            const requestedFile = a.source?.path;
+            if (typeof requestedFile !== "string" || !requestedFile)
               throw Error("A breakpoint needs a source file path.");
+            const file=this.modelSources.get(sourceKey(requestedFile))||requestedFile;
             if (
               (a.breakpoints || []).some(
                 (b) => !Number.isInteger(b.line) || b.line < 1,
@@ -350,7 +381,7 @@ function registerDebugger(vscode, context, services) {
                   name: f.owner + "::" + f.name,
                   source: {
                     ...(f.file
-                      ? { name: path.basename(f.file), path: f.file }
+                      ? { name: path.basename(f.file), path: this.editorSources.get(sourceKey(f.file))||f.file }
                       : {
                           name: f.owner + "::" + f.name,
                           sourceReference: f.sourceReference,
@@ -557,14 +588,25 @@ function registerDebugger(vscode, context, services) {
         this.nativeHandles.clear();
         this.sourceSnapshots.clear();
         const native = await this.native.request("stack");
-        this.frames = (native.frames || [message.method]).map(
-          (frame, index) => {
-            const local = this.models.find(
+        this.frames=[];
+        for(const [index,frame] of (native.frames || [message.method]).entries()){
+            let local = this.models.find(
               (m) =>
                 m.schema === frame.schema &&
                 m.owner === frame.owner &&
                 m.name === frame.method,
             );
+            if(!local&&services.resolveDebugSource){
+              const resolved=await services.resolveDebugSource(frame);
+              if(resolved){
+                this.modelSources.set(sourceKey(resolved.editor),resolved.projection);
+                this.editorSources.set(sourceKey(resolved.projection),resolved.editor);
+                let added=debugMethods(resolved.text,resolved.projection,false);
+                if(!added.length)added=[{schema:frame.schema,owner:frame.owner,name:frame.method,file:resolved.projection,line:1,body:resolved.text,variables:sourceVariables(resolved.text)}];
+                this.models.push(...added);
+                local=added.find(m=>m.schema===frame.schema&&m.owner===frame.owner&&m.name===frame.method);
+              }
+            }
             const value = {
               ...(local || {}),
               ...frame,
@@ -581,9 +623,8 @@ function registerDebugger(vscode, context, services) {
               this.sourceSnapshots.set(value.sourceReference, frame.source);
             }
             this.variableHandles.set(value.id, { frame: value });
-            return value;
-          },
-        );
+            this.frames.push(value);
+        }
         this.frame = this.frames[0];
         if (this.configured) await this.presentStop();
       } else if (message.event === "error") {
@@ -662,7 +703,7 @@ function registerDebugger(vscode, context, services) {
           breakpoint: {
             id: b.id,
             verified: true,
-            source: { path: b.file },
+            source: { path: this.editorSources.get(sourceKey(b.file))||b.file },
             line: b.line,
           },
         });
@@ -699,8 +740,8 @@ function registerDebugger(vscode, context, services) {
       {
         resolveDebugConfiguration(folder, config) {
           const selected=jadeSourceUri(vscode);
-          if(!config.program&&(selected?.scheme!=='file'||!/\.cls$/i.test(selected.fsPath||''))){
-            void vscode.window.showErrorMessage('Open a Jade CLS source file before starting the debugger.');return;
+          if(!config.program&&!supportsSource(selected)){
+            void vscode.window.showErrorMessage(sourcePrompt);return;
           }
           return {
             ...config,
@@ -709,7 +750,7 @@ function registerDebugger(vscode, context, services) {
             name: config.name || "Jade: Debug Current Method (Experimental)",
             program:
               config.program ||
-              selected.fsPath,
+              (selected.scheme==='file'?selected.fsPath:selected.toString()),
           };
         },
       },
@@ -721,8 +762,8 @@ function registerDebugger(vscode, context, services) {
       async (uri, method) => {
         try {
           const document = await resolveSource(uri);
-          if (!document || !/\.cls$/i.test(document.uri.fsPath))
-            throw Error("Open a Jade CLS file.");
+          if (!document || !supportsSource(document.uri))
+            throw Error(services.supportsSource?"Open a supported Jade source member.":"Open a Jade CLS file.");
           const selected = await select(document, method);
           if (!selected) return;
           return vscode.debug.startDebugging(
@@ -731,7 +772,7 @@ function registerDebugger(vscode, context, services) {
               type: "jade-native-experimental",
               request: "launch",
               name: "Jade: Debug " + selected.owner + "::" + selected.name,
-              program: document.uri.fsPath,
+              program: document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString(),
               method: selected.name,
             },
           );
