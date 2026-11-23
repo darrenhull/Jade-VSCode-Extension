@@ -18,7 +18,7 @@ function registerJoxWorkspace(vscode, context, options) {
   if (reporter) context.subscriptions.push(diagnostics, reporter);
   const reportDiagnostic = (project, result) => reporter?.report(project, result);
   const testing = registerNativeSourceTesting(vscode, context, workspace, { reportDiagnostic });
-  require('./native-source-debugger').registerNativeSourceDebugger(vscode, context, workspace, options.client);
+  require('./native-source-debugger').registerNativeSourceDebugger(vscode, context, workspace, options.client, { reportDiagnostic });
   const output = vscode.window.createOutputChannel('Jade Source');
   context.subscriptions.push(output, workspace.onDidChangeSource(project => Promise.all([
     classView.changed(project), classCatalogue.changed(project), testing.refreshProject?.(project)

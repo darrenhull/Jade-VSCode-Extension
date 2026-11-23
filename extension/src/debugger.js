@@ -31,6 +31,7 @@ function registerDebugger(vscode, context, services) {
     ? services.resolveSource(sourceUri(selected))
     : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
   async function select(document, methodName) {
+    if (services.selectMethod) return services.selectMethod(document, methodName);
     const methods = debugMethods(document.getText(), sourcePath(document));
     if (!methods.length)
       throw Error(
@@ -199,7 +200,9 @@ function registerDebugger(vscode, context, services) {
               );
             let working,prepared;
             if(services.prepareLaunch){
-              prepared=await services.prepareLaunch(document,this.selected,output,this.abort.signal);
+              const preparation=Promise.resolve(services.prepareLaunch(document,this.selected,output,this.abort.signal));
+              this.preparing=preparation;
+              try{prepared=await preparation;}finally{if(this.preparing===preparation)this.preparing=undefined;}
               config={...config,...prepared.config,signal:this.abort.signal};working=prepared.working;
             }else{
               await services.workingFiles(config);
@@ -242,7 +245,9 @@ function registerDebugger(vscode, context, services) {
             this.models = (config.files||[sourcePath(document)]).flatMap((file) =>
               debugMethods(fs.readFileSync(file, "utf8"), file, false),
             );
-            const projection=sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
+            const projection=this.selected.file||sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
+            if(services.selectMethod&&!this.models.some(model=>model.schema===this.selected.schema&&model.owner===this.selected.owner&&model.name===this.selected.name))
+              this.models.push({...this.selected,file:projection,line:1,body:document.getText(),variables:sourceVariables(document.getText())});
             for(const mapping of prepared?.sourceMappings||[{editor:editorSource,projection}]){
               this.modelSources.set(sourceKey(mapping.editor),mapping.projection);
               this.editorSources.set(sourceKey(mapping.projection),mapping.editor);
@@ -596,7 +601,9 @@ function registerDebugger(vscode, context, services) {
               if(resolved){
                 this.modelSources.set(sourceKey(resolved.editor),resolved.projection);
                 this.editorSources.set(sourceKey(resolved.projection),resolved.editor);
-                const added=debugMethods(resolved.text,resolved.projection,false);this.models.push(...added);
+                let added=debugMethods(resolved.text,resolved.projection,false);
+                if(!added.length)added=[{schema:frame.schema,owner:frame.owner,name:frame.method,file:resolved.projection,line:1,body:resolved.text,variables:sourceVariables(resolved.text)}];
+                this.models.push(...added);
                 local=added.find(m=>m.schema===frame.schema&&m.owner===frame.owner&&m.name===frame.method);
               }
             }
@@ -743,7 +750,7 @@ function registerDebugger(vscode, context, services) {
             name: config.name || "Jade: Debug Current Method (Experimental)",
             program:
               config.program ||
-              selected.fsPath,
+              (selected.scheme==='file'?selected.fsPath:selected.toString()),
           };
         },
       },
