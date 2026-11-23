@@ -1,0 +1,127 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const {NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');
+const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup');
+
+// Presentation integration: real onboarding/provider/workspace, simulated CLI
+// replies. This does not claim native compilation, reconciliation or execution.
+function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false}={}){
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-git-first-onboarding-'));
+ t.after(()=>{const temp=path.resolve(os.tmpdir())+path.sep,owned=path.resolve(root);assert.ok(owned.startsWith(temp)&&path.basename(owned).startsWith('jade-git-first-onboarding-'));fs.rmSync(owned,{recursive:true,force:true});});
+ const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href});
+ const folder={name:'Existing checkout',uri:uri(root)},source=path.join(root,'sources'),projectFile=path.join(root,'jade.json');
+ fs.mkdirSync(source);fs.mkdirSync(path.join(root,'.git'));
+ const sourceFile=path.join(source,'Fish.jox'),original=Buffer.from('saved JOX fixture bytes\r\n');fs.writeFileSync(sourceFile,original);
+ const gitMarker=path.join(root,'.git','preserve');fs.writeFileSync(gitMarker,'user Git state');
+ const project={sourceFormat:'jox',workingMode:'git-first',workspaceRoots:['sources']};
+ if(configured)fs.writeFileSync(projectFile,JSON.stringify(project));
+ let selected=configured,accepted=existing,snapshotHash='a'.repeat(64),nextSync={passed:true,code:0,report:{noOp:true,loadedFiles:0}};
+ const calls=[],logs=[],commands=new Map();
+ const machine={installPath:'C:/Licensed ANSI Jade',workingSeedDirectory:'C:/Private vendor seed'};
+ const capabilities={id:'jox',catalogue:true,initialization:true,checkoutInitialization:true,sync:true};
+ if(capabilityMissing)delete capabilities.checkoutInitialization;
+ const working={identity:'native-reviewed-working',root:path.join(root,'.jade','working'),databasePath:path.join(root,'.jade','working','system'),installPath:machine.installPath};
+ const snapshot=()=>({provider:'jox',projectId:'opaque-project',generation:'opaque-generation',snapshotHash});
+ const bound=()=>({...snapshot(),projectRoot:folder.uri.toString(),sourceRoots:[uri(source).toString()],capabilities});
+ const reply=body=>({promise:Promise.resolve({passed:true,code:0,body})});
+ const connection={closed:false};
+ const client={client:connection,connect:()=>connection,sourceCapabilities:async config=>{calls.push({command:'capabilities',config});return{sourceSemantic:{format:1,providers:[capabilities]}};},request(command,args){
+  calls.push({command,args});
+  assert.ok(!command.startsWith('source.extract'),'Git-first setup must never extract Source');
+  for(const key of ['databasePath','iniPath','sourceDatabasePath'])assert.equal(args.config?.[key],undefined,'Git-first CLI request must not supply '+key);
+  if(command==='cli'){
+   assert.fail('Existing saved JOX must not require CLI init or create jade.json');
+  }
+  if(command==='working.location'){
+   assert.equal(args.checkoutOnly,true,'Existing source checkout must not enter Source-backed target discovery');
+   if(previewRefused||!selected||args.config.workingMode!=='git-first')return reply({checkoutConfigured:false});
+   return reply({checkoutConfigured:true,workingMode:'git-first',working,workingState:accepted?'existing':'new',sourceRoots:[uri(source).toString()]});
+  }
+  if(command==='working.initialize'){
+   assert.equal(args.expectedWorkingIdentity,working.identity);assert.equal(args.destination,undefined,'Checkout setup must not extract to a destination');
+   if(initializeFailure)return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native checkout load refused'}})};
+   accepted=true;return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
+  }
+  if(command==='working.prepare')return reply({working});
+  if(command==='source.semantic.prepare')return reply(bound());
+  if(command==='sync')return{promise:Promise.resolve(syncFailure?{passed:false,code:6023,report:{error:'Native saved change rejected'}}:nextSync)};
+  assert.fail('Unexpected native operation '+command);
+ }};
+ const configFor=()=>({...((fs.existsSync(projectFile))?JSON.parse(fs.readFileSync(projectFile,'utf8')):{sourceFormat:'jox'}),...(selected?machine:{})});
+ const vscode={Uri:{file:uri},RelativePattern:class{constructor(base,pattern){this.base=base;this.pattern=pattern;}},EventEmitter:class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}},ProgressLocation:{Notification:15},
+  commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return{dispose(){}};},executeCommand:async name=>calls.push({command:'ui.'+name})},
+  extensions:{getExtension:()=>({activate:async()=>({enabled:true,getAPI:()=>({git:{path:'git.exe'},openRepository:async()=>({})})})})},
+  workspace:{workspaceFolders:[folder],textDocuments:[],getWorkspaceFolder:value=>path.resolve(value.fsPath)===root?folder:undefined,findFiles:async(...args)=>{calls.push({command:'ui.findFiles',args});return[uri(sourceFile)];}},
+  window:{createOutputChannel:()=>({show(){},append:line=>logs.push(line),appendLine:line=>logs.push(line),dispose(){}}),
+   showWarningMessage:async(_message,_options,action)=>action,showErrorMessage:async message=>logs.push(message),showInformationMessage:async()=>undefined,
+   withProgress:async(_options,run)=>run({report(){}},{isCancellationRequested:false,onCancellationRequested:()=>({dispose(){}})})}};
+ const context={subscriptions:[],globalState:{get(){},async update(){}}};
+ const workspace=new NativeSourceWorkspace({vscode,client,configFor});
+ workspace.refresh=async()=>calls.push({command:'ui.refresh'});workspace.observeSources=()=>{};
+ const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect:async(...args)=>{calls.push({command:'ui.detect',args});if(detectCancelled)return;selected=true;return machine;}});
+ return{root,folder,sourceFile,projectFile,original,gitMarker,calls,logs,setup,workspace,change:()=>{fs.writeFileSync(sourceFile,'changed saved JOX fixture');snapshotHash='b'.repeat(64);nextSync={passed:true,code:0,report:{noOp:false,loadedFiles:1}};}};
+}
+
+test('existing JOX checkout without jade.json or runtime settings reaches Source-free native setup',async t=>{
+ const f=fixture(t),result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.sourceChoice,'git-first');
+ assert.equal(f.calls.filter(row=>row.command==='ui.detect').length,1);
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,1);
+ assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);assert.equal(fs.readFileSync(f.gitMarker,'utf8'),'user Git state');
+ assert.equal(fs.existsSync(f.projectFile),false,'Git-first setup must preserve optional jade.json absence');
+ assert.equal(f.calls.filter(row=>row.command==='cli').length,0);
+ const scan=f.calls.find(row=>row.command==='ui.findFiles');assert.equal(scan.args[0].base,f.folder.uri);assert.equal(scan.args[0].pattern,'sources/**/*.[jJ][oO][xX]');assert.equal(scan.args[2],1,'Detection must not enumerate the source tree');
+ assert.ok(f.calls.findIndex(row=>row.command==='working.initialize')<f.calls.findIndex(row=>row.command==='ui.refresh'));
+});
+
+test('selected checkout capability probe uses the detected runtime and seed without Source settings',async t=>{
+ const f=fixture(t),result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));
+ const detection=f.calls.findIndex(row=>row.command==='ui.detect'),probe=f.calls.slice(detection+1).find(row=>row.command==='capabilities');
+ assert.ok(probe,'Probe must follow runtime selection');assert.equal(probe.config.installPath,'C:/Licensed ANSI Jade');assert.equal(probe.config.workingSeedDirectory,'C:/Private vendor seed');
+ for(const key of ['databasePath','iniPath','sourceDatabasePath'])assert.equal(probe.config[key],undefined);
+});
+
+for(const [name,options] of [['missing checkout capability',{capabilityMissing:true}],['refused native checkout preview',{previewRefused:true}]])test(name+' fails closed instead of entering Source-backed setup',async t=>{
+ const f=fixture(t,options),result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.passed,false);assert.equal(result.completed,false);assert.match(result.error,/update.*cli|cli.*update|checkout.*unavailable|checkout.*not.*available|checkout.*refus/i);
+ assert.equal(f.calls.filter(row=>row.command==='cli').length,0);assert.equal(f.calls.filter(row=>['working.initialize','working.prepare','sync','ui.refresh'].includes(row.command)).length,0);
+ assert.equal(fs.existsSync(f.projectFile),false);assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);
+});
+
+test('cancelled checkout runtime selection cannot create configuration or prepare a database',async t=>{
+ const f=fixture(t,{detectCancelled:true}),result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.cancelled,true);assert.equal(result.completed,false);
+ assert.equal(f.calls.filter(row=>['cli','working.location','working.initialize','working.prepare','sync','ui.refresh'].includes(row.command)).length,0);
+ assert.equal(fs.existsSync(f.projectFile),false);assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);
+});
+
+test('accepted unchanged Working is reconciled natively on every setup before view refresh',async t=>{
+ const f=fixture(t,{configured:true,existing:true});
+ for(let i=0;i<2;i++){const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));}
+ assert.equal(f.calls.filter(row=>row.command==='sync').length,2,'A previous no-op must not cache the next sync result');
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,0);
+ const firstPrepare=f.calls.findIndex(row=>row.command==='working.prepare'),firstSync=f.calls.findIndex(row=>row.command==='sync'),firstRefresh=f.calls.findIndex(row=>row.command==='ui.refresh');
+ assert.ok(firstPrepare<firstSync&&firstSync<firstRefresh,'Connect, native sync, then refresh');
+});
+
+test('later saved Git changes use the same native sync path without Source extraction or reset',async t=>{
+ const f=fixture(t,{configured:true,existing:true});await f.setup.onboarding.setup(f.folder.uri);f.change();
+ const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));
+ const sync=f.calls.filter(row=>row.command==='sync');assert.equal(sync.length,2);assert.equal(sync[1].args.sourceSnapshot.snapshotHash,'b'.repeat(64));
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,0);assert.equal(fs.readFileSync(f.sourceFile,'utf8'),'changed saved JOX fixture');
+});
+
+test('native checkout failure preserves saved source and cannot fall back to Source extraction',async t=>{
+ const f=fixture(t,{configured:true,initializeFailure:true}),result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.passed,false);assert.equal(result.code,6295);assert.equal(result.completed,false);
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,1);assert.equal(f.calls.filter(row=>row.command==='ui.refresh').length,0);
+ assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);
+});
+
+test('native reconciliation failure does not claim ready views or reinitialize Working',async t=>{
+ const f=fixture(t,{configured:true,existing:true,syncFailure:true}),result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.passed,false);assert.equal(result.code,6023);assert.equal(result.completed,false);
+ assert.equal(f.calls.filter(row=>row.command==='sync').length,1);assert.equal(f.calls.filter(row=>row.command==='ui.refresh').length,0);
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,0);assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);
+});

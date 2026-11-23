@@ -16,7 +16,7 @@ function activateScratchConfiguration(){
  const source=fs.readFileSync(path.resolve(__dirname,'../../extension/src/extension.js'),'utf8');
  vm.runInNewContext('(function(require,module){'+source+'\n})',{process,Buffer,console})((name)=>{
   if(name==='vscode')return vscode;if(name.startsWith('node:'))return require(name);
-  if(name==='./jox-project-setup')return{registerJoxProjectSetup(_v,_c,_workspace,options){joxSetupRegistrations++;assert.equal(typeof options.configFor,'function');return{onboarding:{async resume(){}}};}};
+  if(name==='./jox-project-setup')return{registerJoxProjectSetup(_v,_c,_workspace,options){joxSetupRegistrations++;assert.equal(typeof options.configFor,'function');return{configFor:options.configFor,onboarding:{async resume(){}}};}};
   if(name==='./workspace-initialization')return {registerWorkspaceInitialization:()=>({initialize:async()=>assert.fail('Configuration fixture must not initialize a project')})};
   if(name==='./workspace-onboarding')return {registerWorkspaceOnboarding(_vscode,_context,services){onboardingRegistrations++;assert.equal(typeof services.initialize,'function');assert.equal(typeof services.connectWorking,'function');return {async resume(){onboardingResumes++;}};}};
   if(name==='./language-tools')assert.fail('JOX activation must not register a CLS index');

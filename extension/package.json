@@ -685,6 +685,12 @@
           "scope": "resource",
           "description": "Jade installation directory containing bin/jom.dll."
         },
+        "jadeNative.workingSeedDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Local approved vendor-only Fresh Copy seed for Git-first Working setup. The native CLI verifies the seed fingerprints; application databases are refused."
+        },
         "jadeNative.databasePath": {
           "type": "string",
           "default": "",

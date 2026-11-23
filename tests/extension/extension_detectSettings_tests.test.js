@@ -8,7 +8,7 @@ function setup({missingDatabase=false,iniExists=true}={}){
  const realRequire=createRequire(sourcePath),module={exports:{}};
  const requireModule=name=>name==='vscode'?vscode:name==='node:fs'?{...fs,readdirSync:()=>[],existsSync:file=>!String(file).endsWith('jade.ini')||iniExists}:name==='./config'?{...realRequire(name),inspectInstall:installPath=>({installPath,databasePath:missingDatabase?undefined:'C:/Jade/system',iniPath:'C:/Jade/system/jade.ini'})}:realRequire(name);
  vm.runInNewContext(fs.readFileSync(sourcePath,'utf8')+'\nmodule.exports.detectSettings=detectSettings; module.exports.detectSettingsCommand=typeof detectSettingsCommand==="function"?detectSettingsCommand:undefined;',{require:requireModule,module,exports:module.exports,process:{platform:'win32',env:{}},__dirname:path.dirname(sourcePath),console});
- return{run:token=>module.exports.detectSettings(uri,token),command:token=>module.exports.detectSettingsCommand(uri,token),vscode,updates,messages,settings};
+ return{run:(token,options)=>module.exports.detectSettings(uri,token,options),command:token=>module.exports.detectSettingsCommand(uri,token),vscode,updates,messages,settings};
 }
 test('runtime wizard uses the explicitly selected workspace resource and saves only to that folder',async()=>{
  const s=setup();await s.run();assert.equal(s.updates.length,4);assert.ok(s.updates.every(row=>row[2]===3));assert.deepEqual(s.messages,['Jade runtime settings saved. You can now connect to Database Objects.']);
@@ -80,3 +80,5 @@ test('the discover command forwards its optional cancellation token',async()=>{
  const s=setup(),source=cancellation();let choose,settled=false,pending;s.vscode.window.showQuickPick=()=>new Promise(resolve=>choose=resolve);
  try{pending=s.command(source.token).then(()=>settled=true);await turn();source.cancel();await turn();assert.equal(settled,true);await pending;assert.deepEqual(s.updates,[]);assert.equal(source.listeners.size,0);}finally{source.cancel();choose?.();await pending;}
 });
+
+test('checkout runtime detection saves installation and seed without requiring a Source INI or server',async()=>{const s=setup({iniExists:false});await s.run(undefined,{checkout:true});assert.deepEqual(s.updates.map(row=>row[0]),['installPath','workingSeedDirectory']);assert.equal(s.updates[1][1],'C:/Jade/system');assert.ok(s.updates.every(row=>row[2]===3));});
