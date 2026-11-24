@@ -101,9 +101,10 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       configured=sourceRoot?checkoutConfiguration({...configFor(folder),...(runtime?.settings||detected)},sourceRoot):{...configured,...configurationFor(folder),...(runtime?.settings||detected)};
       if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
     }
-    if(configured.workingMode==='git-first'&&!discoveredState){
+    if(configured.workingMode==='git-first'&&(!discoveredState||runtime)){
       const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
       if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)throw Error(discovery?.report?.error||'Native project configuration discovery failed.');
+      if(discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config})!==JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}):!!discovery.prepared.configFile)throw Error('Project configuration changed while choosing runtime settings. Run Set Up Project again.');
       discoveredState=discovery.prepared;
     }
     const probe=packageProbe(folder,configured);
@@ -157,13 +158,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(!record.sourceRoot&&!record.runtime)return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
       if(workspace.executing||previous&&!workspace.canReconfigure(previous))throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
-      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>record.providerConfig});
+      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>record.providerConfig,watchSources:false});
       const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
       const previous=[...checkoutRoots.keys()];
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
+      if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during setup; no settings were saved.');
       await binding.record.runtime?.commit();
       await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
       try{

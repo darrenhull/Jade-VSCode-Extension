@@ -26,10 +26,11 @@ function physicalSourcePath(file) {
 
 // Project handles and open documents only. Native owns the single source model.
 class NativeSourceWorkspace {
-  constructor({ vscode, client, configFor }) {
+  constructor({ vscode, client, configFor, watchSources = true }) {
     this.vscode = vscode;
     this.client = client;
     this.configFor = configFor;
+    this.watchSources = watchSources;
     this.projects = new Map();
     this.events = new vscode.EventEmitter();
     this.forwarding = new Map();
@@ -100,12 +101,16 @@ class NativeSourceWorkspace {
     if(!this.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
     if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true}))throw Error('The source project changed during Working setup.');
     if(!candidate||!isDeepStrictEqual(candidate.provider.config,this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
+    if(owner.changing.has(candidate))throw Error('The temporary source project is still refreshing. Retry setup.');
+    for(const watcher of candidate.watchers?.values()||[])watcher.dispose();candidate.watchers?.clear();
+    const pending=owner.pendingChanges.get(candidate);if(pending){clearTimeout(pending.timer);owner.pendingChanges.delete(candidate);}
     for(const listener of owner.forwarding.get(candidate)||[])listener.dispose();
     owner.forwarding.delete(candidate);owner.projects.delete(key);
     if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);current.files.dispose();}
     candidate.provider.validateContext=()=>{if(this.project(folder)!==candidate)throw Error('The selected source project changed.');};
     this.projects.set(key,candidate);
     this.forwarding.set(candidate,[candidate.files.onDidChangeFile(changes=>this.events.fire(changes)),candidate.files.onDidFinishSave(({saved})=>{if(saved||this.pendingChanges.has(candidate))this.scheduleRefresh(candidate,saved);})]);
+    this.observeSources(candidate);if(pending)this.scheduleRefresh(candidate,!pending.needsPrepare);
     return candidate;
   }
 
@@ -138,7 +143,7 @@ class NativeSourceWorkspace {
   onDidChangeSource(listener) { this.sourceListeners.add(listener); return { dispose: () => this.sourceListeners.delete(listener) }; }
 
   observeSources(project) {
-    if (!this.vscode.workspace.createFileSystemWatcher || !this.vscode.RelativePattern) return;
+    if (!this.watchSources || !this.vscode.workspace.createFileSystemWatcher || !this.vscode.RelativePattern) return;
     const roots = new Set(project.provider.sourceRoots), watchers = project.watchers ||= new Map();
     for (const [root, watcher] of watchers) if (!roots.has(root)) { watcher.dispose(); watchers.delete(root); }
     for (const root of roots) if (!watchers.has(root)) {

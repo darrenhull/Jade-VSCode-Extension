@@ -112,28 +112,36 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
   }
   const previous=Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
+  const written=new Map();
+  const folderValue=key=>settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key);
+  const unchanged=key=>!settings.inspect||Object.is(folderValue(key),previous[key]);
   const persist=async()=>{
+  if(options.deferSave&&Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');
   // Settings updates are uncancellable: finish the started save before Connect settles.
   let saved = 0;
   try {
     for (const [key, value] of Object.entries(values)) {
       if (!sameFolder()) throw new Error('Selected workspace folder changed; restart runtime setup.');
+      if(options.deferSave&&!unchanged(key))throw Error('Runtime settings changed after review; restart setup.');
       await settings.update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
-      saved++;
+      written.set(key,value);saved++;
     }
   } catch (error) {
     throw new Error(`Jade runtime settings save failed after ${saved} of ${Object.keys(values).length} fields; earlier saves remain. ${error.message}`, { cause: error });
   }
   if (cancelled()) return;
-  void vscode.window.showInformationMessage(options.checkout?'Jade installation and vendor seed saved. Continuing project setup.':'Jade runtime settings saved. You can now connect to Database Objects.');
+  if(!options.deferSave)void vscode.window.showInformationMessage(options.checkout?'Jade installation and vendor seed saved. Continuing project setup.':'Jade runtime settings saved. You can now connect to Database Objects.');
   return values;
   };
   if(options.checkout&&options.deferSave){
     let attempted=false;
-    return {settings:{...values},commit:async()=>{attempted=true;return persist();},rollback:async()=>{
+    return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),commit:async()=>{attempted=true;return persist();},rollback:async()=>{
       if(!attempted)return;
       const failures=[];
-      for(const [key,value] of Object.entries(previous))try{await settings.update(key,value,vscode.ConfigurationTarget.WorkspaceFolder);}catch(error){failures.push(error.message);}
+      for(const [key,value] of written){
+        if(settings.inspect&&!Object.is(folderValue(key),value)){failures.push(key+' changed during setup; user value preserved.');continue;}
+        try{await settings.update(key,previous[key],vscode.ConfigurationTarget.WorkspaceFolder);written.delete(key);}catch(error){failures.push(error.message);}
+      }
       if(failures.length)throw Error('Runtime settings rollback failed: '+failures.join('; '));
       attempted=false;
     }};
