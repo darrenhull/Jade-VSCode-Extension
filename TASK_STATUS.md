@@ -22,3 +22,5 @@
 - Final discovery merge cases: a changed accepted explicit Git-first file cannot silently reaccept its old detected defaults; missing-path detection merges into the already resolved configuration so selecting a seed does not discard a valid installation. Both cases were RED, then205 focused tests passed.
 
 - Cleanup acceptance checks now revalidate the open folder and reviewed configuration after retained-stage shutdown. Independent private-state restores are all attempted even if one fails, preserving original failure and aggregated cleanup evidence. Both review cases and the adjacent configuration-change race reproduced RED;208 focused tests pass.
+
+- Explicit-project preview now starts with no unaccepted private defaults and captures its exact file fingerprint before asynchronous discovery. Dispatch/acceptance recheck that reviewed fingerprint; persisted acceptance uses the reviewed value. New-file and byte-only edit regressions reproduced RED, then211 focused tests passed. PR remains Ready while fixes are reviewed under the updated process.
