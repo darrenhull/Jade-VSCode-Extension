@@ -5,6 +5,7 @@ const { NativeSourceProvider }=require('./NativeSourceProvider');
 const { configDto }=require('./cli-client');
 const path=require('node:path');
 const fs=require('node:fs');
+const {AsyncLocalStorage}=require('node:async_hooks');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
 const { checkoutConfiguration }=require('./jox-checkout-config');
 /** Presents native setup for a saved checkout or Source-backed extraction. */
@@ -13,13 +14,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const state=context.workspaceState;
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
-  const pendingRoots=new Map(),reviewedRoots=new WeakMap();
+  const pendingRoots=new Map(),reviewedRoots=new WeakMap(),setupScope=new AsyncLocalStorage();
   const configurationFor=folder=>{
-    const configured=configFor(folder),selected=pendingRoots.has(folder.uri.toString())||checkoutRoots.has(folder.uri.toString());
+    const configured=configFor(folder),selected=checkoutRoots.has(folder.uri.toString());
     return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
-  workspace.configFor=configurationFor;
+  workspace.configFor=folder=>setupScope.getStore()===folder.uri.toString()&&pendingRoots.has(folder.uri.toString())?checkoutConfiguration(configFor(folder),pendingRoots.get(folder.uri.toString())):configurationFor(folder);
   const projectFor=folder=>workspace.project(folder);
   const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:config.workingMode==='git-first'?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
   const initialization=registerWorkspaceInitialization(vscode,context,{
@@ -85,6 +86,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         configured=checkoutConfiguration(configured,sourceRoot);
       }
     }
+    if(configured.workingMode==='git-first'&&(!configured.installPath||!configured.workingSeedDirectory)){
+      const detected=await detect(folder.uri,undefined,{checkout:true});
+      if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
+      configured=sourceRoot?checkoutConfiguration(configFor(folder),sourceRoot):{...configured,...configurationFor(folder)};
+      if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
+    }
     const probe=packageProbe(folder,configured);
     const capability=await probe.capability();
     if(!Object.hasOwn(capability,'checkoutInitialization')){
@@ -107,7 +114,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return target;
   }
   async function working(folder,title,operation) {
-    const project=projectFor(folder);
+    return setupScope.run(folder.uri.toString(),async()=>{
+    const project=workspace.project(folder,{allowColdConfiguration:pendingRoots.has(folder.uri.toString())});
     if(workspace.executing)throw Error('Another Jade Working operation is running.');
     workspace.executing=true;
     try {
@@ -123,13 +131,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       workspace.executing=false;
       for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);
     }
+    });
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,checkoutTargets,
     activateCheckout:(folder,reviewed)=>{
       if(!reviewedRoots.has(reviewed))return;
       const key=folder.uri.toString();pendingRoots.set(key,reviewedRoots.get(reviewed));
-      try{workspace.project(folder,{allowColdConfiguration:true});}catch(error){pendingRoots.delete(key);throw error;}
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
@@ -146,8 +154,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
       project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write)),
-    syncCheckout:folder=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
-      async(progress,token)=>{output.show(true);return workspace.sync(projectFor(folder),{token,output:text=>output.append(text)});}),
+    syncCheckout:folder=>setupScope.run(folder.uri.toString(),()=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
+      async(progress,token)=>{output.show(true);return workspace.sync(projectFor(folder),{token,output:text=>output.append(text)});})),
     initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
       project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
     refreshProject:async(folder,{prepared})=>{
