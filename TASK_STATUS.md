@@ -30,3 +30,5 @@
 - Stage allocation now rechecks the open folder after native preflight and cleans partial construction before a binding exists. Abort attempts every cleanup, releases its lease, and aggregates all failures with the original native error. Three new cases reproduced RED;316 focused tests pass.
 
 - Preview requires both qualified sync and reviewed-target enforcement before offering existing-Working confirmation. Unknown-profile discovery fails closed for detected configless checkouts; explicit files may use the existing native profile-repair initializer, then must retry discovery successfully before choosing a flow. Failed repair retains the original discovery cause. Three cases reproduced RED;319 focused tests pass.
+
+- Successful native profile repair restarts complete preview discovery once, including settings and exact-file baselines. A repair that rewrites the file is reviewed as the repaired project rather than rejected against the old fingerprint; repeated unknown-profile failures do not loop. Regression reproduced RED;320 focused tests pass.

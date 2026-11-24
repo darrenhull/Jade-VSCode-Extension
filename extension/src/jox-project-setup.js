@@ -89,7 +89,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
-  async function checkoutTargets(folder,{repository}={}) {
+  async function checkoutTargets(folder,{repository,profileRepaired=false}={}) {
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
@@ -102,13 +102,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     }
     if(explicitProject||files.length){
       let discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
-      if(discovered?.passed!==true&&/Unknown Jade connection profile/i.test(discovered?.report?.error||'')&&explicitProject){
+      if(discovered?.passed!==true&&/Unknown Jade connection profile/i.test(discovered?.report?.error||'')&&explicitProject&&!profileRepaired){
         const original=discovered;
         let repaired;
         try{repaired=await initialize(folder.uri);}catch(cause){throw Error(original.report.error+' Project connection repair failed: '+cause.message,{cause});}
         if(repaired?.cancelled)throw Object.assign(Error('Project connection repair cancelled.'),{cancelled:true});
         if(repaired?.passed!==true||repaired.code!==0)throw Error(original.report.error+' Repair the project connection and retry Set Up Project.');
-        discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+        return checkoutTargets(folder,{repository,profileRepaired:true});
       }
       if(discovered?.passed!==true||discovered.code!==0||!discovered.prepared?.config){
         throw Error(discovered?.report?.error||'Native project configuration discovery failed.');
