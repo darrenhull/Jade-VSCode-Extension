@@ -61,6 +61,7 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
   for (const event of [vscode.window.onDidChangeActiveTextEditor, vscode.workspace.onDidChangeWorkspaceFolders,
     vscode.workspace.onDidGrantWorkspaceTrust, vscode.workspace.onDidChangeConfiguration])
     if (event) context.subscriptions.push(event(refresh));
+  if(workspace.onDidChangeSource)context.subscriptions.push(workspace.onDidChangeSource(refresh));
   refresh();
 }
 

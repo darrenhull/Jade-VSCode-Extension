@@ -42,3 +42,5 @@
 - Successful reconciliation records sourceReady immediately after native sync confirmation, independently of later acceptance/view refresh. Later failures retain synced-source truth while viewsReady stays false. Existing failure regression extended and reproduced RED;134 onboarding tests pass.
 
 - Configless review now records explicit file absence, checked before and after native discovery exactly like an existing-file fingerprint. A stale inspect response followed by newly created jade.json is refused before initialization. Regression reproduced RED;325 focused tests pass.
+
+- Full inline-thread audit: ancestor jade.json presence suppresses remembered checkout overrides and native discovery decides mode; accepted defaults bind file identity plus fingerprint. Sync availability now subscribes to accepted source refresh. Scratch execution/policy/cancellation use the selected provider’s session and captured original connection; late cancellation cannot fall back to registration client. All three older Cloud Codex findings reproduced RED;331 focused tests pass.

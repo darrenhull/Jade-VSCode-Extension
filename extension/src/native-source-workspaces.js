@@ -2,7 +2,7 @@
 const { registerWorkspaces } = require('./jade-workspaces');
 
 function createSemanticWorkspaceTransport(workspace, client) {
-  let prepared, activeRequest;
+  let prepared, activeRequest, activeClient;
   const projectFor = config => {
     const roots = config.workspaceRoots;
     const root = config.cwd || (roots?.length === 1 ? roots[0] : undefined);
@@ -12,22 +12,24 @@ function createSemanticWorkspaceTransport(workspace, client) {
   };
   return {
     client: {
-      workingJadeGitCapability: (...args) => client.workingJadeGitCapability(...args),
+      workingJadeGitCapability: (config) => projectFor(config).provider.client.workingJadeGitCapability(config),
       request(command, body, ...args) {
         if (command !== 'workspace.run') {
           if (command === 'cancel' && activeRequest?.id === body.operationId) {
-            try { return client.request(command, body, args[0], args[1], activeRequest.client); }
+            try { return activeClient.request(command, body, args[0], args[1], activeRequest.client); }
             catch (error) { return { promise: Promise.reject(error) }; }
           }
+          if(command==='cancel')return{promise:Promise.reject(Error('The original Scratch request is no longer active.'))};
           return client.request(command, body, ...args);
         }
         const project = projectFor(body.config);
         const binding = project.provider.binding();
         if (!prepared || prepared.project !== project || prepared.schema !== body.config.schema ||
-            prepared.generation !== binding.generation || client.client !== prepared.connection)
+            prepared.generation !== binding.generation || prepared.client !== project.provider.client || prepared.client.client !== prepared.connection)
           throw Error('Scratch Pad source selection changed before execution. Retry the operation.');
         const { cwd, ...config } = body.config;
-        activeRequest = client.request(command, { ...body, config, cwd: project.folder.uri.fsPath, code: body.sourceText,
+        activeClient=prepared.client;
+        activeRequest = activeClient.request(command, { ...body, config, cwd: project.folder.uri.fsPath, code: body.sourceText,
           sourceSnapshot: prepared.sourceSnapshot, semanticSelection: { entityIds: [prepared.entityId] } }, args[0], args[1], prepared.connection);
         return activeRequest;
       }
@@ -38,7 +40,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
       try { await workspace.beforeOperation?.(); }
       catch (error) { workspace.releaseExecution(); throw error; }
     },
-    async afterOperation() { prepared = undefined; activeRequest = undefined; workspace.releaseExecution(); },
+    async afterOperation() { prepared = undefined; activeRequest = undefined; activeClient = undefined; workspace.releaseExecution(); },
     async prepareSource(config, _progress, token) {
       const project = projectFor(config);
       await workspace.saveDirty(project, token);
@@ -49,7 +51,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
       const matches = page.items.filter(value => value.name === config.schema);
       if (matches.length !== 1) throw Error('The selected Scratch Pad schema was not resolved uniquely by the native provider.');
       prepared = { project, schema: config.schema, entityId: matches[0].id, generation: snapshot.generation,
-        connection: client.client, sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId,
+        client:project.provider.client, connection:project.provider.connection, sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId,
           generation: snapshot.generation, snapshotHash: snapshot.snapshotHash } };
     }
   };

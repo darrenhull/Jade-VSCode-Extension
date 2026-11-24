@@ -21,7 +21,7 @@ test('Only a trusted, selected project with explicit sync capability exposes the
   assert.equal(manifest.contributes.commands.find(row => row.command === sync).enablement, key);
   assert.equal(manifest.contributes.menus.commandPalette.find(row => row.command === sync).when, key);
   advertised = true;
-  configurationChanged(); await settle();
+  assert.equal(typeof sourceChanged,'function');sourceChanged(); await settle();
   assert.equal(context.get(key), true);
   state.vscode.workspace.isTrusted = false;
   change(); await settle();
