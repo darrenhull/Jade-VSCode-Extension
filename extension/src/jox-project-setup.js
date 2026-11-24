@@ -214,6 +214,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(binding.record.explicitProject){acceptedFiles.set(key,{fingerprint:projectBytes(folder),defaults:binding.record.runtimeDefaults});await state?.update(CHECKOUT_FILES,Object.fromEntries(acceptedFiles));}
         await requireReviewedDiscovery(folder,binding.record);
         if(JSON.stringify(configDto(configFor(folder)))!==acceptedSettings)throw Error('Runtime settings changed during private acceptance; restart setup.');
+        if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         if(workspace.projects.get(key)!==binding.previous)throw Error('The shared source project changed during setup.');
@@ -221,12 +222,15 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
           binding.retained=true;
         }else workspace.adoptProject(folder,binding.workspace,binding.previous);
-        if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();}
+        if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();await requireReviewedDiscovery(folder,binding.record);if(JSON.stringify(configDto(configFor(folder)))!==acceptedSettings)throw Error('Runtime settings changed during setup cleanup; restart setup.');}
+        if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       }catch(error){
         binding.publishing=false;
         acceptedFiles.clear();for(const [folderKey,entry]of previousFiles)acceptedFiles.set(folderKey,entry);
         if(!previous.includes(key))checkoutRoots.delete(key);
-        try{await state?.update(CHECKOUT_STATE,previous);if(binding.record.explicitProject)await state?.update(CHECKOUT_FILES,Object.fromEntries(previousFiles));}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
+        const failures=[];
+        for(const [stateKey,value]of [[CHECKOUT_STATE,previous],...(binding.record.explicitProject?[[CHECKOUT_FILES,Object.fromEntries(previousFiles)]]:[])]){try{await state?.update(stateKey,value);}catch(cleanup){failures.push(cleanup.message);}}
+        if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');
         throw error;
       }
       binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();

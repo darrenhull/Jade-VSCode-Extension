@@ -20,3 +20,5 @@
 - Private-default finalization: preview and staged provider share explicit-settings precedence; accepted records persist only detected runtime defaults plus an exact configuration fingerprint, never explicit overrides. Reload restores only an unchanged natively accepted Git-first file. Three cases reproduced RED;203 focused tests pass.
 
 - Final discovery merge cases: a changed accepted explicit Git-first file cannot silently reaccept its old detected defaults; missing-path detection merges into the already resolved configuration so selecting a seed does not discard a valid installation. Both cases were RED, then205 focused tests passed.
+
+- Cleanup acceptance checks now revalidate the open folder and reviewed configuration after retained-stage shutdown. Independent private-state restores are all attempted even if one fails, preserving original failure and aggregated cleanup evidence. Both review cases and the adjacent configuration-change race reproduced RED;208 focused tests pass.
