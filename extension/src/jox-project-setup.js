@@ -138,6 +138,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     activateCheckout:(folder,reviewed)=>{
       if(!reviewedRoots.has(reviewed))return;
       const key=folder.uri.toString();pendingRoots.set(key,reviewedRoots.get(reviewed));
+      try{setupScope.run(key,()=>workspace.project(folder,{allowColdConfiguration:true}));}catch(error){pendingRoots.delete(key);throw error;}
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
