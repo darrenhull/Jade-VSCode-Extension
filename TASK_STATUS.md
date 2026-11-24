@@ -26,3 +26,5 @@
 - Explicit-project preview now starts with no unaccepted private defaults and captures its exact file fingerprint before asynchronous discovery. Dispatch/acceptance recheck that reviewed fingerprint; persisted acceptance uses the reviewed value. New-file and byte-only edit regressions reproduced RED, then211 focused tests passed. PR remains Ready while fixes are reviewed under the updated process.
 
 - Runtime/session ownership follow-up: explicit detected defaults persist only in their fingerprint-bound accepted record; configless defaults require an accepted configless checkout. Adopted projects own their dedicated CLI fork, release it on folder retirement/replacement/disposal, and reopen with a fresh fork. Failed release remains visible; shared-session reopen cycles still release native scopes. Review cases reproduced RED;313 focused tests pass. PR stays Ready.
+
+- Stage allocation now rechecks the open folder after native preflight and cleans partial construction before a binding exists. Abort attempts every cleanup, releases its lease, and aggregates all failures with the original native error. Three new cases reproduced RED;316 focused tests pass.

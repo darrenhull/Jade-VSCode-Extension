@@ -195,9 +195,16 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
       const same=previous&&isDeepStrictEqual(previous.provider.config,workspace.projectConfiguration(folder,record.providerConfig));
       if(workspace.executing||previous&&!workspace.canReconfigure(previous)&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
-      const stageClient=client.fork();
-      const owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
-      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
+      if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
+      let stageClient,owner;
+      try{
+        stageClient=client.fork();owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
+        const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
+      }catch(error){
+        const failures=[];for(const cleanup of [()=>owner?.dispose(),()=>stageClient?.dispose()]){try{await cleanup();}catch(failure){failures.push(failure.message);}}
+        if(failures.length)error.message+=' Temporary setup cleanup failed: '+failures.join('; ');
+        throw error;
+      }
     },
     commitCheckout:async(folder,reviewed)=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key),record=binding?.record||reviewedRoots.get(reviewed);
@@ -244,9 +251,11 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     },
     abortCheckout:async folder=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
-      try{await binding.project.provider.closeProject();}finally{
-        try{await binding.record.runtime?.rollback();}finally{try{binding.workspace.dispose();await binding.client.dispose();}finally{setupBindings.delete(key);workspace.executing=false;flushRefreshes();}}
-      }
+      const failures=[];
+      for(const cleanup of [()=>binding.project.provider.closeProject(),()=>binding.record.runtime?.rollback(),()=>binding.workspace.dispose(),()=>binding.client.dispose()]){try{await cleanup();}catch(error){failures.push(error);}}
+      setupBindings.delete(key);workspace.executing=false;
+      try{flushRefreshes();}catch(error){failures.push(error);}
+      if(failures.length)throw new AggregateError(failures,'Setup cleanup failed: '+failures.map(error=>error.message).join('; '));
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>{
       await requireReviewedCheckout(folder,reviewedRoots.get(reviewed));
