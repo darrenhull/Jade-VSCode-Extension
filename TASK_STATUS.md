@@ -18,3 +18,5 @@
 - Native outcome/scoping follow-up: private runtime fallback applies only to an accepted configless checkout or a natively resolved Git-first project whose exact configuration-file bytes remain unchanged. Source-backed configuration receives no stale checkout fallback. Sync refusal/success evidence is captured before folder checks and survives later acceptance failures. Three cases were RED before fixes;200 focused tests pass.
 
 - Private-default finalization: preview and staged provider share explicit-settings precedence; accepted records persist only detected runtime defaults plus an exact configuration fingerprint, never explicit overrides. Reload restores only an unchanged natively accepted Git-first file. Three cases reproduced RED;203 focused tests pass.
+
+- Final discovery merge cases: a changed accepted explicit Git-first file cannot silently reaccept its old detected defaults; missing-path detection merges into the already resolved configuration so selecting a seed does not discard a valid installation. Both cases were RED, then205 focused tests passed.

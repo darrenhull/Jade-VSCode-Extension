@@ -89,6 +89,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
+    let detectedDefaults=privateRuntime(folder).values();
     let explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
     let files=[];
     if(!configured.workingMode&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
@@ -104,7 +105,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       explicitProject=typeof discovered.prepared.configFile==='string'&&discovered.prepared.configFile!=='';
       if(explicitProject){
         if(discovered.prepared.config.workingMode!=='git-first')return;
-        configured={...privateRuntime(folder).values(),...discovered.prepared.config,...explicitConfigFor(folder)};
+        const accepted=acceptedFiles.get(folder.uri.toString());
+        if(accepted)detectedDefaults=accepted.fingerprint===projectBytes(folder)?accepted.defaults:{};
+        configured={...detectedDefaults,...discovered.prepared.config,...explicitConfigFor(folder)};
       }
     }
     if(!configured.workingMode&&!explicitProject){
@@ -114,7 +117,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
           const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
           runtime=detected.settings?detected:undefined;
-          configured={...configFor(folder),...(runtime?.settings||detected)};
+          configured={...configured,...(runtime?.settings||detected)};
         }
         if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
         sourceRoot=path.join(folder.uri.fsPath,'sources');
@@ -125,7 +128,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
       if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
       runtime=detected.settings?detected:undefined;
-      configured=sourceRoot?checkoutConfiguration({...configFor(folder),...(runtime?.settings||detected)},sourceRoot):{...configured,...configurationFor(folder),...(runtime?.settings||detected)};
+      configured=sourceRoot?checkoutConfiguration({...configured,...(runtime?.settings||detected)},sourceRoot):{...configured,...(runtime?.settings||detected)};
       if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
     }
     if(configured.workingMode==='git-first'&&(!discoveredState||runtime)){
@@ -154,7 +157,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
     if(target.workingState==='existing'&&capability.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
     requireSavedCheckout(folder);
-    const runtimeDefaults={...Object.fromEntries(Object.entries(privateRuntime(folder).values()).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
+    const runtimeDefaults={...Object.fromEntries(Object.entries(detectedDefaults).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
       providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder)}:configured,runtimeDefaults,explicitProject});
     return target;
