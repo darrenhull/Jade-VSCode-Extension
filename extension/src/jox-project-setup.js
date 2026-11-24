@@ -16,7 +16,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const pendingRoots=new Map(),reviewedRoots=new WeakMap();
   const configurationFor=folder=>{
     const configured=configFor(folder),selected=pendingRoots.has(folder.uri.toString())||checkoutRoots.has(folder.uri.toString());
-    return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
+    return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
   workspace.configFor=configurationFor;
@@ -58,10 +58,21 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   async function checkoutTargets(folder) {
     let configured=configurationFor(folder),sourceRoot;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
-    const explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
-    if(!configured.workingMode&&explicitProject)return;
+    let explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
+    let files=[];
     if(!configured.workingMode&&vscode.workspace.findFiles&&vscode.RelativePattern){
-      const files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'sources/**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
+      files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'sources/**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
+    }
+    if(explicitProject||files.length){
+      const discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      if(discovered?.passed!==true||discovered.code!==0||!discovered.prepared?.config)throw Error(discovered?.report?.error||'Native project configuration discovery failed.');
+      explicitProject=typeof discovered.prepared.configFile==='string'&&discovered.prepared.configFile!=='';
+      if(explicitProject){
+        if(discovered.prepared.config.workingMode!=='git-first')return;
+        configured={...discovered.prepared.config,...configFor(folder)};
+      }
+    }
+    if(!configured.workingMode&&!explicitProject){
       if(files.length){
         configured=configFor(folder);
         if(!configured.installPath||!configured.workingSeedDirectory){
@@ -122,8 +133,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
+      await state?.update(CHECKOUT_STATE,[...new Set([...checkoutRoots.keys(),key])]);
       checkoutRoots.set(key,true);pendingRoots.delete(key);
-      await state?.update(CHECKOUT_STATE,[...checkoutRoots.keys()]);
     },
     abortCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
