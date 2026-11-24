@@ -166,8 +166,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>record.providerConfig,watchSources:false});
       const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
     },
-    commitCheckout:async folder=>{
-      const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
+    commitCheckout:async(folder,reviewed)=>{
+      const key=folder.uri.toString(),binding=setupBindings.get(key),record=binding?.record||reviewedRoots.get(reviewed);
+      if(!record)return;
+      if(!binding){
+        await requireReviewedDiscovery(folder,record);
+        if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during Working setup. Run Set Up Project again.');
+        return;
+      }
       const previous=[...checkoutRoots.keys()];
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during setup; no settings were saved.');

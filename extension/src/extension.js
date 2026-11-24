@@ -119,8 +119,9 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   }
   const previous=selectionSnapshot?.raw||Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
   const written=new Map();
-  const folderValue=key=>settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key);
-  const unchanged=key=>(!settings.inspect||Object.is(folderValue(key),previous[key]))&&(!selectionSnapshot||Object.is(settings.get(key),selectionSnapshot.effective[key]));
+  const currentSettings=()=>vscode.workspace.getConfiguration('jadeNative',folder.uri);
+  const folderValue=key=>{const current=currentSettings();return current.inspect?current.inspect(key)?.workspaceFolderValue:current.get(key);};
+  const unchanged=key=>{const current=currentSettings();return(!current.inspect||Object.is(current.inspect(key)?.workspaceFolderValue,previous[key]))&&(!selectionSnapshot||Object.is(current.get(key),selectionSnapshot.effective[key]));};
   const persist=async()=>{
   if(options.deferSave&&Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');
   // Settings updates are uncancellable: finish the started save before Connect settles.
@@ -129,7 +130,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
     for (const [key, value] of Object.entries(values)) {
       if (!sameFolder()) throw new Error('Selected workspace folder changed; restart runtime setup.');
       if(options.deferSave&&!unchanged(key))throw Error('Runtime settings changed after review; restart setup.');
-      await settings.update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
+      await currentSettings().update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
       written.set(key,value);saved++;
     }
   } catch (error) {
@@ -147,7 +148,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
       const failures=[];
       for(const [key,value] of written){
         if(settings.inspect&&!Object.is(folderValue(key),value)){failures.push(key+' changed during setup; user value preserved.');continue;}
-        try{await settings.update(key,previous[key],vscode.ConfigurationTarget.WorkspaceFolder);written.delete(key);}catch(error){failures.push(error.message);}
+        try{await currentSettings().update(key,previous[key],vscode.ConfigurationTarget.WorkspaceFolder);written.delete(key);}catch(error){failures.push(error.message);}
       }
       if(failures.length)throw Error('Runtime settings rollback failed: '+failures.join('; '));
       attempted=false;

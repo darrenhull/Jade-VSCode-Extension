@@ -82,7 +82,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
      const result=await services.initializeCheckout(folder,checkout);requireFolder(folder);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
-     await services.commitCheckout?.(folder);
+     await services.commitCheckout?.(folder,checkout);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
     }else{
@@ -91,8 +91,8 @@ function registerWorkspaceOnboarding(vscode,context,services){
      status.workingPrepared=true;
      const synced=await services.syncCheckout(folder);requireFolder(folder);
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
+     await services.commitCheckout?.(folder,checkout);
     }
-    await services.commitCheckout?.(folder);
     stage='refresh';requireFolder(folder);
     await services.refreshProject(folder,{prepared:true});requireFolder(folder);
     status.sourceReady=true;status.viewsReady=true;stage='explorer';
