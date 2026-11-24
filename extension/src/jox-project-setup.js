@@ -180,7 +180,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(workspace.executing&&!binding)throw Error('Another Jade Working operation is running.');
     if(!binding)workspace.executing=true;
     try {
-      await workspace.changing.get(project)?.promise;
+      await workspace.changing.get(binding?.previous||project)?.promise;
+      if(binding){await binding.workspace.changing.get(project)?.promise;await requireReviewedCheckout(folder,binding.record);projectFor(folder);}
       await workspace.beforeOperation?.();projectFor(folder);
       return await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title,cancellable:true},
         async(progress,token)=>{
@@ -286,6 +287,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     openExplorer:()=>vscode.commands.executeCommand('jadeNative.classes.focus'),
     connectWorking:(folder,reviewed)=>working(folder,'Preparing the private Working copy',async(project,token,write)=>{
       await project.provider.capability();projectFor(folder);
+      const binding=setupBindings.get(folder.uri.toString());if(binding)await requireReviewedCheckout(folder,binding.record);
       await project.provider.request('working.prepare',{cwd:project.provider.root,config:{...project.provider.config},expectedWorkingIdentity:reviewed.working.identity},token,write);
       return{selection:'working',readOnly:true};
     })

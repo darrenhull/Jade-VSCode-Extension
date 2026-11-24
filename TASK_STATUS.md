@@ -34,3 +34,5 @@
 - Successful native profile repair restarts complete preview discovery once, including settings and exact-file baselines. A repair that rewrites the file is reviewed as the repaired project rather than rejected against the old fingerprint; repeated unknown-profile failures do not loop. Regression reproduced RED;320 focused tests pass.
 
 - Temporary setup workspace forwards the shared inspection-release hook dynamically before sync. Reviewed settings/configuration are still checked after release, so reopening inspection cannot bypass release or the reviewed-target guard. Regression reproduced RED;321 focused tests pass.
+
+- Checkout operations now await an in-flight refresh keyed by the live previous project (and any staged refresh), then recheck folder/configuration before dispatch. Working reopen also rechecks after capability discovery. Held-refresh overlap and post-refresh changed-review cases reproduced RED;323 focused tests pass.
