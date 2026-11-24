@@ -37,7 +37,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const projectFor=folder=>(setupBindings.get(folder.uri.toString())?.workspace||workspace).project(folder);
   const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:config.workingMode==='git-first'?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
   async function requireReviewedDiscovery(folder,record){
-    const check=()=>{if(record.fingerprint&&record.fingerprint!==projectBytes(folder))throw Error('Project configuration changed after review (file contents). Run Set Up Project again.');};
+    const check=()=>{const actual=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))?projectBytes(folder):null;if(record.fingerprint!==undefined&&record.fingerprint!==actual)throw Error('Project configuration changed after review (file contents or absence). Run Set Up Project again.');};
     check();
     if(!record.discovery)return;
     const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
@@ -172,7 +172,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     requireSavedCheckout(folder);
     const runtimeDefaults={...Object.fromEntries(Object.entries(detectedDefaults).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
-      providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder)}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:undefined});
+      providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder)}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:null});
     return target;
   }
   async function working(folder,title,operation) {
