@@ -206,6 +206,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       let stageClient,owner;
       try{
         stageClient=client.fork();owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
+        owner.beforeOperation=()=>workspace.beforeOperation?.();
         const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
       }catch(error){
         const failures=[];for(const cleanup of [()=>owner?.dispose(),()=>stageClient?.dispose()]){try{await cleanup();}catch(failure){failures.push(failure.message);}}

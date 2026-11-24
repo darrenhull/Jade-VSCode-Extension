@@ -32,3 +32,5 @@
 - Preview requires both qualified sync and reviewed-target enforcement before offering existing-Working confirmation. Unknown-profile discovery fails closed for detected configless checkouts; explicit files may use the existing native profile-repair initializer, then must retry discovery successfully before choosing a flow. Failed repair retains the original discovery cause. Three cases reproduced RED;319 focused tests pass.
 
 - Successful native profile repair restarts complete preview discovery once, including settings and exact-file baselines. A repair that rewrites the file is reviewed as the repaired project rather than rejected against the old fingerprint; repeated unknown-profile failures do not loop. Regression reproduced RED;320 focused tests pass.
+
+- Temporary setup workspace forwards the shared inspection-release hook dynamically before sync. Reviewed settings/configuration are still checked after release, so reopening inspection cannot bypass release or the reviewed-target guard. Regression reproduced RED;321 focused tests pass.
