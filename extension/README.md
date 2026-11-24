@@ -2,7 +2,7 @@
 
 Bundles [official Jade CLI 0.11.4](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.4) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
-Requires Visual Studio Code on Windows and a compatible installed Jade runtime for database operations. The Jade IDE is not required.
+Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The Jade IDE is not required.
 
 Browse JOX schemas, classes and members in Object Explorer and Class Workspace. Open a method to edit its Jade source in a normal VS Code text editor. Native source identities and revision bindings map accepted saves back to the authoritative `.jox` file; `.jade/` contains ignored, regenerable projections and private runtime state.
 
