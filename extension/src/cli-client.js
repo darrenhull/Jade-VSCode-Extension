@@ -171,7 +171,7 @@ class CliWorkingSession{
   this.closing=Promise.allSettled([...this.forks].map(child=>child.dispose()).concat(this.closeOwnedClients(clients,[...operations.map(([,request])=>request.promise),...active.map(operation=>operation.completion)]))).then(results=>{const failed=results.filter(result=>result.status==='rejected').map(result=>result.reason);if(failed.length===1)throw failed[0];if(failed.length)throw new AggregateError(failed,'Owned Jade CLI sessions did not all confirm exit.');});
   // VS Code subscriptions may call dispose without awaiting it. deactivate still
   // returns this same rejecting promise; an unconfirmed exit is never success.
-  void this.closing.then(()=>this.parent?.forks.delete(this),()=>this.parent?.forks.delete(this));
+  void this.closing.then(()=>this.parent?.forks.delete(this),()=>{});
   void this.closing.catch(()=>{});
   return this.closing;
  }

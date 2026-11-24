@@ -17,3 +17,5 @@ test('actual portable fork closes independently while its original private servi
  const {OwnedCliFixture}=require('../../test/OwnedCliFixture');const fixture=new OwnedCliFixture({entry:path.resolve(__dirname,'../../packages/jade-cli-win-x64/jade-cli.exe')});
  await fixture.run(async({session})=>{const fork=session.fork();try{assert.equal((await session.request('status').promise).passed,true);assert.equal((await fork.request('status').promise).passed,true);assert.notEqual(session.client.child.pid,fork.client.child.pid);await fork.dispose();assert.equal(session.client.closed,false);assert.equal((await session.request('status').promise).passed,true);}finally{await fork.dispose();}});
 });
+
+test('parent retains and propagates a fork whose process exit was not confirmed',async()=>{const root=new CliWorkingSession(),fork=root.fork(),failure=Error('Owned process exit unconfirmed');fork.closeOwnedClients=async()=>{throw failure;};await assert.rejects(fork.dispose(),error=>error===failure);await assert.rejects(root.dispose(),error=>error===failure);});

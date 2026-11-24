@@ -7,12 +7,16 @@ const path=require('node:path');
 const {isDeepStrictEqual}=require('node:util');
 const fs=require('node:fs');
 const {NativeSourceWorkspace}=require('./NativeSourceWorkspace');
+const {PrivateRuntimeSettings}=require('./PrivateRuntimeSettings');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
 const { checkoutConfiguration }=require('./jox-checkout-config');
 /** Presents native setup for a saved checkout or Source-backed extraction. */
 function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect}) {
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const state=context.workspaceState;
+  const explicitConfigFor=configFor;
+  const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
+  configFor=folder=>({...privateRuntime(folder).values(),...explicitConfigFor(folder)});
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
   const reviewedRoots=new WeakMap(),setupBindings=new Map();
@@ -103,7 +107,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(files.length){
         configured=configFor(folder);
         if(!configured.installPath||!configured.workingSeedDirectory){
-          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
+          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
           runtime=detected.settings?detected:undefined;
           configured={...configFor(folder),...(runtime?.settings||detected)};
@@ -114,7 +118,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       }
     }
     if(configured.workingMode==='git-first'&&(!configured.installPath||!configured.workingSeedDirectory)){
-      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
+      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
       if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
       runtime=detected.settings?detected:undefined;
       configured=sourceRoot?checkoutConfiguration({...configFor(folder),...(runtime?.settings||detected)},sourceRoot):{...configured,...configurationFor(folder),...(runtime?.settings||detected)};

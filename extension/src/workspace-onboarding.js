@@ -79,9 +79,9 @@ function registerWorkspaceOnboarding(vscode,context,services){
     stage='working';let accepted;
     await services.activateCheckout?.(folder,checkout);
     if(creating){
-     const result=await services.initializeCheckout(folder,checkout);requireFolder(folder);
+     const result=await services.initializeCheckout(folder,checkout);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
-     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
+     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;requireFolder(folder);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
      accepted=await services.commitCheckout?.(folder,checkout);

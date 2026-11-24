@@ -14,7 +14,7 @@ Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved befor
 
 The current qualified flow covers original method-body edits and selected native tests on matching ANSI or Unicode Jade runtimes. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.
 
-The bundled ANSI runtime also qualifies native Scratch execution. Standalone builds, structural editing, debugging and Source publication remain outside this release’s qualified setup/test flow. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
+The bundled ANSI runtime also qualifies native Scratch execution. Standalone builds, structural editing, debugging and Source publication are not qualified by this release. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
 
 The native runtime owns configuration, source interpretation, dependencies, compilation, tests and database ownership. No Node runtime is required by the packaged CLI. Database Objects retains its read-only Source/Working selection and native object identities.
 

@@ -70,6 +70,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
     return current && path.resolve(current.uri.fsPath).toLowerCase() === path.resolve(folder.uri.fsPath).toLowerCase();
   };
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
+  const privateRuntimeSnapshot=options.privateRuntime?.values();
   const selectionSnapshot=options.checkout&&options.deferSave?{raw:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)])),effective:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.get(key)]))}:undefined;
   let installPath=options.checkout?options.resolved?.installPath:undefined;
   if(!installPath){
@@ -142,6 +143,10 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   };
   if(options.checkout&&options.deferSave){
     if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed during selection; restart setup.');
+    if(options.privateRuntime){
+      const transaction=options.privateRuntime.stage(values,{previous:privateRuntimeSnapshot,validate:()=>{if(!sameFolder())throw Error('Selected workspace folder changed; restart runtime setup.');if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');}});
+      return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),...transaction};
+    }
     let attempted=false;
     return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),commit:async()=>{attempted=true;return persist();},rollback:async()=>{
       if(!attempted)return;
