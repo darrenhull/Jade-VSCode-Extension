@@ -111,6 +111,8 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   if (!selection || cancelled() || !sameFolder()) return;
   values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
   }
+  const previous=Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
+  const persist=async()=>{
   // Settings updates are uncancellable: finish the started save before Connect settles.
   let saved = 0;
   try {
@@ -125,6 +127,18 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   if (cancelled()) return;
   void vscode.window.showInformationMessage(options.checkout?'Jade installation and vendor seed saved. Continuing project setup.':'Jade runtime settings saved. You can now connect to Database Objects.');
   return values;
+  };
+  if(options.checkout&&options.deferSave){
+    let attempted=false;
+    return {settings:{...values},commit:async()=>{attempted=true;return persist();},rollback:async()=>{
+      if(!attempted)return;
+      const failures=[];
+      for(const [key,value] of Object.entries(previous))try{await settings.update(key,value,vscode.ConfigurationTarget.WorkspaceFolder);}catch(error){failures.push(error.message);}
+      if(failures.length)throw Error('Runtime settings rollback failed: '+failures.join('; '));
+      attempted=false;
+    }};
+  }
+  return persist();
 }
 
 async function detectSettingsCommand(resource, cancellationToken) {

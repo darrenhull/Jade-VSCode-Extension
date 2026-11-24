@@ -62,11 +62,11 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const name=await vscode.window.showInputBox({title:'Name the new project folder',validateInput:validate});if(name===undefined)return;if(validate(name))throw Error(validate(name));
   const directory=path.join(parent.fsPath,name);await fs.promises.mkdir(directory);return{uri:vscode.Uri.file(directory)};
  }
- async function runJox(folder){
+ async function runJox(folder,repository){
   const status={gitReady:false,configurationReady:false,workingPrepared:false,sourceReady:false,viewsReady:false,completed:false};
   let stage='configuration';
   try{
-   const checkout=await services.checkoutTargets?.(folder);requireFolder(folder);
+   const checkout=await services.checkoutTargets?.(folder,{repository});requireFolder(folder);
    if(checkout){
     status.gitReady=true;status.configurationReady=true;stage='review';
     const creating=checkout.workingState==='new';
@@ -153,7 +153,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
   requireFolder(folder);const repository=await api.openRepository(folder.uri);requireFolder(folder);
   if(!services.jox&&repository?.state?.remotes?.length){const choice=await vscode.window.showQuickPick([{label:'Use the current checkout',kind:'current'},{label:'Pull changes with Git',kind:'pull'}],{title:'Repository sources · '+folder.name,placeHolder:repository.rootUri?.fsPath||folder.uri.fsPath});if(!choice)return{cancelled:true};if(choice.kind==='pull'){log('Pulling through VS Code Git; conflicts and local edits remain under Git control.');await repository.pull();requireFolder(folder);}}
   log('Initialising project configuration and Git ignore'+(services.jox?'':' and the shared source index')+' in '+folder.uri.fsPath+'.');
-  if(services.jox)return runJox(folder);
+  if(services.jox)return runJox(folder,repository);
   const initialized=await services.initialize(folder.uri);requireFolder(folder);
   if(initialized?.cancelled)return{cancelled:true,configurationReady:false,workingPrepared:false};
   if(initialized?.passed!==true||initialized.code!==0)throw Error(initialized?.report?.error||initialized?.error||'Native workspace initialization did not complete.');

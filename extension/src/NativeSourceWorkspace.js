@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
 const fs = require('node:fs');
+const { isDeepStrictEqual } = require('node:util');
 const { fileURLToPath } = require('node:url');
 const { configDto } = require('./cli-client');
 const { isManagedProjectPath } = require('./source-index-scope');
@@ -56,7 +57,7 @@ class NativeSourceWorkspace {
       this.projects.set(key, project);
       this.forwarding.set(project, [project.files.onDidChangeFile(changes => this.events.fire(changes)),
         project.files.onDidFinishSave(({ saved }) => { if (saved || this.pendingChanges.has(project)) this.scheduleRefresh(project, saved); })]);
-    } else if (JSON.stringify(project.provider.config) !== JSON.stringify(config)) {
+    } else if (!isDeepStrictEqual(project.provider.config,config)) {
       const cold = allowColdConfiguration && this.canReconfigure(project);
       if (!cold) throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
       // Explicit setup only; retain the same Explorer row and never reset a model.
@@ -98,7 +99,7 @@ class NativeSourceWorkspace {
     const key=folder.uri.toString(),current=this.projects.get(key),candidate=owner.projects.get(key);
     if(!this.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
     if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true}))throw Error('The source project changed during Working setup.');
-    if(!candidate||JSON.stringify(candidate.provider.config)!==JSON.stringify(this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
+    if(!candidate||!isDeepStrictEqual(candidate.provider.config,this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
     for(const listener of owner.forwarding.get(candidate)||[])listener.dispose();
     owner.forwarding.delete(candidate);owner.projects.delete(key);
     if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);current.files.dispose();}

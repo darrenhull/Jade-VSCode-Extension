@@ -17,6 +17,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const reviewedRoots=new WeakMap(),setupBindings=new Map();
   const flushRefreshes=()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);};
   const configurationFor=folder=>{
+    const binding=setupBindings.get(folder.uri.toString());
+    if(binding&&!binding.publishing)return binding.originalConfig;
     const configured=configFor(folder),selected=checkoutRoots.has(folder.uri.toString());
     return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
   };
@@ -57,17 +59,21 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
-  async function checkoutTargets(folder) {
-    let configured=configurationFor(folder),sourceRoot;
+  async function checkoutTargets(folder,{repository}={}) {
+    let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
     let explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
     let files=[];
-    if(!configured.workingMode&&vscode.workspace.findFiles&&vscode.RelativePattern){
+    if(!configured.workingMode&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
       files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'sources/**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
     if(explicitProject||files.length){
       const discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
-      if(discovered?.passed!==true||discovered.code!==0||!discovered.prepared?.config)throw Error(discovered?.report?.error||'Native project configuration discovery failed.');
+      if(discovered?.passed!==true||discovered.code!==0||!discovered.prepared?.config){
+        if(/Unknown Jade connection profile/i.test(discovered?.report?.error||''))return;
+        throw Error(discovered?.report?.error||'Native project configuration discovery failed.');
+      }
+      discoveredState=discovered.prepared;
       explicitProject=typeof discovered.prepared.configFile==='string'&&discovered.prepared.configFile!=='';
       if(explicitProject){
         if(discovered.prepared.config.workingMode!=='git-first')return;
@@ -78,9 +84,10 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(files.length){
         configured=configFor(folder);
         if(!configured.installPath||!configured.workingSeedDirectory){
-          const detected=await detect(folder.uri,undefined,{checkout:true});
+          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
-          configured=configFor(folder);
+          runtime=detected.settings?detected:undefined;
+          configured={...configFor(folder),...(runtime?.settings||detected)};
         }
         if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
         sourceRoot=path.join(folder.uri.fsPath,'sources');
@@ -88,10 +95,16 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       }
     }
     if(configured.workingMode==='git-first'&&(!configured.installPath||!configured.workingSeedDirectory)){
-      const detected=await detect(folder.uri,undefined,{checkout:true});
+      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true});
       if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
-      configured=sourceRoot?checkoutConfiguration(configFor(folder),sourceRoot):{...configured,...configurationFor(folder)};
+      runtime=detected.settings?detected:undefined;
+      configured=sourceRoot?checkoutConfiguration({...configFor(folder),...(runtime?.settings||detected)},sourceRoot):{...configured,...configurationFor(folder),...(runtime?.settings||detected)};
       if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
+    }
+    if(configured.workingMode==='git-first'&&!discoveredState){
+      const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)throw Error(discovery?.report?.error||'Native project configuration discovery failed.');
+      discoveredState=discovery.prepared;
     }
     const probe=packageProbe(folder,configured);
     const capability=await probe.capability();
@@ -111,7 +124,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         !Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Native setup did not return the reviewed Git-first Working location.');
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
-    if(sourceRoot)reviewedRoots.set(target,sourceRoot);
+    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:JSON.stringify(configDto(configFor(folder))),discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
+      providerConfig:explicitProject?{...configFor(folder),...(runtime?.settings||{})}:configured});
     return target;
   }
   async function working(folder,title,operation) {
@@ -133,23 +147,31 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,checkoutTargets,
-    activateCheckout:(folder,reviewed)=>{
-      if(!reviewedRoots.has(reviewed))return;
+    activateCheckout:async(folder,reviewed)=>{
+      const record=reviewedRoots.get(reviewed);if(!record)return;
+      if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
+      if(record.discovery){
+        const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+        if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)throw Error('Project configuration changed after Working review. Run Set Up Project again.');
+      }
+      if(!record.sourceRoot&&!record.runtime)return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
       if(workspace.executing||previous&&!workspace.canReconfigure(previous))throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
-      const config=checkoutConfiguration(configFor(folder),reviewedRoots.get(reviewed));
-      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>config});
-      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous});workspace.executing=true;
+      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>record.providerConfig});
+      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
       const previous=[...checkoutRoots.keys()];
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
-      await state?.update(CHECKOUT_STATE,[...new Set([...previous,key])]);
+      await binding.record.runtime?.commit();
+      await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
       try{
-        checkoutRoots.set(key,true);
+        binding.publishing=true;
+        if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         workspace.adoptProject(folder,binding.workspace,binding.previous);
       }catch(error){
+        binding.publishing=false;
         if(!previous.includes(key))checkoutRoots.delete(key);
         try{await state?.update(CHECKOUT_STATE,previous);}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
         throw error;
@@ -159,7 +181,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     abortCheckout:async folder=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
       try{await binding.project.provider.closeProject();}finally{
-        binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
+        try{await binding.record.runtime?.rollback();}finally{binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();}
       }
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
