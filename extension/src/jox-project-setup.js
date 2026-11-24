@@ -33,6 +33,17 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)
       throw Error('Project configuration changed after Working review. Run Set Up Project again.');
   }
+  function requireSavedCheckout(folder){
+    const project=workspace.projects.get(folder.uri.toString());
+    if(project&&(vscode.workspace.textDocuments||[]).some(document=>document.isDirty&&document.uri.scheme==='jade-source'&&project.files.documents.has(document.uri.toString())))
+      throw Error('Save or close modified Jade source editors before reviewing the saved checkout.');
+  }
+  async function requireReviewedCheckout(folder,record){
+    requireSavedCheckout(folder);
+    await requireReviewedDiscovery(folder,record);
+    if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed before the reviewed Working operation. Run Set Up Project again.');
+    requireSavedCheckout(folder);
+  }
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
     runtimeSettingsReady:folder=>{
@@ -134,6 +145,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       throw Error('Native setup did not return the reviewed Git-first Working location.');
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
     if(target.workingState==='existing'&&capability.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
+    requireSavedCheckout(folder);
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
       providerConfig:explicitProject?{...configFor(folder),...(runtime?.settings||{})}:configured});
     return target;
@@ -193,13 +205,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
           binding.retained=true;
         }else workspace.adoptProject(folder,binding.workspace,binding.previous);
+        if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();}
       }catch(error){
         binding.publishing=false;
         if(!previous.includes(key))checkoutRoots.delete(key);
         try{await state?.update(CHECKOUT_STATE,previous);}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
         throw error;
       }
-      if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();}
       binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
       return {prepared:!binding.retained};
     },
@@ -209,14 +221,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         try{await binding.record.runtime?.rollback();}finally{try{binding.workspace.dispose();await binding.client.dispose();}finally{setupBindings.delete(key);workspace.executing=false;flushRefreshes();}}
       }
     },
-    initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
-      project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write)),
+    initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>{
+      await requireReviewedCheckout(folder,reviewedRoots.get(reviewed));
+      return project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write);
+    }),
     syncCheckout:(folder,reviewed)=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
       async(progress,token)=>{
         output.show(true);const binding=setupBindings.get(folder.uri.toString()),record=reviewedRoots.get(reviewed);
-        const revalidate=async()=>{await requireReviewedDiscovery(folder,record);if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed before reviewed sync. Run Set Up Project again.');};
-        await revalidate();
-        if(binding?.previous&&isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder,binding.record.providerConfig)))await workspace.saveDirty(binding.previous,token);
+        const revalidate=()=>requireReviewedCheckout(folder,record);
         await revalidate();
         return (binding?.workspace||workspace).sync(projectFor(folder),{token,expectedWorkingIdentity:reviewed.working.identity,beforeRequest:revalidate,output:text=>output.append(text)});
       }),

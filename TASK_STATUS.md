@@ -8,3 +8,5 @@
 - TDD: the setup ownership and reviewed-sync regressions were reproduced before fixes. A qualified ANSI nativeScratch=true distribution exposed a previous hardcoded false-only validator; a new failing test now passes while malformed/mismatched producer declarations remain refused.
 - Validation: normal repository tests passed: 1,911 passed, 52 intentional skips, no failures across 1,963 cases; normal VSIX packaging succeeded. No additional manual release/VSIX/build-agent verification gate. Prior focused setup suite passed101 tests with2 intentional skips.
 - Delivery: push then Ready/fresh Codex review while hosted CI runs; human owner review remains protected. No merge, extension publication, normal installation or Source publication performed.
+
+- Fresh review follow-up: initialization rechecks native configuration and settings after inspection release/progress entry; dirty live projection editors are refused before review and before dispatch without implicit saves; retained-stage cleanup is inside acceptance rollback. All three regressions were RED before fixes;50 focused tests now pass. Changelog matches CLI0.11.6 and qualified ANSI Scratch.
