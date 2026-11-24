@@ -89,8 +89,10 @@ function registerWorkspaceOnboarding(vscode,context,services){
      const result=await services.connectWorking(folder,checkout);
      if(result?.selection!=='working'||result?.readOnly!==true)throw Error('Native Git-first Working reopen was not confirmed.');
      status.workingPrepared=true;
-     const synced=await services.syncCheckout(folder,checkout);requireFolder(folder);
+     const synced=await services.syncCheckout(folder,checkout);
+     status.nativeSyncResult=synced;
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
+     requireFolder(folder);
      accepted=await services.commitCheckout?.(folder,checkout);
     }
     stage='refresh';requireFolder(folder);

@@ -16,7 +16,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const state=context.workspaceState;
   const explicitConfigFor=configFor;
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
-  configFor=folder=>({...privateRuntime(folder).values(),...explicitConfigFor(folder)});
+  const acceptedFiles=new Map();
+  const projectBytes=folder=>fs.readFileSync(path.join(folder.uri.fsPath,'jade.json')).toString('base64');
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
   const reviewedRoots=new WeakMap(),setupBindings=new Map();
@@ -24,8 +25,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const configurationFor=folder=>{
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
-    const configured=configFor(folder),selected=checkoutRoots.has(folder.uri.toString());
-    return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
+    const configured=explicitConfigFor(folder),selected=checkoutRoots.has(folder.uri.toString());
+    if(fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&accepted.bytes===projectBytes(folder)?{...accepted.config,...configured}:configured;}
+    return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
   workspace.configFor=configurationFor;
@@ -100,12 +102,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       explicitProject=typeof discovered.prepared.configFile==='string'&&discovered.prepared.configFile!=='';
       if(explicitProject){
         if(discovered.prepared.config.workingMode!=='git-first')return;
-        configured={...discovered.prepared.config,...configFor(folder)};
+        configured={...privateRuntime(folder).values(),...discovered.prepared.config,...explicitConfigFor(folder)};
       }
     }
     if(!configured.workingMode&&!explicitProject){
       if(files.length){
-        configured=configFor(folder);
+        configured={...privateRuntime(folder).values(),...configFor(folder)};
         if(!configured.installPath||!configured.workingSeedDirectory){
           const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
@@ -151,7 +153,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(target.workingState==='existing'&&capability.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
     requireSavedCheckout(folder);
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
-      providerConfig:explicitProject?{...configFor(folder),...(runtime?.settings||{})}:configured});
+      providerConfig:explicitProject?{...explicitConfigFor(folder),...Object.fromEntries(Object.entries(privateRuntime(folder).values()).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})}:configured,explicitProject});
     return target;
   }
   async function working(folder,title,operation) {
@@ -193,7 +195,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during Working setup. Run Set Up Project again.');
         return;
       }
-      const previous=[...checkoutRoots.keys()];
+      const previous=[...checkoutRoots.keys()],previousFile=acceptedFiles.get(key);
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during setup; no settings were saved.');
       await requireReviewedDiscovery(folder,binding.record);
@@ -205,6 +207,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         if(workspace.projects.get(key)!==binding.previous)throw Error('The shared source project changed during setup.');
+        if(binding.record.explicitProject)acceptedFiles.set(key,{bytes:projectBytes(folder),config:binding.record.providerConfig});
         if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true})){
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
           binding.retained=true;
@@ -212,6 +215,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();}
       }catch(error){
         binding.publishing=false;
+        if(previousFile)acceptedFiles.set(key,previousFile);else acceptedFiles.delete(key);
         if(!previous.includes(key))checkoutRoots.delete(key);
         try{await state?.update(CHECKOUT_STATE,previous);}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
         throw error;
