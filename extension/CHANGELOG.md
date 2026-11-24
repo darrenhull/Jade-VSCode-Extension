@@ -2,6 +2,7 @@
 
 - Set up a saved JOX Git checkout without creating jade.json; detect machine settings and synchronize an existing Working copy automatically.
 - Require the qualified CLI 0.11.4 checkout capability and keep unsupported Scratch and debugging disabled.
+- Preserve explicit Source configuration, keep previews temporary, persist successful checkout selection privately and require a separately selected vendor seed.
 
 - Bundles [Jade CLI 0.11.4](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.4) for local Jade operations.
 

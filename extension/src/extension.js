@@ -90,7 +90,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   const detected = inspectInstall(installPath);
   let values;
   if(options.checkout){
-    const seed=settings.get('workingSeedDirectory')||detected.databasePath||(await chooseFolder('Select the approved vendor-only Fresh Copy seed directory'))?.[0]?.fsPath;
+    const seed=settings.get('workingSeedDirectory')||(await chooseFolder('Select the approved vendor-only Fresh Copy seed directory'))?.[0]?.fsPath;
     if(!seed||cancelled()||!sameFolder())return;
     values={installPath:detected.installPath,workingSeedDirectory:seed};
   }else{

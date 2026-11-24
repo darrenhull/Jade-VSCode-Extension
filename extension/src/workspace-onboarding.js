@@ -77,10 +77,12 @@ function registerWorkspaceOnboarding(vscode,context,services){
      (creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Connect to the accepted generation, then sync saved checkout changes before refreshing views.')},action);
     requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
     stage='working';
+    await services.activateCheckout?.(folder,checkout);
     if(creating){
      const result=await services.initializeCheckout(folder,checkout);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
+     await services.commitCheckout?.(folder);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
     }else{
@@ -90,6 +92,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
      const synced=await services.syncCheckout(folder);requireFolder(folder);
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
     }
+    await services.commitCheckout?.(folder);
     stage='refresh';requireFolder(folder);
     await services.refreshProject(folder,{prepared:true});requireFolder(folder);
     status.sourceReady=true;status.viewsReady=true;stage='explorer';
@@ -134,6 +137,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
    log('Jade project is ready. Working and saved sources are prepared; Object Explorer and tests are refreshed.');
    return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:existing?'existing':'extract'};
   }catch(error){
+   try{await services.abortCheckout?.(folder);}catch(cleanup){error.message+=' Checkout cleanup failed: '+cleanup.message;}
    const native=error.result,cancelled=native?native.cancelled===true:error.cancelled===true;
    error.result={...status,...native,passed:false,completed:false,stage,code:native?.code??(cancelled?130:2),...(cancelled?{cancelled:true}:{})};
    error.message='Jade setup stopped during '+stage+': '+error.message;
