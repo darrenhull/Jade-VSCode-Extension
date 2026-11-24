@@ -66,8 +66,8 @@ class NativeSourceWorkspace {
     return project;
   }
 
-  projectConfiguration(folder) {
-    const supplied = { ...this.configFor(folder), sourceFormat: 'jox' };
+  projectConfiguration(folder,configuration=this.configFor(folder)) {
+    const supplied = { ...configuration, sourceFormat: 'jox' };
     const config = configDto(supplied);
     if (Object.hasOwn(supplied, 'workingJadeGitPolicy')) config.workingJadeGitPolicy = supplied.workingJadeGitPolicy;
     return config;
@@ -326,8 +326,9 @@ class NativeSourceWorkspace {
 
   async sync(project, options = {}) {
     if (options.token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
-    await project.provider.requireSync();
-    return this.withExecution(project, options, () => project.provider.sync({ ...options, beforeRequest: () => {
+    await project.provider.requireSync({expectedWorkingIdentity:options.expectedWorkingIdentity});
+    return this.withExecution(project, options, () => project.provider.sync({ ...options, beforeRequest: async () => {
+      await options.beforeRequest?.();
       this.assertCleanRawJox(project);
       for (const document of this.vscode.workspace.textDocuments || []) {
         if (!document.isDirty || document.uri.scheme !== 'jade-source') continue;

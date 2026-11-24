@@ -16,7 +16,12 @@ class CliWorkingSession{
   if (![shutdownTimeoutMilliseconds,killTimeoutMilliseconds].every(value=>Number.isSafeInteger(value)&&value>0&&value<=30000)) throw Error('Invalid owned CLI shutdown deadline.');
   this.shutdownTimeoutMilliseconds=shutdownTimeoutMilliseconds;
   this.killTimeoutMilliseconds=killTimeoutMilliseconds;
-  this.ownedClients=new Set();
+  this.ownedClients=new Set();this.forks=new Set();
+ }
+ fork(){
+  if(this.disposed)throw Error('Jade CLI connection is disposed.');
+  const child=new CliWorkingSession({entry:this.entry,spawn:this.spawn,shutdownTimeoutMilliseconds:this.shutdownTimeoutMilliseconds,killTimeoutMilliseconds:this.killTimeoutMilliseconds});
+  child.parent=this;this.forks.add(child);return child;
  }
  connect(){
   if(this.disposed)throw Error('Jade CLI connection is disposed.');
@@ -163,9 +168,10 @@ class CliWorkingSession{
    if(sourceIds.has(id)||['cancel','source.cancel','source.permit'].includes(request.command))continue;
    try{void this.request('cancel',{operationId:id},undefined,undefined,request.client).promise.catch(()=>{});}catch{}
   }
-  this.closing=this.closeOwnedClients(clients,[...operations.map(([,request])=>request.promise),...active.map(operation=>operation.completion)]);
+  this.closing=Promise.allSettled([...this.forks].map(child=>child.dispose()).concat(this.closeOwnedClients(clients,[...operations.map(([,request])=>request.promise),...active.map(operation=>operation.completion)]))).then(results=>{const failed=results.filter(result=>result.status==='rejected').map(result=>result.reason);if(failed.length===1)throw failed[0];if(failed.length)throw new AggregateError(failed,'Owned Jade CLI sessions did not all confirm exit.');});
   // VS Code subscriptions may call dispose without awaiting it. deactivate still
   // returns this same rejecting promise; an unconfirmed exit is never success.
+  void this.closing.then(()=>this.parent?.forks.delete(this),()=>this.parent?.forks.delete(this));
   void this.closing.catch(()=>{});
   return this.closing;
  }

@@ -9,10 +9,10 @@ class OwnedCliFixture {
     this.entry=entry;this.spawn=spawnProcess;this.createSession=createSession;this.artifacts=artifacts;
   }
   async run(action){return this.artifacts.run(async root=>{
-    const stateDirectory=path.join(root,'broker'),connections=path.join(root,'connections.json');
+    const stateDirectory=path.join(root,'broker'),connections=path.join(root,'connections.json'),children=new Set();
     const session=this.createSession({entry:this.entry,spawn:(executable,args,options)=>{
       const child=this.spawn(executable,args,{...options,env:{...options.env,JADE_TOOLS_STATE_DIRECTORY:stateDirectory,JADE_TOOLS_CONNECTIONS_FILE:connections}});
-      this.child=this.artifacts.track(child);return child;
+      this.child=this.artifacts.track(child);children.add(child);return child;
     }});
     try{return await action({root,stateDirectory,session});}
     finally{
@@ -27,7 +27,7 @@ class OwnedCliFixture {
           if(!Number.isSafeInteger(record.brokerPID)||record.brokerPID<0||!Array.isArray(nativePids)||!nativePids.every(pid=>Number.isSafeInteger(pid)&&pid>0))throw Error('Invalid owned broker process identity.');
           brokerPID=record.brokerPID;pids=[...(brokerPID?[brokerPID]:[]),...nativePids];
         }
-        if(brokerPID&&session.client?.child===this.child)await session.request('shutdown').promise;
+        if(brokerPID&&children.has(session.client?.child))await session.request('shutdown').promise;
         else if(!brokerPID)session.dispose();
         await this.artifacts.waitClosed(pids);
       }

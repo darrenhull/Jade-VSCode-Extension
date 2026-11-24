@@ -6,7 +6,7 @@ const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup')
 
 // Presentation integration: real onboarding/provider/workspace, simulated CLI
 // replies. This does not claim native compilation, reconciliation or execution.
-function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false,previewSettingsChange=false,preflightSettingsChange=false,changeProjectDuringInitialize=false,changeProjectDuringStateWrite=false}={}){
+function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false,previewSettingsChange=false,preflightSettingsChange=false,changeProjectDuringInitialize=false,changeProjectDuringStateWrite=false,changeProjectDuringPrepare=false,reviewedSyncMissing=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-git-first-onboarding-'));
  t.after(()=>{const temp=path.resolve(os.tmpdir())+path.sep,owned=path.resolve(root);assert.ok(owned.startsWith(temp)&&path.basename(owned).startsWith('jade-git-first-onboarding-'));fs.rmSync(owned,{recursive:true,force:true});});
  const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href});
@@ -19,15 +19,16 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
  let selected=configured||sourceSeedOnly,accepted=existing,snapshotHash='a'.repeat(64),nextSync={passed:true,code:0,report:{noOp:true,loadedFiles:0}};
  const calls=[],logs=[],commands=new Map();
  const machine={installPath:'C:/Licensed ANSI Jade',...(sourceSeedOnly?{databasePath:'C:/Application Source'}:{workingSeedDirectory:'C:/Private vendor seed'})};
- const capabilities={id:'jox',catalogue:true,initialization:true,checkoutInitialization:true,sync:true};
+ const capabilities={id:'jox',catalogue:true,initialization:true,checkoutInitialization:true,sync:true,reviewedWorkingSync:true};
  if(capabilityMissing)delete capabilities.checkoutInitialization;
+ if(reviewedSyncMissing)delete capabilities.reviewedWorkingSync;
  const working={identity:'native-reviewed-working',root:path.join(root,'.jade','working'),databasePath:path.join(root,'.jade','working','system'),installPath:machine.installPath};
  const snapshot=()=>({provider:'jox',projectId:'opaque-project',generation:'opaque-generation',snapshotHash});
  const bound=()=>({...snapshot(),projectRoot:folder.uri.toString(),sourceRoots:[uri(source).toString()],capabilities});
  const reply=body=>({promise:Promise.resolve({passed:true,code:0,body})});
  const connection={closed:false};
  const client={client:connection,connect:()=>connection,sourceCapabilities:async config=>{calls.push({command:'capabilities',config});return{sourceSemantic:{format:1,providers:[capabilities]}};},request(command,args){
-  calls.push({command,args});
+  calls.push({command,args,owner:this.scope||'shared'});
   assert.ok(!command.startsWith('source.extract'),'Git-first setup must never extract Source');
   for(const key of ['databasePath','iniPath','sourceDatabasePath'])assert.equal(args.config?.[key],undefined,'Git-first CLI request must not supply '+key);
   if(command==='cli'){
@@ -45,12 +46,13 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
    if(initializeFailure)return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native checkout load refused'}})};
    accepted=true;if(changeProjectDuringInitialize)fs.writeFileSync(projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));if(removeDuringInitialize)vscode.workspace.workspaceFolders=[];return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
   }
-  if(command==='working.prepare')return reply({working});
+  if(command==='working.prepare'){if(changeProjectDuringPrepare)fs.writeFileSync(projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));return reply({working});}
   if(command==='source.semantic.prepare')return reply(bound());
   if(command==='source.semantic.closeProject')return reply({});
-  if(command==='sync')return{promise:Promise.resolve(syncFailure?{passed:false,code:6023,report:{error:'Native saved change rejected'}}:nextSync)};
+  if(command==='sync')return{promise:Promise.resolve(syncFailure?{passed:false,code:6023,report:{error:'Native saved change rejected'}}:{...nextSync,report:{...nextSync.report,...(args.expectedWorkingIdentity?{reviewedWorkingIdentity:args.expectedWorkingIdentity}:{})}})};
   assert.fail('Unexpected native operation '+command);
  }};
+ client.fork=()=>{const fork={...client,scope:'setup',client:{closed:false},connect(){return this.client;},async dispose(){this.disposed=true;}};return fork;};
  const configFor=()=>({sourceFormat:'jox',...Object.fromEntries(Object.entries(machine).filter(([key])=>selected||!['installPath','workingSeedDirectory','databasePath'].includes(key)))});
  const vscode={Uri:{file:uri},RelativePattern:class{constructor(base,pattern){this.base=base;this.pattern=pattern;}},EventEmitter:class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}},ProgressLocation:{Notification:15},
   commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return{dispose(){}};},executeCommand:async name=>calls.push({command:'ui.'+name})},
@@ -61,7 +63,7 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
    withProgress:async(_options,run)=>run({report(){}},{isCancellationRequested:false,onCancellationRequested:()=>({dispose(){}})})}};
  const savedState=new Map();const context={subscriptions:[],globalState:{get(){},async update(){}},workspaceState:{get:(key,fallback)=>savedState.get(key)??fallback,update:async(key,value)=>{if(stateWriteFailure)throw Error('Private state write failed');savedState.set(key,value);if(changeProjectDuringStateWrite)fs.writeFileSync(projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));}}};
  const workspace=new NativeSourceWorkspace({vscode,client,configFor});
- workspace.refresh=async()=>calls.push({command:'ui.refresh'});workspace.observeSources=()=>{};
+ workspace.refresh=async(_folder,_token,options)=>calls.push({command:'ui.refresh',prepared:options?.prepared});workspace.observeSources=()=>{};
  const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect:async(...args)=>{calls.push({command:'ui.detect',args});if(detectCancelled)return;const before=selected,prior={...machine},resolved=args[2]?.resolved||{},chosen={};if(!resolved.installPath)chosen.installPath=machine.installPath||'C:/Licensed ANSI Jade';if(!resolved.workingSeedDirectory)chosen.workingSeedDirectory=machine.workingSeedDirectory||'C:/Private vendor seed';if(args[2]?.deferSave)return{settings:chosen,commit:async()=>{Object.assign(machine,chosen);selected=true;},rollback:async()=>{for(const key of Object.keys(machine))delete machine[key];Object.assign(machine,prior);selected=before;}};selected=true;return machine;}});
  return{settings:machine,context,vscode,client,configFor,root,folder,sourceFile,projectFile,original,gitMarker,calls,logs,setup,workspace,change:()=>{fs.writeFileSync(sourceFile,'changed saved JOX fixture');snapshotHash='b'.repeat(64);nextSync={passed:true,code:0,report:{noOp:false,loadedFiles:1}};}};
 }
@@ -172,3 +174,10 @@ test('real automatic sync availability leaves the initial shared project cold fo
 for(const option of ['changeProjectDuringInitialize','changeProjectDuringStateWrite'])test('explicit project changes before acceptance cannot publish a stale provider: '+option,async t=>{const f=fixture(t,{configured:true,[option]:true});delete f.settings.workingSeedDirectory;const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false,JSON.stringify(result));assert.equal(f.workspace.projects.size,0);assert.equal(f.configFor(f.folder).workingSeedDirectory,undefined);assert.deepEqual(f.context.workspaceState.get('jadeNative.acceptedGitFirstCheckouts',[]),[]);assert.equal(JSON.parse(fs.readFileSync(f.projectFile,'utf8')).workingMode,'source-backed');});
 
 test('complete explicit checkout revalidates native mode after initialization without a settings binding',async t=>{const f=fixture(t,{configured:true,changeProjectDuringInitialize:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.match(result.error,/configuration changed/i);assert.equal(f.calls.filter(row=>row.command==='ui.refresh').length,0);assert.deepEqual(f.context.workspaceState.get('jadeNative.acceptedGitFirstCheckouts',[]),[]);});
+
+test('complete explicit setup rejection preserves the shared provider and native owner',async t=>{const f=fixture(t,{configured:true,changeProjectDuringInitialize:true});const prior=f.workspace.project(f.folder),config={...prior.provider.config};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.workspace.project(f.folder),prior);assert.deepEqual(prior.provider.config,config);assert.equal(prior.provider.connection,undefined);assert.equal(prior.provider.snapshot,undefined);assert.ok(f.calls.some(row=>row.command==='working.initialize'&&row.owner==='setup'));assert.equal(f.calls.filter(row=>row.command==='source.semantic.closeProject'&&row.owner==='shared').length,0);});
+test('setup refuses changed review before sync after reopening Working',async t=>{const f=fixture(t,{configured:true,existing:true,changeProjectDuringPrepare:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.calls.filter(row=>row.command==='sync').length,0);});
+test('setup sync requires native reviewed-target enforcement and forwards the reviewed identity',async t=>{const f=fixture(t,{configured:true,existing:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));const sync=f.calls.find(row=>row.command==='sync');assert.equal(sync.args.expectedWorkingIdentity,'native-reviewed-working');const old=fixture(t,{configured:true,existing:true,reviewedSyncMissing:true});const refused=await old.setup.onboarding.setup(old.folder.uri);assert.equal(refused.completed,false);assert.match(refused.error,/update|reviewed/i);assert.equal(old.calls.filter(row=>row.command==='sync').length,0);});
+
+test('rejected complete setup leaves a live shared source snapshot and owner untouched',async t=>{const f=fixture(t,{configured:true,changeProjectDuringInitialize:true}),prior=f.workspace.project(f.folder);const snapshot={provider:'jox',projectId:'held-shared-scope',generation:'held-generation',snapshotHash:'a'.repeat(64)};prior.provider.snapshot=snapshot;prior.provider.connection=f.client.client;const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.workspace.project(f.folder),prior);assert.equal(prior.provider.snapshot,snapshot);assert.equal(prior.provider.connection,f.client.client);assert.equal(f.calls.filter(row=>row.command==='source.semantic.closeProject'&&row.owner==='shared').length,0);});
+test('accepted repeat setup preserves live editors and refreshes their existing provider afterward',async t=>{const f=fixture(t,{configured:true,existing:true});assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);const prior=f.workspace.project(f.folder);assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);assert.equal(f.workspace.project(f.folder),prior);assert.equal(f.calls.filter(row=>row.command==='ui.refresh').at(-1).prepared,false);});

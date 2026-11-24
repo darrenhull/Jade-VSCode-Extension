@@ -18,7 +18,7 @@
     "managedUpload": true,
     "nativeTests": true,
     "initialization": true,
-    "nativeScratch": false,
+    "nativeScratch": true,
     "sync": true,
     "checkoutInitialization": true
   },
@@ -45,11 +45,21 @@
     "warmNoUploadCode": 0,
     "disposableSourceDatabaseChangedFiles": [
       "system\\_control.dat"
-    ]
+    ],
+    "sourceRuntime": {
+      "scratchConnectedCliSha256": "83aee95a63d095e8c2a4681568b93f18cea7563a3480b0f9ccdf830d93a81032",
+      "sourceDigest": "b1e27a6783a3686094cf4d884624ccafc65d053f8c8f75e4789ae460aa4ec56b",
+      "checkoutConnectedCliSha256": "6409d1d501d766d0aa481282dc53ec64dfdda3b71283fbc628b9f1d991da49ce",
+      "scratchEvidenceSha256": "d281ba8f18d88d49b556f1bd09bbc0a74e0c2011103d182f478dfb1e58912ac9",
+      "model": "reviewed-source-runtime",
+      "policySha256": "9fb91bc36afbb3db91e3573fb24f9b95d1a0f24d8479973384aed0842cefebf8",
+      "packagedCliSha256": "3583c636de065f0fb81b6fe47ef35429780f726808858e67267bb54599cb55e0",
+      "checkoutEvidenceSha256": "b2e7ccadc19a0e00b9fec75abf8e1a1351b3ab2cb8721d42193003cb0566065c"
+    }
   },
   "checkoutProof": {
     "format": 1,
-    "cliSha256": "6409d1d501d766d0aa481282dc53ec64dfdda3b71283fbc628b9f1d991da49ce",
+    "cliSha256": "3583c636de065f0fb81b6fe47ef35429780f726808858e67267bb54599cb55e0",
     "receiptSha256": "9865acd0f4419be72e1ccc00c1d097a1b8f897b758a433733de8271db571abbd",
     "files": {
       "jade-jox-test-helper-ansi.exe": "e6f665bf6850bd9efdff4eae1ab4c14f90e30529704178cc1e04a8064c0546a7",
@@ -70,6 +80,23 @@
       "noOp": true,
       "isolation": true,
       "unsupportedChangeRefused": true
+    }
+  },
+  "scratchProof": {
+    "checks": {
+      "unchangedNoUpload": true,
+      "output": true,
+      "executed": true,
+      "workingOnly": true
+    },
+    "receiptSha256": "d281ba8f18d88d49b556f1bd09bbc0a74e0c2011103d182f478dfb1e58912ac9",
+    "format": 1,
+    "characterSet": "ansi",
+    "cliSha256": "3583c636de065f0fb81b6fe47ef35429780f726808858e67267bb54599cb55e0",
+    "runtimeFiles": {
+      "jade-jox-test-helper-ansi.exe": "e6f665bf6850bd9efdff4eae1ab4c14f90e30529704178cc1e04a8064c0546a7",
+      "jadegitscm.dll": "1262f4e813ed1067d885f510df7c6e7b667cd25f590b8d2227462bc00913274a",
+      "jadegitdev.dll": "aef1e020513420ea467f0fa45768001bdb573183a8acaa03cd8c2b636dd95bc5"
     }
   }
 }

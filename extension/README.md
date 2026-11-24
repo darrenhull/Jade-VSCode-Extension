@@ -1,6 +1,6 @@
 # Jade Tools
 
-Bundles [official Jade CLI 0.11.4](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.4) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.6](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.6) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The Jade IDE is not required.
 
@@ -14,7 +14,7 @@ Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved befor
 
 The qualified ANSI checkout flow covers saved-source initialization, synchronization and native tests; the existing Unicode method-edit and native-test flow remains available. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.
 
-Standalone builds, structural editing, Scratch execution, debugging and Source publication are not qualified by this release. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
+Native Scratch execution is also qualified on ANSI. Standalone builds, structural editing, debugging and Source publication remain outside this release’s qualified setup/test flow. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
 
 The native runtime owns configuration, source interpretation, dependencies, compilation, tests and database ownership. No Node runtime is required by the packaged CLI. Database Objects retains its read-only Source/Working selection and native object identities.
 

@@ -76,25 +76,25 @@ function registerWorkspaceOnboarding(vscode,context,services){
      '\nWorking: '+checkout.working.databasePath+'\nSaved JOX: '+savedRoot+'\n\nNo application Source database is used. '+
      (creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Connect to the accepted generation, then sync saved checkout changes before refreshing views.')},action);
     requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
-    stage='working';
+    stage='working';let accepted;
     await services.activateCheckout?.(folder,checkout);
     if(creating){
      const result=await services.initializeCheckout(folder,checkout);requireFolder(folder);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
-     await services.commitCheckout?.(folder,checkout);
+     accepted=await services.commitCheckout?.(folder,checkout);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
     }else{
      const result=await services.connectWorking(folder,checkout);
      if(result?.selection!=='working'||result?.readOnly!==true)throw Error('Native Git-first Working reopen was not confirmed.');
      status.workingPrepared=true;
-     const synced=await services.syncCheckout(folder);requireFolder(folder);
+     const synced=await services.syncCheckout(folder,checkout);requireFolder(folder);
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
-     await services.commitCheckout?.(folder,checkout);
+     accepted=await services.commitCheckout?.(folder,checkout);
     }
     stage='refresh';requireFolder(folder);
-    await services.refreshProject(folder,{prepared:true});requireFolder(folder);
+    await services.refreshProject(folder,{prepared:accepted?.prepared!==false});requireFolder(folder);
     status.sourceReady=true;status.viewsReady=true;stage='explorer';
     await services.openExplorer(folder);requireFolder(folder);
     log(creating?'Git-first Working is ready for the saved checkout.':'Working is ready for the current saved checkout.');

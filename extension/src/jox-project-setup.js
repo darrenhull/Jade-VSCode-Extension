@@ -4,6 +4,7 @@ const { registerWorkspaceOnboarding }=require('./workspace-onboarding');
 const { NativeSourceProvider }=require('./NativeSourceProvider');
 const { configDto }=require('./cli-client');
 const path=require('node:path');
+const {isDeepStrictEqual}=require('node:util');
 const fs=require('node:fs');
 const {NativeSourceWorkspace}=require('./NativeSourceWorkspace');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
@@ -132,6 +133,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         !Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Native setup did not return the reviewed Git-first Working location.');
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
+    if(target.workingState==='existing'&&capability.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
       providerConfig:explicitProject?{...configFor(folder),...(runtime?.settings||{})}:configured});
     return target;
@@ -160,11 +162,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
       await requireReviewedDiscovery(folder,record);
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
-      if(!record.sourceRoot&&!record.runtime)return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
-      if(workspace.executing||previous&&!workspace.canReconfigure(previous))throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
-      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>record.providerConfig,watchSources:false});
-      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
+      const same=previous&&isDeepStrictEqual(previous.provider.config,workspace.projectConfiguration(folder,record.providerConfig));
+      if(workspace.executing||previous&&!workspace.canReconfigure(previous)&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      const stageClient=client.fork();
+      const owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
+      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
     },
     commitCheckout:async(folder,reviewed)=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key),record=binding?.record||reviewedRoots.get(reviewed);
@@ -185,25 +188,38 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         await requireReviewedDiscovery(folder,binding.record);
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);
-        workspace.adoptProject(folder,binding.workspace,binding.previous);
+        if(workspace.projects.get(key)!==binding.previous)throw Error('The shared source project changed during setup.');
+        if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true})){
+          if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
+          binding.retained=true;
+        }else workspace.adoptProject(folder,binding.workspace,binding.previous);
       }catch(error){
         binding.publishing=false;
         if(!previous.includes(key))checkoutRoots.delete(key);
         try{await state?.update(CHECKOUT_STATE,previous);}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
         throw error;
       }
+      if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();}
       binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
+      return {prepared:!binding.retained};
     },
     abortCheckout:async folder=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
       try{await binding.project.provider.closeProject();}finally{
-        try{await binding.record.runtime?.rollback();}finally{binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();}
+        try{await binding.record.runtime?.rollback();}finally{try{binding.workspace.dispose();await binding.client.dispose();}finally{setupBindings.delete(key);workspace.executing=false;flushRefreshes();}}
       }
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
       project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write)),
-    syncCheckout:folder=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
-      async(progress,token)=>{output.show(true);return (setupBindings.get(folder.uri.toString())?.workspace||workspace).sync(projectFor(folder),{token,output:text=>output.append(text)});}),
+    syncCheckout:(folder,reviewed)=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
+      async(progress,token)=>{
+        output.show(true);const binding=setupBindings.get(folder.uri.toString()),record=reviewedRoots.get(reviewed);
+        const revalidate=async()=>{await requireReviewedDiscovery(folder,record);if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed before reviewed sync. Run Set Up Project again.');};
+        await revalidate();
+        if(binding?.previous&&isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder,binding.record.providerConfig)))await workspace.saveDirty(binding.previous,token);
+        await revalidate();
+        return (binding?.workspace||workspace).sync(projectFor(folder),{token,expectedWorkingIdentity:reviewed.working.identity,beforeRequest:revalidate,output:text=>output.append(text)});
+      }),
     initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
       project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
     refreshProject:async(folder,{prepared})=>{
