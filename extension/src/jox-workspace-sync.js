@@ -14,7 +14,7 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
     await setAvailable(false);
     if (disposed || current !== revision || !trusted()) return;
     let supported;
-    try { supported = (await selectedProject().provider.capability()).sync === true; }
+    try { supported = (await workspace.probeCapability(selectedProject())).sync === true; }
     catch { return; }
     if (!disposed && current === revision && supported) await setAvailable(true);
   };

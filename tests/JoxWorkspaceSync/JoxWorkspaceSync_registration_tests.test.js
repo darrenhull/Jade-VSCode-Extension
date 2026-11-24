@@ -10,11 +10,11 @@ test('Only a trusted, selected project with explicit sync capability exposes the
   const context = new Map(), sync = 'jadeNative.syncWorkspaceToWorking', key = 'jadeNative.workspaceSyncAvailable';
   state.commands.set('setContext', (name, value) => context.set(name, value));
   state.vscode.workspace.isTrusted = true;
-  let advertised, change, configurationChanged;
+  let advertised, change, configurationChanged, sourceChanged;
   state.vscode.window.onDidChangeActiveTextEditor = fn => { change = fn; return { dispose() {} }; };
   state.vscode.workspace.onDidChangeConfiguration = fn => { configurationChanged = fn; return { dispose() {} }; };
   const project = { folder: state.folder, provider: { capability: async () => ({ sync: advertised }) } };
-  registerJoxWorkspaceSync(state.vscode, state.context, { projectForUri: () => project });
+  registerJoxWorkspaceSync(state.vscode, state.context, { projectForUri: () => project, probeCapability: selected => selected.provider.capability(), onDidChangeSource:fn=>{sourceChanged=fn;return{dispose(){}};} });
   const settle = () => new Promise(resolve => setImmediate(resolve));
   await settle();
   assert.equal(context.get(key), false);

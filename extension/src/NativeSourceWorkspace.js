@@ -74,6 +74,13 @@ class NativeSourceWorkspace {
     return config;
   }
 
+  async probeCapability(project) {
+    const probe=new NativeSourceProvider({client:this.client,config:project.provider.config,projectRoot:project.provider.root});
+    const capability=await probe.capability();
+    if(this.project(project.folder)!==project)throw Error('The source project changed during capability discovery.');
+    return capability;
+  }
+
   canReconfigure(project, { allowExecuting = false } = {}) {
       let cold = (!this.executing || allowExecuting) && !this.pendingChanges.has(project) && !this.changing.has(project) &&
         !project.provider.connection && !project.provider.probe && !project.provider.sourceOperation &&
