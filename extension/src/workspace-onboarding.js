@@ -92,6 +92,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
      const synced=await services.syncCheckout(folder,checkout);
      status.nativeSyncResult=synced;
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
+     status.sourceReady=true;
      requireFolder(folder);
      accepted=await services.commitCheckout?.(folder,checkout);
     }

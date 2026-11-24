@@ -38,3 +38,5 @@
 - Checkout operations now await an in-flight refresh keyed by the live previous project (and any staged refresh), then recheck folder/configuration before dispatch. Working reopen also rechecks after capability discovery. Held-refresh overlap and post-refresh changed-review cases reproduced RED;323 focused tests pass.
 
 - Review6048665696 folder-close report is already guarded by NativeSourceProvider.request validating its temporary workspace context immediately before transport dispatch. Added a behavioral regression closing the folder during final discovery; it passes without a production change and proves zero working.prepare dispatches. Stale authenticated vendor README is preserved; consumer packaging guidance clarifies ANSI/Unicode qualification and upstreamCLIissue162 tracks correction.
+
+- Successful reconciliation records sourceReady immediately after native sync confirmation, independently of later acceptance/view refresh. Later failures retain synced-source truth while viewsReady stays false. Existing failure regression extended and reproduced RED;134 onboarding tests pass.
