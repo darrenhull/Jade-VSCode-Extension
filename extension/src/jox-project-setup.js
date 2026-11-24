@@ -26,6 +26,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   workspace.configFor=configurationFor;
   const projectFor=folder=>(setupBindings.get(folder.uri.toString())?.workspace||workspace).project(folder);
   const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:config.workingMode==='git-first'?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
+  async function requireReviewedDiscovery(folder,record){
+    if(!record.discovery)return;
+    const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+    if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)
+      throw Error('Project configuration changed after Working review. Run Set Up Project again.');
+  }
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
     runtimeSettingsReady:folder=>{
@@ -152,10 +158,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     activateCheckout:async(folder,reviewed)=>{
       const record=reviewedRoots.get(reviewed);if(!record)return;
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
-      if(record.discovery){
-        const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
-        if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)throw Error('Project configuration changed after Working review. Run Set Up Project again.');
-      }
+      await requireReviewedDiscovery(folder,record);
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
       if(!record.sourceRoot&&!record.runtime)return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
@@ -168,9 +171,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const previous=[...checkoutRoots.keys()];
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during setup; no settings were saved.');
+      await requireReviewedDiscovery(folder,binding.record);
+      if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during acceptance; restart setup.');
       await binding.record.runtime?.commit();
       await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
       try{
+        await requireReviewedDiscovery(folder,binding.record);
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         workspace.adoptProject(folder,binding.workspace,binding.previous);

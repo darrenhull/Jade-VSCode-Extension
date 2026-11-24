@@ -6,7 +6,7 @@ const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup')
 
 // Presentation integration: real onboarding/provider/workspace, simulated CLI
 // replies. This does not claim native compilation, reconciliation or execution.
-function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false,previewSettingsChange=false,preflightSettingsChange=false}={}){
+function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false,previewSettingsChange=false,preflightSettingsChange=false,changeProjectDuringInitialize=false,changeProjectDuringStateWrite=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-git-first-onboarding-'));
  t.after(()=>{const temp=path.resolve(os.tmpdir())+path.sep,owned=path.resolve(root);assert.ok(owned.startsWith(temp)&&path.basename(owned).startsWith('jade-git-first-onboarding-'));fs.rmSync(owned,{recursive:true,force:true});});
  const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href});
@@ -43,7 +43,7 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
   if(command==='working.initialize'){
    assert.equal(args.expectedWorkingIdentity,working.identity);assert.equal(args.destination,undefined,'Checkout setup must not extract to a destination');
    if(initializeFailure)return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native checkout load refused'}})};
-   accepted=true;if(removeDuringInitialize)vscode.workspace.workspaceFolders=[];return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
+   accepted=true;if(changeProjectDuringInitialize)fs.writeFileSync(projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));if(removeDuringInitialize)vscode.workspace.workspaceFolders=[];return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
   }
   if(command==='working.prepare')return reply({working});
   if(command==='source.semantic.prepare')return reply(bound());
@@ -51,7 +51,7 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
   if(command==='sync')return{promise:Promise.resolve(syncFailure?{passed:false,code:6023,report:{error:'Native saved change rejected'}}:nextSync)};
   assert.fail('Unexpected native operation '+command);
  }};
- const configFor=()=>({sourceFormat:'jox',...(selected?machine:{})});
+ const configFor=()=>({sourceFormat:'jox',...Object.fromEntries(Object.entries(machine).filter(([key])=>selected||!['installPath','workingSeedDirectory','databasePath'].includes(key)))});
  const vscode={Uri:{file:uri},RelativePattern:class{constructor(base,pattern){this.base=base;this.pattern=pattern;}},EventEmitter:class{constructor(){this.event=()=>({dispose(){}});}fire(){}dispose(){}},ProgressLocation:{Notification:15},
   commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return{dispose(){}};},executeCommand:async name=>calls.push({command:'ui.'+name})},
   extensions:{getExtension:()=>({activate:async()=>({enabled:true,getAPI:()=>({git:{path:'git.exe'},openRepository:async()=>gitRepository?{}:undefined})})})},
@@ -59,10 +59,10 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
   window:{createOutputChannel:()=>({show(){},append:line=>logs.push(line),appendLine:line=>logs.push(line),dispose(){}}),
    showWarningMessage:async(_message,_options,action)=>confirmCancelled?undefined:action,showErrorMessage:async message=>logs.push(message),showInformationMessage:async()=>undefined,
    withProgress:async(_options,run)=>run({report(){}},{isCancellationRequested:false,onCancellationRequested:()=>({dispose(){}})})}};
- const savedState=new Map();const context={subscriptions:[],globalState:{get(){},async update(){}},workspaceState:{get:(key,fallback)=>savedState.get(key)??fallback,update:async(key,value)=>{if(stateWriteFailure)throw Error('Private state write failed');savedState.set(key,value);}}};
+ const savedState=new Map();const context={subscriptions:[],globalState:{get(){},async update(){}},workspaceState:{get:(key,fallback)=>savedState.get(key)??fallback,update:async(key,value)=>{if(stateWriteFailure)throw Error('Private state write failed');savedState.set(key,value);if(changeProjectDuringStateWrite)fs.writeFileSync(projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));}}};
  const workspace=new NativeSourceWorkspace({vscode,client,configFor});
  workspace.refresh=async()=>calls.push({command:'ui.refresh'});workspace.observeSources=()=>{};
- const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect:async(...args)=>{calls.push({command:'ui.detect',args});if(detectCancelled)return;const before=selected;if(args[2]?.deferSave)return{settings:{...machine},commit:async()=>{selected=true;},rollback:async()=>{selected=before;}};selected=true;return machine;}});
+ const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect:async(...args)=>{calls.push({command:'ui.detect',args});if(detectCancelled)return;const before=selected,prior={...machine},resolved=args[2]?.resolved||{},chosen={};if(!resolved.installPath)chosen.installPath=machine.installPath||'C:/Licensed ANSI Jade';if(!resolved.workingSeedDirectory)chosen.workingSeedDirectory=machine.workingSeedDirectory||'C:/Private vendor seed';if(args[2]?.deferSave)return{settings:chosen,commit:async()=>{Object.assign(machine,chosen);selected=true;},rollback:async()=>{for(const key of Object.keys(machine))delete machine[key];Object.assign(machine,prior);selected=before;}};selected=true;return machine;}});
  return{settings:machine,context,vscode,client,configFor,root,folder,sourceFile,projectFile,original,gitMarker,calls,logs,setup,workspace,change:()=>{fs.writeFileSync(sourceFile,'changed saved JOX fixture');snapshotHash='b'.repeat(64);nextSync={passed:true,code:0,report:{noOp:false,loadedFiles:1}};}};
 }
 
@@ -168,3 +168,5 @@ test('settings changed during native preview cannot pass confirmation with a lat
 test('settings changed during native preflight are rechecked immediately before Working',async t=>{const f=fixture(t,{configured:true,preflightSettingsChange:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.calls.filter(row=>['working.initialize','working.prepare','sync'].includes(row.command)).length,0);});
 
 test('real automatic sync availability leaves the initial shared project cold for first setup',async t=>{const f=fixture(t);f.vscode.workspace.isTrusted=true;require('../../extension/src/jox-workspace-sync').registerJoxWorkspaceSync(f.vscode,f.context,f.workspace);await new Promise(resolve=>setImmediate(resolve));const project=f.workspace.project(f.folder);assert.equal(project.provider.connection,undefined);assert.equal(project.provider.probe,undefined);const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));});
+
+for(const option of ['changeProjectDuringInitialize','changeProjectDuringStateWrite'])test('explicit project changes before acceptance cannot publish a stale provider: '+option,async t=>{const f=fixture(t,{configured:true,[option]:true});delete f.settings.workingSeedDirectory;const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false,JSON.stringify(result));assert.equal(f.workspace.projects.size,0);assert.equal(f.configFor(f.folder).workingSeedDirectory,undefined);assert.deepEqual(f.context.workspaceState.get('jadeNative.acceptedGitFirstCheckouts',[]),[]);assert.equal(JSON.parse(fs.readFileSync(f.projectFile,'utf8')).workingMode,'source-backed');});
