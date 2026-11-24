@@ -10,3 +10,5 @@
 - Delivery: push then Ready/fresh Codex review while hosted CI runs; human owner review remains protected. No merge, extension publication, normal installation or Source publication performed.
 
 - Fresh review follow-up: initialization rechecks native configuration and settings after inspection release/progress entry; dirty live projection editors are refused before review and before dispatch without implicit saves; retained-stage cleanup is inside acceptance rollback. All three regressions were RED before fixes;50 focused tests now pass. Changelog matches CLI0.11.6 and qualified ANSI Scratch.
+
+- Acceptance-order follow-up: changed-view creation is reported as Working-created without persisting/adopting a rejected provider; a memento that mutates before storage rejects is restored within the rollback block. Both cases reproduced RED, then109 focused onboarding/provider tests passed.

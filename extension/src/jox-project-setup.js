@@ -195,8 +195,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       await requireReviewedDiscovery(folder,binding.record);
       if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during acceptance; restart setup.');
       await binding.record.runtime?.commit();
-      await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
       try{
+        await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
         await requireReviewedDiscovery(folder,binding.record);
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);

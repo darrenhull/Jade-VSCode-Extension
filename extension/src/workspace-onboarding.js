@@ -82,9 +82,9 @@ function registerWorkspaceOnboarding(vscode,context,services){
      const result=await services.initializeCheckout(folder,checkout);requireFolder(folder);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
-     accepted=await services.commitCheckout?.(folder,checkout);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
+     accepted=await services.commitCheckout?.(folder,checkout);
     }else{
      const result=await services.connectWorking(folder,checkout);
      if(result?.selection!=='working'||result?.readOnly!==true)throw Error('Native Git-first Working reopen was not confirmed.');
