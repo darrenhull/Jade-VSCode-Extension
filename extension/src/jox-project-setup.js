@@ -208,7 +208,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
       const same=previous&&isDeepStrictEqual(previous.provider.config,workspace.projectConfiguration(folder,record.providerConfig));
-      if(workspace.executing||previous&&!workspace.canReconfigure(previous)&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      if(workspace.executing||previous&&!workspace.canReconfigure(previous,{allowStoredProjections:true})&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       let stageClient,owner;
       try{
@@ -246,7 +246,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         binding.publishing=true;
         if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         if(workspace.projects.get(key)!==binding.previous)throw Error('The shared source project changed during setup.');
-        if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true})){
+        if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true,allowStoredProjections:true})){
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
           binding.retained=true;
         }else{const adopted=workspace.adoptProject(folder,binding.workspace,binding.previous);adopted.ownedClient=binding.client;}

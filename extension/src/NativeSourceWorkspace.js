@@ -84,7 +84,7 @@ class NativeSourceWorkspace {
     return capability;
   }
 
-  canReconfigure(project, { allowExecuting = false } = {}) {
+  canReconfigure(project, { allowExecuting = false, allowStoredProjections = false } = {}) {
       let cold = (!this.executing || allowExecuting) && !this.pendingChanges.has(project) && !this.changing.has(project) &&
         !project.provider.connection && !project.provider.probe && !project.provider.sourceOperation &&
         !project.provider.snapshot && !project.provider.sourceRoots?.length && !project.watchers?.size &&
@@ -99,8 +99,8 @@ class NativeSourceWorkspace {
           try { return path.relative(project.provider.root, fileURLToPath(selected)) === ''; }
           catch { return true; }
         });
-        try { fs.lstatSync(path.join(project.provider.root, '.jade', 'projections')); cold = false; }
-        catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; }
+        if(!allowStoredProjections){try { fs.lstatSync(path.join(project.provider.root, '.jade', 'projections')); cold = false; }
+        catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; }}
       }
 
     return cold;
@@ -127,7 +127,7 @@ class NativeSourceWorkspace {
   adoptProject(folder, owner, expectedPrevious) {
     const key=folder.uri.toString(),current=this.projects.get(key),candidate=owner.projects.get(key);
     if(!this.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
-    if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true}))throw Error('The source project changed during Working setup.');
+    if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true,allowStoredProjections:true}))throw Error('The source project changed during Working setup.');
     if(!candidate||!isDeepStrictEqual(candidate.provider.config,this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
     if(owner.changing.has(candidate))throw Error('The temporary source project is still refreshing. Retry setup.');
     let listeners;const watchers=new Map();

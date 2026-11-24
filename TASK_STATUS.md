@@ -44,3 +44,5 @@
 - Configless review now records explicit file absence, checked before and after native discovery exactly like an existing-file fingerprint. A stale inspect response followed by newly created jade.json is refused before initialization. Regression reproduced RED;325 focused tests pass.
 
 - Full inline-thread audit: ancestor jade.json presence suppresses remembered checkout overrides and native discovery decides mode; accepted defaults bind file identity plus fingerprint. Sync availability now subscribes to accepted source refresh. Scratch execution/policy/cancellation use the selected provider’s session and captured original connection; late cancellation cannot fall back to registration client. All three older Cloud Codex findings reproduced RED;331 focused tests pass.
+
+- Explicit setup may replace an otherwise-unused availability placeholder despite preserved on-disk projections. Native snapshots, connections, probes, active operations, restored/open editors and document bindings still block replacement; generic automatic reconfiguration remains conservative. Disk-preservation regression reproduced RED;332 focused tests pass.
