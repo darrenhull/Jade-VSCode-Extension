@@ -156,6 +156,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
         if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)throw Error('Project configuration changed after Working review. Run Set Up Project again.');
       }
+      if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
       if(!record.sourceRoot&&!record.runtime)return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
       if(workspace.executing||previous&&!workspace.canReconfigure(previous))throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
