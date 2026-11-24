@@ -14,7 +14,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const state=context.workspaceState;
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
-  const pendingRoots=new Map(),reviewedRoots=new WeakMap(),setupScope=new AsyncLocalStorage();
+  const pendingRoots=new Map(),reviewedRoots=new WeakMap(),setupBindings=new Map(),setupScope=new AsyncLocalStorage();
+  const providerStateKeys=['config','connection','probe','snapshot','sourceOperation','sourceRoots','projectRoot','flags'];
+  const flushRefreshes=()=>setupScope.exit(()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);});
   const configurationFor=folder=>{
     const configured=configFor(folder),selected=checkoutRoots.has(folder.uri.toString());
     return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
@@ -129,7 +131,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         });
     } finally {
       workspace.executing=false;
-      for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);
+      if(!pendingRoots.has(folder.uri.toString()))flushRefreshes();
     }
     });
   }
@@ -137,20 +139,28 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     jox:true,initialize,targets,checkoutTargets,
     activateCheckout:(folder,reviewed)=>{
       if(!reviewedRoots.has(reviewed))return;
-      const key=folder.uri.toString();pendingRoots.set(key,reviewedRoots.get(reviewed));
-      try{setupScope.run(key,()=>workspace.project(folder,{allowColdConfiguration:true}));}catch(error){pendingRoots.delete(key);throw error;}
+      const key=folder.uri.toString(),previous=workspace.projects.get(key);
+      const saved=previous?Object.fromEntries(providerStateKeys.filter(name=>Object.hasOwn(previous.provider,name)).map(name=>[name,previous.provider[name]])):undefined;
+      pendingRoots.set(key,reviewedRoots.get(reviewed));
+      try{const project=setupScope.run(key,()=>workspace.project(folder,{allowColdConfiguration:true}));setupBindings.set(key,{project,previous,saved});}catch(error){pendingRoots.delete(key);throw error;}
     },
     commitCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
       await state?.update(CHECKOUT_STATE,[...new Set([...checkoutRoots.keys(),key])]);
-      checkoutRoots.set(key,true);pendingRoots.delete(key);
+      checkoutRoots.set(key,true);pendingRoots.delete(key);setupBindings.delete(key);flushRefreshes();
     },
     abortCheckout:async folder=>{
       const key=folder.uri.toString();if(!pendingRoots.has(key))return;
-      const project=workspace.projects.get(key);
+      const binding=setupBindings.get(key),project=binding?.project;
       try{if(project)await project.provider.closeProject();}finally{
-        pendingRoots.delete(key);
-        if(project){for(const listener of workspace.forwarding.get(project)||[])listener.dispose();workspace.forwarding.delete(project);project.files.dispose();workspace.projects.delete(key);}
+        pendingRoots.delete(key);setupBindings.delete(key);
+        if(binding?.previous){
+          for(const name of providerStateKeys){if(Object.hasOwn(binding.saved,name))project.provider[name]=binding.saved[name];else delete project.provider[name];}
+        }else if(project){
+          for(const listener of workspace.forwarding.get(project)||[])listener.dispose();workspace.forwarding.delete(project);project.files.dispose();
+          if(workspace.projects.get(key)===project)workspace.projects.delete(key);
+        }
+        flushRefreshes();
       }
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
