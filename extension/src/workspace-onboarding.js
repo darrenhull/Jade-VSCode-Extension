@@ -79,7 +79,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
     stage='working';
     await services.activateCheckout?.(folder,checkout);
     if(creating){
-     const result=await services.initializeCheckout(folder,checkout);
+     const result=await services.initializeCheckout(folder,checkout);requireFolder(folder);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
      await services.commitCheckout?.(folder);

@@ -6,7 +6,7 @@ const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup')
 
 // Presentation integration: real onboarding/provider/workspace, simulated CLI
 // replies. This does not claim native compilation, reconciliation or execution.
-function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false}={}){
+function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-git-first-onboarding-'));
  t.after(()=>{const temp=path.resolve(os.tmpdir())+path.sep,owned=path.resolve(root);assert.ok(owned.startsWith(temp)&&path.basename(owned).startsWith('jade-git-first-onboarding-'));fs.rmSync(owned,{recursive:true,force:true});});
  const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href});
@@ -42,7 +42,7 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
   if(command==='working.initialize'){
    assert.equal(args.expectedWorkingIdentity,working.identity);assert.equal(args.destination,undefined,'Checkout setup must not extract to a destination');
    if(initializeFailure)return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native checkout load refused'}})};
-   accepted=true;return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
+   accepted=true;if(removeDuringInitialize)vscode.workspace.workspaceFolders=[];return reply({...bound(),sourceSnapshot:snapshot(),working,report:{workingMode:'git-first',workingPrepared:true,publicationEstablished:true}});
   }
   if(command==='working.prepare')return reply({working});
   if(command==='source.semantic.prepare')return reply(bound());
@@ -147,3 +147,8 @@ test('failed setup restores a reused cold project and its provider configuration
 test('deferred workspace refresh is scheduled only after checkout state commit',async t=>{const f=fixture(t);let committed=false,scheduled=0;const save=f.context.workspaceState.update;f.context.workspaceState.update=async(...args)=>{await save(...args);committed=true;};f.workspace.pendingChanges.set({}, {needsPrepare:false});f.workspace.scheduleRefresh=()=>{scheduled++;assert.equal(committed,true);assert.equal(f.workspace.configFor(f.folder).workingMode,'git-first');};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.ok(scheduled>0);});
 
 test('failed private persistence restores reused provider after closing the temporary native binding',async t=>{const f=fixture(t,{stateWriteFailure:true});const prior=f.workspace.project(f.folder),config={...prior.provider.config};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.workspace.projects.get(f.folder.uri.toString()),prior);assert.deepEqual(prior.provider.config,config);for(const key of ['connection','probe','snapshot','sourceRoots','flags'])assert.equal(Object.hasOwn(prior.provider,key),false,key);assert.ok(f.calls.some(row=>row.command==='source.semantic.closeProject'));});
+
+test('pending setup never changes a provider already held by a workspace caller',async t=>{const f=fixture(t);const prior=f.workspace.project(f.folder),config={...prior.provider.config};const save=f.context.workspaceState.update;let observed=false;f.context.workspaceState.update=async(...args)=>{observed=true;assert.deepEqual(prior.provider.config,config);assert.equal(prior.provider.connection,undefined);return save(...args);};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(observed,true);assert.notEqual(f.workspace.projects.get(f.folder.uri.toString()),prior);});
+test('folder removal during initialization cannot persist checkout selection',async t=>{const f=fixture(t,{removeDuringInitialize:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.deepEqual(f.context.workspaceState.get('jadeNative.acceptedGitFirstCheckouts',[]),[]);assert.equal(f.setup.configFor(f.folder).workingMode,undefined);});
+
+test('setup adoption preserves an explicitly inherited Working policy',async t=>{const f=fixture(t);f.settings.workingJadeGitPolicy='inherit';const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(f.workspace.project(f.folder).provider.config.workingJadeGitPolicy,'inherit');});

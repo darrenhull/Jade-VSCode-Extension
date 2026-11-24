@@ -46,9 +46,7 @@ class NativeSourceWorkspace {
     if (this.disposed) throw Error('The native source workspace is closed.');
     const current = this.folders().find(value => value.uri.toString() === folder?.uri.toString());
     if (!current) throw Error('The selected Jade project is no longer open.');
-    const supplied = { ...this.configFor(current), sourceFormat: 'jox' };
-    const config = configDto(supplied);
-    if (Object.hasOwn(supplied, 'workingJadeGitPolicy')) config.workingJadeGitPolicy = supplied.workingJadeGitPolicy;
+    const config = this.projectConfiguration(current);
     const key = current.uri.toString();
     let project = this.projects.get(key);
     if (!project) {
@@ -59,7 +57,23 @@ class NativeSourceWorkspace {
       this.forwarding.set(project, [project.files.onDidChangeFile(changes => this.events.fire(changes)),
         project.files.onDidFinishSave(({ saved }) => { if (saved || this.pendingChanges.has(project)) this.scheduleRefresh(project, saved); })]);
     } else if (JSON.stringify(project.provider.config) !== JSON.stringify(config)) {
-      let cold = allowColdConfiguration && !this.executing && !this.pendingChanges.has(project) && !this.changing.has(project) &&
+      const cold = allowColdConfiguration && this.canReconfigure(project);
+      if (!cold) throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      // Explicit setup only; retain the same Explorer row and never reset a model.
+      project.provider.config = config;
+    }
+    return project;
+  }
+
+  projectConfiguration(folder) {
+    const supplied = { ...this.configFor(folder), sourceFormat: 'jox' };
+    const config = configDto(supplied);
+    if (Object.hasOwn(supplied, 'workingJadeGitPolicy')) config.workingJadeGitPolicy = supplied.workingJadeGitPolicy;
+    return config;
+  }
+
+  canReconfigure(project, { allowExecuting = false } = {}) {
+      let cold = (!this.executing || allowExecuting) && !this.pendingChanges.has(project) && !this.changing.has(project) &&
         !project.provider.connection && !project.provider.probe && !project.provider.sourceOperation &&
         !project.provider.snapshot && !project.provider.sourceRoots?.length && !project.watchers?.size &&
         !project.files.documents.size && !project.files.entities.size && !project.files.opening.size;
@@ -76,11 +90,22 @@ class NativeSourceWorkspace {
         try { fs.lstatSync(path.join(project.provider.root, '.jade', 'projections')); cold = false; }
         catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; }
       }
-      if (!cold) throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
-      // Explicit setup only; retain the same Explorer row and never reset a model.
-      project.provider.config = config;
-    }
-    return project;
+
+    return cold;
+  }
+
+  adoptProject(folder, owner, expectedPrevious) {
+    const key=folder.uri.toString(),current=this.projects.get(key),candidate=owner.projects.get(key);
+    if(!this.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
+    if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true}))throw Error('The source project changed during Working setup.');
+    if(!candidate||JSON.stringify(candidate.provider.config)!==JSON.stringify(this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
+    for(const listener of owner.forwarding.get(candidate)||[])listener.dispose();
+    owner.forwarding.delete(candidate);owner.projects.delete(key);
+    if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);current.files.dispose();}
+    candidate.provider.validateContext=()=>{if(this.project(folder)!==candidate)throw Error('The selected source project changed.');};
+    this.projects.set(key,candidate);
+    this.forwarding.set(candidate,[candidate.files.onDidChangeFile(changes=>this.events.fire(changes)),candidate.files.onDidFinishSave(({saved})=>{if(saved||this.pendingChanges.has(candidate))this.scheduleRefresh(candidate,saved);})]);
+    return candidate;
   }
 
   async prepare(folder, token) {

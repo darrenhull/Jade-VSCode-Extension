@@ -5,7 +5,7 @@ const { NativeSourceProvider }=require('./NativeSourceProvider');
 const { configDto }=require('./cli-client');
 const path=require('node:path');
 const fs=require('node:fs');
-const {AsyncLocalStorage}=require('node:async_hooks');
+const {NativeSourceWorkspace}=require('./NativeSourceWorkspace');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
 const { checkoutConfiguration }=require('./jox-checkout-config');
 /** Presents native setup for a saved checkout or Source-backed extraction. */
@@ -14,16 +14,15 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const state=context.workspaceState;
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
-  const pendingRoots=new Map(),reviewedRoots=new WeakMap(),setupBindings=new Map(),setupScope=new AsyncLocalStorage();
-  const providerStateKeys=['config','connection','probe','snapshot','sourceOperation','sourceRoots','projectRoot','flags'];
-  const flushRefreshes=()=>setupScope.exit(()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);});
+  const reviewedRoots=new WeakMap(),setupBindings=new Map();
+  const flushRefreshes=()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);};
   const configurationFor=folder=>{
     const configured=configFor(folder),selected=checkoutRoots.has(folder.uri.toString());
     return selected&&!fs.existsSync(path.join(folder.uri.fsPath,'jade.json'))&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration(configured,path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
-  workspace.configFor=folder=>setupScope.getStore()===folder.uri.toString()&&pendingRoots.has(folder.uri.toString())?checkoutConfiguration(configFor(folder),pendingRoots.get(folder.uri.toString())):configurationFor(folder);
-  const projectFor=folder=>workspace.project(folder);
+  workspace.configFor=configurationFor;
+  const projectFor=folder=>(setupBindings.get(folder.uri.toString())?.workspace||workspace).project(folder);
   const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:config.workingMode==='git-first'?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
@@ -116,10 +115,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return target;
   }
   async function working(folder,title,operation) {
-    return setupScope.run(folder.uri.toString(),async()=>{
-    const project=workspace.project(folder,{allowColdConfiguration:pendingRoots.has(folder.uri.toString())});
-    if(workspace.executing)throw Error('Another Jade Working operation is running.');
-    workspace.executing=true;
+    const binding=setupBindings.get(folder.uri.toString()),project=projectFor(folder);
+    if(workspace.executing&&!binding)throw Error('Another Jade Working operation is running.');
+    if(!binding)workspace.executing=true;
     try {
       await workspace.changing.get(project)?.promise;
       await workspace.beforeOperation?.();projectFor(folder);
@@ -130,43 +128,44 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
           return operation(project,token,text=>output.append(text));
         });
     } finally {
-      workspace.executing=false;
-      if(!pendingRoots.has(folder.uri.toString()))flushRefreshes();
+      if(!binding){workspace.executing=false;flushRefreshes();}
     }
-    });
   }
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,checkoutTargets,
     activateCheckout:(folder,reviewed)=>{
       if(!reviewedRoots.has(reviewed))return;
       const key=folder.uri.toString(),previous=workspace.projects.get(key);
-      const saved=previous?Object.fromEntries(providerStateKeys.filter(name=>Object.hasOwn(previous.provider,name)).map(name=>[name,previous.provider[name]])):undefined;
-      pendingRoots.set(key,reviewedRoots.get(reviewed));
-      try{const project=setupScope.run(key,()=>workspace.project(folder,{allowColdConfiguration:true}));setupBindings.set(key,{project,previous,saved});}catch(error){pendingRoots.delete(key);throw error;}
+      if(workspace.executing||previous&&!workspace.canReconfigure(previous))throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      const config=checkoutConfiguration(configFor(folder),reviewedRoots.get(reviewed));
+      const owner=new NativeSourceWorkspace({vscode,client,configFor:()=>config});
+      const project=owner.project(folder);setupBindings.set(key,{workspace:owner,project,previous});workspace.executing=true;
     },
     commitCheckout:async folder=>{
-      const key=folder.uri.toString();if(!pendingRoots.has(key))return;
-      await state?.update(CHECKOUT_STATE,[...new Set([...checkoutRoots.keys(),key])]);
-      checkoutRoots.set(key,true);pendingRoots.delete(key);setupBindings.delete(key);flushRefreshes();
+      const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
+      const previous=[...checkoutRoots.keys()];
+      if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
+      await state?.update(CHECKOUT_STATE,[...new Set([...previous,key])]);
+      try{
+        checkoutRoots.set(key,true);
+        workspace.adoptProject(folder,binding.workspace,binding.previous);
+      }catch(error){
+        if(!previous.includes(key))checkoutRoots.delete(key);
+        try{await state?.update(CHECKOUT_STATE,previous);}catch(cleanup){error.message+=' Private selection rollback failed: '+cleanup.message;}
+        throw error;
+      }
+      binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
     },
     abortCheckout:async folder=>{
-      const key=folder.uri.toString();if(!pendingRoots.has(key))return;
-      const binding=setupBindings.get(key),project=binding?.project;
-      try{if(project)await project.provider.closeProject();}finally{
-        pendingRoots.delete(key);setupBindings.delete(key);
-        if(binding?.previous){
-          for(const name of providerStateKeys){if(Object.hasOwn(binding.saved,name))project.provider[name]=binding.saved[name];else delete project.provider[name];}
-        }else if(project){
-          for(const listener of workspace.forwarding.get(project)||[])listener.dispose();workspace.forwarding.delete(project);project.files.dispose();
-          if(workspace.projects.get(key)===project)workspace.projects.delete(key);
-        }
-        flushRefreshes();
+      const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
+      try{await binding.project.provider.closeProject();}finally{
+        binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
       }
     },
     initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>
       project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write)),
-    syncCheckout:folder=>setupScope.run(folder.uri.toString(),()=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
-      async(progress,token)=>{output.show(true);return workspace.sync(projectFor(folder),{token,output:text=>output.append(text)});})),
+    syncCheckout:folder=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
+      async(progress,token)=>{output.show(true);return (setupBindings.get(folder.uri.toString())?.workspace||workspace).sync(projectFor(folder),{token,output:text=>output.append(text)});}),
     initializeWorkingSources:(folder,reviewed)=>working(folder,'Creating Working and extracting sources',async(project,token,write)=>
       project.provider.initialize({destination:reviewed.destination,expectedWorkingIdentity:reviewed.working.identity},token,write)),
     refreshProject:async(folder,{prepared})=>{
