@@ -60,6 +60,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
   async function checkoutTargets(folder,{repository}={}) {
+    const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
     let explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
@@ -125,7 +126,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         !Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Native setup did not return the reviewed Git-first Working location.');
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
-    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:JSON.stringify(configDto(configFor(folder))),discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
+    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
       providerConfig:explicitProject?{...configFor(folder),...(runtime?.settings||{})}:configured});
     return target;
   }

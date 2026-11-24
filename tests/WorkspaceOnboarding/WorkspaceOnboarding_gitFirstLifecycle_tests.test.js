@@ -6,7 +6,7 @@ const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup')
 
 // Presentation integration: real onboarding/provider/workspace, simulated CLI
 // replies. This does not claim native compilation, reconciliation or execution.
-function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false}={}){
+function fixture(t,{configured=false,existing=false,initializeFailure=false,syncFailure=false,capabilityMissing=false,previewRefused=false,detectCancelled=false,confirmCancelled=false,sourceMode=false,sourceSeedOnly=false,stateWriteFailure=false,removeDuringInitialize=false,gitRepository=true,unknownProfile=false,previewSettingsChange=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-git-first-onboarding-'));
  t.after(()=>{const temp=path.resolve(os.tmpdir())+path.sep,owned=path.resolve(root);assert.ok(owned.startsWith(temp)&&path.basename(owned).startsWith('jade-git-first-onboarding-'));fs.rmSync(owned,{recursive:true,force:true});});
  const uri=file=>({scheme:'file',fsPath:file,toString:()=>pathToFileURL(file).href});
@@ -36,6 +36,7 @@ function fixture(t,{configured=false,existing=false,initializeFailure=false,sync
   if(command==='prepare'){if(unknownProfile)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Unknown Jade connection profile: demo'}})};const explicit=fs.existsSync(projectFile)?JSON.parse(fs.readFileSync(projectFile,'utf8')):undefined;return{promise:Promise.resolve({passed:true,code:0,prepared:{config:explicit||{},configFile:explicit?projectFile:null}})};}
   if(command==='working.location'){
    assert.equal(args.checkoutOnly,true,'Existing source checkout must not enter Source-backed target discovery');
+   if(previewSettingsChange)machine.installPath='C:/UserChanged';
    if(previewRefused||!args.config.installPath||!args.config.workingSeedDirectory||args.config.workingMode!=='git-first')return reply({checkoutConfigured:false});
    return reply({checkoutConfigured:true,workingMode:'git-first',working,workingState:accepted?'existing':'new',sourceRoots:[uri(source).toString()]});
   }
@@ -161,3 +162,5 @@ test('refused preview leaves existing machine settings and cold provider unchang
 test('failed acceptance rolls staged runtime settings back before releasing shared configuration',async t=>{const f=fixture(t,{stateWriteFailure:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.deepEqual(f.configFor(f.folder),{sourceFormat:'jox'});assert.deepEqual(f.setup.configFor(f.folder),{sourceFormat:'jox'});});
 
 test('an explicit project appearing during remembered runtime detection stops before Working',async t=>{const f=fixture(t);assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);delete f.settings.installPath;delete f.settings.workingSeedDirectory;const before=f.calls.length,again=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:f.configFor});const setup=registerJoxProjectSetup(f.vscode,f.context,again,{client:f.client,configFor:f.configFor,detect:async()=>{fs.writeFileSync(f.projectFile,JSON.stringify({sourceFormat:'jox',workingMode:'source-backed'}));return{settings:{installPath:'C:/Licensed ANSI Jade',workingSeedDirectory:'C:/Private vendor seed'},commit:async()=>assert.fail('Staged settings must remain untouched'),rollback:async()=>{}};}});const result=await setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.calls.slice(before).filter(row=>['working.initialize','working.prepare','sync'].includes(row.command)).length,0);});
+
+test('settings changed during native preview cannot pass confirmation with a later baseline',async t=>{const f=fixture(t,{configured:true,previewSettingsChange:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,false);assert.equal(f.calls.filter(row=>['working.initialize','working.prepare','sync'].includes(row.command)).length,0);});

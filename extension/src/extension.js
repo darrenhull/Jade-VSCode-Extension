@@ -70,6 +70,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
     return current && path.resolve(current.uri.fsPath).toLowerCase() === path.resolve(folder.uri.fsPath).toLowerCase();
   };
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
+  const selectionSnapshot=options.checkout&&options.deferSave?{raw:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)])),effective:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.get(key)]))}:undefined;
   const candidates = new Set([settings.get('installPath'), process.env.JADE_INSTALL].filter(Boolean));
   const drive = process.env.SystemDrive || 'C:';
   for (const entry of fs.readdirSync(drive + path.sep, { withFileTypes: true })) {
@@ -111,10 +112,10 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   if (!selection || cancelled() || !sameFolder()) return;
   values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
   }
-  const previous=Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
+  const previous=selectionSnapshot?.raw||Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
   const written=new Map();
   const folderValue=key=>settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key);
-  const unchanged=key=>!settings.inspect||Object.is(folderValue(key),previous[key]);
+  const unchanged=key=>(!settings.inspect||Object.is(folderValue(key),previous[key]))&&(!selectionSnapshot||Object.is(settings.get(key),selectionSnapshot.effective[key]));
   const persist=async()=>{
   if(options.deferSave&&Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');
   // Settings updates are uncancellable: finish the started save before Connect settles.
@@ -134,6 +135,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   return values;
   };
   if(options.checkout&&options.deferSave){
+    if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed during selection; restart setup.');
     let attempted=false;
     return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),commit:async()=>{attempted=true;return persist();},rollback:async()=>{
       if(!attempted)return;
