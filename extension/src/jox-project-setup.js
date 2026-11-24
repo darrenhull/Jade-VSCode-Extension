@@ -101,9 +101,16 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'sources/**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
     if(explicitProject||files.length){
-      const discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      let discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      if(discovered?.passed!==true&&/Unknown Jade connection profile/i.test(discovered?.report?.error||'')&&explicitProject){
+        const original=discovered;
+        let repaired;
+        try{repaired=await initialize(folder.uri);}catch(cause){throw Error(original.report.error+' Project connection repair failed: '+cause.message,{cause});}
+        if(repaired?.cancelled)throw Object.assign(Error('Project connection repair cancelled.'),{cancelled:true});
+        if(repaired?.passed!==true||repaired.code!==0)throw Error(original.report.error+' Repair the project connection and retry Set Up Project.');
+        discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      }
       if(discovered?.passed!==true||discovered.code!==0||!discovered.prepared?.config){
-        if(/Unknown Jade connection profile/i.test(discovered?.report?.error||''))return;
         throw Error(discovered?.report?.error||'Native project configuration discovery failed.');
       }
       discoveredState=discovered.prepared;
@@ -161,7 +168,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         !Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Native setup did not return the reviewed Git-first Working location.');
     if(capability.checkoutInitialization!==true)throw Error('Git-first Working setup is not available in this CLI package.');
-    if(target.workingState==='existing'&&capability.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
+    if(target.workingState==='existing'&&(capability.sync!==true||capability.reviewedWorkingSync!==true))throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
     requireSavedCheckout(folder);
     const runtimeDefaults={...Object.fromEntries(Object.entries(detectedDefaults).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
     reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
