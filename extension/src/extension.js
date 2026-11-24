@@ -71,13 +71,15 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   };
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
   const selectionSnapshot=options.checkout&&options.deferSave?{raw:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)])),effective:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.get(key)]))}:undefined;
+  let installPath=options.checkout?options.resolved?.installPath:undefined;
+  if(!installPath){
   const candidates = new Set([settings.get('installPath'), process.env.JADE_INSTALL].filter(Boolean));
   const drive = process.env.SystemDrive || 'C:';
   for (const entry of fs.readdirSync(drive + path.sep, { withFileTypes: true })) {
     if (entry.isDirectory() && /^jade\d{4}$/i.test(entry.name)) candidates.add(path.join(drive + path.sep, entry.name));
   }
   const valid = [...candidates].filter(candidate => fs.existsSync(path.join(candidate, 'bin', 'jom.dll')));
-  let installPath;
+
   if (valid.length) {
     const selected = await prompt(() => vscode.window.showQuickPick([
       ...valid.map(directory => ({ label: directory, description: 'Detected Jade installation', directory })),
@@ -87,13 +89,16 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
     if (!selected.browse) installPath = selected.directory;
     else installPath = (await chooseFolder('Select Jade installation folder (contains bin/jom.dll)'))?.[0]?.fsPath;
   } else installPath = (await chooseFolder('Select Jade installation folder (contains bin/jom.dll)'))?.[0]?.fsPath;
+  }
   if (!installPath || cancelled()) return;
   const detected = inspectInstall(installPath);
   let values;
   if(options.checkout){
-    const seed=settings.get('workingSeedDirectory')||(await chooseFolder('Select the approved vendor-only Fresh Copy seed directory'))?.[0]?.fsPath;
+    const seed=options.resolved?.workingSeedDirectory||settings.get('workingSeedDirectory')||(await chooseFolder('Select the approved vendor-only Fresh Copy seed directory'))?.[0]?.fsPath;
     if(!seed||cancelled()||!sameFolder())return;
-    values={installPath:detected.installPath,workingSeedDirectory:seed};
+    values={};
+    if(!options.resolved?.installPath)values.installPath=detected.installPath;
+    if(!options.resolved?.workingSeedDirectory)values.workingSeedDirectory=seed;
   }else{
   if (!detected.databasePath) {
     detected.databasePath = (await chooseFolder('Select Jade database directory'))?.[0]?.fsPath;

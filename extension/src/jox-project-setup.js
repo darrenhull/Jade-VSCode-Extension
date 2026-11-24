@@ -85,7 +85,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(files.length){
         configured=configFor(folder);
         if(!configured.installPath||!configured.workingSeedDirectory){
-          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true});
+          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
           runtime=detected.settings?detected:undefined;
           configured={...configFor(folder),...(runtime?.settings||detected)};
@@ -96,7 +96,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       }
     }
     if(configured.workingMode==='git-first'&&(!configured.installPath||!configured.workingSeedDirectory)){
-      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true});
+      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
       if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
       runtime=detected.settings?detected:undefined;
       configured=sourceRoot?checkoutConfiguration({...configFor(folder),...(runtime?.settings||detected)},sourceRoot):{...configured,...configurationFor(folder),...(runtime?.settings||detected)};

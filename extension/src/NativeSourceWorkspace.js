@@ -56,8 +56,7 @@ class NativeSourceWorkspace {
         validateContext: () => { if (this.project(current) !== project) throw Error('The selected source project changed.'); } });
       project = { folder: current, provider, files: new JadeSourceFileSystemProvider(this.vscode, provider) };
       this.projects.set(key, project);
-      this.forwarding.set(project, [project.files.onDidChangeFile(changes => this.events.fire(changes)),
-        project.files.onDidFinishSave(({ saved }) => { if (saved || this.pendingChanges.has(project)) this.scheduleRefresh(project, saved); })]);
+      this.forwarding.set(project,this.projectListeners(project));
     } else if (!isDeepStrictEqual(project.provider.config,config)) {
       const cold = allowColdConfiguration && this.canReconfigure(project);
       if (!cold) throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
@@ -103,21 +102,45 @@ class NativeSourceWorkspace {
     return cold;
   }
 
+  projectListeners(project) {
+    const listeners=[];
+    try{
+      listeners.push(project.files.onDidChangeFile(changes=>this.events.fire(changes)));
+      listeners.push(project.files.onDidFinishSave(({saved})=>{if(saved||this.pendingChanges.has(project))this.scheduleRefresh(project,saved);}));
+      return listeners;
+    }catch(error){for(const listener of listeners)listener.dispose();throw error;}
+  }
+
+  createSourceWatcher(project,root) {
+    const watcher=this.vscode.workspace.createFileSystemWatcher(new this.vscode.RelativePattern(this.vscode.Uri.file(root),'**/*.[jJ][oO][xX]'));
+    try{
+      const changed=uri=>{if(uri.scheme==='file'&&!isManagedProjectPath(uri.fsPath))this.scheduleRefresh(project);};
+      watcher.onDidChange(changed);watcher.onDidCreate(changed);watcher.onDidDelete(changed);
+      return watcher;
+    }catch(error){watcher.dispose();throw error;}
+  }
+
   adoptProject(folder, owner, expectedPrevious) {
     const key=folder.uri.toString(),current=this.projects.get(key),candidate=owner.projects.get(key);
     if(!this.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
     if(current!==expectedPrevious||current&&!this.canReconfigure(current,{allowExecuting:true}))throw Error('The source project changed during Working setup.');
     if(!candidate||!isDeepStrictEqual(candidate.provider.config,this.projectConfiguration(folder)))throw Error('The accepted Working configuration changed during setup.');
     if(owner.changing.has(candidate))throw Error('The temporary source project is still refreshing. Retry setup.');
-    for(const watcher of candidate.watchers?.values()||[])watcher.dispose();candidate.watchers?.clear();
+    let listeners;const watchers=new Map();
+    try{
+      listeners=this.projectListeners(candidate);
+      if(this.watchSources&&this.vscode.workspace.createFileSystemWatcher&&this.vscode.RelativePattern)
+        for(const root of new Set(candidate.provider.sourceRoots||[]))watchers.set(root,this.createSourceWatcher(candidate,root));
+    }catch(error){for(const listener of listeners||[])listener.dispose();for(const watcher of watchers.values())watcher.dispose();throw error;}
+    for(const watcher of candidate.watchers?.values()||[])watcher.dispose();candidate.watchers=watchers;
     const pending=owner.pendingChanges.get(candidate);if(pending){clearTimeout(pending.timer);owner.pendingChanges.delete(candidate);}
     for(const listener of owner.forwarding.get(candidate)||[])listener.dispose();
     owner.forwarding.delete(candidate);owner.projects.delete(key);
     if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);current.files.dispose();}
     candidate.provider.validateContext=()=>{if(this.project(folder)!==candidate)throw Error('The selected source project changed.');};
     this.projects.set(key,candidate);
-    this.forwarding.set(candidate,[candidate.files.onDidChangeFile(changes=>this.events.fire(changes)),candidate.files.onDidFinishSave(({saved})=>{if(saved||this.pendingChanges.has(candidate))this.scheduleRefresh(candidate,saved);})]);
-    this.observeSources(candidate);if(pending)this.scheduleRefresh(candidate,!pending.needsPrepare);
+    this.forwarding.set(candidate,listeners);
+    if(pending)this.scheduleRefresh(candidate,!pending.needsPrepare);
     return candidate;
   }
 
@@ -154,9 +177,7 @@ class NativeSourceWorkspace {
     const roots = new Set(project.provider.sourceRoots), watchers = project.watchers ||= new Map();
     for (const [root, watcher] of watchers) if (!roots.has(root)) { watcher.dispose(); watchers.delete(root); }
     for (const root of roots) if (!watchers.has(root)) {
-      const watcher = this.vscode.workspace.createFileSystemWatcher(new this.vscode.RelativePattern(this.vscode.Uri.file(root), '**/*.[jJ][oO][xX]'));
-      const changed = uri => { if (uri.scheme === 'file' && !isManagedProjectPath(uri.fsPath)) this.scheduleRefresh(project); };
-      watcher.onDidChange(changed); watcher.onDidCreate(changed); watcher.onDidDelete(changed);
+      const watcher=this.createSourceWatcher(project,root);
       watchers.set(root, watcher);
     }
   }
