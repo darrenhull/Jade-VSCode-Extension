@@ -51,6 +51,10 @@ class NativeSourceWorkspace {
     const config = this.projectConfiguration(current);
     const key = current.uri.toString();
     let project = this.projects.get(key);
+    if(project?.retiring)throw Error('The previous Jade project session is still closing. Retry after cleanup.');
+    if(project?.retirementError)throw Error('The previous Jade project session could not be released: '+project.retirementError.message,{cause:project.retirementError});
+    if(project?.releaseAttempt)delete project.releaseAttempt;
+    if(project?.ownedClient?.disposed){project.ownedClient=this.client.fork();project.provider.client=project.ownedClient;delete project.releaseAttempt;delete project.provider.connection;delete project.provider.snapshot;delete project.provider.probe;}
     if (!project) {
       const provider = new NativeSourceProvider({ client: this.client, config, projectRoot: current.uri.fsPath,
         validateContext: () => { if (this.project(current) !== project) throw Error('The selected source project changed.'); } });
@@ -136,7 +140,7 @@ class NativeSourceWorkspace {
     const pending=owner.pendingChanges.get(candidate);if(pending){clearTimeout(pending.timer);owner.pendingChanges.delete(candidate);}
     for(const listener of owner.forwarding.get(candidate)||[])listener.dispose();
     owner.forwarding.delete(candidate);owner.projects.delete(key);
-    if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);current.files.dispose();}
+    if(current){for(const listener of this.forwarding.get(current)||[])listener.dispose();this.forwarding.delete(current);void this.releaseProject(current).catch(error=>this.reportError(error));current.files.dispose();}
     candidate.provider.validateContext=()=>{if(this.project(folder)!==candidate)throw Error('The selected source project changed.');};
     this.projects.set(key,candidate);
     this.forwarding.set(candidate,listeners);
@@ -209,6 +213,21 @@ class NativeSourceWorkspace {
     }
   }
 
+  releaseProject(project){
+    if(project.releaseAttempt)return project.releaseAttempt;
+    project.retiring=true;
+    const closing=(async()=>{
+      const failures=[];
+      try{await project.provider.closeProject();}catch(error){failures.push(error);}
+      try{await project.ownedClient?.dispose();}catch(error){failures.push(error);}
+      if(failures.length===1)throw failures[0];
+      if(failures.length)throw new AggregateError(failures,'Native source model and owned session release failed.');
+    })();
+    project.releaseAttempt=closing;
+    void closing.then(()=>{project.retiring=false;},error=>{project.retiring=false;project.retirementError=error;});
+    return closing;
+  }
+
   retireClosedProjects() {
     const open = new Set(this.folders().map(folder => folder.uri.toString()));
     for (const project of this.projects.values()) if (!open.has(project.folder.uri.toString())) {
@@ -216,7 +235,7 @@ class NativeSourceWorkspace {
       this.pendingChanges.delete(project); this.changing.get(project)?.source?.cancel();
       for (const watcher of project.watchers?.values() || []) watcher.dispose();
       project.watchers?.clear();
-      void project.provider.closeProject().catch(error => this.reportError(error));
+      void this.releaseProject(project).catch(error => this.reportError(error));
     }
   }
 
@@ -406,7 +425,7 @@ class NativeSourceWorkspace {
     this.sourceListeners.clear();
     for (const listeners of this.forwarding.values()) for (const listener of listeners) listener.dispose();
     for (const project of this.projects.values()) {
-      void project.provider.closeProject().catch(error => this.reportError(error));
+      void this.releaseProject(project).catch(error => this.reportError(error));
       project.files.dispose();
     }
     this.forwarding.clear(); this.projects.clear(); this.events.dispose();

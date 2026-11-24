@@ -17,6 +17,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const state=context.workspaceState;
   const explicitConfigFor=configFor;
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
+  const transientRuntime={values:()=>({}),stage:(_values,{validate=()=>{}}={})=>({commit:validate,rollback:async()=>{}})};
   const savedFiles=state?.get(CHECKOUT_FILES,{});
   const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&/^[a-f0-9]{64}$/.test(entry.fingerprint)&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory'].includes(key)&&typeof value==='string')));
   const projectBytes=folder=>require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(folder.uri.fsPath,'jade.json'))).digest('hex');
@@ -92,7 +93,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&configured.workingMode!=='git-first')return;
-    let detectedDefaults=privateRuntime(folder).values();
+    let detectedDefaults=checkoutRoots.has(folder.uri.toString())?privateRuntime(folder).values():{};
     let explicitProject=fs.existsSync(path.join(folder.uri.fsPath,'jade.json'));
     const reviewedFingerprint=explicitProject?projectBytes(folder):undefined;
     let files=[];
@@ -117,9 +118,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     }
     if(!configured.workingMode&&!explicitProject){
       if(files.length){
-        configured={...privateRuntime(folder).values(),...configFor(folder)};
+        configured={...detectedDefaults,...configFor(folder)};
         if(!configured.installPath||!configured.workingSeedDirectory){
-          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
+          const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:explicitProject?transientRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
           if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
           runtime=detected.settings?detected:undefined;
           configured={...configured,...(runtime?.settings||detected)};
@@ -130,7 +131,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       }
     }
     if(configured.workingMode==='git-first'&&(!configured.installPath||!configured.workingSeedDirectory)){
-      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
+      const detected=await detect(folder.uri,undefined,{checkout:true,deferSave:true,privateRuntime:explicitProject?transientRuntime:privateRuntime(folder),resolved:{installPath:configured.installPath,workingSeedDirectory:configured.workingSeedDirectory}});
       if(!detected)throw Object.assign(Error('Git-first runtime selection cancelled.'),{cancelled:true});
       runtime=detected.settings?detected:undefined;
       configured=sourceRoot?checkoutConfiguration({...configured,...(runtime?.settings||detected)},sourceRoot):{...configured,...(runtime?.settings||detected)};
@@ -226,7 +227,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true})){
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
           binding.retained=true;
-        }else workspace.adoptProject(folder,binding.workspace,binding.previous);
+        }else{const adopted=workspace.adoptProject(folder,binding.workspace,binding.previous);adopted.ownedClient=binding.client;}
         if(binding.retained){await binding.project.provider.closeProject();await binding.client.dispose();await requireReviewedDiscovery(folder,binding.record);if(JSON.stringify(configDto(configFor(folder)))!==acceptedSettings)throw Error('Runtime settings changed during setup cleanup; restart setup.');}
         if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       }catch(error){
