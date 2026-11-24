@@ -348,27 +348,35 @@ class NativeSourceProvider {
     return entry.result;
   }
 
-  async requireSync() {
-    if ((await this.capability()).sync !== true)
-      throw Error('The bundled Jade CLI does not support JOX sync. Install a Jade Tools update with a runtime qualified for sync.');
+  async requireSync({expectedWorkingIdentity} = {}) {
+    const capabilities=await this.capability();
+    if(expectedWorkingIdentity!==undefined){
+      required(expectedWorkingIdentity,'reviewed Working identity');
+      if(capabilities.reviewedWorkingSync!==true)throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
+    }
+    if(capabilities.sync!==true)throw Error('The bundled Jade CLI does not support JOX sync. Install a Jade Tools update with a runtime qualified for sync.');
   }
 
-  async sync({ token, output, beforeRequest } = {}) {
-    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
-    const snapshot = await this.prepare(token);
-    if (!this.flags.sync) throw Error('This Jade CLI does not support sync for the selected JOX project.');
-    const connection = this.connection;
-    if (this.config.workingJadeGitPolicy && this.config.workingJadeGitPolicy !== 'inherit')
-      await require('./working-jadegit-policy').requireWorkingJadeGitPolicy(this.client, this.config);
-    if (token?.isCancellationRequested) return { passed: false, code: 130, cancelled: true };
-    this.validateContext();
-    this.assertConnection(connection);
-    this.assertBinding(snapshot);
-    if (snapshot.snapshotHash !== this.snapshot.snapshotHash) throw Error('The saved JOX snapshot changed. Retry sync.');
-    beforeRequest?.();
-    const { provider, projectId, generation, snapshotHash } = snapshot;
-    return this.requestExecution('sync', { cwd: this.root, config: clone(this.config),
-      sourceSnapshot: { provider, projectId, generation, snapshotHash } }, { token, output }, connection);
+  async sync({token,output,beforeRequest,expectedWorkingIdentity} = {}) {
+    if(token?.isCancellationRequested)return{passed:false,code:130,cancelled:true};
+    await this.requireSync({expectedWorkingIdentity});
+    const snapshot=await this.prepare(token);
+    if(!this.flags.sync)throw Error('This Jade CLI does not support sync for the selected JOX project.');
+    const connection=this.connection;
+    if(this.config.workingJadeGitPolicy&&this.config.workingJadeGitPolicy!=='inherit')await require('./working-jadegit-policy').requireWorkingJadeGitPolicy(this.client,this.config);
+    if(token?.isCancellationRequested)return{passed:false,code:130,cancelled:true};
+    this.validateContext();this.assertConnection(connection);this.assertBinding(snapshot);
+    if(snapshot.snapshotHash!==this.snapshot.snapshotHash)throw Error('The saved JOX snapshot changed. Retry sync.');
+    await beforeRequest?.();
+    if(token?.isCancellationRequested)return{passed:false,code:130,cancelled:true};
+    this.validateContext();this.assertConnection(connection);this.assertBinding(snapshot);
+    if(snapshot.snapshotHash!==this.snapshot.snapshotHash)throw Error('The saved JOX snapshot changed before sync. Retry sync.');
+    const {provider,projectId,generation,snapshotHash}=snapshot;
+    const result=await this.requestExecution('sync',{cwd:this.root,config:clone(this.config),
+      ...(expectedWorkingIdentity===undefined?{}:{expectedWorkingIdentity}),sourceSnapshot:{provider,projectId,generation,snapshotHash}},{token,output},connection);
+    if(expectedWorkingIdentity!==undefined&&result.passed===true&&result.code===0&&result.report?.reviewedWorkingIdentity!==expectedWorkingIdentity)
+      throw Object.assign(Error('Native sync did not confirm the reviewed Working target.'),{result:{...result,passed:false,code:2}});
+    return result;
   }
 
   async executeBatch(command, operations, { token, output } = {}) {

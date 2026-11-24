@@ -265,6 +265,7 @@ function completeJoxFixture(t,{configured=false,cancelDetect=false,cancelReview=
    fs.writeFileSync(path.join(f.root,'jade.json'),'{"connection":"native-profile","sourceFormat":"jox"}');
    return{promise:Promise.resolve({passed:true,code:0,created:true,git:{root:f.root,initialized:true,reused:false,ignoreEnsured:true}})};
   }
+  if(command==='prepare')return{promise:Promise.resolve({passed:true,code:0,prepared:{config:{sourceFormat:'jox',connection:'native-profile'},configFile:path.join(f.root,'jade.json')}})};
   if(command==='working.location')return reply({working,source:{databasePath:settings.databasePath,iniPath:settings.iniPath,server:settings.server},initialization:{destination}});
   if(command==='working.initialize'){
    if(failInitialization&&!failed){failed=true;return{promise:Promise.resolve({passed:false,code:6295,report:{error:'Native restore stopped; existing owned outputs preserved'}})};}

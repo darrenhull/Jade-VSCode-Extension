@@ -29,3 +29,11 @@ test('retains the contained fixture when its owned broker remains alive after ac
  try{await assert.rejects(fixture.run(async({root,stateDirectory})=>{stage=root;fs.mkdirSync(stateDirectory,{recursive:true});fs.writeFileSync(path.join(stateDirectory,'owner.json'),JSON.stringify({brokerPID:31337,nativePIDs:[]}));}),/still running|artifacts retained|cleanup/i);assert.equal(fs.existsSync(stage),true);}
  finally{alive=false;assert.equal(path.dirname(fs.realpathSync(container)),fs.realpathSync(os.tmpdir()));fs.rmSync(container,{recursive:true,force:true});}
 });
+
+test('forked proxy tracking still shuts down through the original owned session',async()=>{
+ const container=fs.mkdtempSync(path.join(os.tmpdir(),'jade-owned-fork-test-'));const first=proxy(),fork=proxy();let alive=true,shutdown=false,index=0,stage;
+ const artifacts=new HostTestArtifacts({root:container,minimumFreeBytes:0,isAlive:()=>alive,waitMilliseconds:10,pollMilliseconds:1});
+ const fixture=new OwnedCliFixture({entry:'fixture.exe',artifacts,spawn:()=>index++?fork:first,createSession:options=>{options.spawn('fixture.exe',[],{env:{}});options.spawn('fixture.exe',[],{env:{}});return{client:{child:first},request(command){assert.equal(command,'shutdown');shutdown=true;alive=false;first.exitCode=0;first.emit('close',0);return{promise:Promise.resolve({passed:true})};},dispose(){}};}});
+ try{await fixture.run(async({root,stateDirectory})=>{stage=root;fs.mkdirSync(stateDirectory,{recursive:true});fs.writeFileSync(path.join(stateDirectory,'owner.json'),JSON.stringify({brokerPID:31337,nativePIDs:[]}));fork.exitCode=0;fork.emit('close',0);});assert.equal(shutdown,true);assert.equal(fs.existsSync(stage),false);}
+ finally{alive=false;for(const child of [first,fork])if(child.exitCode===null){child.exitCode=0;child.emit('close',0);}assert.equal(path.dirname(fs.realpathSync(container)),fs.realpathSync(os.tmpdir()));fs.rmSync(container,{recursive:true,force:true});}
+});

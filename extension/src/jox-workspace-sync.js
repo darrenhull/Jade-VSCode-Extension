@@ -14,7 +14,7 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
     await setAvailable(false);
     if (disposed || current !== revision || !trusted()) return;
     let supported;
-    try { supported = (await selectedProject().provider.capability()).sync === true; }
+    try { supported = (await workspace.probeCapability(selectedProject())).sync === true; }
     catch { return; }
     if (!disposed && current === revision && supported) await setAvailable(true);
   };
@@ -61,6 +61,7 @@ function registerJoxWorkspaceSync(vscode, context, workspace) {
   for (const event of [vscode.window.onDidChangeActiveTextEditor, vscode.workspace.onDidChangeWorkspaceFolders,
     vscode.workspace.onDidGrantWorkspaceTrust, vscode.workspace.onDidChangeConfiguration])
     if (event) context.subscriptions.push(event(refresh));
+  if(workspace.onDidChangeSource)context.subscriptions.push(workspace.onDidChangeSource(refresh));
   refresh();
 }
 

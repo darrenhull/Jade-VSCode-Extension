@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Browse and edit JOX source and run local native Jade tests in Visual Studio Code.",
-  "version": "0.23.3",
+  "version": "0.23.4",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -685,6 +685,12 @@
           "scope": "resource",
           "description": "Jade installation directory containing bin/jom.dll."
         },
+        "jadeNative.workingSeedDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Local approved vendor-only Fresh Copy seed for Git-first Working setup. The native CLI verifies the seed fingerprints; application databases are refused."
+        },
         "jadeNative.databasePath": {
           "type": "string",
           "default": "",
@@ -796,6 +802,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.11.1"
+    "minimumCliVersion": "0.11.6"
   }
 }

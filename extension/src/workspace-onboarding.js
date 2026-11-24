@@ -62,37 +62,45 @@ function registerWorkspaceOnboarding(vscode,context,services){
   const name=await vscode.window.showInputBox({title:'Name the new project folder',validateInput:validate});if(name===undefined)return;if(validate(name))throw Error(validate(name));
   const directory=path.join(parent.fsPath,name);await fs.promises.mkdir(directory);return{uri:vscode.Uri.file(directory)};
  }
- async function runJox(folder){
+ async function runJox(folder,repository){
   const status={gitReady:false,configurationReady:false,workingPrepared:false,sourceReady:false,viewsReady:false,completed:false};
   let stage='configuration';
   try{
-   const checkout=await services.checkoutTargets?.(folder);requireFolder(folder);
+   const checkout=await services.checkoutTargets?.(folder,{repository});requireFolder(folder);
    if(checkout){
     status.gitReady=true;status.configurationReady=true;stage='review';
     const creating=checkout.workingState==='new';
-    const action=creating?'Create Working from checkout':'Reopen Git-first Working';
+    const action=creating?'Create Working from checkout':'Sync checkout to Working';
     const savedRoot=require('node:url').fileURLToPath(checkout.sourceRoots[0]);
     const confirm=await vscode.window.showWarningMessage(action+'?',{modal:true,detail:'Jade installation: '+checkout.working.installPath+
      '\nWorking: '+checkout.working.databasePath+'\nSaved JOX: '+savedRoot+'\n\nNo application Source database is used. '+
-     (creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Reopen only the accepted generation. Run Sync to Working to load newer saved changes.')},action);
+     (creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Connect to the accepted generation, then sync saved checkout changes before refreshing views.')},action);
     requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
-    stage='working';
+    stage='working';let accepted;
+    await services.activateCheckout?.(folder,checkout);
     if(creating){
      const result=await services.initializeCheckout(folder,checkout);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
-     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;
+     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;requireFolder(folder);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
+     accepted=await services.commitCheckout?.(folder,checkout);
     }else{
      const result=await services.connectWorking(folder,checkout);
      if(result?.selection!=='working'||result?.readOnly!==true)throw Error('Native Git-first Working reopen was not confirmed.');
      status.workingPrepared=true;
+     const synced=await services.syncCheckout(folder,checkout);
+     status.nativeSyncResult=synced;
+     if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
+     status.sourceReady=true;
+     requireFolder(folder);
+     accepted=await services.commitCheckout?.(folder,checkout);
     }
     stage='refresh';requireFolder(folder);
-    await services.refreshProject(folder,{prepared:creating});requireFolder(folder);
+    await services.refreshProject(folder,{prepared:accepted?.prepared!==false});requireFolder(folder);
     status.sourceReady=true;status.viewsReady=true;stage='explorer';
     await services.openExplorer(folder);requireFolder(folder);
-    log(creating?'Git-first Working is ready for the saved checkout.':'The accepted Git-first Working database is ready.');
+    log(creating?'Git-first Working is ready for the saved checkout.':'Working is ready for the current saved checkout.');
     return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:'git-first'};
    }
    const initialized=await services.initialize(folder.uri);requireFolder(folder);
@@ -132,6 +140,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
    log('Jade project is ready. Working and saved sources are prepared; Object Explorer and tests are refreshed.');
    return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:existing?'existing':'extract'};
   }catch(error){
+   try{await services.abortCheckout?.(folder);}catch(cleanup){error.message+=' Checkout cleanup failed: '+cleanup.message;}
    const native=error.result,cancelled=native?native.cancelled===true:error.cancelled===true;
    error.result={...status,...native,passed:false,completed:false,stage,code:native?.code??(cancelled?130:2),...(cancelled?{cancelled:true}:{})};
    error.message='Jade setup stopped during '+stage+': '+error.message;
@@ -147,7 +156,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
   requireFolder(folder);const repository=await api.openRepository(folder.uri);requireFolder(folder);
   if(!services.jox&&repository?.state?.remotes?.length){const choice=await vscode.window.showQuickPick([{label:'Use the current checkout',kind:'current'},{label:'Pull changes with Git',kind:'pull'}],{title:'Repository sources · '+folder.name,placeHolder:repository.rootUri?.fsPath||folder.uri.fsPath});if(!choice)return{cancelled:true};if(choice.kind==='pull'){log('Pulling through VS Code Git; conflicts and local edits remain under Git control.');await repository.pull();requireFolder(folder);}}
   log('Initialising project configuration and Git ignore'+(services.jox?'':' and the shared source index')+' in '+folder.uri.fsPath+'.');
-  if(services.jox)return runJox(folder);
+  if(services.jox)return runJox(folder,repository);
   const initialized=await services.initialize(folder.uri);requireFolder(folder);
   if(initialized?.cancelled)return{cancelled:true,configurationReady:false,workingPrepared:false};
   if(initialized?.passed!==true||initialized.code!==0)throw Error(initialized?.report?.error||initialized?.error||'Native workspace initialization did not complete.');

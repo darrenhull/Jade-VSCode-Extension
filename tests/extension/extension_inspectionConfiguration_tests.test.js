@@ -13,7 +13,7 @@ function setup(explicit={},nativeFailure){
  const workspace={executing:false,projectForUri:()=>({folder}),sourceContext(){}};
  const context={extensionPath:root,subscriptions:[],workspaceState:{get:()=> 'retired-editor-generation'}};
  const actualRequire=createRequire(sourcePath),module={exports:{}};
- const requireModule=name=>name==='vscode'?vscode:name==='./cli-client'?{CliWorkingSession:class{constructor(){return client;}}}:name==='./cli-gateway'?{configure(){}}:name==='./register-jox-workspace'?{registerJoxWorkspace:()=>({workspace})}:name==='./object-explorer'?{registerObjectExplorer:(_v,_c,options)=>{inspection=options;return{releaseForOperation(){}};}}:name==='./jox-project-setup'?{registerJoxProjectSetup:()=>({onboarding:{resume:async()=>{}}})}:actualRequire(name);
+ const requireModule=name=>name==='vscode'?vscode:name==='./cli-client'?{CliWorkingSession:class{constructor(){return client;}}}:name==='./cli-gateway'?{configure(){}}:name==='./register-jox-workspace'?{registerJoxWorkspace:()=>({workspace})}:name==='./object-explorer'?{registerObjectExplorer:(_v,_c,options)=>{inspection=options;return{releaseForOperation(){}};}}:name==='./jox-project-setup'?{registerJoxProjectSetup:(_v,_c,_w,options)=>({configFor:options.configFor,onboarding:{resume:async()=>{}}})}:actualRequire(name);
  vm.runInNewContext(fs.readFileSync(sourcePath,'utf8')+'\nmodule.exports.activateForInspectionControl=activate;',{require:requireModule,module,exports:module.exports,process:{platform:process.platform,env:{...process.env,JADE_INSTALL:''}},__dirname:path.dirname(sourcePath),console});
  module.exports.activateForInspectionControl(context);
  return{inspection,folder,resolved,configFile,requests,targetCalls,locationCalls};

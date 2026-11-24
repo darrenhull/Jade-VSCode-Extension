@@ -15,7 +15,7 @@ const {diagnosticLocation,diagnosticLines}=require('./compiler-diagnostic-presen
 
 let activeNativeService;
 
-const keys = ['installPath', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope', 'disableJadeGitForWorking'];
+const keys = ['installPath', 'workingSeedDirectory', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope', 'disableJadeGitForWorking'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));
@@ -44,7 +44,7 @@ function expand(value, folder, resource=jadeSourceUri(vscode)) {
     .replaceAll('${file}', resource?.fsPath || '');
 }
 
-async function detectSettings(selectedResource, cancellationToken) {
+async function detectSettings(selectedResource, cancellationToken, options={}) {
   const cancelled = () => cancellationToken?.isCancellationRequested;
   if (cancelled()) return;
   const prompt = async show => {
@@ -70,13 +70,17 @@ async function detectSettings(selectedResource, cancellationToken) {
     return current && path.resolve(current.uri.fsPath).toLowerCase() === path.resolve(folder.uri.fsPath).toLowerCase();
   };
   const settings = vscode.workspace.getConfiguration('jadeNative', folder.uri);
+  const privateRuntimeSnapshot=options.privateRuntime?.values();
+  const selectionSnapshot=options.checkout&&options.deferSave?{raw:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)])),effective:Object.fromEntries(['installPath','workingSeedDirectory'].map(key=>[key,settings.get(key)]))}:undefined;
+  let installPath=options.checkout?options.resolved?.installPath:undefined;
+  if(!installPath){
   const candidates = new Set([settings.get('installPath'), process.env.JADE_INSTALL].filter(Boolean));
   const drive = process.env.SystemDrive || 'C:';
   for (const entry of fs.readdirSync(drive + path.sep, { withFileTypes: true })) {
     if (entry.isDirectory() && /^jade\d{4}$/i.test(entry.name)) candidates.add(path.join(drive + path.sep, entry.name));
   }
   const valid = [...candidates].filter(candidate => fs.existsSync(path.join(candidate, 'bin', 'jom.dll')));
-  let installPath;
+
   if (valid.length) {
     const selected = await prompt(() => vscode.window.showQuickPick([
       ...valid.map(directory => ({ label: directory, description: 'Detected Jade installation', directory })),
@@ -86,8 +90,17 @@ async function detectSettings(selectedResource, cancellationToken) {
     if (!selected.browse) installPath = selected.directory;
     else installPath = (await chooseFolder('Select Jade installation folder (contains bin/jom.dll)'))?.[0]?.fsPath;
   } else installPath = (await chooseFolder('Select Jade installation folder (contains bin/jom.dll)'))?.[0]?.fsPath;
+  }
   if (!installPath || cancelled()) return;
   const detected = inspectInstall(installPath);
+  let values;
+  if(options.checkout){
+    const seed=options.resolved?.workingSeedDirectory||settings.get('workingSeedDirectory')||(await chooseFolder('Select the approved vendor-only Fresh Copy seed directory'))?.[0]?.fsPath;
+    if(!seed||cancelled()||!sameFolder())return;
+    values={};
+    if(!options.resolved?.installPath)values.installPath=detected.installPath;
+    if(!options.resolved?.workingSeedDirectory)values.workingSeedDirectory=seed;
+  }else{
   if (!detected.databasePath) {
     detected.databasePath = (await chooseFolder('Select Jade database directory'))?.[0]?.fsPath;
     if (!detected.databasePath || cancelled()) return;
@@ -103,21 +116,50 @@ async function detectSettings(selectedResource, cancellationToken) {
     { label: 'Multi user', description: detected.serverConnection || 'Connect using the selected INI', value: 'multiUser' }
   ], { title: `Jade server mode (INI: ${detected.serverFromIni || 'unspecified'})` }, cancellationToken));
   if (!selection || cancelled() || !sameFolder()) return;
-  const values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
+  values = { installPath: detected.installPath, databasePath: detected.databasePath, iniPath: detected.iniPath, server: selection.value };
+  }
+  const previous=selectionSnapshot?.raw||Object.fromEntries(Object.keys(values).map(key=>[key,settings.inspect?settings.inspect(key)?.workspaceFolderValue:settings.get(key)]));
+  const written=new Map();
+  const currentSettings=()=>vscode.workspace.getConfiguration('jadeNative',folder.uri);
+  const folderValue=key=>{const current=currentSettings();return current.inspect?current.inspect(key)?.workspaceFolderValue:current.get(key);};
+  const unchanged=key=>{const current=currentSettings();return(!current.inspect||Object.is(current.inspect(key)?.workspaceFolderValue,previous[key]))&&(!selectionSnapshot||Object.is(current.get(key),selectionSnapshot.effective[key]));};
+  const persist=async()=>{
+  if(options.deferSave&&Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');
   // Settings updates are uncancellable: finish the started save before Connect settles.
   let saved = 0;
   try {
     for (const [key, value] of Object.entries(values)) {
       if (!sameFolder()) throw new Error('Selected workspace folder changed; restart runtime setup.');
-      await settings.update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
-      saved++;
+      if(options.deferSave&&!unchanged(key))throw Error('Runtime settings changed after review; restart setup.');
+      await currentSettings().update(key, value, vscode.ConfigurationTarget.WorkspaceFolder);
+      written.set(key,value);saved++;
     }
   } catch (error) {
-    throw new Error(`Jade runtime settings save failed after ${saved} of 4 fields; earlier saves remain. ${error.message}`, { cause: error });
+    throw new Error(`Jade runtime settings save failed after ${saved} of ${Object.keys(values).length} fields; earlier saves remain. ${error.message}`, { cause: error });
   }
   if (cancelled()) return;
-  void vscode.window.showInformationMessage('Jade runtime settings saved. You can now connect to Database Objects.');
+  if(!options.deferSave)void vscode.window.showInformationMessage(options.checkout?'Jade installation and vendor seed saved. Continuing project setup.':'Jade runtime settings saved. You can now connect to Database Objects.');
   return values;
+  };
+  if(options.checkout&&options.deferSave){
+    if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed during selection; restart setup.');
+    if(options.privateRuntime){
+      const transaction=options.privateRuntime.stage(values,{previous:privateRuntimeSnapshot,validate:()=>{if(!sameFolder())throw Error('Selected workspace folder changed; restart runtime setup.');if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');}});
+      return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),...transaction};
+    }
+    let attempted=false;
+    return {settings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,expand(value,folder,folder.uri)])),commit:async()=>{attempted=true;return persist();},rollback:async()=>{
+      if(!attempted)return;
+      const failures=[];
+      for(const [key,value] of written){
+        if(settings.inspect&&!Object.is(folderValue(key),value)){failures.push(key+' changed during setup; user value preserved.');continue;}
+        try{await currentSettings().update(key,previous[key],vscode.ConfigurationTarget.WorkspaceFolder);written.delete(key);}catch(error){failures.push(error.message);}
+      }
+      if(failures.length)throw Error('Runtime settings rollback failed: '+failures.join('; '));
+      attempted=false;
+    }};
+  }
+  return persist();
 }
 
 async function detectSettingsCommand(resource, cancellationToken) {
@@ -129,7 +171,7 @@ function activate(context) {
   activeNativeService = nativeTests;
   require('./cli-gateway').configure(nativeTests);
   context.subscriptions.push(nativeTests,{dispose:()=>require('./cli-gateway').configure(undefined)});
-  const configFor = folder => ({sourceFormat:'jox',...Object.fromEntries(Object.entries(explicitDefaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]))});
+  let configFor = folder => ({sourceFormat:'jox',...Object.fromEntries(Object.entries(explicitDefaults(folder.uri)).map(([key,value])=>[key,expand(value,folder,folder.uri)]))});
   const inspectionConfigFor = folder => require('./inspection-config').inspectionConfiguration(nativeTests,folder.uri.fsPath,configFor(folder));
   let objectExplorer;
   const source = require('./register-jox-workspace').registerJoxWorkspace(vscode,context,{client:nativeTests,configFor,instances:row=>objectExplorer?.browseInstances(row)});
@@ -146,6 +188,7 @@ function activate(context) {
   });
   source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
   const setup=require('./jox-project-setup').registerJoxProjectSetup(vscode,context,source.workspace,{client:nativeTests,configFor,detect:detectSettings});
+  configFor=setup.configFor;
   void setup.onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));
   context.subscriptions.push(vscode.commands.registerCommand('jadeNative.discover',detectSettingsCommand));
   const tools=require('./jox-tools').registerJoxTools(vscode,context);

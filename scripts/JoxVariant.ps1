@@ -54,7 +54,7 @@ function Assert-JoxAnsiVariant([Collections.IDictionary]$Manifest,[string]$Direc
  $flags=@('managedUpload','nativeTests','initialization','nativeScratch');$keys=@('format','characterSet','engineCommit')+$flags
  if($ansi -is [Collections.IDictionary]){foreach($key in @('sync','checkoutInitialization','checkoutSeed')){if($ansi.Contains($key)){$keys+=$key}}}
  if($variants -isnot [Collections.IDictionary] -or $variants.Count -ne 1 -or !$variants.Contains('ansi') -or $ansi -isnot [Collections.IDictionary] -or $ansi.Count -ne $keys.Count -or @($ansi.Keys|Where-Object{$_ -notin $keys}).Count -or ($ansi.format -isnot [int] -and $ansi.format -isnot [long]) -or $ansi.format -ne 1 -or $ansi.characterSet -cne 'ansi' -or $ansi.engineCommit -cne $jox.engineCommit){throw 'ANSI runtime needs an exact qualified per-mode declaration.'}
- foreach($flag in $flags){if($ansi[$flag] -isnot [bool] -or $ansi[$flag] -ne ($flag -ne 'nativeScratch')){throw 'ANSI runtime purpose is not qualified or is not an explicit boolean.'}}
+ foreach($flag in $flags){if($ansi[$flag] -isnot [bool] -or ($flag -ne 'nativeScratch' -and !$ansi[$flag])){throw 'ANSI runtime purpose is not qualified or is not an explicit boolean.'}}
  $names=@('jade-jox-test-helper-ansi.exe','jadegitscm.dll','jadegitdev.dll');$proofName=$prefix+'runtime-provenance.json'
  if($payload.Count -ne 4){throw 'ANSI fixed helper, components and provenance are required.'}
  foreach($name in ($names+@('runtime-provenance.json'))){if(!$Manifest.runtimeFiles.Contains($prefix+$name)){throw 'ANSI fixed helper, components and provenance are required.'}}

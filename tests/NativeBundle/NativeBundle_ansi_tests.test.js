@@ -96,3 +96,8 @@ Write-Output 'PASS ANSI atomic update and retained previous receipt'
  const result=spawnSync('pwsh',['-NoProfile','-NonInteractive','-File',runner,updater,f.source,path.join(f.root,'consumer'),f.root],{encoding:'utf8',windowsHide:true});
  assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout,/PASS ANSI atomic/);
 });
+
+test('explicit qualified ANSI scratch is accepted while nonboolean or producer mismatch remains refused',t=>{
+ const f=fixture(t);f.manifest.joxRuntime.variants.ansi.nativeScratch=true;f.proof.qualification.nativeScratch=true;f.save();bundleCli(f);assert.equal(f.verify().status,0);
+ for(const bad of [false,'true',undefined]){f.proof.qualification.nativeScratch=bad;f.save();assert.throws(()=>bundleCli(f),/ANSI/i);assert.notEqual(f.verify().status,0);}
+});
