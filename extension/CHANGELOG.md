@@ -1,3 +1,10 @@
+# 0.23.4 - Jade CLI 0.11.4
+
+- Set up a saved JOX Git checkout without creating jade.json; detect machine settings and synchronize an existing Working copy automatically.
+- Require the qualified CLI 0.11.4 checkout capability and keep unsupported Scratch and debugging disabled.
+
+- Bundles [Jade CLI 0.11.4](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.4) for local Jade operations.
+
 # 0.23.3 - Jade CLI 0.11.3
 
 - Bundles [Jade CLI 0.11.3](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.3) for local Jade operations.

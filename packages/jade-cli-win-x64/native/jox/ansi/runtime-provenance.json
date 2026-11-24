@@ -49,8 +49,8 @@
   },
   "checkoutProof": {
     "format": 1,
-    "cliSha256": "595f4ce558e68db5873fe22fe42ad6d5ec7f36acf07550e27ea91ca6f7b4bf20",
-    "receiptSha256": "f97eff2c89a9438c0c2b7dc6a4f7afaa6ae340b512f5271271d73285b2fe8d49",
+    "cliSha256": "6409d1d501d766d0aa481282dc53ec64dfdda3b71283fbc628b9f1d991da49ce",
+    "receiptSha256": "9865acd0f4419be72e1ccc00c1d097a1b8f897b758a433733de8271db571abbd",
     "files": {
       "jade-jox-test-helper-ansi.exe": "e6f665bf6850bd9efdff4eae1ab4c14f90e30529704178cc1e04a8064c0546a7",
       "jadegitscm.dll": "1262f4e813ed1067d885f510df7c6e7b667cd25f590b8d2227462bc00913274a",
@@ -58,9 +58,9 @@
     },
     "seed": {
       "platform": "25.0.1",
-      "monitorSha256": "45a953c8981abb28ddd4b290b0a2c4aba53a169e715353a386cacac2921e57e7",
       "jomSha256": "d7d235da0f027814df47de740855509a7c222c83dd2c4289ce4853241bcea9e0",
-      "controlSha256": "8eecbf2aedc216bb2871672b233fad6ff2325e6d373eb9c38ae6ad9b6862f65c"
+      "controlSha256": "8eecbf2aedc216bb2871672b233fad6ff2325e6d373eb9c38ae6ad9b6862f65c",
+      "monitorSha256": "45a953c8981abb28ddd4b290b0a2c4aba53a169e715353a386cacac2921e57e7"
     },
     "checks": {
       "sourceFreeSetup": true,
