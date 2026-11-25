@@ -88,7 +88,7 @@ test('shipped activation uses one shared CLI and never loads legacy source index
     return name.startsWith('./') ? require('../../extension/src/' + name.slice(2)) : require(name);
   };
   vm.runInNewContext('(function(require,module,__dirname){' + source + '\n})', { process, Buffer, console })(require_, exported, path.resolve(__dirname, '../../extension/src'));
-  const registered = exported.exports.activate({ ...f.context, extensionPath: 'C:/extension', workspaceState: { get: () => 'initial' } });
+  const registered = exported.exports.activate({ ...f.context, extensionPath: 'C:/extension', workspaceState: { get: () => undefined } });
   assert.equal(registered.nativeTests, f.client); assert.equal(inspection.client, f.client);
   const config = await inspection.config(undefined, f.folder);
   assert.equal(config.databasePath, settings.databasePath); assert.equal(config.iniPath, settings.iniPath);

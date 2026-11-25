@@ -1,0 +1,6 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {checkoutRoute}=require('../../extension/src/checkout-route');
+test('real root schemas checkout defaults to its configured Working despite detected database and connection-only config',()=>{const machine={databasePath:'C:/Working/system',iniPath:'C:/Working/jade.ini',installPath:'C:/Jade',connection:'current'};const value=checkoutRoute(machine,{connection:'current',sourceFormat:'jox'},'C:/repo');assert.equal(value.workingMode,'existing');assert.equal(value.databasePath,machine.databasePath);assert.equal(value.iniPath,machine.iniPath);assert.deepEqual(value.workspaceRoots,[path.resolve('C:/repo')]);assert.equal(value.workingSeedDirectory,undefined);assert.equal(value.sourceDatabasePath,undefined);});
+test('explicit source-backed project preserves extraction as opt-in',()=>{assert.equal(checkoutRoute({databasePath:'C:/Base'},{workingMode:'source-backed'},'C:/repo'),undefined);});
+test('user-authored roots and explicit connection remain authoritative',()=>{const value=checkoutRoute({connection:'machine',databasePath:'C:/Working'},{connection:'project',workspaceRoots:['src']},'C:/repo');assert.equal(value.connection,'project');assert.deepEqual(value.workspaceRoots,['src']);});

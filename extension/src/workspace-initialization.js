@@ -1,5 +1,6 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),{randomUUID}=require('node:crypto');
+const fs=require('node:fs'),path=require('node:path');
+const {WorkspaceConnectionProfile}=require('./WorkspaceConnectionProfile');
 
 // Native CLI owns Git/ignore and project/profile setup; this command presents progress.
 function registerWorkspaceInitialization(vscode,context,services){
@@ -12,6 +13,7 @@ function registerWorkspaceInitialization(vscode,context,services){
   if(!folder&&folders.length)folder=(await vscode.window.showQuickPick(folders.map(folder=>({label:folder.name,description:folder.uri.fsPath,folder})),{title:'Choose Jade workspace to initialise'}))?.folder;
   if(!folder){if(!folders.length)void vscode.window.showInformationMessage('Create or open a source folder, then run Jade: Initialise Workspace.');return{cancelled:true};}
   const key=folder.uri.fsPath;if(pending.has(key))return pending.get(key);
+  const profiles=new WorkspaceConnectionProfile(context.workspaceState,folder.uri.toString?.()||key,(...args)=>vscode.window.showQuickPick(...args));
   const sameFolder=()=>vscode.workspace.getWorkspaceFolder(folder.uri)?.uri.fsPath===key;
   const requireFolder=()=>{if(!sameFolder())throw Error('Workspace changed during setup.');};
   let runtimeDetected=false;
@@ -47,7 +49,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    if(!original){
     const config=await runtimeConfig();if(!config)return{cancelled:true};initialConfig=config;
     // Unique native profile avoids replacing another project's shared profile.
-    if(!services.nativeDiscovery||config.installPath)argv.push('--profile','vscode-'+randomUUID(),...argumentsFor(config));
+    if(!services.nativeDiscovery||config.installPath)argv.push('--profile',profiles.nameFor(config),...argumentsFor(config));
    }
    output.show(true);output.appendLine('Initialising Git and configuration in '+key+'. This does not extract, back up, build or publish.');
    async function invoke(args,expectedConfig=initialConfig){
@@ -61,6 +63,10 @@ function registerWorkspaceInitialization(vscode,context,services){
     }).promise;
    }
    let result=await invoke(argv);
+   if(result?.passed!==true){
+    const profile=await profiles.select(result?.report?.error);
+    if(profile)result=await invoke([...argv,'--profile',profile]);
+   }
    const failure=value=>value?.report?.error||'Native workspace initialisation failed.';
    // Only the native missing-profile diagnosis enables repair. Other failures keep their cause.
    if(original&&result?.passed!==true&&result?.code===2&&result?.cancelled!==true&&/^Unknown Jade connection profile '/.test(failure(result))){
@@ -82,7 +88,7 @@ function registerWorkspaceInitialization(vscode,context,services){
     output.appendLine(failure(result));
     const config=await runtimeConfig({detect:true,requireInstall:true});if(!config)return{cancelled:true};
     const retry=['--config',configFile];
-    if(!original)retry.push('--profile','vscode-'+randomUUID());
+    if(!original)retry.push('--profile',profiles.nameFor(config));
     result=await invoke([...retry,...argumentsFor(config)],config);
    }
    if(result?.passed!==true||result.code!==0)throw Error(failure(result));

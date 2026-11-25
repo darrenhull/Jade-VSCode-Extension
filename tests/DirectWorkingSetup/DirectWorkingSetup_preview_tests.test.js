@@ -1,0 +1,37 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{pathToFileURL}=require('node:url');
+const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup');
+function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=false}={}){
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-root-checkout-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const uri=p=>({scheme:'file',fsPath:p,toString:()=>pathToFileURL(p).href}),folder={name:'Checkout',uri:uri(root)},calls=[],warnings=[],state=new Map();
+ fs.mkdirSync(path.join(root,'.git'));const source=path.join(root,...(nested?['sources','schemas']:['schemas']),'Demo','types');fs.mkdirSync(source,{recursive:true});const file=path.join(source,'Fish.jox');fs.writeFileSync(file,'saved JOX');
+ const project={sourceFormat:'jox',...(ambiguous?{}:{connection:'existing'}),...(sourceBacked?{workingMode:'source-backed'}:{})};fs.writeFileSync(path.join(root,'jade.json'),JSON.stringify(project));
+ const configured={installPath:'C:/Jade',databasePath:network?'Z:/Working':'C:/Working/system',iniPath:'C:/Working/jade.ini',server:'singleUser'};
+ const connection={closed:false},flags={id:'jox',catalogue:true,checkoutInitialization:true,sync:true,reviewedWorkingSync:true};
+ const client={client:connection,connect:()=>connection,sourceCapabilities:async config=>{calls.push({command:'capability',config});return{sourceSemantic:{format:1,providers:[flags]}};},request(command,args){
+  calls.push({command,args});let value;
+  if(command==='prepare'){
+   if(ambiguous&&!args.argv.includes('--profile'))return{promise:Promise.resolve({passed:false,code:2,report:{error:'Multiple Jade connection profiles are available (first, second). Choose --profile <name>; no interactive prompt is available.'}})};
+   value={passed:true,code:0,prepared:{config:{...configured,...project,workingMode:sourceBacked?'source-backed':'source-backed',...(ambiguous?{connection:'second'}:{})},configFile:path.join(root,'jade.json')}};
+  }else if(command==='working.location'){
+   if(network)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Existing Working requires local fixed storage'}})};
+   value={passed:true,code:0,body:{checkoutConfigured:true,workingMode:'existing',workingState:'new',working:{identity:'reviewed-direct',root:path.join(root,'.jade','operations'),databasePath:configured.databasePath,installPath:configured.installPath},sourceRoots:[uri(root).toString()]}};
+  }else if(command==='cli')value={passed:false,code:2,report:{error:'Explicit Source-backed initialization selected'}};
+  else assert.fail('Unexpected source/database operation '+command);
+  return{promise:Promise.resolve(value)};
+ }};
+ const commands=new Map(),vscode={RelativePattern:class{constructor(base,pattern){this.base=base;this.pattern=pattern;}},Uri:{file:uri},ProgressLocation:{Notification:15},
+  workspace:{workspaceFolders:[folder],getWorkspaceFolder:()=>folder,textDocuments:[],findFiles:async(pattern,exclude,limit)=>{calls.push({command:'find',pattern,exclude,limit});return[uri(file)];}},
+  extensions:{getExtension:()=>({activate:async()=>({enabled:true,getAPI:()=>({git:{path:'git'},openRepository:async()=>({})})})})},commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return{dispose(){}};}},window:{createOutputChannel:()=>({show(){},append(){},appendLine(){},dispose(){}}),withProgress:async(_o,fn)=>fn({report(){}}),showWarningMessage:async(message,options)=>{warnings.push({message,...options});return undefined;},showQuickPick:async rows=>rows.find(row=>row.profile==='second'),showErrorMessage:async()=>{},showInformationMessage:async()=>{}}};
+ const context={subscriptions:[],workspaceState:{get:(k,d)=>state.get(k)??d,update:async(k,v)=>state.set(k,v)},globalState:{get(){},update:async()=>{}}},workspace={projects:new Map(),pendingChanges:new Map()};
+ const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor:()=>configured,detect:async()=>assert.fail('Existing detected Working settings need no seed or detection')});
+ return{root,folder,file,calls,warnings,setup,state,configured};
+}
+for(const nested of [false,true])test('saved '+(nested?'nested sources':'root schemas')+' checkout previews direct Working without extraction or a seed',async t=>{
+ const f=fixture(t,{nested});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));const target=f.calls.find(c=>c.command==='working.location');assert.equal(target.args.config.workingMode,'existing');assert.equal(target.args.config.databasePath,f.configured.databasePath);assert.deepEqual(target.args.config.workspaceRoots,[nested?path.join(f.root,'sources'):f.root]);assert.equal(target.args.config.workingSeedDirectory,undefined);assert.match(f.warnings[0].detail,/Working-only changes.*overwritten/);assert.match(f.warnings[0].detail,/No backup, extraction or second database/);assert(!f.calls.some(c=>c.command==='cli'||/extract|backup/.test(c.command)));const scan=f.calls.find(c=>c.command==='find');assert.equal(scan.pattern.pattern,'**/*.[jJ][oO][xX]');assert.match(scan.exclude,/.jade/);assert.equal(scan.limit,1);assert.equal(fs.readFileSync(f.file,'utf8'),'saved JOX');
+});
+test('explicit Source-backed project retains its separate opt-in initializer',async t=>{const f=fixture(t,{sourceBacked:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert(f.calls.some(c=>c.command==='cli'));assert(!f.calls.some(c=>c.command==='working.location'&&c.args.checkoutOnly));});
+test('mapped network drive refusal is actionable before confirmation or sync',async t=>{const f=fixture(t,{network:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/locally available/);assert.match(result.error,/Z:\/Working/);assert.equal(f.warnings.length,0);});
+test('ambiguous profiles use QuickPick and carry the exact selected profile into direct discovery',async t=>{const f=fixture(t,{ambiguous:true});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));const retry=f.calls.filter(c=>c.command==='prepare').at(-1);assert.deepEqual(retry.args.argv.slice(0,2),['--profile','second']);assert.equal(f.calls.find(c=>c.command==='working.location').args.config.connection,'second','The selected workspace profile reaches all native stages');});
+test('UNC checkout/database paths are refused without a native Working request',async t=>{const f=fixture(t);f.configured.databasePath=path.win32.sep.repeat(2)+'server'+path.win32.sep+'Working';const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Network path/);assert(!f.calls.some(c=>c.command==='working.location'));});
+test('a locally available OneDrive name is not rejected as a network path',async t=>{const f=fixture(t);f.configured.databasePath='C:/Users/example/OneDrive/Working';const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));assert(f.calls.some(c=>c.command==='working.location'));});

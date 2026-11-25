@@ -1,8 +1,10 @@
-# JOX activation fix0.23.7
+# Direct Working checkout setup0.23.8
 
-- Owner: Codex on behalf of @darrenhull; branch codex/agent/debugger-manifest-activation; closes issue149.
-- Official0.23.6 released VSIX reproduced a real VSCode activation exception before opening Jade: its manifest does not declare jade-native-experimental, but JOX registration attempted to register that adapter.
-- Fix: register the adapter only when this extension actually owns the debugger contribution. Keep unqualified debugging and breakpoint advertising disabled; preserve the explicitly declared adapter route and native qualification checks.
-- TDD:2 ownership controls failed before the fix; all13 focused registration/debugger regressions passed afterward.
-- Real isolated VSCode candidate host (official package plus only the guarded module) activated and reached disposable8JOX Working setup. Connected setup/sync/Scratch/test and current-head package CI are still pending at this checkpoint. No Source database configured or published.
-- Keep PRDraft until connected evidence and normal CI pass; then trigger fresh automated review and request owner review after findings are addressed. Auto-merge remains off. No release or user installation performed by this branch.
+- Owner: Codex on behalf of @darrenhull; branch codex/agent/direct-working-setup; closes issue151. PR150 activation fix is already merged and released as0.23.7.
+- Git JOX is source authority. Default setup recognizes root schemas/ and nested schemas roots, preserves the configured database as existing Working and requests native existing-mode reconciliation. No default seed, Source backup, restore or extraction. Explicit source-backed mode remains opt-in; explicit legacy git-first mode retains compatibility coverage.
+- The reviewed first sync carries native overwriteWorkingChanges consent and exact Working identity. UNC paths are rejected before Working discovery; native physical storage checks provide mapped-drive/offline refusal with actionable local paths. OneDrive is not rejected by name.
+- Setup awaits owned inspection cursors, source projects and retained execution clients. No external process is killed. Missing/ambiguous profiles use explicit VSCode selection, persist the exact alias and reuse a stable workspace name on initialization retries. Old aliases have no provable ownership metadata and are preserved rather than deleted.
+- TDD controls cover direct initialization consent/receipt, real root and nested layout preview, explicit Source mode, local-storage refusal, profile ambiguity/cancellation and direct Scratch without second-directory overrides.
+- Current affected suite:348 cases;346 passed,2 intentional native opt-in skips,0 failed. One broader database-free run found a synthetic fixture returning initial for every state key; that fixture was corrected and its complete affected registration suite passed. No redundant native build or package rebuild performed.
+- BLOCKER: pinned official CLI0.11.7 does not implement the direct existing Working route. CLI PR167 is being reworked to that contract. Do not merge/release this follow-up until its actual published package is pinned and a realistic root-schemas direct-Working Code-host setup/sync/Scratch/test proof passes. Existing seeded/sources qualification is not evidence for this new route.
+- No user database was opened or changed by this follow-up. Auto-merge off. Keep the implementation/pin/tests/release notes together in one PR; normal CI and automated reviews may run in parallel.

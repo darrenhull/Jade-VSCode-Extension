@@ -1,0 +1,5 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {releaseWorkingConsumers}=require('../../extension/src/working-setup-preflight');
+test('setup awaits inspector cursors and retained native clients before touching policy',async()=>{const events=[];const release=name=>async()=>{await new Promise(r=>setImmediate(r));events.push(name);};await releaseWorkingConsumers({inspector:{releaseForOperation:release('inspection-closed')},client:{release:release('runtime-disconnected')},projects:[{provider:{closeProject:release('source-project-closed')},ownedClient:{release:release('retained-client-disconnected')}}]});events.push('setup');assert.deepEqual(events,['inspection-closed','source-project-closed','retained-client-disconnected','runtime-disconnected','setup']);});
+test('a failed owned closure stops setup and never kills external processes',async()=>{const events=[];await assert.rejects(releaseWorkingConsumers({inspector:{releaseForOperation:async()=>{throw Error('Owned inspection closure failed');}},client:{release:async()=>events.push('disconnected')},projects:[]}),/closure failed/);assert.deepEqual(events,[]);});

@@ -11,6 +11,8 @@ const {PrivateRuntimeSettings}=require('./PrivateRuntimeSettings');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
 const CHECKOUT_FILES='jadeNative.acceptedGitFirstProjectFiles';
 const { checkoutConfiguration }=require('./jox-checkout-config');
+const {checkoutRoute}=require('./checkout-route');
+const {WorkspaceConnectionProfile}=require('./WorkspaceConnectionProfile');
 function projectFile(folder){
   let directory=path.resolve(folder.uri.fsPath);
   for(;;){const file=path.join(directory,'jade.json');if(fs.existsSync(file))return file;const parent=path.dirname(directory);if(parent===directory)return null;directory=parent;}
@@ -21,10 +23,20 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const state=context.workspaceState;
   const explicitConfigFor=configFor;
+  const profilesFor=folder=>new WorkspaceConnectionProfile(state,folder.uri.toString(),(...args)=>vscode.window.showQuickPick(...args));
+  const discoveredFor=async (folder,overrides={})=>{
+    const file=projectFile(folder),project=file?JSON.parse(fs.readFileSync(file,'utf8')):{};
+    const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=configured.connection||project.connection||profiles.current();
+    const runtime=Object.entries({install:overrides.installPath,database:overrides.databasePath,ini:overrides.iniPath,server:overrides.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([name,value])=>['--'+name,value]);
+    const request=name=>client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[...(name?['--profile',name]:[]),...runtime]}).promise;
+    let result=await request(profile);
+    if(result?.passed!==true){const selected=await profiles.select(result?.report?.error);if(selected)result=await request(selected);}
+    return result;
+  };
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
   const transientRuntime={values:()=>({}),stage:(_values,{validate=()=>{}}={})=>({commit:validate,rollback:async()=>{}})};
   const savedFiles=state?.get(CHECKOUT_FILES,{});
-  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&typeof entry.file==='string'&&/^[a-f0-9]{64}$/.test(entry.fingerprint)&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory'].includes(key)&&typeof value==='string')));
+  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&(entry.file===null||typeof entry.file==='string')&&(entry.fingerprint===null||/^[a-f0-9]{64}$/.test(entry.fingerprint))&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','workspaceRoots'].includes(key)&&(typeof value==='string'||key==='workspaceRoots'&&Array.isArray(value)&&value.every(root=>typeof root==='string')))));
   const projectBytes=(folder,file=projectFile(folder))=>require('node:crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
@@ -33,19 +45,21 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const configurationFor=folder=>{
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
-    const configured=explicitConfigFor(folder),selected=checkoutRoots.has(folder.uri.toString());
+    const configured={...(profilesFor(folder).current()?{connection:profilesFor(folder).current()}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
+    const acceptedDirect=acceptedFiles.get(folder.uri.toString()),currentFile=projectFile(folder);
+    if(acceptedDirect?.defaults.workingMode==='existing'&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))return{...acceptedDirect.defaults,...configured};
     if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
     return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
   workspace.configFor=configurationFor;
   const projectFor=folder=>(setupBindings.get(folder.uri.toString())?.workspace||workspace).project(folder);
-  const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:config.workingMode==='git-first'?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
+  const packageProbe=(folder,config=configurationFor(folder))=>new NativeSourceProvider({client,config:['git-first','existing'].includes(config.workingMode)?configDto(config):{sourceFormat:'jox'},projectRoot:folder.uri.fsPath});
   async function requireReviewedDiscovery(folder,record){
     const check=()=>{const file=projectFile(folder),actual=file?projectBytes(folder,file):null;if(record.fingerprint!==undefined&&(!sameFile(record.projectFile,file)||record.fingerprint!==actual))throw Error('Project configuration changed after review (file contents or absence). Run Set Up Project again.');};
     check();
     if(!record.discovery)return;
-    const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+    const discovery=await discoveredFor(folder,record.discoveryConfig);
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config||JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config})!==record.discovery)
       throw Error('Project configuration changed after Working review. Run Set Up Project again.');
     check();
@@ -94,20 +108,57 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
+  async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot}) {
+    const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
+    if(original.workingMode==='source-backed')return;
+    let runtime;
+    if(!configured.installPath||!configured.databasePath){
+      runtime=await detect(folder.uri,undefined,{existingWorking:true,deferSave:true});
+      if(!runtime)throw Object.assign(Error('Working connection selection cancelled.'),{cancelled:true});
+      configured={...configured,...(runtime.settings||runtime)};
+    }
+    const discovery=await discoveredFor(folder,configured);
+    if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)
+      throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
+    configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
+    if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
+    for(const value of [folder.uri.fsPath,configured.databasePath])if(value.startsWith(path.win32.sep.repeat(2))||value.startsWith('//'))throw Error('Use locally available storage for the checkout and Working database. Network path: '+value);
+    let capability,target;
+    try{
+      const probe=packageProbe(folder,configured);capability=await probe.capability();
+      target=await probe.request('working.location',{cwd:probe.root,config:configDto(configured),checkoutOnly:true});
+    }catch(cause){if(/local.*storage|materialized|path.*unavailable|network/i.test(cause.message))throw Error('The checkout and Working database must be locally available. Checkout: '+folder.uri.fsPath+'; Working: '+configured.databasePath+'. Move network locations to a local drive or make cloud files available offline. '+cause.message,{cause});throw Error('This checkout requires a Jade CLI supporting direct existing Working setup. Update Jade Tools before continuing. No backup or extraction was started. '+cause.message,{cause});}
+    if(target.checkoutConfigured!==true||target.workingMode!=='existing'||target.source||!target.working?.identity||
+      !target.working.databasePath||!['new','existing'].includes(target.workingState)||!Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
+      throw Error('Update Jade Tools: native setup did not confirm the direct Working database and disk checkout. No backup or extraction was started.');
+    if(capability.checkoutInitialization!==true||capability.sync!==true||capability.reviewedWorkingSync!==true)
+      throw Error('Update Jade Tools: direct Working initialization and reviewed sync are not available in this CLI package.');
+    requireSavedCheckout(folder);
+    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,
+      discoveryConfig:configured,discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
+      providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
+      fingerprint:reviewedFile?reviewedFingerprint:null,projectFile:reviewedFile||null});
+    return target;
+  }
   async function checkoutTargets(folder,{repository,profileRepaired=false}={}) {
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
-    if(configured.workingMode&&configured.workingMode!=='git-first')return;
+    if(configured.workingMode&&!['git-first','existing'].includes(configured.workingMode))return;
     let detectedDefaults=checkoutRoots.has(folder.uri.toString())?privateRuntime(folder).values():{};
     const reviewedFile=projectFile(folder);
     let explicitProject=reviewedFile!==null;
     const reviewedFingerprint=explicitProject?projectBytes(folder,reviewedFile):undefined;
     let files=[];
-    if(!configured.workingMode&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
-      files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'sources/**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
+    if(repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
+      files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
+    }
+    if(configured.workingMode!=='git-first'&&files.length&&(!explicitProject||!JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode||JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode==='existing')){
+      const relative=path.relative(folder.uri.fsPath,files[0].fsPath).split(path.sep),schemas=relative.findIndex(part=>part.toLowerCase()==='schemas');
+      const sourceRoot=schemas>0?path.join(folder.uri.fsPath,...relative.slice(0,schemas)):folder.uri.fsPath;
+      return directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot});
     }
     if(explicitProject||files.length){
-      let discovered=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      let discovered=await discoveredFor(folder);
       if(discovered?.passed!==true&&/Unknown Jade connection profile/i.test(discovered?.report?.error||'')&&explicitProject&&!profileRepaired){
         const original=discovered;
         let repaired;
@@ -151,7 +202,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(!configured.installPath||!configured.workingSeedDirectory)throw Error('Choose a Jade installation and approved vendor seed in runtime settings before setting up this checkout.');
     }
     if(configured.workingMode==='git-first'&&(!discoveredState||runtime)){
-      const discovery=await client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[]}).promise;
+      const discovery=await discoveredFor(folder);
       if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)throw Error(discovery?.report?.error||'Native project configuration discovery failed.');
       if(discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config})!==JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}):!!discovery.prepared.configFile)throw Error('Project configuration changed while choosing runtime settings. Run Set Up Project again.');
       discoveredState=discovery.prepared;
@@ -188,7 +239,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     try {
       await workspace.changing.get(binding?.previous||project)?.promise;
       if(binding){await binding.workspace.changing.get(project)?.promise;await requireReviewedCheckout(folder,binding.record);projectFor(folder);}
-      await workspace.beforeOperation?.();projectFor(folder);
+      if(workspace.beforeSetup)await workspace.beforeSetup();else await workspace.beforeOperation?.();projectFor(folder);
       return await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title,cancellable:true},
         async(progress,token)=>{
           if(token?.isCancellationRequested)throw Object.assign(Error('Working setup cancelled.'),{cancelled:true});
@@ -202,6 +253,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,checkoutTargets,
     activateCheckout:async(folder,reviewed)=>{
+      await workspace.beforeSetup?.();
       const record=reviewedRoots.get(reviewed);if(!record)return;
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
       await requireReviewedDiscovery(folder,record);
@@ -239,7 +291,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       try{
         await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
         await requireReviewedDiscovery(folder,binding.record);
-        if(binding.record.explicitProject){acceptedFiles.set(key,{file:binding.record.projectFile,fingerprint:binding.record.fingerprint,defaults:binding.record.runtimeDefaults});await state?.update(CHECKOUT_FILES,Object.fromEntries(acceptedFiles));}
+        if(binding.record.explicitProject||binding.record.configured?.workingMode==='existing'){acceptedFiles.set(key,{file:binding.record.projectFile,fingerprint:binding.record.fingerprint,defaults:binding.record.runtimeDefaults});await state?.update(CHECKOUT_FILES,Object.fromEntries(acceptedFiles));}
         await requireReviewedDiscovery(folder,binding.record);
         if(JSON.stringify(configDto(configFor(folder)))!==acceptedSettings)throw Error('Runtime settings changed during private acceptance; restart setup.');
         if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
@@ -257,7 +309,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         acceptedFiles.clear();for(const [folderKey,entry]of previousFiles)acceptedFiles.set(folderKey,entry);
         if(!previous.includes(key))checkoutRoots.delete(key);
         const failures=[];
-        for(const [stateKey,value]of [[CHECKOUT_STATE,previous],...(binding.record.explicitProject?[[CHECKOUT_FILES,Object.fromEntries(previousFiles)]]:[])]){try{await state?.update(stateKey,value);}catch(cleanup){failures.push(cleanup.message);}}
+        for(const [stateKey,value]of [[CHECKOUT_STATE,previous],...(binding.record.explicitProject||binding.record.configured?.workingMode==='existing'?[[CHECKOUT_FILES,Object.fromEntries(previousFiles)]]:[])]){try{await state?.update(stateKey,value);}catch(cleanup){failures.push(cleanup.message);}}
         if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');
         throw error;
       }
@@ -272,9 +324,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       try{flushRefreshes();}catch(error){failures.push(error);}
       if(failures.length)throw new AggregateError(failures,'Setup cleanup failed: '+failures.map(error=>error.message).join('; '));
     },
-    initializeCheckout:(folder,reviewed)=>working(folder,'Creating Working from saved JOX',async(project,token,write)=>{
+    initializeCheckout:(folder,reviewed)=>working(folder,reviewed.workingMode==='existing'?'Reconciling saved checkout with existing Working':'Creating Working from saved JOX',async(project,token,write)=>{
       await requireReviewedCheckout(folder,reviewedRoots.get(reviewed));
-      return project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity},token,write);
+      return project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity,...(reviewed.workingMode==='existing'?{overwriteWorkingChanges:true}:{})},token,write);
     }),
     syncCheckout:(folder,reviewed)=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
       async(progress,token)=>{

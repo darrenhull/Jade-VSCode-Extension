@@ -1,3 +1,10 @@
+# 0.23.8 - Set up existing Working from Git source
+
+- Recognize saved JOX under root schemas/ and nested source folders and review direct synchronization into the configured Working database.
+- Select ambiguous connection profiles in VS Code and reuse a stable workspace profile instead of creating new aliases on each retry.
+- Close owned inspection and execution clients before setup, and report local-storage requirements without rejecting cloud folders by name.
+- Require confirmation before overwriting unexported Working changes. Keep database extraction as an explicit Source-backed option.
+
 # 0.23.7 - Workspace activation fix
 
 - Open JOX workspaces successfully when the installed package does not advertise a qualified native debugger.
