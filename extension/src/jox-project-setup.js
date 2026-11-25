@@ -47,7 +47,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
   const reviewedRoots=new WeakMap(),setupBindings=new Map();
   const flushRefreshes=()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);};
-  const configurationFor=folder=>{
+  const configurationFor=(folder,{reviewedSetup=false}={})=>{
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
     const currentFile=projectFile(folder);let project;
@@ -55,6 +55,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
+    if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&(!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
     if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
       return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
     if(project.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing'))return checkoutRoute(configured,project,folder.uri.fsPath);
@@ -171,7 +172,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   async function checkoutTargets(folder,{repository,profileRepaired=false}={}) {
     pendingProfiles.delete(folder.uri.toString());
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
-    let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
+    let configured=configurationFor(folder,{reviewedSetup:true}),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&!['git-first','existing'].includes(configured.workingMode))return;
     let detectedDefaults=checkoutRoots.has(folder.uri.toString())?privateRuntime(folder).values():{};
     const reviewedFile=projectFile(folder);
@@ -309,7 +310,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       try{
         stageClient=client.fork();owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
         owner.beforeOperation=()=>workspace.beforeOperation?.();
-        const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder),record});workspace.executing=true;
+        const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder,{reviewedSetup:true}),record});workspace.executing=true;
       }catch(error){
         const failures=[];for(const cleanup of [()=>owner?.dispose(),()=>stageClient?.dispose()]){try{await cleanup();}catch(failure){failures.push(failure.message);}}
         if(failures.length)error.message+=' Temporary setup cleanup failed: '+failures.join('; ');

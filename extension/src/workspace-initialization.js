@@ -101,7 +101,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    progress.report({message:'Native project configuration is ready.'});
    output.appendLine((result.created?'Created ':'Preserved existing ')+configFile+'. Configuration step complete.');
    if(services.refreshSourceIndex){progress.report({message:'Initialising the shared Git source index…'});await services.refreshSourceIndex(folder);output.appendLine('Shared source index is ready.');}
-   if(notify&&sameFolder())void vscode.window.showInformationMessage(services.nativeDiscovery?'Jade project configuration is ready. Use Set Up Project to create Working and extract sources.':'Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
+   if(notify&&sameFolder())void vscode.window.showInformationMessage(services.nativeDiscovery?'Jade project configuration is ready. Use Set Up Project to synchronize saved source with Working.':'Jade workspace configuration is ready. Use Extract All Sources for missing source, then Connect Database Objects to prepare Working.');
    return result;
   }).finally(()=>{if(pending.get(key)===run)pending.delete(key);});
   pending.set(key,run);return run;
