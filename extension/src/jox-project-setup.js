@@ -54,7 +54,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
     const currentFile=projectFile(folder);let project;
-    try{project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};if(!project||typeof project!=='object'||Array.isArray(project))throw Error('Project configuration must be an object.');}catch{return {...explicitConfigFor(folder)};}
+    try{project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};if(!project||typeof project!=='object'||Array.isArray(project))throw Error('Project configuration must be an object.');}catch(cause){if(acceptedFiles.get(folder.uri.toString())?.defaults.workingMode==='existing')throw Error('Cannot read Jade project configuration '+currentFile+'. Fix the file and run Set Up Project to review Working again.',{cause});return {...explicitConfigFor(folder)};}
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
