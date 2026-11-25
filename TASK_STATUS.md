@@ -1,11 +1,8 @@
-# Scratch user-schema patch0.23.5
+# JOX activation fix0.23.7
 
-- Owner: Codex on behalf of @darrenhull; branch codex/agent/scratch-schema-session from main d933c56; closes issue145.
-- Minimal extension adapter change: prepare an operation-owned native source snapshot with the selected schema before workspace.run. The CLI remains unchanged at0.11.6.
-- Shared Explorer provider configuration/snapshot stay unchanged. Git-first private prepare pins the native-reviewed Working directory and runtime; native discovery rejects a changed generation. Native Working identity is also checked across schema selection; captured private source/session owns execution, cancellation and cleanup.
-- TDD: actual adapter/provider regression reproduced the published RootSchema refusal because native execution uses cached prepare configuration and ignores a later schema-only run override. The schema-bound prepare→run case now emits distinctive output; cancellation and identity refusal regressions pass.
-- Normal test workflow:1961 passed,52 intentional skips,0 failed across2013 cases.
-- Connected ANSI25.0.1 proof: Scratch compiled/executed in CliJoxManagedF4Schema and emitted SCRATCH_0235_USER_SCHEMA_NATIVE_OUTPUT; no source upload, shared provider preserved. Setup123399ms; Scratch4463ms (JADE client3549ms).
-- Git A→B proof: exactly one controlled method file synced in the same Working identity d40d9bc72dfc29c04cee391e, zero saved overlays and clean HEAD/tree. Planned B test produced the expected native assertion failure, confirming B actually executed despite sync not claiming readiness. Sync137195ms; B test8690ms. No separate readiness bug found.
-- All owned processes exited, approved vendor seed unchanged, disposable DB/checkout removed. Small local evidence retained outside Temp; no developer Source was configured/opened or published.
-- Normal package build passed; one bot-authored PR146 closes145 and is Ready. Initial hosted build and linked-issue check passed. Review follow-ups: preserve explicit undefined settings and pin the reviewed Git-first target before prepare; focused101/101 pass. Actual bundled CLI0.11.6 refused a drifted generation pinned to the reviewed directory without creating/opening Working. Remaining: current-head hosted CI and fresh automated review. Keep PR Ready while checks run. No merge/publication or redundant manual artifact verification.
+- Owner: Codex on behalf of @darrenhull; branch codex/agent/debugger-manifest-activation; closes issue149.
+- Official0.23.6 released VSIX reproduced a real VSCode activation exception before opening Jade: its manifest does not declare jade-native-experimental, but JOX registration attempted to register that adapter.
+- Fix: register the adapter only when this extension actually owns the debugger contribution. Keep unqualified debugging and breakpoint advertising disabled; preserve the explicitly declared adapter route and native qualification checks.
+- TDD:2 ownership controls failed before the fix; all13 focused registration/debugger regressions passed afterward.
+- Real isolated VSCode candidate host (official package plus only the guarded module) activated and reached disposable8JOX Working setup. Connected setup/sync/Scratch/test and current-head package CI are still pending at this checkpoint. No Source database configured or published.
+- Keep PRDraft until connected evidence and normal CI pass; then trigger fresh automated review and request owner review after findings are addressed. Auto-merge remains off. No release or user installation performed by this branch.
