@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {resolveSchemaFolder}=require('../../extension/src/schema-folder');
+function fixture(t){const owned=fs.mkdtempSync(path.join(os.tmpdir(),'jade-schema-folder-')),root=path.join(owned,'checkout');fs.mkdirSync(root);t.after(()=>fs.rmSync(owned,{recursive:true,force:true}));return{owned,root};}
+test('default schema folder is schemas inside the checkout',t=>{const f=fixture(t),schemas=path.join(f.root,'schemas');fs.mkdirSync(schemas);assert.equal(resolveSchemaFolder(f.root),schemas);});
+test('custom nested schema folder is preserved and resolved inside checkout',t=>{const f=fixture(t),schemas=path.join(f.root,'src','domain');fs.mkdirSync(schemas,{recursive:true});assert.equal(resolveSchemaFolder(f.root,'src/domain'),schemas);});
+for(const value of ['../outside','C:/another/place','//server/share','',null])test('invalid or escaping schema folder is refused: '+String(value),t=>{const f=fixture(t);assert.throws(()=>resolveSchemaFolder(f.root,value),/relative|inside|schemaPath|folder/i);});
+test('schema folder must exist before Working review',t=>{const f=fixture(t);assert.throws(()=>resolveSchemaFolder(f.root,'missing'),/exist|available|folder/i);});
+test('redirect outside checkout is refused even when target is local',t=>{const f=fixture(t),outside=path.join(f.owned,'outside');fs.mkdirSync(outside);fs.symlinkSync(outside,path.join(f.root,'redirect'),'junction');assert.throws(()=>resolveSchemaFolder(f.root,'redirect'),/inside|redirect|checkout/i);});

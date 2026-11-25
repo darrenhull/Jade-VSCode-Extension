@@ -79,7 +79,7 @@ class NativeSourceProvider {
       if (result?.passed !== true || result.code !== 0 || !result.body || typeof result.body !== 'object')
         throw Object.assign(Error(result?.report?.error || 'Native source operation failed.'), { result });
       if (command === 'working.initialize' && (this.client.client !== connection || connection.closed)) {
-        const completed = result.body.report?.workingMode === 'git-first' ? 'Git-first Working setup' : 'Working and source creation';
+        const completed = result.body.working?.workingMode === 'existing' ? 'Existing Working synchronization' : result.body.report?.workingMode === 'git-first' ? 'Git-first Working setup' : 'Working and source creation';
         return { ...clone(result.body), viewRefreshRequired: true,
           warning: `${completed} completed. The native connection changed; refresh Object Explorer when the project is open.` };
       }
@@ -148,16 +148,18 @@ class NativeSourceProvider {
     });
   }
 
-  initializeCheckout({ expectedWorkingIdentity }, token, output) {
+  initializeCheckout({ expectedWorkingIdentity, overwriteWorkingChanges }, token, output) {
     return this.serializeSource(async () => {
       if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
       this.validateContext();
       const identity = required(expectedWorkingIdentity, 'reviewed Working target');
+      if(this.config.workingMode==='existing'&&overwriteWorkingChanges!==true)throw Error('Confirm that saved source may overwrite Working-only changes before initial synchronization.');
       const capabilities = await this.capability();
       if (capabilities.checkoutInitialization !== true) throw Error('Update the Jade CLI: Git-first Working setup is unavailable.');
-      const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), expectedWorkingIdentity: identity }, token, output);
+      const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), expectedWorkingIdentity: identity,...(this.config.workingMode==='existing'?{overwriteWorkingChanges:true}:{}) }, token, output);
+      const modeConfirmed=this.config.workingMode==='existing'?result.working?.workingMode==='existing'&&result.sourceAuthority==='checkout'&&result.report?.extracted===false:result.report?.workingMode==='git-first';
       if (result.working?.identity !== identity || !path.isAbsolute(result.working?.root ?? '') || Object.hasOwn(result.working, 'sourceDatabasePath') ||
-          result.report?.workingMode !== 'git-first' || result.report.workingPrepared !== true || result.report.publicationEstablished !== true)
+          !modeConfirmed || result.report.workingPrepared !== true || result.report.publicationEstablished !== true)
         throw Error('Native setup did not confirm the reviewed Working database and saved checkout baseline.');
       return this.adoptInitialization(result, capabilities);
     });

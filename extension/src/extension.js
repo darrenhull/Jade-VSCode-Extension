@@ -141,7 +141,7 @@ async function detectSettings(selectedResource, cancellationToken, options={}) {
   if(!options.deferSave)void vscode.window.showInformationMessage(options.checkout?'Jade installation and vendor seed saved. Continuing project setup.':'Jade runtime settings saved. You can now connect to Database Objects.');
   return values;
   };
-  if(options.checkout&&options.deferSave){
+  if(options.deferSave){
     if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed during selection; restart setup.');
     if(options.privateRuntime){
       const transaction=options.privateRuntime.stage(values,{previous:privateRuntimeSnapshot,validate:()=>{if(!sameFolder())throw Error('Selected workspace folder changed; restart runtime setup.');if(Object.keys(values).some(key=>!unchanged(key)))throw Error('Runtime settings changed after review; restart setup.');}});
@@ -187,6 +187,7 @@ function activate(context) {
     workingLocation:config=>nativeTests.workingLocation(config)
   });
   source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
+  source.workspace.beforeSetup=()=>require('./working-setup-preflight').releaseWorkingConsumers({inspector:objectExplorer,client:nativeTests,projects:source.workspace.projects.values()});
   const setup=require('./jox-project-setup').registerJoxProjectSetup(vscode,context,source.workspace,{client:nativeTests,configFor,detect:detectSettings});
   configFor=setup.configFor;
   void setup.onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));

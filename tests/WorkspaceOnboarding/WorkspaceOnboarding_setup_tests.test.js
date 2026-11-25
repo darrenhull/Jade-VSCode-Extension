@@ -324,3 +324,9 @@ test('existing sources without native-owned Working stop safely and never fall b
  assert.equal(result.passed,false);assert.equal(result.code,2);assert.equal(result.completed,false);assert.equal(result.stage,'working');assert.match(result.error,/Initialize the owned JOX Working copy/);
  assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,0);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,0);assert.equal(f.explorerRefreshes(),0);
 });
+
+test('direct existing Working always uses reviewed initial reconciliation even when operations state already exists',async t=>{
+ const f=fixture(t,{warnings:['Sync checkout to existing Working']}),target={workingMode:'existing',workingState:'existing',working:{identity:'direct',installPath:'C:/Jade',databasePath:'C:/Working'},sourceRoots:[f.uri(f.root).toString()]};
+ Object.assign(f.services,{jox:true,checkoutTargets:async()=>target,initializeCheckout:async()=>{f.calls.push(['direct-reconcile']);return{sourceSnapshot:{projectId:'direct'}};},connectWorking:async()=>assert.fail('A retained inspector must not be opened before initial reconciliation'),syncCheckout:async()=>assert.fail('Use native initialization to admit/reuse the persisted direct baseline'),refreshProject:async()=>{},openExplorer:async()=>{}});
+ const result=await f.controller.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(f.calls.filter(row=>row[0]==='direct-reconcile').length,1);
+});

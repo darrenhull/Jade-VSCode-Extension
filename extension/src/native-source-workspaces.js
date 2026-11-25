@@ -62,15 +62,18 @@ function createSemanticWorkspaceTransport(workspace, client) {
       const owned=parent.fork();scope={client:owned,validate};
       const provider=new NativeSourceProvider({client:owned,config:{...configuration,schema:config.schema},projectRoot:project.folder.uri.fsPath,validateContext:validate});
       scope.provider=provider;
+      if(provider.config.workingMode==='existing')for(const key of ['workingDatabaseDirectory','workingSeedDirectory','sourceDatabasePath'])delete provider.config[key];
       await provider.capability();
-      const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(configuration.workingMode==='git-first'?{checkoutOnly:true}:{})},token);
-      const reviewed=await location(configuration);
+      const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(['git-first','existing'].includes(configuration.workingMode)?{checkoutOnly:true}:{})},token);
+      const reviewed=await location(provider.config);
       if(typeof reviewed.working?.identity!=='string'||!reviewed.working.identity)throw Error('Scratch Pad native Working identity is missing. Retry.');
       const target=reviewed.working;
       if(typeof target.root!=='string'||!target.root||typeof target.installPath!=='string'||!target.installPath)throw Error('Scratch Pad native Working target is incomplete. Retry.');
-      // Bind native preparation to the reviewed directory; checkout discovery also enforces its generation.
-      provider.config={...provider.config,workingDatabaseDirectory:target.root,installPath:target.installPath,
-        ...(reviewed.workingMode==='git-first'||target.workingMode==='git-first'||configuration.workingMode==='git-first'?{workingMode:'git-first'}:{})};
+      const targetMode=reviewed.workingMode||target.workingMode||configuration.workingMode;
+      // Bind private generations by directory; direct Working remains bound by native identity.
+      provider.config={...provider.config,...(targetMode==='existing'?{}:{workingDatabaseDirectory:target.root}),installPath:target.installPath,
+        ...(['git-first','existing'].includes(targetMode)?{workingMode:targetMode}:{})};
+      if(targetMode==='existing')for(const key of ['workingDatabaseDirectory','workingSeedDirectory','sourceDatabasePath'])delete provider.config[key];
       const snapshot = await provider.prepare(token);
       if (!provider.flags.deploymentFromSavedSnapshot || !provider.flags.nativeScratch)
         throw Error('This Jade CLI does not yet support Scratch Pad execution from saved JOX source.');
