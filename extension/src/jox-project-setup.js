@@ -29,6 +29,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=explicitConfigFor(folder).connection||project.connection||overrides.connection||pendingProfiles.get(folder.uri.toString())?.name||profiles.current();
     const runtime=Object.entries({install:overrides.installPath,database:overrides.databasePath,ini:overrides.iniPath,server:overrides.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([name,value])=>['--'+name,value]);
     const request=name=>client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[...(name?['--profile',name]:[]),...runtime]}).promise;
+    const priorProfile=profiles.current();
     let result=await request(profile);
     if(result?.passed!==true&&/^Unknown Jade connection profile /i.test(result?.report?.error||'')&&profile===profiles.current()&&!explicitConfigFor(folder).connection&&!project.connection&&!overrides.connection&&!pendingProfiles.has(folder.uri.toString())){
       const previous=profiles.current();result=await request(undefined);
@@ -36,6 +37,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(result?.passed===true&&typeof replacement==='string'&&replacement)pendingProfiles.set(folder.uri.toString(),{name:replacement,previous});
     }
     if(result?.passed!==true){const previous=profiles.current(),selected=await profiles.select(result?.report?.error,{persist:false});if(selected){pendingProfiles.set(folder.uri.toString(),{name:selected,previous});result=await request(selected);}}
+    const resolvedProfile=result?.prepared?.config?.connection;
+    if(result?.passed===true&&typeof resolvedProfile==='string'&&resolvedProfile&&!explicitConfigFor(folder).connection&&!project.connection&&!overrides.connection&&!pendingProfiles.has(folder.uri.toString()))pendingProfiles.set(folder.uri.toString(),{name:resolvedProfile,previous:priorProfile});
     return result;
   };
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
@@ -55,7 +58,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
-    if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&(!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
+    if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&((configured.connection||project.connection)!==acceptedDirect.defaults.connection||!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
     if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
       return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
     if(project.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing'))return checkoutRoute(configured,project,folder.uri.fsPath);
@@ -124,7 +127,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(original.workingMode==='source-backed')return;
     const present=values=>Object.fromEntries(Object.entries(values).filter(([,value])=>value!==undefined&&value!==''));
     configured=present(configured);
-    let runtime,discovery=await discoveredFor(folder,configured);
+    let discoveryOverrides={...configured};
+    let runtime,discovery=await discoveredFor(folder,discoveryOverrides);
     if(discovery?.passed!==true&&reviewedFile&&/^Unknown Jade connection profile /i.test(discovery?.report?.error||'')){
       const override=explicitConfigFor(folder).connection;
       if(override&&override!==original.connection)throw Error(discovery.report.error+' The configured VS Code profile override is missing. Select an available connection or configure that profile before setup; the different project-file alias was not repaired.');
@@ -140,12 +144,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       if(discovery?.passed!==true&&!/connection.*(?:required|not configured)|No Jade installation|installPath|databasePath/i.test(reason))throw Error(reason||'Native Working configuration discovery failed.');
       runtime=await detect(folder.uri,undefined,{existingWorking:true,deferSave:true});
       if(!runtime)throw Object.assign(Error('Working connection selection cancelled.'),{cancelled:true});
-      configured={...configured,...(runtime.settings||runtime)};
-      discovery=await discoveredFor(folder,configured);
+      discoveryOverrides={...discoveryOverrides,...present(runtime.settings||runtime)};
+      discovery=await discoveredFor(folder,discoveryOverrides);
     }
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)
       throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
-    configured=checkoutRoute({...discovery.prepared.config,...present(configured)},original,sourceRoot);
+    configured=checkoutRoute({...discovery.prepared.config,...discoveryOverrides},original,sourceRoot);
     configured.schemaPath=schemaPath;
     configured.workspaceRoots=[sourceRoot];
     if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
@@ -164,7 +168,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     requireSavedCheckout(folder);
     const selectedProfile=pendingProfiles.get(folder.uri.toString());
     reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,
-      discoveryConfig:configured,discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
+      discoveryConfig:{...discoveryOverrides,...(configured.connection?{connection:configured.connection}:{})},discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
       providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
       fingerprint:reviewedFile?reviewedFingerprint:null,projectFile:reviewedFile||null});
     return target;
