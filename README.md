@@ -1,6 +1,6 @@
 # Jade Tools
 
-Bundles [official Jade CLI 0.11.6](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.6) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The native CLI detects its character mode and rejects an explicit mismatch. The Jade IDE is not required.
 
@@ -9,6 +9,8 @@ Browse JOX schemas, classes and members in Object Explorer and Class Workspace. 
 Run **Jade: Set Up Project** from Jade Tools or the Command Palette. Existing Git checkouts with saved `sources/**/*.jox` use Git-first setup: detect missing machine runtime settings, review the private Working target, and create or reconcile Working from those saved files without extracting Source or creating `jade.json`. Explicit project modes are resolved by the native CLI. Projects without a saved checkout retain the Source/Working setup and extraction flow. Both routes refresh Object Explorer and tests automatically. It preserves existing source files and Working data on conflicts. Source remains separate and is not published by setup or local testing.
 
 **Jade: Sync Workspace to Working** appears in the Command Palette only when the bundled CLI advertises qualified JOX sync. It sends the selected project's saved JOX snapshot to its existing Working database. Save any dirty raw `.jox` editors first. Sync does not run tests, write to Git, or publish to Source. The bundled ANSI runtime qualifies sync and checkout initialization. Reviewed setup sync requires native enforcement of the exact Working identity shown in the confirmation.
+
+Saved-source preparation uses a fifteen-minute fallback. Configure `jadeNative.sourcePreparationTimeoutSeconds` per user or workspace when a different fallback is needed. An explicit native/project `timeoutMilliseconds` remains authoritative; native test execution keeps its separate timeout.
 
 Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved before execution. The native provider uploads saved Git changes to Working and compiles them before running the selected native tests. Unchanged runs still execute tests without uploading the same source again. Normal Git commit/push remains available through VS Code Source Control; database publication is separate.
 

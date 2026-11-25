@@ -15,7 +15,7 @@ const {diagnosticLocation,diagnosticLines}=require('./compiler-diagnostic-presen
 
 let activeNativeService;
 
-const keys = ['installPath', 'workingSeedDirectory', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope', 'disableJadeGitForWorking'];
+const keys = ['installPath', 'workingSeedDirectory', 'databasePath', 'iniPath', 'characterSet', 'schema', 'server', 'application', 'cacheDirectory', 'testTimeoutSeconds', 'sourcePreparationTimeoutSeconds', 'workingDatabaseTimeoutSeconds', 'extractionDirectory', 'extractionTimeoutSeconds', 'cppHelperPath', 'systemSnapshotPath', 'workingDatabaseDirectory', 'testDependencyScope', 'disableJadeGitForWorking'];
 function defaults(resource) {
   const settings = vscode.workspace.getConfiguration('jadeNative', resource);
   const values = Object.fromEntries(keys.map(key => [key, settings.get(key)]));

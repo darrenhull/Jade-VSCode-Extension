@@ -1,6 +1,6 @@
 # Jade Tools
 
-Bundles [official Jade CLI 0.11.6](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.6) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The Jade IDE is not required.
 
@@ -9,6 +9,8 @@ Browse JOX schemas, classes and members in Object Explorer and Class Workspace. 
 Run **Jade: Set Up Project**, then choose **Create Working copy and extract sources**. Review Source and Working once. Native setup creates a fresh private Working copy and extracts sources once from that same copy. It preserves existing source files and Working data on conflicts. Source remains separate and is not published by setup or local testing.
 
 For an existing Git checkout containing saved `sources/**/*.jox` files, **Set Up Project** detects the checkout and offers **Create Working from checkout** or synchronizes its existing Working copy. It detects missing machine settings first; a `jade.json` file is not required. Explicit machine paths in VS Code settings are honored; newly detected installation and seed paths are stored privately per folder, outside checked-in workspace files; choose the approved vendor-only seed separately using **Jade Native: Working Seed Directory**. Successful checkout selection is retained in private VS Code workspace state across reloads. Cancelling or refusing the preview leaves the active project mode unchanged, and an explicit Source-backed project retains its existing setup flow. The review shows the saved JOX root and the private Working target. Setup uses a verified vendor-only seed, not an application Source database; it never extracts or overwrites checkout files. After switching branches or editing files, use **Sync Workspace to Working** to apply the saved checkout and see the accepted commit and any saved file changes. Sync automatically saves modified Jade projection editors in the selected project before capturing the snapshot. Save modified raw `.jox` files manually before syncing; the command refuses unsaved raw JOX changes in the project. Unsupported changes are reported, not treated as successful sync or automatically reset.
+
+Saved-source preparation uses a fifteen-minute fallback. Configure `jadeNative.sourcePreparationTimeoutSeconds` per user or workspace when a different fallback is needed. An explicit native/project `timeoutMilliseconds` remains authoritative; native test execution keeps its separate timeout.
 
 Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved before execution. The native provider uploads saved Git changes to Working and compiles them before running the selected native tests. Unchanged runs still execute tests without uploading the same source again. Normal Git commit/push remains available through VS Code Source Control; database publication is separate.
 
