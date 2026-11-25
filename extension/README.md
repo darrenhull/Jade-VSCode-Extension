@@ -1,6 +1,6 @@
 # Jade Tools
 
-Bundles [official Jade CLI 0.11.6](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.6) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The Jade IDE is not required.
 

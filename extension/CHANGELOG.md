@@ -1,3 +1,8 @@
+# 0.23.6 - Faster saved-source preparation
+
+- Prepare large JOX workspaces faster with the native Git object cache in [Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7).
+- Configure the fifteen-minute saved-source preparation fallback with `jadeNative.sourcePreparationTimeoutSeconds`; explicit project deadlines and separate test/Scratch limits retain precedence.
+
 # 0.23.5 - Scratch user-schema snapshots
 
 - Prepare Scratch in an operation-owned source session bound to the selected user schema, preserving Object Explorer state and the Working target.
