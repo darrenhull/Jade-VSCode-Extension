@@ -58,6 +58,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
+    const effectiveMode=project.workingMode==='source-backed'?'source-backed':configured.workingMode||project.workingMode;
+    if(acceptedDirect?.defaults.workingMode==='existing'&&effectiveMode&&effectiveMode!=='existing')return {...configured,workingMode:effectiveMode};
     const targetChanged=acceptedDirect&&['installPath','databasePath','iniPath','server','characterSet','schemaPath','workspaceRoots'].some(key=>configured[key]!==undefined&&configured[key]!==''&&!isDeepStrictEqual(configured[key],acceptedDirect.defaults[key]));
     if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&(targetChanged||(configured.connection||project.connection)!==acceptedDirect.defaults.connection||!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
     if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
