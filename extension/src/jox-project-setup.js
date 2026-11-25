@@ -178,7 +178,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
       const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
       require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
-      return directCheckoutTargets(folder,{configured:{...privateRuntime(folder).values(),...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath});
+      return directCheckoutTargets(folder,{configured:{...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath});
     }
     if(explicitProject||files.length){
       let discovered=await discoveredFor(folder);
@@ -320,14 +320,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       await binding.record.profileStage?.commit();
       const acceptedSettings=JSON.stringify(configDto(configFor(folder)));
       try{
-        await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
+        await state?.update(CHECKOUT_STATE,binding.record.configured?.workingMode==='existing'?previous.filter(value=>value!==key):binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
         await requireReviewedDiscovery(folder,binding.record);
         if(binding.record.explicitProject||binding.record.configured?.workingMode==='existing'){acceptedFiles.set(key,{file:binding.record.projectFile,fingerprint:binding.record.fingerprint,defaults:binding.record.runtimeDefaults});await state?.update(CHECKOUT_FILES,Object.fromEntries(acceptedFiles));}
         await requireReviewedDiscovery(folder,binding.record);
         if(JSON.stringify(configDto(configFor(folder)))!==acceptedSettings)throw Error('Runtime settings changed during private acceptance; restart setup.');
         if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
         binding.publishing=true;
-        if(binding.record.sourceRoot)checkoutRoots.set(key,true);
+        if(binding.record.configured?.workingMode==='existing')checkoutRoots.delete(key);else if(binding.record.sourceRoot)checkoutRoots.set(key,true);
         if(workspace.projects.get(key)!==binding.previous)throw Error('The shared source project changed during setup.');
         if(binding.previous&&!workspace.canReconfigure(binding.previous,{allowExecuting:true,allowStoredProjections:true})){
           if(!isDeepStrictEqual(binding.previous.provider.config,workspace.projectConfiguration(folder)))throw Error('The shared source configuration changed during setup.');
