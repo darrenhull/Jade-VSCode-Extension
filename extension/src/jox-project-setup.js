@@ -26,7 +26,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const profilesFor=folder=>new WorkspaceConnectionProfile(state,folder.uri.toString(),(...args)=>vscode.window.showQuickPick(...args));
   const discoveredFor=async (folder,overrides={})=>{
     const file=projectFile(folder),project=file?JSON.parse(fs.readFileSync(file,'utf8')):{};
-    const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=configured.connection||project.connection||profiles.current();
+    const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=explicitConfigFor(folder).connection||project.connection||overrides.connection||profiles.current();
     const runtime=Object.entries({install:overrides.installPath,database:overrides.databasePath,ini:overrides.iniPath,server:overrides.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([name,value])=>['--'+name,value]);
     const request=name=>client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[...(name?['--profile',name]:[]),...runtime]}).promise;
     let result=await request(profile);
@@ -111,13 +111,17 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot}) {
     const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
     if(original.workingMode==='source-backed')return;
-    let runtime;
+    let runtime,discovery=await discoveredFor(folder,configured);
+    if(discovery?.passed===true&&discovery.code===0&&discovery.prepared?.config)
+      configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
     if(!configured.installPath||!configured.databasePath){
+      const reason=discovery?.report?.error||'';
+      if(discovery?.passed!==true&&!/connection.*(?:required|not configured)|No Jade installation|installPath|databasePath/i.test(reason))throw Error(reason||'Native Working configuration discovery failed.');
       runtime=await detect(folder.uri,undefined,{existingWorking:true,deferSave:true});
       if(!runtime)throw Object.assign(Error('Working connection selection cancelled.'),{cancelled:true});
       configured={...configured,...(runtime.settings||runtime)};
+      discovery=await discoveredFor(folder,configured);
     }
-    const discovery=await discoveredFor(folder,configured);
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)
       throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
     configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
@@ -152,10 +156,10 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
       files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
-    if(configured.workingMode!=='git-first'&&files.length&&(!explicitProject||!JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode||JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode==='existing')){
-      const relative=path.relative(folder.uri.fsPath,files[0].fsPath).split(path.sep),schemas=relative.findIndex(part=>part.toLowerCase()==='schemas');
-      const sourceRoot=schemas>0?path.join(folder.uri.fsPath,...relative.slice(0,schemas)):folder.uri.fsPath;
-      return directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot});
+    if(explicitConfigFor(folder).workingMode!=='git-first'&&files.length&&(!explicitProject||!JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode||JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode==='existing')){
+      const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
+      const sourceRoot=await require('./checkout-route').selectCheckoutRoot(folder.uri.fsPath,original,vscode);
+      return directCheckoutTargets(folder,{configured:{...privateRuntime(folder).values(),...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot});
     }
     if(explicitProject||files.length){
       let discovered=await discoveredFor(folder);

@@ -1,6 +1,6 @@
 # Jade Tools
 
-For a Git checkout containing saved JOX, **Set Up Project** uses the configured database as **Working** and reads source from disk. Root schemas/ and nested source layouts are detected. Review the local paths and confirm that initial synchronization may overwrite unexported Working changes. This route does not create another database, make a backup, extract source, or require a clean seed. Unsupported CLI packages refuse this route before database preparation. An explicitly declared workingMode: source-backed project retains the separate extraction workflow. If connection profiles are ambiguous, choose one in VS Code; the workspace remembers that choice.
+For a Git checkout containing saved JOX, **Jade: Set Up Project** uses the configured database as **Working** and reads source from disk. Root schemas/ and nested source layouts are detected. Review the local paths and confirm that initial synchronization may overwrite unexported Working changes. This route does not create another database, make a backup, extract source, or require a clean seed. Unsupported CLI packages refuse this route before database preparation. An explicitly declared workingMode: source-backed project retains the separate extraction workflow. If connection profiles are ambiguous, choose one in VS Code; the workspace remembers that choice.
 
 Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
@@ -8,7 +8,7 @@ Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicod
 
 Browse JOX schemas, classes and members in Object Explorer and Class Workspace. Open a method to edit its Jade source in a normal VS Code text editor. Native source identities and revision bindings map accepted saves back to the authoritative `.jox` file; `.jade/` contains ignored, regenerable projections and private runtime state.
 
-To initialize explicitly from a separate Source database, declare workingMode: source-backed in the project configuration and use the separate extraction workflow. This is not the default for a Git JOX checkout.
+To initialize explicitly from a separate Source database, declare workingMode: source-backed in the project configuration and use the separate extraction workflow. Choose **Create Working copy and extract sources** for that explicit mode. This is not the default for a Git JOX checkout. Source remains separate and is not published by setup or local testing.
 
 After switching branches or editing saved files, use **Jade: Sync Workspace to Working**. Native Jade compares against its accepted loaded baseline and applies the saved checkout changes. Save raw JOX files first; unsupported changes and incomplete loads remain failures rather than readiness claims.
 

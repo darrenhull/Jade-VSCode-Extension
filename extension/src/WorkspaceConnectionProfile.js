@@ -8,7 +8,7 @@ class WorkspaceConnectionProfile{
  async select(message){
   const match=/^Multiple Jade connection profiles are available \(([^\r\n]+)\)\. Choose --profile <name>; no interactive prompt is available\.$/.exec(message||'');
   if(!match)return;
-  const names=match[1].split(', ').filter(name=>/^[A-Za-z0-9_.-]+$/.test(name));
+  const names=match[1].split(', ').filter(name=>name.trim()&&Buffer.byteLength(name,'utf8')<=128&&!name.includes(String.fromCharCode(0)));
   if(!names.length||names.join(', ')!==match[1])throw Error('Native connection profile list is invalid.');
   const previous=this.current();if(previous&&names.includes(previous))return previous;
   const selected=await this.pick(names.map(name=>({label:name,profile:name})),{title:'Choose the Jade connection for this workspace',placeHolder:'Select a connection profile'});
