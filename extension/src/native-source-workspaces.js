@@ -66,12 +66,11 @@ function createSemanticWorkspaceTransport(workspace, client) {
       const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(configuration.workingMode==='git-first'?{checkoutOnly:true}:{})},token);
       const reviewed=await location(configuration);
       if(typeof reviewed.working?.identity!=='string'||!reviewed.working.identity)throw Error('Scratch Pad native Working identity is missing. Retry.');
-      if(reviewed.workingMode==='git-first'||reviewed.working.workingMode==='git-first'||configuration.workingMode==='git-first'){
-        const target=reviewed.working;
-        if(typeof target?.root!=='string'||!target.root||typeof target.installPath!=='string'||!target.installPath)throw Error('Scratch Pad native Working target is incomplete. Retry.');
-        // Native discovery enforces that this explicit directory matches the checkout generation.
-        provider.config={...provider.config,workingMode:'git-first',workingDatabaseDirectory:target.root,installPath:target.installPath};
-      }
+      const target=reviewed.working;
+      if(typeof target.root!=='string'||!target.root||typeof target.installPath!=='string'||!target.installPath)throw Error('Scratch Pad native Working target is incomplete. Retry.');
+      // Bind native preparation to the reviewed directory; checkout discovery also enforces its generation.
+      provider.config={...provider.config,workingDatabaseDirectory:target.root,installPath:target.installPath,
+        ...(reviewed.workingMode==='git-first'||target.workingMode==='git-first'||configuration.workingMode==='git-first'?{workingMode:'git-first'}:{})};
       const snapshot = await provider.prepare(token);
       if (!provider.flags.deploymentFromSavedSnapshot || !provider.flags.nativeScratch)
         throw Error('This Jade CLI does not yet support Scratch Pad execution from saved JOX source.');
