@@ -65,6 +65,12 @@ function createSemanticWorkspaceTransport(workspace, client) {
       await provider.capability();
       const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(configuration.workingMode==='git-first'?{checkoutOnly:true}:{})},token);
       const reviewed=await location(configuration);
+      if(configuration.workingMode==='git-first'){
+        const target=reviewed.working;
+        if(typeof target?.root!=='string'||!target.root||typeof target.installPath!=='string'||!target.installPath)throw Error('Scratch Pad native Working target is incomplete. Retry.');
+        // Native discovery enforces that this explicit directory matches the checkout generation.
+        provider.config={...provider.config,workingDatabaseDirectory:target.root,installPath:target.installPath};
+      }
       const snapshot = await provider.prepare(token);
       if (!provider.flags.deploymentFromSavedSnapshot || !provider.flags.nativeScratch)
         throw Error('This Jade CLI does not yet support Scratch Pad execution from saved JOX source.');
