@@ -155,7 +155,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     configured.schemaPath=schemaPath;
     configured.workspaceRoots=[sourceRoot];
     if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
-    for(const value of [folder.uri.fsPath,configured.databasePath])if(value.startsWith(path.win32.sep.repeat(2))||value.startsWith('//'))throw Error('Use locally available storage for the checkout and Working database. Network path: '+value);
+    for(const value of [folder.uri.fsPath,configured.databasePath]){const extendedLocal=value.startsWith('\\\\?\\')&&/^[A-Za-z]:[\\/]/.test(value.slice(4));if(!extendedLocal&&(value.startsWith(path.win32.sep.repeat(2))||value.startsWith('//')))throw Error('Use locally available storage for the checkout and Working database. Network path: '+value);}
     let capability,target;
     try{
       const probe=packageProbe(folder,configured);capability=await probe.capability();
