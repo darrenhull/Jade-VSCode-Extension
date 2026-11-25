@@ -121,6 +121,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath,schemaFolder}) {
     const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
     if(original.workingMode==='source-backed')return;
+    const present=values=>Object.fromEntries(Object.entries(values).filter(([,value])=>value!==undefined&&value!==''));
+    configured=present(configured);
     let runtime,discovery=await discoveredFor(folder,configured);
     if(discovery?.passed!==true&&reviewedFile&&/^Unknown Jade connection profile /i.test(discovery?.report?.error||'')){
       const override=explicitConfigFor(folder).connection;
@@ -131,7 +133,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       discovery=await discoveredFor(folder,configured);
     }
     if(discovery?.passed===true&&discovery.code===0&&discovery.prepared?.config)
-      configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
+      configured=checkoutRoute({...discovery.prepared.config,...present(configured)},original,sourceRoot);
     if(!configured.installPath||!configured.databasePath){
       const reason=discovery?.report?.error||'';
       if(discovery?.passed!==true&&!/connection.*(?:required|not configured)|No Jade installation|installPath|databasePath/i.test(reason))throw Error(reason||'Native Working configuration discovery failed.');
@@ -142,7 +144,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     }
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)
       throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
-    configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
+    configured=checkoutRoute({...discovery.prepared.config,...present(configured)},original,sourceRoot);
     configured.schemaPath=schemaPath;
     configured.workspaceRoots=[sourceRoot];
     if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
@@ -178,6 +180,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     let projectDeclaration;
     try{projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};if(!projectDeclaration||typeof projectDeclaration!=='object'||Array.isArray(projectDeclaration))throw Error('Project configuration must be an object.');}catch(cause){throw Error('Cannot read Jade project configuration '+reviewedFile+': '+cause.message,{cause});}
     const declaredSource=Object.hasOwn(projectDeclaration,'schemaPath')||Object.hasOwn(projectDeclaration,'workspaceRoots');
+    if(!repository&&declaredSource&&(!projectDeclaration.workingMode||projectDeclaration.workingMode==='existing'))throw Error('Initialize Git for this project with Initialise Workspace, then retry Set Up Project. No database was prepared.');
     let files=[];
     if(!declaredSource&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
       const scanRoot=repository.rootUri?.fsPath||(reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath);
