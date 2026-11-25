@@ -1,3 +1,8 @@
+# 0.23.5 - Scratch user-schema snapshots
+
+- Prepare Scratch in an operation-owned source session bound to the selected user schema, preserving Object Explorer state and the Working target.
+- Close private source/proxy resources after success, failure or cancellation.
+
 # 0.23.4 - Jade CLI 0.11.6
 
 - Set up a saved JOX Git checkout without creating jade.json; detect machine settings and synchronize an existing Working copy automatically.

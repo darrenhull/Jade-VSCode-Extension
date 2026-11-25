@@ -1,8 +1,10 @@
 'use strict';
 const { registerWorkspaces } = require('./jade-workspaces');
+const {NativeSourceProvider}=require('./NativeSourceProvider');
+const {isDeepStrictEqual}=require('node:util');
 
 function createSemanticWorkspaceTransport(workspace, client) {
-  let prepared, activeRequest, activeClient;
+  let prepared, activeRequest, activeClient, scope;
   const projectFor = config => {
     const roots = config.workspaceRoots;
     const root = config.cwd || (roots?.length === 1 ? roots[0] : undefined);
@@ -23,9 +25,10 @@ function createSemanticWorkspaceTransport(workspace, client) {
           return client.request(command, body, ...args);
         }
         const project = projectFor(body.config);
-        const binding = project.provider.binding();
+        scope?.validate();
+        const binding = scope?.provider.binding();
         if (!prepared || prepared.project !== project || prepared.schema !== body.config.schema ||
-            prepared.generation !== binding.generation || prepared.client !== project.provider.client || prepared.client.client !== prepared.connection)
+            prepared.generation !== binding?.generation || prepared.client !== scope?.client || prepared.client.client !== prepared.connection)
           throw Error('Scratch Pad source selection changed before execution. Retry the operation.');
         const { cwd, ...config } = body.config;
         activeClient=prepared.client;
@@ -40,19 +43,40 @@ function createSemanticWorkspaceTransport(workspace, client) {
       try { await workspace.beforeOperation?.(); }
       catch (error) { workspace.releaseExecution(); throw error; }
     },
-    async afterOperation() { prepared = undefined; activeRequest = undefined; activeClient = undefined; workspace.releaseExecution(); },
+    async afterOperation() {
+      const owned=scope;scope=undefined;prepared=undefined;activeRequest=undefined;activeClient=undefined;
+      const failures=[];
+      try{await owned?.provider?.closeProject();}catch(error){failures.push(error);}
+      try{await owned?.client.dispose();}catch(error){failures.push(error);}
+      workspace.releaseExecution();
+      if(failures.length)throw new AggregateError(failures,'Scratch cleanup failed: '+failures.map(error=>error.message).join('; '));
+    },
     async prepareSource(config, _progress, token) {
       const project = projectFor(config);
       await workspace.saveDirty(project, token);
-      const snapshot = await project.provider.prepare(token);
-      if (!project.provider.flags.deploymentFromSavedSnapshot || !project.provider.flags.nativeScratch)
+      await project.provider.sourceOperation;
+      if(token?.isCancellationRequested)throw Object.assign(Error('Source operation cancelled.'),{cancelled:true});
+      const configuration=JSON.parse(JSON.stringify(project.provider.config)),parent=project.provider.client;
+      const validate=()=>{if(workspace.project(project.folder)!==project||project.provider.client!==parent||parent.disposed||!isDeepStrictEqual(project.provider.config,configuration))throw Error('Scratch Pad project configuration or source session changed before execution. Retry.');};
+      validate();
+      const owned=parent.fork();scope={client:owned,validate};
+      const provider=new NativeSourceProvider({client:owned,config:{...configuration,schema:config.schema},projectRoot:project.folder.uri.fsPath,validateContext:validate});
+      scope.provider=provider;
+      await provider.capability();
+      const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(configuration.workingMode==='git-first'?{checkoutOnly:true}:{})},token);
+      const reviewed=await location(configuration);
+      const snapshot = await provider.prepare(token);
+      if (!provider.flags.deploymentFromSavedSnapshot || !provider.flags.nativeScratch)
         throw Error('This Jade CLI does not yet support Scratch Pad execution from saved JOX source.');
-      const page = await project.provider.query({ kind: 'schema', search: config.schema, offset: 0, limit: 100 }, token);
+      const page = await provider.query({ kind: 'schema', search: config.schema, offset: 0, limit: 100 }, token);
       const matches = page.items.filter(value => value.name === config.schema);
       if (matches.length !== 1) throw Error('The selected Scratch Pad schema was not resolved uniquely by the native provider.');
+      const selected=await location(provider.config);validate();
+      if(typeof reviewed.working?.identity!=='string'||!reviewed.working.identity||selected.working?.identity!==reviewed.working.identity)throw Error('Scratch Pad Working target changed while selecting the schema. Retry.');
       prepared = { project, schema: config.schema, entityId: matches[0].id, generation: snapshot.generation,
-        client:project.provider.client, connection:project.provider.connection, sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId,
+        client:owned, connection:provider.connection, sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId,
           generation: snapshot.generation, snapshotHash: snapshot.snapshotHash } };
+
     }
   };
 }
