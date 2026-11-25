@@ -56,7 +56,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
       await workspace.saveDirty(project, token);
       await project.provider.sourceOperation;
       if(token?.isCancellationRequested)throw Object.assign(Error('Source operation cancelled.'),{cancelled:true});
-      const configuration=JSON.parse(JSON.stringify(project.provider.config)),parent=project.provider.client;
+      const configuration=structuredClone(project.provider.config),parent=project.provider.client;
       const validate=()=>{if(workspace.project(project.folder)!==project||project.provider.client!==parent||parent.disposed||!isDeepStrictEqual(project.provider.config,configuration))throw Error('Scratch Pad project configuration or source session changed before execution. Retry.');};
       validate();
       const owned=parent.fork();scope={client:owned,validate};
