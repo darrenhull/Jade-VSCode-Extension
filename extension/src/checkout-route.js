@@ -4,7 +4,7 @@ const path=require('node:path');
 function checkoutRoute(machine,project,root){
  if(project.workingMode==='source-backed')return;
  const resolved=Object.fromEntries(Object.entries(machine).filter(([,value])=>value!==undefined&&value!==''));
- const result={...project,...resolved,sourceFormat:'jox',workingMode:'existing',workspaceRoots:project.workspaceRoots||[path.resolve(root)]};
+ const result={...project,...resolved,sourceFormat:'jox',workingMode:'existing',workspaceRoots:resolved.workspaceRoots||project.workspaceRoots||[path.resolve(root)]};
  if(machine.connection||project.connection)result.connection=machine.connection||project.connection;
  for(const key of ['workingSeedDirectory','workingDatabaseDirectory','sourceDatabasePath','user','username','password'])delete result[key];
  return result;

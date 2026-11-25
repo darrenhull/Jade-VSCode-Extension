@@ -136,6 +136,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
     configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
     configured.schemaPath=schemaPath;
+    configured.workspaceRoots=[sourceRoot];
     if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
     for(const value of [folder.uri.fsPath,configured.databasePath])if(value.startsWith(path.win32.sep.repeat(2))||value.startsWith('//'))throw Error('Use locally available storage for the checkout and Working database. Network path: '+value);
     let capability,target;
@@ -165,12 +166,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const reviewedFile=projectFile(folder);
     let explicitProject=reviewedFile!==null;
     const reviewedFingerprint=explicitProject?projectBytes(folder,reviewedFile):undefined;
+    const projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
+    const explicitSchema=Object.hasOwn(projectDeclaration,'schemaPath');
     let files=[];
-    if(repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
+    if(!explicitSchema&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
       files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
-    if(explicitConfigFor(folder).workingMode!=='git-first'&&files.length&&(!explicitProject||!JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode||JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode==='existing')){
-      const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
+    if(explicitConfigFor(folder).workingMode!=='git-first'&&(explicitSchema||files.length)&&(!projectDeclaration.workingMode||projectDeclaration.workingMode==='existing')){
+      const original=projectDeclaration;
       const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath;
       const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
       const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
