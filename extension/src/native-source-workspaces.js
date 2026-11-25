@@ -65,6 +65,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
       await provider.capability();
       const location=configuration=>provider.request('working.location',{cwd:project.folder.uri.fsPath,config:configuration,...(configuration.workingMode==='git-first'?{checkoutOnly:true}:{})},token);
       const reviewed=await location(configuration);
+      if(typeof reviewed.working?.identity!=='string'||!reviewed.working.identity)throw Error('Scratch Pad native Working identity is missing. Retry.');
       if(configuration.workingMode==='git-first'){
         const target=reviewed.working;
         if(typeof target?.root!=='string'||!target.root||typeof target.installPath!=='string'||!target.installPath)throw Error('Scratch Pad native Working target is incomplete. Retry.');
@@ -78,7 +79,7 @@ function createSemanticWorkspaceTransport(workspace, client) {
       const matches = page.items.filter(value => value.name === config.schema);
       if (matches.length !== 1) throw Error('The selected Scratch Pad schema was not resolved uniquely by the native provider.');
       const selected=await location(provider.config);validate();
-      if(typeof reviewed.working?.identity!=='string'||!reviewed.working.identity||selected.working?.identity!==reviewed.working.identity)throw Error('Scratch Pad Working target changed while selecting the schema. Retry.');
+      if(selected.working?.identity!==reviewed.working.identity)throw Error('Scratch Pad Working target changed while selecting the schema. Retry.');
       prepared = { project, schema: config.schema, entityId: matches[0].id, generation: snapshot.generation,
         client:owned, connection:provider.connection, sourceSnapshot: { provider: snapshot.provider, projectId: snapshot.projectId,
           generation: snapshot.generation, snapshotHash: snapshot.snapshotHash } };
