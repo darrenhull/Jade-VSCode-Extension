@@ -77,7 +77,7 @@ test('existing JOX checkout without jade.json or runtime settings reaches Source
  assert.deepEqual(fs.readFileSync(f.sourceFile),f.original);assert.equal(fs.readFileSync(f.gitMarker,'utf8'),'user Git state');
  assert.equal(fs.existsSync(f.projectFile),false,'Git-first setup must preserve optional jade.json absence');
  assert.equal(f.calls.filter(row=>row.command==='cli').length,0);
- const scan=f.calls.find(row=>row.command==='ui.findFiles');assert.equal(scan.args[0].base,f.folder.uri);assert.equal(scan.args[0].pattern,'**/*.[jJ][oO][xX]');assert.equal(scan.args[2],1,'Detection must not enumerate the source tree');
+ const scan=f.calls.find(row=>row.command==='ui.findFiles');assert.equal(scan.args[0].base.fsPath,f.folder.uri.fsPath);assert.equal(scan.args[0].pattern,'**/*.[jJ][oO][xX]');assert.equal(scan.args[2],1,'Detection must not enumerate the source tree');
  assert.ok(f.calls.findIndex(row=>row.command==='working.initialize')<f.calls.findIndex(row=>row.command==='ui.refresh'));
 });
 

@@ -45,7 +45,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const configurationFor=folder=>{
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
-    const currentFile=projectFile(folder),project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};
+    const currentFile=projectFile(folder);let project;
+    try{project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};}catch{return {...explicitConfigFor(folder)};}
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
@@ -167,15 +168,17 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const reviewedFile=projectFile(folder);
     let explicitProject=reviewedFile!==null;
     const reviewedFingerprint=explicitProject?projectBytes(folder,reviewedFile):undefined;
-    const projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
+    let projectDeclaration;
+    try{projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};}catch(cause){throw Error('Cannot read Jade project configuration '+reviewedFile+': '+cause.message,{cause});}
     const declaredSource=Object.hasOwn(projectDeclaration,'schemaPath')||Object.hasOwn(projectDeclaration,'workspaceRoots');
     let files=[];
     if(!declaredSource&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
-      files=await vscode.workspace.findFiles(new vscode.RelativePattern(folder.uri,'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
+      const scanRoot=reviewedFile?path.dirname(reviewedFile):repository.rootUri?.fsPath||folder.uri.fsPath;
+      files=await vscode.workspace.findFiles(new vscode.RelativePattern(vscode.Uri.file(scanRoot),'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
     if(explicitConfigFor(folder).workingMode!=='git-first'&&(declaredSource||files.length)&&(!projectDeclaration.workingMode||projectDeclaration.workingMode==='existing')){
       const original=projectDeclaration;
-      const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath;
+      const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):repositoryRoot;
       const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
       const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
       const schemaFolder=require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
