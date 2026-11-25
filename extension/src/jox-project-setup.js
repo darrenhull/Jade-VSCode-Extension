@@ -50,9 +50,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
-    if(acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
+    if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
       return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
-    if(project.workingMode==='existing')return checkoutRoute(configured,project,folder.uri.fsPath);
+    if(project.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing'))return checkoutRoute(configured,project,folder.uri.fsPath);
     if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&accepted.defaults.workingMode!=='existing'&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
     return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
   };
@@ -173,12 +173,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const declaredSource=Object.hasOwn(projectDeclaration,'schemaPath')||Object.hasOwn(projectDeclaration,'workspaceRoots');
     let files=[];
     if(!declaredSource&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){
-      const scanRoot=reviewedFile?path.dirname(reviewedFile):repository.rootUri?.fsPath||folder.uri.fsPath;
+      const scanRoot=repository.rootUri?.fsPath||(reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath);
       files=await vscode.workspace.findFiles(new vscode.RelativePattern(vscode.Uri.file(scanRoot),'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
     }
     if(explicitConfigFor(folder).workingMode!=='git-first'&&(declaredSource||files.length)&&(!projectDeclaration.workingMode||projectDeclaration.workingMode==='existing')){
       const original=projectDeclaration;
-      const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):repositoryRoot;
+      const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=original.workspaceRoots!==undefined&&reviewedFile?path.dirname(reviewedFile):repositoryRoot;
       const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
       const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
       const schemaFolder=require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
