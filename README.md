@@ -10,6 +10,8 @@ Run **Jade: Set Up Project** from Jade Tools or the Command Palette. Existing Gi
 
 **Jade: Sync Workspace to Working** appears in the Command Palette only when the bundled CLI advertises qualified JOX sync. It sends the selected project's saved JOX snapshot to its existing Working database. Save any dirty raw `.jox` editors first. Sync does not run tests, write to Git, or publish to Source. The bundled ANSI runtime qualifies sync and checkout initialization. Reviewed setup sync requires native enforcement of the exact Working identity shown in the confirmation.
 
+Saved-source preparation uses a fifteen-minute fallback. Configure `jadeNative.sourcePreparationTimeoutSeconds` per user or workspace when a different fallback is needed. An explicit native/project `timeoutMilliseconds` remains authoritative; native test execution keeps its separate timeout.
+
 Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved before execution. The native provider uploads saved Git changes to Working and compiles them before running the selected native tests. Unchanged runs still execute tests without uploading the same source again. Normal Git commit/push remains available through VS Code Source Control; database publication is separate.
 
 The current qualified flow covers original method-body edits and selected native tests on matching ANSI or Unicode Jade runtimes. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.

@@ -663,6 +663,14 @@
           "scope": "resource",
           "description": "Timeout in seconds for Extract All Sources. Defaults to two hours; increase for large schemas. Cancel retains already-applied files and discards the unfinished file."
         },
+        "jadeNative.sourcePreparationTimeoutSeconds": {
+          "type": "integer",
+          "default": 900,
+          "minimum": 1,
+          "maximum": 7200,
+          "scope": "resource",
+          "description": "Fallback timeout in seconds for preparing saved JOX source during setup and sync. Defaults to fifteen minutes. An explicit native/project timeoutMilliseconds takes precedence; native test execution keeps its separate timeout."
+        },
         "jadeNative.sourceIndexTimeoutSeconds": {
           "type": "integer",
           "default": 600,
