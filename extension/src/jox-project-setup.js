@@ -112,7 +112,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
-  async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath}) {
+  async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath,schemaFolder}) {
     const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
     if(original.workingMode==='source-backed')return;
     let runtime,discovery=await discoveredFor(folder,configured);
@@ -149,6 +149,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       throw Error('Update Jade Tools: native setup did not confirm the direct Working database and disk checkout. No backup or extraction was started.');
     if(capability.checkoutInitialization!==true||capability.sync!==true||capability.reviewedWorkingSync!==true)
       throw Error('Update Jade Tools: direct Working initialization and reviewed sync are not available in this CLI package.');
+    target.schemaFolder=schemaFolder;
     requireSavedCheckout(folder);
     const selectedProfile=pendingProfiles.get(folder.uri.toString());
     reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,
@@ -177,8 +178,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath;
       const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
       const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
-      require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
-      return directCheckoutTargets(folder,{configured:{...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath});
+      const schemaFolder=require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
+      return directCheckoutTargets(folder,{configured:{...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath,schemaFolder});
     }
     if(explicitProject||files.length){
       let discovered=await discoveredFor(folder);
@@ -338,7 +339,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       }catch(error){
         binding.publishing=false;
         acceptedFiles.clear();for(const [folderKey,entry]of previousFiles)acceptedFiles.set(folderKey,entry);
-        if(!previous.includes(key))checkoutRoots.delete(key);
+        if(previous.includes(key))checkoutRoots.set(key,true);else checkoutRoots.delete(key);
         const failures=[];
         for(const [stateKey,value]of [[CHECKOUT_STATE,previous],...(binding.record.explicitProject||binding.record.configured?.workingMode==='existing'?[[CHECKOUT_FILES,Object.fromEntries(previousFiles)]]:[])]){try{await state?.update(stateKey,value);}catch(cleanup){failures.push(cleanup.message);}}
         if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');

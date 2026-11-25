@@ -74,7 +74,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
     const action=direct?'Sync checkout to existing Working':creating?'Create Working from checkout':'Sync checkout to Working';
     const savedRoot=require('node:url').fileURLToPath(checkout.sourceRoots[0]);
     const confirm=await vscode.window.showWarningMessage(action+'?',{modal:true,detail:'Jade installation: '+checkout.working.installPath+
-     '\nWorking: '+checkout.working.databasePath+'\nSaved JOX: '+savedRoot+'\n\nNo application Source database is used. '+
+     '\nWorking: '+checkout.working.databasePath+'\nSaved JOX: '+savedRoot+(checkout.schemaFolder?'\nSchema folder: '+checkout.schemaFolder:'')+'\n\nNo application Source database is used. '+
      (direct?'The saved Git checkout is authoritative. Working-only changes and changes not exported to this checkout may be overwritten. Continue only if you want to reconcile this Working database with the saved files. No backup, extraction or second database is created.':creating?'Load the saved checkout, including saved edits. Unsaved editor buffers are not loaded.':'Connect to the accepted generation, then sync saved checkout changes before refreshing views.')},action);
     requireFolder(folder);if(confirm!==action)return{...status,passed:false,code:130,cancelled:true,stage};
     stage='working';let accepted;
