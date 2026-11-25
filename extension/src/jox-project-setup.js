@@ -267,7 +267,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const runtimeDefaults={...Object.fromEntries(Object.entries(detectedDefaults).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
     const selectedProfile=pendingProfiles.get(folder.uri.toString());
     reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
-      providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder)}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:null,projectFile:explicitProject?reviewedFile:null});
+      providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder),...(configured.connection?{connection:configured.connection}:{})}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:null,projectFile:explicitProject?reviewedFile:null});
     return target;
   }
   async function working(folder,title,operation) {
