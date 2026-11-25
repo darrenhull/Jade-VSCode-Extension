@@ -30,6 +30,11 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const runtime=Object.entries({install:overrides.installPath,database:overrides.databasePath,ini:overrides.iniPath,server:overrides.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([name,value])=>['--'+name,value]);
     const request=name=>client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[...(name?['--profile',name]:[]),...runtime]}).promise;
     let result=await request(profile);
+    if(result?.passed!==true&&/^Unknown Jade connection profile /i.test(result?.report?.error||'')&&profile===profiles.current()&&!explicitConfigFor(folder).connection&&!project.connection&&!overrides.connection&&!pendingProfiles.has(folder.uri.toString())){
+      const previous=profiles.current();result=await request(undefined);
+      const replacement=result?.prepared?.config?.connection;
+      if(result?.passed===true&&typeof replacement==='string'&&replacement)pendingProfiles.set(folder.uri.toString(),{name:replacement,previous});
+    }
     if(result?.passed!==true){const previous=profiles.current(),selected=await profiles.select(result?.report?.error,{persist:false});if(selected){pendingProfiles.set(folder.uri.toString(),{name:selected,previous});result=await request(selected);}}
     return result;
   };
@@ -118,6 +123,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(original.workingMode==='source-backed')return;
     let runtime,discovery=await discoveredFor(folder,configured);
     if(discovery?.passed!==true&&reviewedFile&&/^Unknown Jade connection profile /i.test(discovery?.report?.error||'')){
+      const override=explicitConfigFor(folder).connection;
+      if(override&&override!==original.connection)throw Error(discovery.report.error+' The configured VS Code profile override is missing. Select an available connection or configure that profile before setup; the different project-file alias was not repaired.');
       const originalFailure=discovery.report.error,repaired=await initialize(folder.uri);
       if(repaired?.cancelled)throw Object.assign(Error('Project connection repair cancelled.'),{cancelled:true});
       if(repaired?.passed!==true||repaired.code!==0)throw Error(originalFailure+' Project connection repair did not complete.');
