@@ -75,7 +75,7 @@ function registerWorkspaceInitialization(vscode,context,services){
     requireFolder();
     if(choice!=='Configure This Machine')throw Error(failure(result));
     const config=await runtimeConfig({requireInstall:true});if(!config)return{cancelled:true};
-    const confirmed=await vscode.window.showWarningMessage('Create this project’s missing private connection profile?',{modal:true,detail:'Use the selected runtime and Source on this machine:\nInstallation: '+config.installPath+'\nSource: '+(config.databasePath||'Native default')+'\nINI: '+(config.iniPath||'Native default')+'\nServer: '+(config.server||'Native default')+'\n\njade.json is preserved. Native ownership rules refuse changing an existing profile to another connection. No database is opened.'},'Create Machine Profile');
+    const confirmed=await vscode.window.showWarningMessage('Create this project’s missing private connection profile?',{modal:true,detail:'Use the selected runtime and database on this machine:\nInstallation: '+config.installPath+'\nDatabase: '+(config.databasePath||'Native default')+'\nINI: '+(config.iniPath||'Native default')+'\nServer: '+(config.server||'Native default')+'\n\njade.json is preserved. Native ownership rules refuse changing an existing profile to another connection. No database is opened.'},'Create Machine Profile');
     requireFolder();if(confirmed!=='Create Machine Profile')return{cancelled:true};
     // Omitting --profile lets native init use the existing file's connection alias.
     result=await invoke(['--config',configFile,...argumentsFor(config)],config);

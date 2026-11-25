@@ -45,9 +45,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const configurationFor=folder=>{
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
-    const configured={...(profilesFor(folder).current()?{connection:profilesFor(folder).current()}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
-    const acceptedDirect=acceptedFiles.get(folder.uri.toString()),currentFile=projectFile(folder);
-    if(acceptedDirect?.defaults.workingMode==='existing'&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))return{...acceptedDirect.defaults,...configured};
+    const currentFile=projectFile(folder),project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};
+    const profile=project.connection?undefined:profilesFor(folder).current();
+    const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
+    const acceptedDirect=acceptedFiles.get(folder.uri.toString());
+    if(acceptedDirect?.defaults.workingMode==='existing'&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
+      return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
+    if(project.workingMode==='existing')return checkoutRoute(configured,project,folder.uri.fsPath);
     if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
     return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
   };
@@ -112,6 +116,12 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
     if(original.workingMode==='source-backed')return;
     let runtime,discovery=await discoveredFor(folder,configured);
+    if(discovery?.passed!==true&&reviewedFile&&/^Unknown Jade connection profile /i.test(discovery?.report?.error||'')){
+      const originalFailure=discovery.report.error,repaired=await initialize(folder.uri);
+      if(repaired?.cancelled)throw Object.assign(Error('Project connection repair cancelled.'),{cancelled:true});
+      if(repaired?.passed!==true||repaired.code!==0)throw Error(originalFailure+' Project connection repair did not complete.');
+      discovery=await discoveredFor(folder,configured);
+    }
     if(discovery?.passed===true&&discovery.code===0&&discovery.prepared?.config)
       configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
     if(!configured.installPath||!configured.databasePath){

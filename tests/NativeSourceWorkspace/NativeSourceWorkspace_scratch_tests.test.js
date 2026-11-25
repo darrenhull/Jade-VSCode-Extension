@@ -143,6 +143,6 @@ test('Scratch pins the reviewed native directory and runtime in Source-backed mo
 
 for(const explicit of [true,false])test('direct Working Scratch never injects a second database directory (explicit='+explicit+')',async()=>{
  let capture;const f=fixture({nativeReply:(command,body)=>{if(command==='working.location')return{passed:true,code:0,body:{workingMode:'existing',working:{identity:'direct',workingMode:'existing',root:'C:/Private/operations',databasePath:'C:/Working/system',installPath:'C:/Jade-ANSI'}}};if(command==='source.semantic.prepare'){capture=body.config;if(capture.workingDatabaseDirectory!==undefined)throw Error('Direct Working forbids a second database directory');}}});
- if(explicit)f.config.workingMode='existing';f.config.databasePath='C:/Working/system';
- const result=await f.runner.run({document:document()});assert.equal(result.passed,true,JSON.stringify(result));assert.equal(capture.workingMode,'existing');assert.equal(capture.workingDatabaseDirectory,undefined);assert.equal(capture.databasePath,'C:/Working/system');assert.equal(f.config.workingDatabaseDirectory,undefined);
+ if(explicit)f.config.workingMode='existing';f.config.databasePath='C:/Working/system';f.config.workingDatabaseDirectory='C:/Old/private-working';f.config.workingSeedDirectory='C:/Old/seed';
+ const result=await f.runner.run({document:document()});assert.equal(result.passed,true,JSON.stringify(result));assert.equal(capture.workingMode,'existing');assert.equal(capture.workingDatabaseDirectory,undefined);assert.equal(capture.databasePath,'C:/Working/system');assert.equal(f.config.workingDatabaseDirectory,'C:/Old/private-working');
 });

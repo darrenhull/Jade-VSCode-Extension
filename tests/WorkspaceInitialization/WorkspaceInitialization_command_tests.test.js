@@ -235,7 +235,7 @@ test('explicit installation-only profile repair reviews native defaults without 
  const s=setup(t,{existing:true,results:[{passed:false,code:2,report:{error:"Unknown Jade connection profile 'keep-me'."}},{passed:true,code:0,created:false}],choices:['Configure This Machine','Create Machine Profile']});nativeDiscovery(s);
  s.services.configFor=()=>({sourceFormat:'jox',installPath:selectedRuntime.installPath});s.services.detect=async()=>{assert.fail('Explicit installation settings should reach native defaults');};
  const result=await s.initialize(s.folder.uri);assert.equal(result.passed,true);
- const detail=s.prompts.find(row=>row.options?.modal).options.detail;assert.ok(!detail.includes('undefined'));assert.match(detail,/Source: Native default\nINI: Native default\nServer: Native default/);
+ const detail=s.prompts.find(row=>row.options?.modal).options.detail;assert.ok(!detail.includes('undefined'));assert.match(detail,/Database: Native default\nINI: Native default\nServer: Native default/);
  assert.deepEqual(s.calls[1].argv,['--config',path.join(s.root,'jade.json'),'--install',selectedRuntime.installPath]);
 });
 
