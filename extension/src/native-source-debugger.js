@@ -45,6 +45,8 @@ async function prepareSemanticDebugLaunch(workspace,client,document,output,signa
 
 function registerNativeSourceDebugger(vscode,context,workspace,client,{reportDiagnostic=()=>{}}={}){
  if(!vscode.debug?.registerDebugAdapterDescriptorFactory||!vscode.debug?.registerDebugConfigurationProvider)return;
+ // VS Code requires this extension to own the debugger contribution before registration.
+ if(!context.extension?.packageJSON?.contributes?.debuggers?.some(row=>row.type==='jade-native-experimental'))return;
  let debugging=false;
  const record=document=>workspace.record(document.uri),debugRoot=path.join(context.extensionPath,'vendor','jade-tools-cli','native');
  return registerDebugger(vscode,context,{

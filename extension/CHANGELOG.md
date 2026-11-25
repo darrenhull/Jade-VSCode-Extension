@@ -1,3 +1,8 @@
+# 0.23.7 - Workspace activation fix
+
+- Open JOX workspaces successfully when the installed package does not advertise a qualified native debugger.
+- Keep debugging disabled until both package ownership and native runtime qualification allow it.
+
 # 0.23.6 - Faster saved-source preparation
 
 - Prepare large JOX workspaces faster with the native Git object cache in [Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7).
