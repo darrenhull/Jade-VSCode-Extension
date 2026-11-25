@@ -22,15 +22,15 @@ const sameFile=(left,right)=>left===null||right===null?left===right:typeof left=
 function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,detect}) {
   const output=vscode.window.createOutputChannel('Jade Working Setup');context.subscriptions.push(output);
   const state=context.workspaceState;
-  const explicitConfigFor=configFor;
+  const explicitConfigFor=configFor,pendingProfiles=new Map();
   const profilesFor=folder=>new WorkspaceConnectionProfile(state,folder.uri.toString(),(...args)=>vscode.window.showQuickPick(...args));
   const discoveredFor=async (folder,overrides={})=>{
     const file=projectFile(folder),project=file?JSON.parse(fs.readFileSync(file,'utf8')):{};
-    const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=explicitConfigFor(folder).connection||project.connection||overrides.connection||profiles.current();
+    const profiles=profilesFor(folder),configured={...configFor(folder),...overrides},profile=explicitConfigFor(folder).connection||project.connection||overrides.connection||pendingProfiles.get(folder.uri.toString())?.name||profiles.current();
     const runtime=Object.entries({install:overrides.installPath,database:overrides.databasePath,ini:overrides.iniPath,server:overrides.server}).filter(([,value])=>typeof value==='string'&&value).flatMap(([name,value])=>['--'+name,value]);
     const request=name=>client.request('prepare',{operation:'inspect.target',cwd:folder.uri.fsPath,argv:[...(name?['--profile',name]:[]),...runtime]}).promise;
     let result=await request(profile);
-    if(result?.passed!==true){const selected=await profiles.select(result?.report?.error);if(selected)result=await request(selected);}
+    if(result?.passed!==true){const previous=profiles.current(),selected=await profiles.select(result?.report?.error,{persist:false});if(selected){pendingProfiles.set(folder.uri.toString(),{name:selected,previous});result=await request(selected);}}
     return result;
   };
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
@@ -148,13 +148,15 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(capability.checkoutInitialization!==true||capability.sync!==true||capability.reviewedWorkingSync!==true)
       throw Error('Update Jade Tools: direct Working initialization and reviewed sync are not available in this CLI package.');
     requireSavedCheckout(folder);
-    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,
+    const selectedProfile=pendingProfiles.get(folder.uri.toString());
+    reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,
       discoveryConfig:configured,discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
       providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
       fingerprint:reviewedFile?reviewedFingerprint:null,projectFile:reviewedFile||null});
     return target;
   }
   async function checkoutTargets(folder,{repository,profileRepaired=false}={}) {
+    pendingProfiles.delete(folder.uri.toString());
     const settingsBaseline=JSON.stringify(configDto(configFor(folder)));
     let configured=configurationFor(folder),sourceRoot,runtime,discoveredState;
     if(configured.workingMode&&!['git-first','existing'].includes(configured.workingMode))return;
@@ -242,7 +244,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(target.workingState==='existing'&&(capability.sync!==true||capability.reviewedWorkingSync!==true))throw Error('Update the Jade CLI: reviewed Working target enforcement for sync is unavailable.');
     requireSavedCheckout(folder);
     const runtimeDefaults={...Object.fromEntries(Object.entries(detectedDefaults).filter(([key])=>!discoveredState?.config[key])),...(runtime?.settings||{})};
-    reviewedRoots.set(target,{sourceRoot,configured,runtime,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
+    const selectedProfile=pendingProfiles.get(folder.uri.toString());
+    reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,discovery:discoveredState?JSON.stringify({file:discoveredState.configFile||null,config:discoveredState.config}):undefined,
       providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder)}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:null,projectFile:explicitProject?reviewedFile:null});
     return target;
   }
@@ -267,14 +270,19 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const onboarding=registerWorkspaceOnboarding(vscode,context,{
     jox:true,initialize,targets,checkoutTargets,
     activateCheckout:async(folder,reviewed)=>{
+      const key=folder.uri.toString();
+      if(workspace.executing)throw Error('Another Jade Working operation is running. Wait for it to finish before setup.');
+      workspace.executing=true;
+      try{
+      await workspace.changing?.get(workspace.projects.get(key))?.promise;
       await workspace.beforeSetup?.();
       const record=reviewedRoots.get(reviewed);if(!record)return;
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
       await requireReviewedDiscovery(folder,record);
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
-      const key=folder.uri.toString(),previous=workspace.projects.get(key);
+      const previous=workspace.projects.get(key);
       const same=previous&&isDeepStrictEqual(previous.provider.config,workspace.projectConfiguration(folder,record.providerConfig));
-      if(workspace.executing||previous&&!workspace.canReconfigure(previous,{allowStoredProjections:true})&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
+      if(previous&&!workspace.canReconfigure(previous,{allowExecuting:true,allowStoredProjections:true})&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       let stageClient,owner;
       try{
@@ -286,6 +294,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(failures.length)error.message+=' Temporary setup cleanup failed: '+failures.join('; ');
         throw error;
       }
+      }finally{if(!setupBindings.has(key)){workspace.executing=false;flushRefreshes();}}
     },
     commitCheckout:async(folder,reviewed)=>{
       const key=folder.uri.toString(),binding=setupBindings.get(key),record=binding?.record||reviewedRoots.get(reviewed);
@@ -301,6 +310,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       await requireReviewedDiscovery(folder,binding.record);
       if(JSON.stringify(configDto(configFor(folder)))!==binding.record.baseline)throw Error('Runtime settings changed during acceptance; restart setup.');
       await binding.record.runtime?.commit();
+      await binding.record.profileStage?.commit();
       const acceptedSettings=JSON.stringify(configDto(configFor(folder)));
       try{
         await state?.update(CHECKOUT_STATE,binding.record.sourceRoot?[...new Set([...previous,key])]:previous);
@@ -327,13 +337,13 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');
         throw error;
       }
-      binding.workspace.dispose();setupBindings.delete(key);workspace.executing=false;flushRefreshes();
+      binding.workspace.dispose();setupBindings.delete(key);pendingProfiles.delete(key);workspace.executing=false;flushRefreshes();
       return {prepared:!binding.retained};
     },
     abortCheckout:async folder=>{
-      const key=folder.uri.toString(),binding=setupBindings.get(key);if(!binding)return;
+      const key=folder.uri.toString(),binding=setupBindings.get(key);pendingProfiles.delete(key);if(!binding)return;
       const failures=[];
-      for(const cleanup of [()=>binding.project.provider.closeProject(),()=>binding.record.runtime?.rollback(),()=>binding.workspace.dispose(),()=>binding.client.dispose()]){try{await cleanup();}catch(error){failures.push(error);}}
+      for(const cleanup of [()=>binding.project.provider.closeProject(),()=>binding.record.runtime?.rollback(),()=>binding.record.profileStage?.rollback(),()=>binding.workspace.dispose(),()=>binding.client.dispose()]){try{await cleanup();}catch(error){failures.push(error);}}
       setupBindings.delete(key);workspace.executing=false;
       try{flushRefreshes();}catch(error){failures.push(error);}
       if(failures.length)throw new AggregateError(failures,'Setup cleanup failed: '+failures.map(error=>error.message).join('; '));
