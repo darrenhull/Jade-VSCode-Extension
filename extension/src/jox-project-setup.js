@@ -46,7 +46,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const binding=setupBindings.get(folder.uri.toString());
     if(binding&&!binding.publishing)return binding.originalConfig;
     const currentFile=projectFile(folder);let project;
-    try{project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};}catch{return {...explicitConfigFor(folder)};}
+    try{project=currentFile?JSON.parse(fs.readFileSync(currentFile,'utf8')):{};if(!project||typeof project!=='object'||Array.isArray(project))throw Error('Project configuration must be an object.');}catch{return {...explicitConfigFor(folder)};}
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
@@ -169,7 +169,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     let explicitProject=reviewedFile!==null;
     const reviewedFingerprint=explicitProject?projectBytes(folder,reviewedFile):undefined;
     let projectDeclaration;
-    try{projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};}catch(cause){throw Error('Cannot read Jade project configuration '+reviewedFile+': '+cause.message,{cause});}
+    try{projectDeclaration=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};if(!projectDeclaration||typeof projectDeclaration!=='object'||Array.isArray(projectDeclaration))throw Error('Project configuration must be an object.');}catch(cause){throw Error('Cannot read Jade project configuration '+reviewedFile+': '+cause.message,{cause});}
     const declaredSource=Object.hasOwn(projectDeclaration,'schemaPath')||Object.hasOwn(projectDeclaration,'workspaceRoots');
     let files=[];
     if(!declaredSource&&repository&&vscode.workspace.findFiles&&vscode.RelativePattern){

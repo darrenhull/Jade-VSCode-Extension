@@ -49,7 +49,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    if(!original){
     const config=await runtimeConfig();if(!config)return{cancelled:true};initialConfig=config;
     // Unique native profile avoids replacing another project's shared profile.
-    if(!services.nativeDiscovery||config.installPath)argv.push('--profile',profiles.nameFor(config),...argumentsFor(config));
+    if(!services.nativeDiscovery||config.installPath)argv.push('--profile',profiles.nameFor(config,{creating:true}),...argumentsFor(config));
    }
    output.show(true);output.appendLine('Initialising Git and configuration in '+key+'. This does not extract, back up, build or publish.');
    async function invoke(args,expectedConfig=initialConfig){
@@ -88,7 +88,7 @@ function registerWorkspaceInitialization(vscode,context,services){
     output.appendLine(failure(result));
     const config=await runtimeConfig({detect:true,requireInstall:true});if(!config)return{cancelled:true};
     const retry=['--config',configFile];
-    if(!original)retry.push('--profile',profiles.nameFor(config));
+    if(!original)retry.push('--profile',profiles.nameFor(config,{creating:true}));
     result=await invoke([...retry,...argumentsFor(config)],config);
    }
    if(result?.passed!==true||result.code!==0)throw Error(failure(result));

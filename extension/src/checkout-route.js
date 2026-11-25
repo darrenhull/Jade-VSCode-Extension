@@ -16,7 +16,7 @@ async function selectCheckoutRoot(root,project,vscode,{repositoryRoot=root}={}){
   const found=await vscode.workspace.findFiles(new vscode.RelativePattern(vscode.Uri.file(schema),'**/*.[jJ][oO][xX]'),'**/{.jade,.git,node_modules}/**',1);
   if(!found.some(file=>{const relative=path.relative(schema,file.fsPath);return relative!==''&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)&&file.fsPath.toLowerCase().endsWith('.jox');}))throw Error('schemaPath must contain saved JOX before Working can be reviewed.');
   if(project.workspaceRoots!==undefined&&(!Array.isArray(project.workspaceRoots)||project.workspaceRoots.length!==1||typeof project.workspaceRoots[0]!=='string'))throw Error('Choose exactly one saved source root.');
-  const selected=project.workspaceRoots?path.resolve(root,project.workspaceRoots[0]):root,relative=path.relative(selected,schema),rootRelative=path.relative(repositoryRoot,selected);
+  const selected=project.workspaceRoots?path.resolve(root,project.workspaceRoots[0]):repositoryRoot,relative=path.relative(selected,schema),rootRelative=path.relative(repositoryRoot,selected);
   if(relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative)||rootRelative==='..'||rootRelative.startsWith('..'+path.sep)||path.isAbsolute(rootRelative))throw Error('schemaPath and its selected source root must remain inside the checkout.');
   return selected;
  }

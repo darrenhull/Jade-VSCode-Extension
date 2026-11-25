@@ -4,7 +4,7 @@ const {createHash}=require('node:crypto');
 class WorkspaceConnectionProfile{
  constructor(state,folder,pick){this.state=state;this.folder=folder;this.pick=pick;this.key='jadeNative.connectionProfile:'+folder;}
  current(){const saved=this.state?.get(this.key);return typeof saved==='string'&&saved?saved:undefined;}
- nameFor(config){return config.connection||this.current()||'vscode-'+createHash('sha256').update(this.folder).digest('hex').slice(0,24);}
+ nameFor(config,{creating=false}={}){return config.connection||(!creating&&this.current())||'vscode-'+createHash('sha256').update(this.folder).digest('hex').slice(0,24);}
  stage(name,previous=this.current()){
   let attempted=false;
   return{commit:async()=>{if(this.current()!==previous)throw Error('Workspace connection profile changed after review; selection preserved.');attempted=true;await this.state?.update(this.key,name);},
