@@ -95,6 +95,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    if(selectedProfile&&result.connection!==selectedProfile)throw Error('Native initialization did not confirm the selected connection profile; no profile selection was saved.');
    const git=result.git,relative=typeof git?.root==='string'&&path.isAbsolute(git.root)?path.relative(git.root,key):undefined;
    if(!git||typeof git.initialized!=='boolean'||typeof git.reused!=='boolean'||git.initialized===git.reused||git.ignoreEnsured!==true||relative===undefined||relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative))throw Error('Native workspace initialization did not confirm Git setup. Update the Jade CLI bundle and run Initialise Workspace again.');
+   if(selectedProfileStage&&services.isBusy())throw Error('Wait for the current Jade operation before accepting this profile selection.');
    try{await selectedProfileStage?.commit();}catch(error){try{await selectedProfileStage?.rollback();}catch(cleanup){error.message+=' Profile selection rollback failed: '+cleanup.message;}throw error;}
    if(runtimeDetected)await services.runtimeSettingsReady?.(folder);
    output.appendLine((git.initialized?'Initialised':'Reused')+' Git repository: '+git.root+'.');output.appendLine('Managed .jade state is ignored by Git.');

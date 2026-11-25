@@ -8,7 +8,8 @@ class WorkspaceConnectionProfile{
  stage(name,...captured){
   const previous=captured.length?captured[0]:this.current();
   let attempted=false;
-  return{commit:async()=>{if(this.current()!==previous)throw Error('Workspace connection profile changed after review; selection preserved.');attempted=true;await this.state?.update(this.key,name);},
+  const validate=()=>{if(this.current()!==previous)throw Error('Workspace connection profile changed after review; selection preserved.');};
+  return{validate,commit:async()=>{validate();attempted=true;await this.state?.update(this.key,name);},
    rollback:async()=>{if(!attempted)return;if(this.current()!==name){if(this.current()===previous){attempted=false;return;}throw Error('Workspace connection profile changed; concurrent selection preserved.');}await this.state?.update(this.key,previous);attempted=false;}};
  }
  async select(message,{persist=true}={}){

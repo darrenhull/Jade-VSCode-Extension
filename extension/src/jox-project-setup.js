@@ -58,7 +58,8 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
-    if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&((configured.connection||project.connection)!==acceptedDirect.defaults.connection||!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
+    const targetChanged=acceptedDirect&&['installPath','databasePath','iniPath','server','characterSet','schemaPath','workspaceRoots'].some(key=>configured[key]!==undefined&&configured[key]!==''&&!isDeepStrictEqual(configured[key],acceptedDirect.defaults[key]));
+    if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&(targetChanged||(configured.connection||project.connection)!==acceptedDirect.defaults.connection||!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
     if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
       return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
     if(project.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing'))return checkoutRoute(configured,project,folder.uri.fsPath);
@@ -88,6 +89,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     await requireReviewedDiscovery(folder,record);
     if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed before the reviewed Working operation. Run Set Up Project again.');
     requireSavedCheckout(folder);
+    record.profileStage?.validate();
   }
   const initialization=registerWorkspaceInitialization(vscode,context,{
     nativeDiscovery:true,client,isBusy:()=>workspace.executing,configFor,detect,
