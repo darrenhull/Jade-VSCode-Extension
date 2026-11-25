@@ -5,7 +5,8 @@ class WorkspaceConnectionProfile{
  constructor(state,folder,pick){this.state=state;this.folder=folder;this.pick=pick;this.key='jadeNative.connectionProfile:'+folder;}
  current(){const saved=this.state?.get(this.key);return typeof saved==='string'&&saved?saved:undefined;}
  nameFor(config,{creating=false}={}){return config.connection||(!creating&&this.current())||'vscode-'+createHash('sha256').update(this.folder).digest('hex').slice(0,24);}
- stage(name,previous=this.current()){
+ stage(name,...captured){
+  const previous=captured.length?captured[0]:this.current();
   let attempted=false;
   return{commit:async()=>{if(this.current()!==previous)throw Error('Workspace connection profile changed after review; selection preserved.');attempted=true;await this.state?.update(this.key,name);},
    rollback:async()=>{if(!attempted)return;if(this.current()!==name){if(this.current()===previous){attempted=false;return;}throw Error('Workspace connection profile changed; concurrent selection preserved.');}await this.state?.update(this.key,previous);attempted=false;}};
