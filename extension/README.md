@@ -2,6 +2,17 @@
 
 For a Git checkout containing saved JOX, **Jade: Set Up Project** uses the configured database as **Working** and reads source from disk. The root schemas/ and sources/schemas/ layouts are detected automatically; other layouts use a source-root picker. Review the local paths and confirm that initial synchronization may overwrite unexported Working changes. This route does not create another database, make a backup, extract source, or require a clean seed. Unsupported CLI packages refuse this route before database preparation. An explicitly declared workingMode: source-backed project retains the separate extraction workflow. If connection profiles are ambiguous, choose one in VS Code; the workspace remembers that choice.
 
+An optional project `jade.json` can select the schema folder:
+
+```json
+{
+  "sourceFormat": "jox",
+  "schemaPath": "schemas"
+}
+```
+
+`schemaPath` is relative to the Git repository root and defaults to `schemas`. Nested paths such as `src/jade/schemas` are supported; the current native engine requires the final folder to remain named `schemas`. Setup preserves this file, validates that the folder stays inside the checkout and contains saved JOX, and asks the native CLI to validate local storage before synchronization. Renamed schema-folder leaves are refused rather than silently compiled from another location.
+
 Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The Jade IDE is not required.

@@ -36,7 +36,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
   const transientRuntime={values:()=>({}),stage:(_values,{validate=()=>{}}={})=>({commit:validate,rollback:async()=>{}})};
   const savedFiles=state?.get(CHECKOUT_FILES,{});
-  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&(entry.file===null||typeof entry.file==='string')&&(entry.fingerprint===null||/^[a-f0-9]{64}$/.test(entry.fingerprint))&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','workspaceRoots'].includes(key)&&(typeof value==='string'||key==='workspaceRoots'&&Array.isArray(value)&&value.every(root=>typeof root==='string')))));
+  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&(entry.file===null||typeof entry.file==='string')&&(entry.fingerprint===null||/^[a-f0-9]{64}$/.test(entry.fingerprint))&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots'].includes(key)&&(typeof value==='string'||key==='workspaceRoots'&&Array.isArray(value)&&value.every(root=>typeof root==='string')))));
   const projectBytes=(folder,file=projectFile(folder))=>require('node:crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
@@ -49,10 +49,10 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const profile=project.connection?undefined:profilesFor(folder).current();
     const configured={...(profile?{connection:profile}:{}),...explicitConfigFor(folder)},selected=checkoutRoots.has(folder.uri.toString());
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
-    if(acceptedDirect?.defaults.workingMode==='existing'&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
+    if(acceptedDirect?.defaults.workingMode==='existing'&&(!configured.connection||configured.connection===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
       return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
     if(project.workingMode==='existing')return checkoutRoute(configured,project,folder.uri.fsPath);
-    if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
+    if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&accepted.defaults.workingMode!=='existing'&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
     return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
   };
   // All subsequent native providers use the same machine-scoped checkout config.
@@ -112,7 +112,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     return {...target,destination:target.initialization?.destination,config:{installPath:target.working.installPath,
       databasePath:target.source.databasePath,iniPath:target.source.iniPath,server:target.source.server}};
   }
-  async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot}) {
+  async function directCheckoutTargets(folder,{configured,settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath}) {
     const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
     if(original.workingMode==='source-backed')return;
     let runtime,discovery=await discoveredFor(folder,configured);
@@ -135,13 +135,14 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(discovery?.passed!==true||discovery.code!==0||!discovery.prepared?.config)
       throw Error(discovery?.report?.error||'Native Working configuration discovery failed.');
     configured=checkoutRoute({...discovery.prepared.config,...configured},original,sourceRoot);
+    configured.schemaPath=schemaPath;
     if(!configured.installPath||!configured.databasePath)throw Error('Detect Runtime Settings and select the existing Working database before setup.');
     for(const value of [folder.uri.fsPath,configured.databasePath])if(value.startsWith(path.win32.sep.repeat(2))||value.startsWith('//'))throw Error('Use locally available storage for the checkout and Working database. Network path: '+value);
     let capability,target;
     try{
       const probe=packageProbe(folder,configured);capability=await probe.capability();
       target=await probe.request('working.location',{cwd:probe.root,config:configDto(configured),checkoutOnly:true});
-    }catch(cause){if(/local.*storage|materialized|path.*unavailable|network/i.test(cause.message))throw Error('The checkout and Working database must be locally available. Checkout: '+folder.uri.fsPath+'; Working: '+configured.databasePath+'. Move network locations to a local drive or make cloud files available offline. '+cause.message,{cause});throw Error('This checkout requires a Jade CLI supporting direct existing Working setup. Update Jade Tools before continuing. No backup or extraction was started. '+cause.message,{cause});}
+    }catch(cause){if(/local.*storage|materialized|path.*unavailable|network/i.test(cause.message))throw Error('The checkout and Working database must be locally available. Checkout: '+folder.uri.fsPath+'; Working: '+configured.databasePath+'. Move network locations to a local drive or make cloud files available offline. '+cause.message,{cause});if(/workingMode must be|unsupported.*workingMode|checkout.*not available|Unknown.*working/i.test(cause.message))throw Error('This checkout requires a Jade CLI supporting direct existing Working setup. Update Jade Tools before continuing. No backup or extraction was started. '+cause.message,{cause});throw Error('Cannot review the configured Working checkout: '+cause.message+' No backup or extraction was started.',{cause});}
     if(target.checkoutConfigured!==true||target.workingMode!=='existing'||target.source||!target.working?.identity||
       !target.working.databasePath||!['new','existing'].includes(target.workingState)||!Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Update Jade Tools: native setup did not confirm the direct Working database and disk checkout. No backup or extraction was started.');
@@ -151,7 +152,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const selectedProfile=pendingProfiles.get(folder.uri.toString());
     reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,
       discoveryConfig:configured,discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
-      providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
+      providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
       fingerprint:reviewedFile?reviewedFingerprint:null,projectFile:reviewedFile||null});
     return target;
   }
@@ -170,8 +171,11 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     }
     if(explicitConfigFor(folder).workingMode!=='git-first'&&files.length&&(!explicitProject||!JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode||JSON.parse(fs.readFileSync(reviewedFile,'utf8')).workingMode==='existing')){
       const original=reviewedFile?JSON.parse(fs.readFileSync(reviewedFile,'utf8')):{};
-      const sourceRoot=await require('./checkout-route').selectCheckoutRoot(folder.uri.fsPath,original,vscode);
-      return directCheckoutTargets(folder,{configured:{...privateRuntime(folder).values(),...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot});
+      const repositoryRoot=repository?.rootUri?.fsPath||folder.uri.fsPath,layoutRoot=reviewedFile?path.dirname(reviewedFile):folder.uri.fsPath;
+      const sourceRoot=await require('./checkout-route').selectCheckoutRoot(layoutRoot,original,vscode,{repositoryRoot});
+      const schemaPath=original.schemaPath??path.relative(repositoryRoot,path.join(sourceRoot,'schemas')).split(path.sep).join('/');
+      require('./schema-folder').resolveSchemaFolder(repositoryRoot,schemaPath);
+      return directCheckoutTargets(folder,{configured:{...privateRuntime(folder).values(),...explicitConfigFor(folder)},settingsBaseline,reviewedFile,reviewedFingerprint,sourceRoot,schemaPath});
     }
     if(explicitProject||files.length){
       let discovered=await discoveredFor(folder);

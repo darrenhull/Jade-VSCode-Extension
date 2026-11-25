@@ -62,10 +62,10 @@ function registerWorkspaceInitialization(vscode,context,services){
      for(const line of lines)if(/^\[Setup\] Git ignore(?:\s|$)/.test(line))progress.report({message:'Ensuring managed .jade state is ignored by Git…'});else if(/^\[Setup\] Git(?:\s|$)/.test(line))progress.report({message:'Preparing the Git repository…'});
     }).promise;
    }
-   let result=await invoke(argv);
+   let selectedProfileStage,result=await invoke(argv);
    if(result?.passed!==true){
-    const profile=await profiles.select(result?.report?.error);
-    if(profile)result=await invoke([...argv,'--profile',profile]);
+    const previous=profiles.current(),profile=await profiles.select(result?.report?.error,{persist:false});
+    if(profile){selectedProfileStage=profiles.stage(profile,previous);result=await invoke([...argv,'--profile',profile]);}
    }
    const failure=value=>value?.report?.error||'Native workspace initialisation failed.';
    // Only the native missing-profile diagnosis enables repair. Other failures keep their cause.
@@ -94,6 +94,7 @@ function registerWorkspaceInitialization(vscode,context,services){
    if(result?.passed!==true||result.code!==0)throw Error(failure(result));
    const git=result.git,relative=typeof git?.root==='string'&&path.isAbsolute(git.root)?path.relative(git.root,key):undefined;
    if(!git||typeof git.initialized!=='boolean'||typeof git.reused!=='boolean'||git.initialized===git.reused||git.ignoreEnsured!==true||relative===undefined||relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative))throw Error('Native workspace initialization did not confirm Git setup. Update the Jade CLI bundle and run Initialise Workspace again.');
+   try{await selectedProfileStage?.commit();}catch(error){try{await selectedProfileStage?.rollback();}catch(cleanup){error.message+=' Profile selection rollback failed: '+cleanup.message;}throw error;}
    if(runtimeDetected)await services.runtimeSettingsReady?.(folder);
    output.appendLine((git.initialized?'Initialised':'Reused')+' Git repository: '+git.root+'.');output.appendLine('Managed .jade state is ignored by Git.');
    progress.report({message:'Native project configuration is ready.'});
