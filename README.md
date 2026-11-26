@@ -13,7 +13,7 @@ An optional project `jade.json` can select the schema folder:
 
 `schemaPath` is relative to the Git repository root and defaults to `schemas`. Nested paths such as `src/jade/schemas` are supported; the current native engine requires the final folder to remain named `schemas`. Setup preserves this file, validates that the folder stays inside the checkout and contains saved JOX, and asks the native CLI to validate local storage before synchronization. Renamed schema-folder leaves are refused rather than silently compiled from another location.
 
-Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The native CLI detects its character mode and rejects an explicit mismatch. The Jade IDE is not required.
 

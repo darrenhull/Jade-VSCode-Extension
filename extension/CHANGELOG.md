@@ -1,3 +1,8 @@
+# 0.23.9 - Jade CLI 0.11.8
+
+- Project Setup can now synchronize saved Git JOX source into your configured existing Working database using [Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8). Review the target and confirm before the initial reconciliation.
+- Saved method edits and supported branch changes reuse that Working database for Scratch Pad and tests. Unsupported structural changes are reported before loading.
+
 # 0.23.8 - Set up existing Working from Git source
 
 - Recognize saved JOX under root schemas/ or sources/schemas/ and offer a source-root picker for other layouts and review direct synchronization into the configured Working database.
