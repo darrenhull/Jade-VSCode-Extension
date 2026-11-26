@@ -13,7 +13,11 @@ An optional project `jade.json` can select the schema folder:
 
 `schemaPath` is relative to the Git repository root and defaults to `schemas`. Nested paths such as `src/jade/schemas` are supported; the current native engine requires the final folder to remain named `schemas`. Setup preserves this file, validates that the folder stays inside the checkout and contains saved JOX, and asks the native CLI to validate local storage before synchronization. Renamed schema-folder leaves are refused rather than silently compiled from another location.
 
-Bundles [official Jade CLI 0.11.7](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.7) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+
+CLI 0.11.8 no longer advertises vendor-seed initialization for explicit `workingMode: "git-first"` projects. Migrate to the default existing-Working mode by configuring an existing local Working database, or explicitly select `workingMode: "source-backed"` to create a private copy from a separate Source database. If neither database is available, provision one with your installed Jade tools before setup.
+
+Scratch Pad runs in the configured existing Working database in default mode. Persistent changes committed by a Scratch script remain in that database; this is not an isolated or rollback-only session. Explicit source-backed mode uses its private Working copy.
 
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The native CLI detects its character mode and rejects an explicit mismatch. The Jade IDE is not required.
 

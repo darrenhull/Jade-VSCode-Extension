@@ -21,7 +21,7 @@ try{
  $workspace=Join-Path $temporary 'workspace';[IO.Directory]::CreateDirectory($workspace)|Out-Null
  if($joxMode){
   $sources=Join-Path $workspace 'sources';[IO.Directory]::CreateDirectory((Join-Path $sources 'schemas/PortableSchema/types'))|Out-Null
-  [IO.File]::WriteAllText((Join-Path $workspace 'jade.json'),(@{sourceFormat='jox';workspaceRoots=@('sources');databasePath=(Join-Path $temporary 'database-must-not-be-opened')}|ConvertTo-Json))
+  [IO.File]::WriteAllText((Join-Path $workspace 'jade.json'),(@{sourceFormat='jox';workingMode='source-backed';workspaceRoots=@('sources');databasePath=(Join-Path $temporary 'database-must-not-be-opened')}|ConvertTo-Json))
   [IO.File]::WriteAllText((Join-Path $sources '.jadegit'),"[core]`nplatform = '25.0.2'`n") # Explicit synthetic source fixture, not observed runtime authority.
   [IO.File]::WriteAllText((Join-Path $sources 'schemas/PortableSchema.jox'),'<Schema name="PortableSchema" id="360989a0-b460-4647-8941-169cf70ac504"><superschema name="RootSchema"/></Schema>')
   $methodSource=@('portableProbe() unitTest;','begin',' self.assertTrue(true);','end;') -join "`n"

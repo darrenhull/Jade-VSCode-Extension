@@ -101,3 +101,8 @@ test('explicit qualified ANSI scratch is accepted while nonboolean or producer m
  const f=fixture(t);f.manifest.joxRuntime.variants.ansi.nativeScratch=true;f.proof.qualification.nativeScratch=true;f.save();bundleCli(f);assert.equal(f.verify().status,0);
  for(const bad of [false,'true',undefined]){f.proof.qualification.nativeScratch=bad;f.save();assert.throws(()=>bundleCli(f),/ANSI/i);assert.notEqual(f.verify().status,0);}
 });
+
+test('released ANSI disabled debugger declaration is preserved without enabling debugger support',t=>{
+ const f=fixture(t);f.manifest.joxRuntime.variants.ansi.nativeDebug=false;f.save();bundleCli(f);const accepted=f.verify();assert.equal(accepted.status,0,accepted.stderr);
+ for(const bad of [true,'false',0]){f.manifest.joxRuntime.variants.ansi.nativeDebug=bad;f.save();assert.throws(()=>bundleCli(f),/ANSI/i);assert.notEqual(f.verify().status,0);}
+});
