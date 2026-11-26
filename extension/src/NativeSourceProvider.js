@@ -155,7 +155,10 @@ class NativeSourceProvider {
       const identity = required(expectedWorkingIdentity, 'reviewed Working target');
       if(this.config.workingMode==='existing'&&overwriteWorkingChanges!==true)throw Error('Confirm that saved source may overwrite Working-only changes before initial synchronization.');
       const capabilities = await this.capability();
-      if (capabilities.checkoutInitialization !== true) throw Error('Update the Jade CLI: Git-first Working setup is unavailable.');
+      if (this.config.workingMode === 'existing') {
+        if (capabilities.initialization !== true || capabilities.sync !== true || capabilities.reviewedWorkingSync !== true)
+          throw Error('Update the Jade CLI: direct Working initialization and reviewed sync are unavailable.');
+      } else if (capabilities.checkoutInitialization !== true) throw Error('Update the Jade CLI: Git-first Working setup is unavailable.');
       const result = await this.request('working.initialize', { cwd: this.root, config: clone(this.config), expectedWorkingIdentity: identity,...(this.config.workingMode==='existing'?{overwriteWorkingChanges:true}:{}) }, token, output);
       const modeConfirmed=this.config.workingMode==='existing'?result.working?.workingMode==='existing'&&result.sourceAuthority==='checkout'&&result.report?.extracted===false:result.report?.workingMode==='git-first';
       if (result.working?.identity !== identity || !path.isAbsolute(result.working?.root ?? '') || Object.hasOwn(result.working, 'sourceDatabasePath') ||

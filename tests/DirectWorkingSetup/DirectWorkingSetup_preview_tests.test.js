@@ -9,7 +9,7 @@ function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=fals
  if(remembered){fs.unlinkSync(path.join(root,'jade.json'));state.set('jadeNative.acceptedGitFirstCheckouts',[folder.uri.toString()]);state.set('jadeNative.detectedCheckoutRuntimes',{[folder.uri.toString()]:{installPath:'C:/Old',workingSeedDirectory:'C:/OldSeed'}});}
  const configured={installPath:'C:/Jade',databasePath:network?'Z:/Working':'C:/Working/system',iniPath:'C:/Working/jade.ini',server:'singleUser'};
  const profileDefaults={...configured};let profileMissing=missingProfile;
- const connection={closed:false},flags={id:'jox',catalogue:true,checkoutInitialization:true,sync:true,reviewedWorkingSync:true};
+ const connection={closed:false},flags={id:'jox',catalogue:true,initialization:true,checkoutInitialization:false,sync:true,reviewedWorkingSync:true};
  const client={client:connection,connect(){return this.client;},sourceCapabilities:async config=>{calls.push({command:'capability',config});return{sourceSemantic:{format:1,providers:[flags]}};},request(command,args){
   calls.push({command,args,profileAtRequest:state.get("jadeNative.connectionProfile:"+folder.uri.toString())});let value;
   if(command==='prepare'){
@@ -114,3 +114,9 @@ for(const mode of ['source-backed','git-first'])test('an explicit project mode s
 test('explicit project source-backed declaration wins over a detected existing mode',t=>{const f=fixture(t,{accepted:true}),file=path.join(f.root,'jade.json');fs.writeFileSync(file,JSON.stringify({...JSON.parse(fs.readFileSync(file)),workingMode:'source-backed'}));f.configured.workingMode='existing';assert.equal(f.setup.configFor(f.folder).workingMode,'source-backed');});
 
 for(const invalid of ['{ invalid','null','unreadable'])test('accepted direct project read or parse failure blocks all target use: '+invalid,async t=>{const f=fixture(t,{accepted:true}),file=path.join(f.root,'jade.json');if(invalid==='unreadable'){fs.unlinkSync(file);fs.mkdirSync(file);}else fs.writeFileSync(file,invalid);for(const setup of [f.setup,f.restart()])assert.throws(()=>setup.configFor(f.folder),/jade.json.*Set Up Project/i);const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/jade.json.*Set Up Project/i);assert(!f.calls.some(c=>['prepare','working.location','working.initialize','cli'].includes(c.command)));});
+
+test('official CLI capability reaches direct Working review despite disabled legacy seed initialization',{skip:process.platform!=='win32'},async t=>{
+ const f=fixture(t),capability=await require('./released-capability.cjs').releasedCapability();
+ f.client.sourceCapabilities=async()=>({sourceSemantic:{format:1,providers:[capability]}});
+ const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));assert.equal(f.warnings.length,1);assert(f.calls.some(row=>row.command==='working.location'));assert(!f.calls.some(row=>row.command==='working.initialize'));assert.match(f.warnings[0].detail,/Working-only changes.*overwritten/);
+});

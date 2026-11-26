@@ -166,7 +166,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     if(target.checkoutConfigured!==true||target.workingMode!=='existing'||target.source||!target.working?.identity||
       !target.working.databasePath||!['new','existing'].includes(target.workingState)||!Array.isArray(target.sourceRoots)||target.sourceRoots.length!==1)
       throw Error('Update Jade Tools: native setup did not confirm the direct Working database and disk checkout. No backup or extraction was started.');
-    if(capability.checkoutInitialization!==true||capability.sync!==true||capability.reviewedWorkingSync!==true)
+    if(capability.initialization!==true||capability.sync!==true||capability.reviewedWorkingSync!==true)
       throw Error('Update Jade Tools: direct Working initialization and reviewed sync are not available in this CLI package.');
     target.schemaFolder=schemaFolder;
     requireSavedCheckout(folder);

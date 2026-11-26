@@ -1,3 +1,7 @@
+# 0.23.10
+
+- Fix Project Setup incorrectly refusing direct synchronization into an existing Working database even when the bundled CLI supports it. Existing-Working setup no longer depends on the separate legacy vendor-seed initialization capability.
+
 # 0.23.9 - Jade CLI 0.11.8
 
 - Project Setup can now synchronize saved Git JOX source into your configured existing Working database using [Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8). Review the target and confirm before the initial reconciliation.
