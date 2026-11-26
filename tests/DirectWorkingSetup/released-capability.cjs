@@ -16,7 +16,12 @@ async function cleanupCapabilityFixture(root,executable,primary,{run=spawnSync,a
   }
  }catch(error){failures.push(error);}
  // A shutdown failure still reaches cleanup, but live native files must remain.
- try{if(!ownershipKnown)throw Error('Invalid ownership; retained '+root);for(let i=0;pids.some(isAlive)&&i<attempts;i++)await pause();if(pids.some(isAlive))throw Error('Owned capability process is still running; retained '+root);remove();}catch(error){failures.push(error);}
+ try{if(!ownershipKnown)throw Error('Invalid ownership; retained '+root);for(let i=0;pids.some(isAlive)&&i<attempts;i++)await pause();if(pids.some(isAlive))throw Error('Owned capability process is still running; retained '+root);
+  const finalOwner=JSON.parse(fs.readFileSync(ownerFile,'utf8'));
+  if(!Number.isSafeInteger(finalOwner.brokerPID)||finalOwner.brokerPID<0||!Array.isArray(finalOwner.nativePIDs)||!finalOwner.nativePIDs.every(pid=>Number.isSafeInteger(pid)&&pid>0))throw Error('Final capability ownership unavailable; retained '+root);
+  const finalPids=[...new Set([...pids,...(finalOwner.brokerPID?[finalOwner.brokerPID]:[]),...finalOwner.nativePIDs])];
+  for(let i=0;finalPids.some(isAlive)&&i<attempts;i++)await pause();
+  if(finalPids.some(isAlive))throw Error('Final owned capability process is still running; retained '+root);remove();}catch(error){failures.push(error);}
  if(failures.length===1)throw failures[0];if(failures.length)throw new AggregateError(failures,'Capability test and cleanup failed; fixture '+root);
 }
 async function releasedCapability(){
