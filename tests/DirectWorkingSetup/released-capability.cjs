@@ -2,10 +2,11 @@
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}};
 async function cleanupCapabilityFixture(root,executable,primary,{run=spawnSync,alive:isAlive=alive,remove=()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:100}),pause=()=>new Promise(resolve=>setTimeout(resolve,100)),attempts=50}={}){
- const failures=primary?[primary]:[],ownerFile=path.join(root,'broker','owner.json');let pids=[],ownershipKnown=true;
+ const failures=primary?[primary]:[],ownerFile=path.join(root,'broker','owner.json');let pids=[],ownershipKnown=false;
  try{
+  for(let i=0;!fs.existsSync(ownerFile)&&i<attempts;i++)await pause();
+  if(!fs.existsSync(ownerFile))throw Error('Capability broker ownership unavailable; retained '+root);
   if(fs.existsSync(ownerFile)){
-   ownershipKnown=false;
    const owner=JSON.parse(fs.readFileSync(ownerFile,'utf8'));
    if(!Number.isSafeInteger(owner.brokerPID)||owner.brokerPID<0||!Array.isArray(owner.nativePIDs)||!owner.nativePIDs.every(pid=>Number.isSafeInteger(pid)&&pid>0))throw Error('Invalid private capability broker owner');
    ownershipKnown=true;
