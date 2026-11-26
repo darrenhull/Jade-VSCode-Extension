@@ -116,7 +116,7 @@ test('explicit project source-backed declaration wins over a detected existing m
 for(const invalid of ['{ invalid','null','unreadable'])test('accepted direct project read or parse failure blocks all target use: '+invalid,async t=>{const f=fixture(t,{accepted:true}),file=path.join(f.root,'jade.json');if(invalid==='unreadable'){fs.unlinkSync(file);fs.mkdirSync(file);}else fs.writeFileSync(file,invalid);for(const setup of [f.setup,f.restart()])assert.throws(()=>setup.configFor(f.folder),/jade.json.*Set Up Project/i);const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/jade.json.*Set Up Project/i);assert(!f.calls.some(c=>['prepare','working.location','working.initialize','cli'].includes(c.command)));});
 
 test('official CLI capability reaches direct Working review despite disabled legacy seed initialization',{skip:process.platform!=='win32'},async t=>{
- const f=fixture(t),capability=require('./released-capability.cjs').releasedCapability();
+ const f=fixture(t),capability=await require('./released-capability.cjs').releasedCapability();
  f.client.sourceCapabilities=async()=>({sourceSemantic:{format:1,providers:[capability]}});
  const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));assert.equal(f.warnings.length,1);assert(f.calls.some(row=>row.command==='working.location'));assert(!f.calls.some(row=>row.command==='working.initialize'));assert.match(f.warnings[0].detail,/Working-only changes.*overwritten/);
 });

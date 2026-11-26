@@ -5,7 +5,7 @@ function setup(){const f=fixture({flags:{initialization:true,checkoutInitializat
 test('direct initialization refuses unreviewed overwrite before a Working request',async()=>{const f=setup();await assert.rejects(f.provider.initializeCheckout({expectedWorkingIdentity:'direct-target'}),/Confirm/);assert(!f.requests.some(r=>r.command==='working.initialize'));});
 test('reviewed direct initialization forwards native overwrite authority and accepts disk-only receipt',async()=>{const f=setup();const result=await f.provider.initializeCheckout({expectedWorkingIdentity:'direct-target',overwriteWorkingChanges:true});assert.equal(result.sourceAuthority,'checkout');const sent=f.requests.find(r=>r.command==='working.initialize').body;assert.equal(sent.overwriteWorkingChanges,true);assert.equal(sent.config.databasePath,'C:/Working/system');assert.equal(sent.destination,undefined);assert.equal(sent.config.workingSeedDirectory,undefined);});
 test('official released capability permits reviewed direct initialization without enabling seed setup',{skip:process.platform!=='win32'},async()=>{
- const f=setup(),capability=require('./released-capability.cjs').releasedCapability();Object.assign(f.flags,capability);
+ const f=setup(),capability=await require('./released-capability.cjs').releasedCapability();Object.assign(f.flags,capability);
  const result=await f.provider.initializeCheckout({expectedWorkingIdentity:'direct-target',overwriteWorkingChanges:true});assert.equal(result.sourceAuthority,'checkout');assert.equal(f.requests.filter(row=>row.command==='working.initialize').length,1);
 });
 for(const flag of ['initialization','sync','reviewedWorkingSync'])test('direct initialization refuses missing '+flag+' without relying on enabled legacy seed mode',async()=>{
