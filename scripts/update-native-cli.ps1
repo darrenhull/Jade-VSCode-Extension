@@ -135,14 +135,14 @@ function Install-NativeRelease([string]$Root,[string]$Archive,[string]$ExpectedH
  try{
   Expand-NativeRelease -Archive $Archive -Destination $stage -ExpectedHash $ExpectedHash
   $new=Test-NativeDistribution $stage;if($new.packageVersion -ne $Version){throw 'Native CLI manifest version differs from the release tag.'}
-  if(Test-Path -LiteralPath $destination){Move-Item -LiteralPath $destination -Destination $backup}
-  Move-Item -LiteralPath $stage -Destination $destination;$installed=$true
+  if(Test-Path -LiteralPath $destination){[IO.Directory]::Move($destination,$backup)}
+  [IO.Directory]::Move($stage,$destination);$installed=$true
   [IO.File]::WriteAllText($pinTemp,(@{version=$Version;sha256=$ExpectedHash;tag='v'+$Version;distributionSha256=(Get-FileHash -LiteralPath (Join-Path $destination 'distribution.json') -Algorithm SHA256).Hash.ToLowerInvariant()}|ConvertTo-Json));Move-Item -LiteralPath $pinTemp -Destination $pin -Force;$committed=$true
   return @{updated=$true;dependencyChanged=(!$current -or $current.version -ne $Version -or $current.sha256 -ne $ExpectedHash);version=$Version;sha=$ExpectedHash;tag='v'+$Version;branch='codex/update-jade-cli-'+$Version}
  }finally{
   if(!$committed){
    if($installed -and (Test-Path -LiteralPath $destination)){Assert-NativeContained $packages $destination;Remove-Item -LiteralPath $destination -Recurse -Force}
-   if(Test-Path -LiteralPath $backup){Move-Item -LiteralPath $backup -Destination $destination}
+   if(Test-Path -LiteralPath $backup){[IO.Directory]::Move($backup,$destination)}
   }
   foreach($directory in @($stage,$backup)){if(Test-Path -LiteralPath $directory){Assert-NativeContained $packages $directory;Remove-Item -LiteralPath $directory -Recurse -Force}}
   if(Test-Path -LiteralPath $pinTemp){Assert-NativeContained $packages $pinTemp;Remove-Item -LiteralPath $pinTemp -Force}

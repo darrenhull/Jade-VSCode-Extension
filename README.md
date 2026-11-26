@@ -13,7 +13,9 @@ An optional project `jade.json` can select the schema folder:
 
 `schemaPath` is relative to the Git repository root and defaults to `schemas`. Nested paths such as `src/jade/schemas` are supported; the current native engine requires the final folder to remain named `schemas`. Setup preserves this file, validates that the folder stays inside the checkout and contains saved JOX, and asks the native CLI to validate local storage before synchronization. Renamed schema-folder leaves are refused rather than silently compiled from another location.
 
-Bundles [official Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.9](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.9) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
+
+Large JOX preparation now honors its configured deadline. ANSI and UTF-8 values can coexist in a file without converting saved sources. File-local semantic projection problems are listed as warnings while other files remain available; Project Setup shows the complete warning count and opens the full local diagnostic report on request. Native JadeGit still receives the original saved source and reports its own load failures.
 
 CLI 0.11.8 no longer advertises vendor-seed initialization for explicit `workingMode: "git-first"` projects. Migrate to the default existing-Working mode by configuring an existing local Working database, or explicitly select `workingMode: "source-backed"` to create a private copy from a separate Source database. If neither database is available, provision one with your installed Jade tools before setup.
 

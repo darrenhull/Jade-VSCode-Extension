@@ -1,3 +1,10 @@
+# 0.23.11 - Jade CLI 0.11.9
+
+- Large JadeGit checkouts use the full configured preparation deadline instead of stopping a Git query after 30 seconds.
+- Browse and edit ANSI and UTF-8 values in the same JOX file without converting the saved source; unchanged saves remain byte-for-byte identical.
+- Project Setup lists file-local projection warnings, continues other files and offers a complete local details report. Native JadeGit still reports its own load failures.
+- Includes [Jade CLI 0.11.9](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.9).
+
 # 0.23.10
 
 - Fix Project Setup incorrectly refusing direct synchronization into an existing Working database even when the bundled CLI supports it. Existing-Working setup no longer depends on the separate legacy vendor-seed initialization capability.
