@@ -330,3 +330,53 @@ test('direct existing Working always uses reviewed initial reconciliation even w
  Object.assign(f.services,{jox:true,checkoutTargets:async()=>target,initializeCheckout:async()=>{f.calls.push(['direct-reconcile']);return{sourceSnapshot:{projectId:'direct'}};},connectWorking:async()=>assert.fail('A retained inspector must not be opened before initial reconciliation'),syncCheckout:async()=>assert.fail('Use native initialization to admit/reuse the persisted direct baseline'),refreshProject:async()=>{},openExplorer:async()=>{}});
  const result=await f.controller.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(f.calls.filter(row=>row[0]==='direct-reconcile').length,1);
 });
+const projectionWarning={code:'semantic-projection-failed',severity:'warning',path:'schemas/Demo/types/Legacy.jox',reason:'Unsupported semantic projection metadata',projectionSkipped:true};
+function partialProjectionSetup(t,{failure=false}={}){
+ const f=fixture(t,{warnings:['Sync checkout to existing Working']});
+ const target={workingMode:'existing',workingState:'existing',working:{identity:'native-review',databasePath:path.join(f.root,'working'),installPath:'C:/Jade'},sourceRoots:[f.uri(f.root).toString()]};
+ Object.assign(f.services,{jox:true,checkoutTargets:async()=>target,initializeCheckout:async()=>{
+  const report={warnings:[projectionWarning],uploaded:!failure};
+  if(failure)throw Object.assign(Error('Native JadeGit load failed'),{result:{passed:false,code:6023,report}});
+  return {sourceSnapshot:{projectId:'project'},report};
+ },refreshProject:async()=>{},openExplorer:async()=>{}});
+ return f;
+}
+test('setup summarizes file-local projection warnings without claiming native source was skipped',async t=>{
+ const f=partialProjectionSetup(t),value=await f.controller.setup(f.folder.uri);
+ assert.equal(value.passed,true);assert.equal(value.completed,true);assert.equal(value.workingPrepared,true);
+ assert.deepEqual(value.warnings,[projectionWarning]);assert.equal(value.projectionSkippedFiles,1);assert.equal(value.projectionComplete,false);assert.equal(value.sourceComplete,undefined);
+ assert.ok(f.logs.some(line=>line.includes(projectionWarning.path)&&line.includes(projectionWarning.reason)),'Setup omitted the exact file-local warning');
+ assert.ok(f.logs.some(line=>/completed with warnings/i.test(line)&&/semantic projection/i.test(line)),'Final summary omitted projection warnings');
+ assert.ok(f.calls.some(call=>call[0]==='warning'&&/completed with warnings/i.test(call[1])),'Partial projection did not notify the user');
+ assert.ok(!f.logs.some(line=>/source file.*skipped/i.test(line)),'Projection warning falsely claimed native source was skipped');
+});
+test('native failure stays fatal while earlier file-local projection warnings remain visible',async t=>{
+ const f=partialProjectionSetup(t,{failure:true}),value=await f.controller.setup(f.folder.uri);
+ assert.equal(value.passed,false);assert.equal(value.completed,false);assert.equal(value.code,6023);assert.match(value.error,/Native JadeGit load failed/);
+ assert.deepEqual(value.warnings,[projectionWarning]);assert.ok(f.logs.some(line=>line.includes(projectionWarning.path)));
+});
+
+test('setup shows the full projection warning count and opens all managed details only when requested',async t=>{
+ const f=partialProjectionSetup(t),uri=f.uri(path.join(f.root,'.jade','semantic','project','projection-diagnostics.json')).toString();
+ f.vscode.window.showWarningMessage=async(message)=>{f.calls.push(['warning',message]);return message.includes('completed with warnings')?'Show Details':'Sync checkout to existing Working';};
+ f.services.initializeCheckout=async()=>({sourceSnapshot:{projectId:'project'},projectRoot:f.folder.uri.toString(),report:{warnings:[projectionWarning],warningCount:30000,remainingWarningCount:29999,warningDetailsUri:uri}});
+ const value=await f.controller.setup(f.folder.uri);
+ assert.equal(value.completed,true);assert.equal(value.projectionSkippedFiles,30000);assert.equal(value.remainingWarningCount,29999);
+ assert.ok(f.logs.some(line=>line.includes('30000')&&line.includes('completed with warnings')));
+ assert.ok(f.logs.some(line=>line.includes('29999')&&line.includes('more')));
+ assert.ok(f.calls.some(call=>call[0]==='command'&&call[1]==='vscode.open'&&call[2].toString()===uri));
+});
+for(const foreign of ['https://example.invalid/warnings.json','outside'])test('setup never opens untrusted projection detail '+foreign,async t=>{
+ const f=partialProjectionSetup(t),uri=foreign==='outside'?f.uri(path.join(f.root,'..','outside-warning.json')).toString():foreign;
+ f.vscode.window.showWarningMessage=async(message)=>message.includes('completed with warnings')?'Show Details':'Sync checkout to existing Working';
+ f.services.initializeCheckout=async()=>({sourceSnapshot:{projectId:'project'},projectRoot:f.folder.uri.toString(),report:{warnings:[projectionWarning],warningCount:20,remainingWarningCount:19,warningDetailsUri:uri}});
+ const value=await f.controller.setup(f.folder.uri);assert.equal(value.completed,true);
+ assert.ok(!f.calls.some(call=>call[0]==='command'&&call[1]==='vscode.open'));
+});
+
+test('setup retains full warning summary when the bounded inline list is empty',async t=>{
+ const f=partialProjectionSetup(t),uri=f.uri(path.join(f.root,'.jade','semantic','project','projection-diagnostics.json')).toString();
+ f.services.initializeCheckout=async()=>({sourceSnapshot:{projectId:'project'},projectRoot:f.folder.uri.toString(),report:{warnings:[],warningCount:1,remainingWarningCount:1,warningDetailsUri:uri}});
+ const value=await f.controller.setup(f.folder.uri);assert.equal(value.completed,true);assert.equal(value.projectionSkippedFiles,1);assert.equal(value.remainingWarningCount,1);assert.equal(value.warningDetailsUri,uri);
+ assert.ok(f.logs.some(line=>/completed with warnings/.test(line)));
+});

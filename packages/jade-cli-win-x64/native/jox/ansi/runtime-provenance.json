@@ -41,14 +41,14 @@
       "JoxManagedValidity_tests"
     ],
     "sourceRuntime": {
-      "packagedCliSha256": "d33e3e3f16586a9a32757d397593ab091fc54ce91390b0d01fb035119bdef706",
-      "model": "sdk-build-controls",
-      "policySha256": "274c10cc93bbf2f5ce6d875cc50a0a4fe952498b5ff13d247b2a6efbcc7131d7",
-      "connectedTested": false,
+      "packagedCliSha256": "5f11ca0d4a9924d2c615ebd4c19e4fda65dcf8269519a26cda647a27cb46fac2",
       "controls": [
         "JoxManagedActivation_tests",
         "JoxManagedValidity_tests"
-      ]
+      ],
+      "model": "sdk-build-controls",
+      "policySha256": "274c10cc93bbf2f5ce6d875cc50a0a4fe952498b5ff13d247b2a6efbcc7131d7",
+      "connectedTested": false
     }
   }
 }

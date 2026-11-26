@@ -1,6 +1,6 @@
 {
-  "version": "0.11.8",
-  "tag": "v0.11.8",
-  "distributionSha256": "a931df2edebe95ab2e88659e85a7fb7f7750e3d243f7d7de7225ccb0179a68ab",
-  "sha256": "41d7e76ba4ecc47e9f0b7af4c24fa6c4a7d766b41b87e458dfed9495d25e7bb6"
+  "tag": "v0.11.9",
+  "distributionSha256": "6edeecf9e6111de41a6b31ff34bae82e8f87235cbc994e4ee4407d44dcc92619",
+  "sha256": "150a7c9ce64fde6fbde7a646a4619c4bdc6cc73d13ca89ca0d7de4f04ce7f369",
+  "version": "0.11.9"
 }

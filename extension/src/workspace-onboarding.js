@@ -6,6 +6,34 @@ const samePath=(a,b)=>process.platform==='win32'?path.resolve(a).toLowerCase()==
 function registerWorkspaceOnboarding(vscode,context,services){
  const output=vscode.window.createOutputChannel('Jade Project Setup');let pending;
  const log=message=>{output.show(true);output.appendLine(message);};
+ function recordProjectionWarnings(result,status,folder){
+  const report=result?.report??result?.body?.report??result;
+  const warnings=report?.warnings??result?.warnings;
+  if(!Array.isArray(warnings))return;
+  const retained=new Map((status.warnings||[]).map(warning=>[JSON.stringify(warning),warning]));
+  for(const warning of warnings){
+   if(warning?.projectionSkipped!==true||typeof warning.path!=='string'||typeof warning.reason!=='string')continue;
+   const key=JSON.stringify(warning);if(retained.has(key))continue;
+   retained.set(key,{...warning});
+   const offset=Number.isSafeInteger(warning.byteOffset)&&warning.byteOffset>=0?' at '+(warning.offsetContext||'raw')+' byte offset '+warning.byteOffset:'';
+   log('Semantic projection unavailable for '+JSON.stringify(warning.path)+offset+': '+warning.reason.replace(/[\r\n]+/g,' '));
+  }
+  const count=Number.isSafeInteger(report?.warningCount)&&report.warningCount>=0?report.warningCount:retained.size;
+  if(count||retained.size){
+   status.warnings=[...retained.values()];status.projectionComplete=false;status.projectionSkippedFiles=Math.max(count,new Set(status.warnings.map(warning=>warning.path)).size);
+   status.remainingWarningCount=Number.isSafeInteger(report?.remainingWarningCount)&&report.remainingWarningCount>=0?report.remainingWarningCount:0;
+   try{
+    const root=new URL(result?.projectRoot||folder.uri.toString()),details=new URL(report.warningDetailsUri);
+    if(root.protocol==='file:'&&!root.host&&!root.search&&!root.hash&&details.protocol==='file:'&&!details.host&&!details.search&&!details.hash){
+     const {fileURLToPath}=require('node:url'),projectRoot=fileURLToPath(root);
+     const context=path.relative(projectRoot,folder.uri.fsPath),relative=path.relative(path.join(projectRoot,'.jade','semantic'),fileURLToPath(details));
+     const inside=value=>value!==''&&value!=='..'&&!value.startsWith('..'+path.sep)&&!path.isAbsolute(value);
+     if((context===''||inside(context))&&inside(relative))status.warningDetailsUri=details.href;
+    }
+   }catch{/* A diagnostic link cannot authorize opening a remote or unrelated file. */}
+   if(status.remainingWarningCount)log(status.remainingWarningCount+' more projection warnings'+(status.warningDetailsUri?'; complete details: '+status.warningDetailsUri:'.'));
+  }
+ }
  const openFolder=uri=>(vscode.workspace.workspaceFolders||[]).find(folder=>uri.scheme==='file'&&samePath(folder.uri.fsPath,uri.fsPath));
  const requireFolder=folder=>{if(!openFolder(folder.uri))throw Error('The selected project is no longer open. Run Set Up Project again.');};
  function markerPath(uri){
@@ -81,6 +109,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
     await services.activateCheckout?.(folder,checkout);
     if(creating||direct){
      const result=await services.initializeCheckout(folder,checkout);
+     recordProjectionWarnings(result,status,folder);
      if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
      status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;requireFolder(folder);
      stage='refresh';
@@ -92,6 +121,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
      status.workingPrepared=true;
      const synced=await services.syncCheckout(folder,checkout);
      status.nativeSyncResult=synced;
+     recordProjectionWarnings(synced,status,folder);
      if(synced?.passed!==true||synced.code!==0)throw Object.assign(Error(synced?.report?.error||'Native checkout reconciliation failed.'),{result:synced});
      status.sourceReady=true;
      requireFolder(folder);
@@ -101,7 +131,13 @@ function registerWorkspaceOnboarding(vscode,context,services){
     await services.refreshProject(folder,{prepared:accepted?.prepared!==false});requireFolder(folder);
     status.sourceReady=true;status.viewsReady=true;stage='explorer';
     await services.openExplorer(folder);requireFolder(folder);
-    log(creating?'Git-first Working is ready for the saved checkout.':'Working is ready for the current saved checkout.');
+    if(status.projectionSkippedFiles){
+     const summary='Project setup completed with warnings: '+status.projectionSkippedFiles+' file'+(status.projectionSkippedFiles===1?' has':'s have')+' no semantic projection. Native synchronization used the original saved source. See Jade Project Setup output for details.';
+     log(summary);
+     const action=await vscode.window.showWarningMessage(summary,'Show Details');if(action==='Show Details'){
+      if(status.warningDetailsUri){try{await vscode.commands.executeCommand('vscode.open',vscode.Uri.parse(status.warningDetailsUri));}catch(error){log('Could not open projection details: '+error.message);}}else output.show(true);
+     }
+    }else log(creating?'Git-first Working is ready for the saved checkout.':'Working is ready for the current saved checkout.');
     return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:'git-first'};
    }
    const initialized=await services.initialize(folder.uri);requireFolder(folder);
@@ -141,6 +177,7 @@ function registerWorkspaceOnboarding(vscode,context,services){
    log('Jade project is ready. Working and saved sources are prepared; Object Explorer and tests are refreshed.');
    return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:existing?'existing':'extract'};
   }catch(error){
+   recordProjectionWarnings(error.result,status,folder);
    try{await services.abortCheckout?.(folder);}catch(cleanup){error.message+=' Checkout cleanup failed: '+cleanup.message;}
    const native=error.result,cancelled=native?native.cancelled===true:error.cancelled===true;
    error.result={...status,...native,passed:false,completed:false,stage,code:native?.code??(cancelled?130:2),...(cancelled?{cancelled:true}:{})};

@@ -95,6 +95,27 @@ try{
  try{Reject {Install-NativeRelease -Root $consumer -Archive $zip -ExpectedHash (Get-FileHash $zip).Hash -Version '0.2.0'} 'injected pin write failure'}finally{Remove-Item Function:\Move-Item}
  Assert ([IO.File]::ReadAllText((Join-Path $consumer 'packages/jade-cli-win-x64/jade-cli.exe')) -eq 'native replacement') 'Pin write failure did not restore the prior runtime'
  Assert (@(Get-ChildItem (Join-Path $consumer 'packages') -Force|Where-Object Name -match '^\.jade-').Count -eq 0) 'Failed update left stale stage, backup or pin files'
+ # A child holding its current directory must make replacement fail atomically.
+ # Do not use a Jade process or touch the repository's installed package.
+ $lockedRoot=Join-Path $consumer 'packages/jade-cli-win-x64'
+ $priorPin=[IO.File]::ReadAllBytes((Join-Path $consumer 'packages/jade-cli-pin.json'))
+ $priorFiles=@{};Get-ChildItem -LiteralPath $lockedRoot -Recurse -File|ForEach-Object{$priorFiles[$_.FullName.Substring($lockedRoot.Length)]=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+ $start=[Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+ $start.WorkingDirectory=Join-Path $lockedRoot 'native';$start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardInput=$true;$start.RedirectStandardOutput=$true
+ foreach($argument in @('-NoProfile','-Command',"[Console]::WriteLine('locked'); [Console]::ReadLine() | Out-Null")){$start.ArgumentList.Add($argument)}
+ $child=[Diagnostics.Process]::Start($start)
+ try{
+  Assert ($child.StandardOutput.ReadLine() -eq 'locked') 'Owned child did not acquire its fixture directory'
+  $failed=$false;try{Install-NativeRelease -Root $consumer -Archive $zip -ExpectedHash (Get-FileHash $zip).Hash -Version '0.2.0'|Out-Null}catch{$failed=$true}
+  Assert $failed 'Locked installed runtime unexpectedly moved'
+ }finally{
+  if(!$child.HasExited){$child.StandardInput.WriteLine();$child.StandardInput.Flush();if(!$child.WaitForExit(5000)){$child.Kill();$child.WaitForExit()}};$child.Dispose()
+ }
+ $afterFiles=@{};Get-ChildItem -LiteralPath $lockedRoot -Recurse -File|ForEach-Object{$afterFiles[$_.FullName.Substring($lockedRoot.Length)]=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+ Assert ($afterFiles.Count -eq $priorFiles.Count) 'Locked update changed the prior bundle file count or nested a backup'
+ foreach($name in $priorFiles.Keys){Assert ($afterFiles.ContainsKey($name) -and $afterFiles[$name] -eq $priorFiles[$name]) ('Locked update changed prior runtime file: '+$name)}
+ Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $consumer 'packages/jade-cli-pin.json'))) -eq [Convert]::ToBase64String($priorPin)) 'Locked update changed the previous pin'
+ Assert (@(Get-ChildItem (Join-Path $consumer 'packages') -Force|Where-Object Name -match '^\.jade-').Count -eq 0) 'Locked update left a stage or nested backup'
  $junctionRoot=Join-Path $root 'junction-consumer';$junctionTarget=Join-Path $root 'junction-target';[IO.Directory]::CreateDirectory($junctionRoot)|Out-Null;[IO.Directory]::CreateDirectory($junctionTarget)|Out-Null
  New-Item -ItemType Junction -Path (Join-Path $junctionRoot 'packages') -Target $junctionTarget|Out-Null
  Reject {Install-NativeRelease -Root $junctionRoot -Archive $zip -ExpectedHash (Get-FileHash $zip).Hash -Version '0.2.0'} 'links'
