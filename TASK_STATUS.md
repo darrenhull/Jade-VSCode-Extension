@@ -7,3 +7,5 @@
 - Validation: focused disabled-debugger manifest regression reproduced the rejection before the compatibility fix and passed afterward. Normal extension tests passed: 2,136 cases, 2,084 passed, 52 intentional skips, zero failures. Standard VSIX packaging passed (210 files, 12.55 MB). No user database is opened by this dependency update.
 - Delivery: one linked-issue review PR, normal protected checks, owner approval, auto-merge off. No additional connected-receipt or artifact requalification gate is required.
 - Existing-mode object inspection remains a separate CLI limitation (Jade-CLI issue #168).
+
+- CI follow-up: the portable metadata fixture now explicitly selects source-backed mode instead of entering existing-Working mode implicitly. Focused smoke controls: eight passed; exact packaged smoke passed with no Node on PATH, native test discovery, no database connection. Consumer docs now describe vendor-seed initialization removal/migration and persistent Scratch effects; official distribution bytes remain unchanged.

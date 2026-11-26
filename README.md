@@ -15,6 +15,10 @@ An optional project `jade.json` can select the schema folder:
 
 Bundles [official Jade CLI 0.11.8](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.8) with matching ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
+CLI 0.11.8 no longer advertises vendor-seed initialization for explicit `workingMode: "git-first"` projects. Migrate to the default existing-Working mode by configuring an existing local Working database, or explicitly select `workingMode: "source-backed"` to create a private copy from a separate Source database. If neither database is available, provision one with your installed Jade tools before setup.
+
+Scratch Pad runs in the configured existing Working database in default mode. Persistent changes committed by a Scratch script remain in that database; this is not an isolated or rollback-only session. Explicit source-backed mode uses its private Working copy.
+
 Requires Visual Studio Code on Windows and a compatible installed ANSI or Unicode Jade runtime for database operations. The native CLI detects its character mode and rejects an explicit mismatch. The Jade IDE is not required.
 
 Browse JOX schemas, classes and members in Object Explorer and Class Workspace. Open a method to edit its Jade source in a normal VS Code text editor. Native source identities and revision bindings map accepted saves back to the authoritative `.jox` file; `.jade/` contains ignored, regenerable projections and private runtime state.
