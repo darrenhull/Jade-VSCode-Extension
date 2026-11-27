@@ -12,7 +12,7 @@
   "repository": {
     "method": {
       "name": "meta.method.jox",
-      "begin": "<JadeMethod\\b[^>]*>",
+      "begin": "<JadeMethod(?=\\s|/?>)(?!(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*/\\s*>)(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*>",
       "end": "</JadeMethod\\s*>",
       "beginCaptures": {
         "0": {
@@ -27,7 +27,7 @@
       "patterns": [
         {
           "name": "meta.method.source.jox",
-          "begin": "<source\\b[^>]*>",
+          "begin": "<source(?=\\s|/?>)(?!(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*/\\s*>)(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*>",
           "end": "</source\\s*>",
           "beginCaptures": {
             "0": {

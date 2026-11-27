@@ -22,3 +22,21 @@ test('JOX remains XML outside JadeMethod source and embeds Jade inside source te
  assert.equal(rows[9].some(t=>t.scopes.includes('keyword.control.jade')),false);
  assert.equal(rows[14].some(t=>t.scopes.includes('source.jade-nz')),false);
 });
+
+test('only exact non-self-closing native method/source tags introduce Jade scopes',async()=>{
+ const cases=[
+  ['<JadeMethod-other><source>','begin','</source></JadeMethod-other>'],
+  ['<JadeMethod.metadata><source>','begin','</source></JadeMethod.metadata>'],
+  ['<JadeMethod:metadata><source>','begin','</source></JadeMethod:metadata>'],
+  ['<JadeMethod><source-map>','begin','</source-map></JadeMethod>'],
+  ['<JadeMethod><source.info>','begin','</source.info></JadeMethod>'],
+  ['<JadeMethod><source:info>','begin','</source:info></JadeMethod>'],
+  ['<JadeMethod/><source>','begin','</source>'],
+  ['<JadeMethod name="none" />','<source>begin</source>'],
+  ['<JadeMethod><source/>','begin','</JadeMethod>'],
+  ['<JadeMethod><source data="x" />','begin','</JadeMethod>']
+ ];
+ for(const lines of cases){const rows=await tokenize(lines);assert.equal(rows.flat().some(token=>token.scopes.includes('source.jade-nz')),false,lines.join(' '));}
+ const rows=await tokenize(['<JadeMethod name="test>ok"><source data="/>" >','begin','end;','</source></JadeMethod>']);
+ assert.ok(rows[1].some(token=>token.text==='begin'&&token.scopes.includes('keyword.control.jade')));
+});

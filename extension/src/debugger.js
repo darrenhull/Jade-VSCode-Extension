@@ -324,15 +324,12 @@ function registerDebugger(vscode, context, services) {
             )
               throw Error("Breakpoint lines must be positive integers.");
             this.breakpoints = this.breakpoints.filter(
-              (b) => b.file.toLowerCase() !== file.toLowerCase(),
+              (b) => sourceKey(b.requestedFile||b.file) !== sourceKey(requestedFile),
             );
-            for (const b of a.breakpoints || [])
-              this.breakpoints.push({
-                file,
-                line: locations?locations.breakpointLine(b.line,b.column)?.line:b.line,
-                requestedLine:b.line,
-                id: ++this.breakpointSeq,
-              });
+            for (const b of a.breakpoints || []) {
+              const projected=locations?locations.breakpointLine(b.line,b.column):{line:b.line,column:b.column};
+              this.breakpoints.push({file,requestedFile,line:projected?.line,column:projected?.column,requestedLine:b.line,id:++this.breakpointSeq});
+            }
             const actual = await this.applyBreakpoints();
             this.response(request, {
               breakpoints: (a.breakpoints || []).map(
@@ -340,10 +337,10 @@ function registerDebugger(vscode, context, services) {
                   actual.find(
                     (v) =>
                       v.requested === b.line &&
-                      v.file.toLowerCase() === file.toLowerCase(),
+                      sourceKey(v.requestedFile||v.file) === sourceKey(requestedFile),
                   ) || {
                     id: this.breakpoints.find(
-                      (v) => v.file === file && v.requestedLine === b.line,
+                      (v) => sourceKey(v.requestedFile||v.file) === sourceKey(requestedFile) && v.requestedLine === b.line,
                     )?.id,
                     verified: false,
                     line: b.line,
@@ -664,6 +661,12 @@ function registerDebugger(vscode, context, services) {
       const point=mapping.toEditor({line:position.line-1,character:position.column-1});
       return point?{line:point.line+1,column:point.character+1}:{line:0,column:0};
     }
+    breakpointLocation(breakpoint,position){
+      const mapping=this.editorLocations.get(sourceKey(breakpoint.requestedFile));
+      if(!mapping)return position;
+      const point=mapping.toEditor({line:position.line-1,character:position.column-1});
+      return point?{line:point.line+1,column:point.character+1}:{line:0,column:0};
+    }
     async applyBreakpoints() {
       const operation = this.breakpointQueue.then(() =>
         this.applyBreakpointSnapshot(),
@@ -685,6 +688,7 @@ function registerDebugger(vscode, context, services) {
             this.selected,
             this.nativeSource,
             b.line,
+            b.column,
           ),
         }))
         .filter((b) => b.position !== undefined);
@@ -694,9 +698,11 @@ function registerDebugger(vscode, context, services) {
       return candidates.map((b, i) => ({
         id: b.id,
         file: b.file,
+        requestedFile:b.requestedFile,
+        source:{path:b.requestedFile||this.editorSources.get(sourceKey(b.file))||b.file},
         requested: b.requestedLine??b.line,
         verified: true,
-        ...this.editorLocation(b.file,nativeLocation(
+        ...this.breakpointLocation(b,nativeLocation(
           this.selected,
           this.nativeSource,
           result.positions[i],
@@ -712,8 +718,9 @@ function registerDebugger(vscode, context, services) {
           breakpoint: {
             id: b.id,
             verified: true,
-            source: { path: this.editorSources.get(sourceKey(b.file))||b.file },
+            source: b.source,
             line: b.line,
+            column:b.column,
           },
         });
       this.event("stopped", {

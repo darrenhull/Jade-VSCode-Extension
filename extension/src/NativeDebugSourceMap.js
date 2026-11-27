@@ -27,7 +27,7 @@ class NativeDebugSourceMap {
  toEditor(position){return this.translate(position,'projectionRange','rawRange');}
  breakpointLine(line,column){
   const rawLine=line-1;
-  const run=this.runs.find(value=>value.rawRange.start.line<=rawLine&&value.rawRange.end.line>=rawLine);
+  const run=this.runs.find(value=>value.rawRange.start.line<=rawLine&&(value.rawRange.end.line>rawLine||value.rawRange.end.line===rawLine&&value.rawRange.end.character>0));
   if(!run)return;
   const position=this.toProjection({line:rawLine,character:column===undefined?(run.rawRange.start.line===rawLine?run.rawRange.start.character:0):column-1});
   return position&&{line:position.line+1,column:position.character+1};
