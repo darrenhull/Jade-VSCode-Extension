@@ -145,3 +145,12 @@ for(const invalid of ['missing-capture','invalid-hash','foreign-root'])test('def
  await assert.rejects(f.provider.initializeCheckout({expectedWorkingIdentity:'reviewed-working'}),/binding|capture|root|context/i);
  assert.equal(f.provider.snapshot,undefined);assert.equal(f.requests.filter(x=>x.command==='source.semantic.prepare').length,0);
 });
+
+test('native cancellation acknowledgement reaches setup output without replacing the terminal result',async()=>{
+ let cancel;const f=setup({reply:command=>command==='cancel'?{passed:true,code:0,cancelled:true}:undefined}),lines=[];
+ const token={isCancellationRequested:false,onCancellationRequested(fn){cancel=fn;return{dispose(){}};}};
+ f.reply=()=>{cancel();return{passed:true,code:0,body:clone(f.initialized)};};
+ const result=await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(result.extractedFiles,7);assert.ok(lines.some(line=>/cancellation acknowledged/i.test(line)));
+});

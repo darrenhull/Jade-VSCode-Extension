@@ -290,3 +290,16 @@ test('capture-only repeat setup invalidates the retained live catalogue without 
  assert.equal(prior.provider.semanticPreparationRequired,true);
  assert.equal(f.calls.filter(row=>['source.semantic.prepare','ui.refresh'].includes(row.command)).length,0);
 });
+
+test('Working output contains operation target stage and timestamp before the native initialize request',async t=>{
+ const f=fixture(t,{configured:true}),fork=f.client.fork;let observed=false;
+ f.client.fork=()=>{const child=fork(),request=child.request;child.request=function(command,...args){
+  if(command==='working.initialize'){
+   const line=f.logs.find(value=>/Working setup:/.test(value));assert.ok(line,'Output was blank at native dispatch');
+   assert.match(line,/\[\d{4}-\d\d-\d\dT[^\]]+\]/);assert.ok(line.includes(path.join(f.root,'.jade','working','system')));
+   assert.match(line,/stage:.*native request/);observed=true;
+  }
+  return request.call(this,command,...args);
+ };return child;};
+ const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(observed,true);
+});

@@ -69,7 +69,13 @@ class NativeSourceProvider {
     const connection = this.connection;
     const request = this.client.request(command, body, output, undefined, connection);
     const cancel = () => {
-      try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
+      try {
+        void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          output?.(reply?.cancelled === true
+            ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
+            : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
+        }).catch(() => {});
+      }
       catch { /* The original request still owns the terminal connection result. */ }
     };
     const subscription = token?.onCancellationRequested(cancel);
@@ -473,7 +479,13 @@ class NativeSourceProvider {
   async requestExecution(command, body, { token, output }, connection) {
     const request = this.client.request(command, body, output, undefined, connection);
     const cancel = () => {
-      try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
+      try {
+        void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          output?.(reply?.cancelled === true
+            ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
+            : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
+        }).catch(() => {});
+      }
       catch { /* Preserve the terminal result from this captured request. */ }
     };
     const subscription = token?.onCancellationRequested(cancel);

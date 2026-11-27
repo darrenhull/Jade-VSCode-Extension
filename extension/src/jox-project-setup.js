@@ -279,7 +279,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       providerConfig:explicitProject?{...runtimeDefaults,...explicitConfigFor(folder),...(configured.connection?{connection:configured.connection}:{})}:configured,runtimeDefaults,explicitProject,fingerprint:explicitProject?reviewedFingerprint:null,projectFile:explicitProject?reviewedFile:null});
     return target;
   }
-  async function working(folder,title,operation) {
+  async function working(folder,title,operation,reviewedTarget) {
     const binding=setupBindings.get(folder.uri.toString()),project=projectFor(folder);
     if(workspace.executing&&!binding)throw Error('Another Jade Working operation is running.');
     if(!binding)workspace.executing=true;
@@ -291,7 +291,9 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         async(progress,token)=>{
           if(token?.isCancellationRequested)throw Object.assign(Error('Working setup cancelled.'),{cancelled:true});
           projectFor(folder);output.show(true);progress.report({message:title});
-          return operation(project,token,text=>output.append(text));
+          const {WorkingSetupProgress}=require('./WorkingSetupProgress');
+          const target=reviewedTarget;
+          return new WorkingSetupProgress({output,operation:title,target,progress}).run(write=>operation(project,token,write),token);
         });
     } finally {
       if(!binding){workspace.executing=false;flushRefreshes();}
@@ -386,7 +388,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     initializeCheckout:(folder,reviewed)=>working(folder,reviewed.workingMode==='existing'?'Reconciling saved checkout with existing Working':'Creating Working from saved JOX',async(project,token,write)=>{
       await requireReviewedCheckout(folder,reviewedRoots.get(reviewed));
       return project.provider.initializeCheckout({expectedWorkingIdentity:reviewed.working.identity,...(reviewed.workingMode==='existing'?{overwriteWorkingChanges:true}:{})},token,write);
-    }),
+    },reviewed.working.databasePath),
     syncCheckout:(folder,reviewed)=>vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Syncing saved checkout to Working',cancellable:true},
       async(progress,token)=>{
         output.show(true);const binding=setupBindings.get(folder.uri.toString()),record=reviewedRoots.get(reviewed);
