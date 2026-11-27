@@ -4,7 +4,7 @@
 - Breakpoints at different columns on one line no longer borrow another breakpoint's location or verified status.
 - Native locations outside an editor's source map remain unverified at the requested location, with an explanation instead of a zero-line marker.
 - Line-only breakpoints choose the first mapped source column, skipping ranges that ended on the previous line.
-- JOX highlighting recognizes exact method/source element names and handles self-closing tags and quoted attributes without leaking Jade scopes into XML.
+- JOX highlighting recognizes exact method/source element names and handles multiline opening tags, self-closing tags and quoted attributes without leaking Jade scopes into XML.
 
 # 0.23.12 - JOX highlighting and native debugging
 

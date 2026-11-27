@@ -12,8 +12,8 @@
   "repository": {
     "method": {
       "name": "meta.method.jox",
-      "begin": "<JadeMethod(?=\\s|/?>)(?!(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*/\\s*>)(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*>",
-      "end": "</JadeMethod\\s*>",
+      "begin": "<JadeMethod(?=\\s|/?>)",
+      "end": "</JadeMethod(?=\\s|>)|/\\s*>",
       "beginCaptures": {
         "0": {
           "name": "entity.name.tag.xml"
@@ -26,15 +26,35 @@
       },
       "patterns": [
         {
-          "name": "meta.method.source.jox",
-          "begin": "<source(?=\\s|/?>)(?!(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*/\\s*>)(?:[^\"'<>]|\"[^\"]*\"|'[^']*')*>",
-          "end": "</source\\s*>",
+          "include": "#method-opening"
+        },
+        {
+          "include": "#source"
+        },
+        {
+          "include": "text.xml"
+        }
+      ]
+    },
+    "source": {
+      "name": "meta.method.source.jox",
+      "begin": "<source(?=\\s|/?>)",
+      "end": "</source(?=\\s|>)|/\\s*>",
+      "beginCaptures": {
+        "0": {
+          "name": "entity.name.tag.xml"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "entity.name.tag.xml"
+        }
+      },
+      "patterns": [
+        {
+          "begin": ">",
+          "end": "(?=</source(?=\\s|>))",
           "beginCaptures": {
-            "0": {
-              "name": "entity.name.tag.xml"
-            }
-          },
-          "endCaptures": {
             "0": {
               "name": "entity.name.tag.xml"
             }
@@ -70,7 +90,54 @@
           ]
         },
         {
-          "include": "text.xml"
+          "include": "#source-opening"
+        }
+      ]
+    },
+    "method-opening": {
+      "name": "meta.tag.jox",
+      "begin": "(?<=<JadeMethod)\\G",
+      "end": "(?=/\\s*>)|>",
+      "endCaptures": {
+        "0": {
+          "name": "entity.name.tag.xml"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ]
+    },
+    "source-opening": {
+      "name": "meta.tag.jox",
+      "begin": "(?<=<source)\\G",
+      "end": "(?=>|/\\s*>)",
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.xml",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.xml",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "entity.other.attribute-name.xml",
+          "match": "[A-Za-z_:][\\w:.-]*(?=\\s*=)"
+        },
+        {
+          "name": "punctuation.separator.key-value.xml",
+          "match": "="
         }
       ]
     }

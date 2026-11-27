@@ -40,3 +40,17 @@ test('only exact non-self-closing native method/source tags introduce Jade scope
  const rows=await tokenize(['<JadeMethod name="test>ok"><source data="/>" >','begin','end;','</source></JadeMethod>']);
  assert.ok(rows[1].some(token=>token.text==='begin'&&token.scopes.includes('keyword.control.jade')));
 });
+
+test('multiline opening tags stay XML until their body and self-closing tags never enter Jade',async()=>{
+ const lines=['<JadeMethod',' name="test">','<source',' xml:space="preserve"','>','begin','end;','</source','>','</JadeMethod','>'];
+ const rows=await tokenize(lines);
+ assert.ok(rows[5].some(token=>token.text==='begin'&&token.scopes.includes('keyword.control.jade')),'Multiline method/source opening tags must enter Jade body');
+ assert.equal(rows.slice(0,5).flat().some(token=>token.scopes.includes('source.jade-nz')),false,'Opening attributes remain XML');
+ for(const closed of [
+  ['<JadeMethod',' name="empty"','/>','<source>','begin','</source>'],
+  ['<JadeMethod name="test">','<source',' xml:space="preserve"','/>','begin','</JadeMethod>']
+ ]){assert.equal((await tokenize(closed)).flat().some(token=>token.scopes.includes('source.jade-nz')),false,closed.join(' '));}
+ const quoted=await tokenize(['<JadeMethod',' name="test/>"','>','<source',' data="first','/>','last"','>','begin','end;','</source></JadeMethod>']);
+ assert.ok(quoted[8].some(token=>token.scopes.includes('keyword.control.jade')),'Quoted delimiters across lines cannot end opening state');
+ assert.equal(quoted.slice(0,8).flat().some(token=>token.scopes.includes('source.jade-nz')),false);
+});
