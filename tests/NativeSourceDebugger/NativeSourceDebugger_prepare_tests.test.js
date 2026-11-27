@@ -9,7 +9,8 @@ function fixture({capable=true,workingMode='git-first',sourceDatabasePath}={}){
  const calls=[];
  const workspace={record:()=>({project,document:{projection:{cacheUri:pathToFileURL(projection).href}}}),sync:async(value,options)=>{calls.push(['sync',value,options]);return{passed:true,code:0,report:{inSync:true}};}};
  const working={root:path.join(root,'.jade','working'),databasePath:path.join(root,'.jade','working','system'),installPath:path.join(root,'Jade'),workingMode,characterSet:'ansi',...(sourceDatabasePath?{sourceDatabasePath}:{})};
- const client={prepareWorking:async(config,output,options)=>{calls.push(['prepare',config,output,options]);return working;}};
+ working.abi=path.join(root,'native','debugger-abi-ansi.json');working.admittedEvidence={opaque:'native-only'};
+ const client={workingLocation:async()=>({identity:'reviewed-native-working'}),prepareDebugSession:async(config,output,options)=>{calls.push(['prepare',config,output,options]);return working;},prepareWorking:()=>assert.fail('Public Working fields cannot reconstruct an admitted debug session')};
  return {root,projection,document,project,workspace,client,calls,working};
 }
 
@@ -17,7 +18,7 @@ test('semantic debug preparation syncs saved JOX and reuses exact Source-free Wo
  const f=fixture(),output=()=>{},signal=new AbortController().signal;
  const diagnostics=[];const result=await prepareSemanticDebugLaunch(f.workspace,f.client,f.document,output,signal,(...args)=>diagnostics.push(args));
  assert.deepEqual(f.calls.map(value=>value[0]),['sync','prepare']);assert.strictEqual(f.calls[0][1],f.project);
- assert.equal(f.calls[1][3].cwd,f.root);assert.strictEqual(f.calls[1][3].signal,signal);assert.equal(f.calls[1][1].signal,undefined);assert.equal(result.working,f.working);assert.equal(result.config.sourceFormat,'jox');
+ assert.equal(f.calls[0][2].expectedWorkingIdentity,'reviewed-native-working');assert.equal(f.calls[1][3].expectedWorkingIdentity,'reviewed-native-working');assert.equal(f.calls[1][3].cwd,f.root);assert.strictEqual(f.calls[1][3].signal,signal);assert.equal(f.calls[1][1].signal,undefined);assert.equal(result.working,f.working);assert.equal(result.debugSession,f.working);assert.equal(result.config.sourceFormat,'jox');
  assert.equal(result.config.installPath,f.working.installPath);assert.equal(result.config.characterSet,'ansi');assert.deepEqual(result.config.files,[path.join(f.root,'.jade','projections','Other.cls'),f.projection]);
  assert.deepEqual(diagnostics,[[f.project,{passed:true,code:0,report:{inSync:true}}]]);
  assert.deepEqual(result.sourceMappings.map(value=>value.editor),['jade-source:/Other.cls',f.document.uri.toString()]);assert.equal(result.config.databasePath,undefined);
@@ -33,7 +34,7 @@ test('semantic debug preparation stops before Working preparation when sync is c
 test('semantic debug preparation refuses unqualified or Source-backed targets',async()=>{
  await assert.rejects(prepareSemanticDebugLaunch(fixture({capable:false}).workspace,{},fixture({capable:false}).document,()=>{},new AbortController().signal),/not qualified/i);
  const source=fixture({sourceDatabasePath:path.resolve('source')});
- await assert.rejects(prepareSemanticDebugLaunch(source.workspace,source.client,source.document,()=>{},new AbortController().signal),/Source-free Git-first Working/i);
+ await assert.rejects(prepareSemanticDebugLaunch(source.workspace,source.client,source.document,()=>{},new AbortController().signal),/Source-free Working/i);
 });
 
 test('JOX member projection launches from exact native method metadata',()=>{
@@ -43,4 +44,18 @@ test('JOX member projection launches from exact native method metadata',()=>{
  assert.throws(()=>selectNativeMethod(native,text,'other'),/does not match/i);
  assert.throws(()=>selectNativeMethod({...native,entity:{...native.entity,flags:{typeMethod:true}}},text),/non-static/i);
  assert.throws(()=>selectNativeMethod(native,'value(input: Integer);\nbegin\nend;'),/parameterless/i);
+});
+
+test('qualified direct existing Working is reused without Source or a second database',async()=>{
+ const f=fixture({workingMode:'existing'});
+ const result=await prepareSemanticDebugLaunch(f.workspace,f.client,f.document,()=>{},new AbortController().signal);
+ assert.strictEqual(result.working,f.working);assert.deepEqual(f.calls.map(row=>row[0]),['sync','prepare']);
+});
+
+test('raw source mappings use filesystem paths as DAP does, and retain native mapping runs',async()=>{
+ const f=fixture({workingMode:'existing'}),runs=[{rawRange:{start:{line:2,character:3},end:{line:2,character:4}},projectionRange:{start:{line:0,character:0},end:{line:0,character:1}}}];
+ f.document.uri={scheme:'file',fsPath:'C:/saved/Fish.jox',toString:()=> 'file:///C:/saved/Fish.jox'};
+ const selection={project:f.project,document:{projection:{cacheUri:f.projection,mapping:runs}}};
+ const result=await prepareSemanticDebugLaunch(f.workspace,f.client,f.document,()=>{},new AbortController().signal,()=>{},selection);
+ assert.deepEqual(result.sourceMappings.at(-1),{editor:f.document.uri.fsPath,projection:f.projection,runs});
 });

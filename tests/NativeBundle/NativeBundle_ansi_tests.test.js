@@ -106,3 +106,17 @@ test('released ANSI disabled debugger declaration is preserved without enabling 
  const f=fixture(t);f.manifest.joxRuntime.variants.ansi.nativeDebug=false;f.save();bundleCli(f);const accepted=f.verify();assert.equal(accepted.status,0,accepted.stderr);
  for(const bad of [true,'false',0]){f.manifest.joxRuntime.variants.ansi.nativeDebug=bad;f.save();assert.throws(()=>bundleCli(f),/ANSI/i);assert.notEqual(f.verify().status,0);}
 });
+
+test('qualified ANSI debug declaration is accepted only with its hashed matching helper and ABI profile',t=>{
+ const f=fixture(t);f.manifest.joxRuntime.variants.ansi.nativeDebug=true;
+ f.put('native/jade-debug-helper-ansi.exe','qualified ansi debugger');f.put('native/debugger-abi-ansi.json',JSON.stringify({characterSet:'ansi',libraries:{}}));f.save();
+ assert.doesNotThrow(()=>bundleCli(f));assert.equal(f.verify().status,0);
+ for(const change of ['missing-helper','missing-profile','wrong-mode','not-boolean']){
+  const candidate=fixture(t);candidate.manifest.joxRuntime.variants.ansi.nativeDebug=true;
+  candidate.put('native/jade-debug-helper-ansi.exe','qualified ansi debugger');candidate.put('native/debugger-abi-ansi.json',JSON.stringify({characterSet:change==='wrong-mode'?'unicode':'ansi',libraries:{}}));
+  if(change==='missing-helper')delete candidate.manifest.runtimeFiles['native/jade-debug-helper-ansi.exe'];
+  if(change==='missing-profile')delete candidate.manifest.runtimeFiles['native/debugger-abi-ansi.json'];
+  if(change==='not-boolean')candidate.manifest.joxRuntime.variants.ansi.nativeDebug='true';
+  candidate.save();assert.throws(()=>bundleCli(candidate),/debug|declaration/i);assert.notEqual(candidate.verify().status,0);
+ }
+});

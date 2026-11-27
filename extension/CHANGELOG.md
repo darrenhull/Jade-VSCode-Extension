@@ -1,3 +1,10 @@
+# 0.23.12 - JOX highlighting and native debugging
+
+- Raw JOX files keep XML highlighting and highlight Jade method source, including CDATA.
+- Debug a selected Object Explorer/Class Workspace method or the saved raw JOX method under the cursor with F5 on qualified ANSI installations. No Jade IDE is required.
+- Native breakpoint and call-stack locations return to the originating JOX or method editor, including XML entity mappings.
+- Includes [Jade CLI 0.11.10](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.10). Unsupported character modes or DLL builds are refused before debugging.
+
 # 0.23.11 - Jade CLI 0.11.9
 
 - Large JadeGit checkouts use the full configured preparation deadline instead of stopping a Git query after 30 seconds.

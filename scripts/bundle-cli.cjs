@@ -37,7 +37,14 @@ function assertAnsiVariant(manifest,files){
  const names=['jade-jox-test-helper-ansi.exe','jadegitscm.dll','jadegitdev.dll'],proofName=prefix+'runtime-provenance.json';
  const ansi=variants?.ansi;
  const flags=['managedUpload','nativeTests','initialization','nativeScratch'],keys=['format','characterSet','engineCommit',...flags,...['sync','checkoutInitialization','checkoutSeed','nativeDebug'].filter(key=>has(ansi,key))];
- if((has(ansi,'nativeDebug')&&ansi.nativeDebug!==false)||!object(variants)||Object.keys(variants).join(',')!=='ansi'||!object(ansi)||Object.keys(ansi).length!==keys.length||Object.keys(ansi).some(key=>!keys.includes(key))||ansi.format!==1||ansi.characterSet!=='ansi'||ansi.engineCommit!==jox.engineCommit||!flags.every(key=>typeof ansi[key]==='boolean')||!flags.slice(0,3).every(key=>ansi[key]))throw Error('ANSI runtime needs an exact qualified per-mode declaration.');
+ if((has(ansi,'nativeDebug')&&typeof ansi.nativeDebug!=='boolean')||!object(variants)||Object.keys(variants).join(',')!=='ansi'||!object(ansi)||Object.keys(ansi).length!==keys.length||Object.keys(ansi).some(key=>!keys.includes(key))||ansi.format!==1||ansi.characterSet!=='ansi'||ansi.engineCommit!==jox.engineCommit||!flags.every(key=>typeof ansi[key]==='boolean')||!flags.slice(0,3).every(key=>ansi[key]))throw Error('ANSI runtime needs an exact qualified per-mode declaration.');
+ if(ansi.nativeDebug===true){
+  const helper='native/jade-debug-helper-ansi.exe',profile='native/debugger-abi-ansi.json';
+  if(!Object.hasOwn(manifest.runtimeFiles,helper)||!Object.hasOwn(manifest.runtimeFiles,profile))throw Error('ANSI debugging requires its hashed helper and ABI profile.');
+  const bytes=files.get(profile);let abi;
+  try{if(!bytes||bytes.length>1024*1024)throw Error();abi=JSON.parse(bytes.toString('utf8'));}catch{throw Error('ANSI debugger ABI profile is missing, oversized or invalid.');}
+  if(!object(abi)||abi.characterSet!=='ansi')throw Error('ANSI debugger ABI profile character mode differs.');
+ }
  if(payload.length!==4||![...names.map(name=>prefix+name),proofName].every(name=>Object.hasOwn(manifest.runtimeFiles,name)))throw Error('ANSI fixed helper, components and provenance are required.');
  const bytes=files.get(proofName);if(!bytes||bytes.length>1024*1024)throw Error('ANSI producer proof is missing or oversized.');
  let proof;try{proof=JSON.parse(bytes.toString('utf8'));}catch{throw Error('ANSI producer proof is invalid JSON.');}

@@ -97,7 +97,7 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
         publish: () => vscode.commands.executeCommand('jadeNative.publishClass', currentDocument()?.uri)
       } });
       const key = keyFor(row);
-      views.set(key, { panel, view, row });
+      views.set(key, { panel, view, row, currentDocument });
       const changed = value => {
         const active = currentDocument(), document = value.document || value;
         if (!active || active.uri.toString() !== document.uri.toString() || !selectedCurrent()) return;
@@ -129,6 +129,6 @@ function registerNativeClassWorkspaces(vscode, context, workspace, options = {})
     catch (error) { pending.delete(row.file); throw error; }
     return { opened: true, uri: row.file };
   }
-  return { open, provider, refresh: project => Promise.all([...views.values()].filter(value => !project || value.row.project === project).map(value => value.view.refresh())) };
+  return { open, provider, activeDocument:uri=>{const view=[...views.values()].find(value=>value.panel.active),selected=view?.currentDocument();return !uri||uri.toString()===view?.row.file||uri.toString()===selected?.uri.toString()?selected:undefined;}, refresh: project => Promise.all([...views.values()].filter(value => !project || value.row.project === project).map(value => value.view.refresh())) };
 }
 module.exports = { createNativeClassWorkspaceModel, registerNativeClassWorkspaces };

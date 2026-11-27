@@ -3,6 +3,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
 const {jadeSourceUri}=require('./active-jade-source');
+const {NativeDebugSourceMap}=require('./NativeDebugSourceMap');
 const { NativeDebugger } = require("./debug-transport");
 const {diagnosticLines}=require('./compiler-diagnostic-presentation');
 const {
@@ -27,8 +28,8 @@ function registerDebugger(vscode, context, services) {
     if(typeof value!=='string')return '';
     return (!/^[a-z]:[\\/]/i.test(value)&&/^[a-z][a-z0-9+.-]*:/i.test(value)?value:path.resolve(value)).toLowerCase();
   };
-  const resolveSource=selected=>services.resolveSource
-    ? services.resolveSource(sourceUri(selected))
+  const resolveSource=(selected,signal)=>services.resolveSource
+    ? services.resolveSource(sourceUri(selected),signal)
     : selected?vscode.workspace.openTextDocument(selected):vscode.window.activeTextEditor?.document;
   async function select(document, methodName) {
     if (services.selectMethod) return services.selectMethod(document, methodName);
@@ -89,6 +90,8 @@ function registerDebugger(vscode, context, services) {
       this.sourceSnapshots = new Map();
       this.modelSources = new Map();
       this.editorSources = new Map();
+      this.sourceLocations = new Map();
+      this.editorLocations = new Map();
     }
     send(message) {
       if (this.disposed) return;
@@ -149,7 +152,7 @@ function registerDebugger(vscode, context, services) {
             await services.setBusy(true);
             const selected=a.program||jadeSourceUri(vscode);
             if(!supportsSource(sourceUri(selected)))throw Error(sourcePrompt);
-            const document = await resolveSource(selected);
+            const document = await resolveSource(selected,this.abort.signal);
             if(!document)throw Error('Open a Jade CLS source file before starting the debugger.');
             output.clear();
             output.show(true);
@@ -208,8 +211,9 @@ function registerDebugger(vscode, context, services) {
               await services.workingFiles(config);
               this.assertActive();
             }
-            const abi=prepared?.abi||defaultAbi,
-              manifest = JSON.parse(fs.readFileSync(abi, "utf8"));
+            const abi=prepared?.debugSession?.abi||prepared?.abi||defaultAbi;
+            if(!prepared?.debugSession){
+              const manifest = JSON.parse(fs.readFileSync(abi, "utf8"));
             for (const [name, digest] of Object.entries(manifest.libraries))
               if (
                 crypto
@@ -223,6 +227,7 @@ function registerDebugger(vscode, context, services) {
                   "Experimental debugging does not support this Jade DLL build: " +
                     name,
                 );
+            }
             if(!working){
               this.operation = services.startWorking(
                 config,
@@ -247,10 +252,11 @@ function registerDebugger(vscode, context, services) {
             );
             const projection=this.selected.file||sourcePath(document),editorSource=document.uri.scheme==='file'?document.uri.fsPath:document.uri.toString();
             if(services.selectMethod&&!this.models.some(model=>model.schema===this.selected.schema&&model.owner===this.selected.owner&&model.name===this.selected.name))
-              this.models.push({...this.selected,file:projection,line:1,body:document.getText(),variables:sourceVariables(document.getText())});
+              this.models.push({...this.selected,file:projection,body:this.selected.body,variables:sourceVariables(this.selected.body)});
             for(const mapping of prepared?.sourceMappings||[{editor:editorSource,projection}]){
               this.modelSources.set(sourceKey(mapping.editor),mapping.projection);
               this.editorSources.set(sourceKey(mapping.projection),mapping.editor);
+              if(mapping.runs){const locations=new NativeDebugSourceMap(mapping.runs);this.sourceLocations.set(sourceKey(mapping.projection),locations);this.editorLocations.set(sourceKey(mapping.editor),locations);}
             }
             const directory = path.join(working.root, "debug-sessions");
             fs.mkdirSync(directory, { recursive: true });
@@ -259,22 +265,16 @@ function registerDebugger(vscode, context, services) {
             fs.writeFileSync(
               file,
               JSON.stringify({
-                ...working,
-                ...(config.characterSet === undefined ? {} : { characterSet: config.characterSet }),
-                workingWrites: true,
-                ...(config.sourceFormat==='jox'?{sourceFormat:'jox'}:{sourceDatabasePath: config.databasePath}),
+                ...(prepared?.debugSession || {
+                  ...working,
+                  ...(config.characterSet === undefined ? {} : { characterSet: config.characterSet }),
+                  workingWrites: true,
+                  ...(config.sourceFormat==='jox'?{sourceFormat:'jox'}:{sourceDatabasePath: config.databasePath}),
+                  abi,
+                }),
                 launchMode: this.applicationMode ? "application" : "method",
-                ...(this.applicationMode
-                  ? {
-                      application: this.applicationName,
-                      applicationParameter: a.applicationParameter,
-                    }
-                  : {}),
-                schema: this.selected.schema,
-                owner: this.selected.owner,
-                method: this.selected.name,
-                unitTest: this.selected.unitTest,
-                abi,
+                ...(this.applicationMode ? {application:this.applicationName,applicationParameter:a.applicationParameter} : {}),
+                schema:this.selected.schema,owner:this.selected.owner,method:this.selected.name,unitTest:this.selected.unitTest,
               }),
             );
             this.native = new NativeDebugger(
@@ -316,6 +316,7 @@ function registerDebugger(vscode, context, services) {
             if (typeof requestedFile !== "string" || !requestedFile)
               throw Error("A breakpoint needs a source file path.");
             const file=this.modelSources.get(sourceKey(requestedFile))||requestedFile;
+            const locations=this.editorLocations.get(sourceKey(requestedFile));
             if (
               (a.breakpoints || []).some(
                 (b) => !Number.isInteger(b.line) || b.line < 1,
@@ -328,7 +329,8 @@ function registerDebugger(vscode, context, services) {
             for (const b of a.breakpoints || [])
               this.breakpoints.push({
                 file,
-                line: b.line,
+                line: locations?locations.breakpointLine(b.line,b.column)?.line:b.line,
+                requestedLine:b.line,
                 id: ++this.breakpointSeq,
               });
             const actual = await this.applyBreakpoints();
@@ -341,7 +343,7 @@ function registerDebugger(vscode, context, services) {
                       v.file.toLowerCase() === file.toLowerCase(),
                   ) || {
                     id: this.breakpoints.find(
-                      (v) => v.file === file && v.line === b.line,
+                      (v) => v.file === file && v.requestedLine === b.line,
                     )?.id,
                     verified: false,
                     line: b.line,
@@ -389,7 +391,7 @@ function registerDebugger(vscode, context, services) {
                   },
                   ...(f.position === null
                     ? { line: 0, column: 0 }
-                    : nativeLocation(f, f.source, f.position)),
+                    : this.editorLocation(f.file,nativeLocation(f, f.source, f.position))),
                 })),
               totalFrames: frames.length,
             });
@@ -599,8 +601,9 @@ function registerDebugger(vscode, context, services) {
             if(!local&&services.resolveDebugSource){
               const resolved=await services.resolveDebugSource(frame);
               if(resolved){
-                this.modelSources.set(sourceKey(resolved.editor),resolved.projection);
+                if(!this.modelSources.has(sourceKey(resolved.editor)))this.modelSources.set(sourceKey(resolved.editor),resolved.projection);
                 this.editorSources.set(sourceKey(resolved.projection),resolved.editor);
+                if(resolved.runs)this.sourceLocations.set(sourceKey(resolved.projection),new NativeDebugSourceMap(resolved.runs));
                 let added=debugMethods(resolved.text,resolved.projection,false);
                 if(!added.length)added=[{schema:frame.schema,owner:frame.owner,name:frame.method,file:resolved.projection,line:1,body:resolved.text,variables:sourceVariables(resolved.text)}];
                 this.models.push(...added);
@@ -655,6 +658,12 @@ function registerDebugger(vscode, context, services) {
         this.event("exited", { exitCode: message.exitCode });
       }
     }
+    editorLocation(file,position){
+      const mapping=this.sourceLocations.get(sourceKey(file));
+      if(!mapping)return position;
+      const point=mapping.toEditor({line:position.line-1,character:position.column-1});
+      return point?{line:point.line+1,column:point.character+1}:{line:0,column:0};
+    }
     async applyBreakpoints() {
       const operation = this.breakpointQueue.then(() =>
         this.applyBreakpointSnapshot(),
@@ -672,7 +681,7 @@ function registerDebugger(vscode, context, services) {
         )
         .map((b) => ({
           ...b,
-          position: breakpointPosition(
+          position: b.line===undefined?undefined:breakpointPosition(
             this.selected,
             this.nativeSource,
             b.line,
@@ -685,13 +694,13 @@ function registerDebugger(vscode, context, services) {
       return candidates.map((b, i) => ({
         id: b.id,
         file: b.file,
-        requested: b.line,
+        requested: b.requestedLine??b.line,
         verified: true,
-        ...nativeLocation(
+        ...this.editorLocation(b.file,nativeLocation(
           this.selected,
           this.nativeSource,
           result.positions[i],
-        ),
+        )),
       }));
     }
     async presentStop() {
@@ -739,7 +748,7 @@ function registerDebugger(vscode, context, services) {
       "jade-native-experimental",
       {
         resolveDebugConfiguration(folder, config) {
-          const selected=jadeSourceUri(vscode);
+          const selected=services.selectedSourceUri?.()||jadeSourceUri(vscode);
           if(!config.program&&!supportsSource(selected)){
             void vscode.window.showErrorMessage(sourcePrompt);return;
           }

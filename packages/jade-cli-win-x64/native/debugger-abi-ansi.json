@@ -1,0 +1,20 @@
+{
+  "characterSet": "ansi",
+  "libraries": {
+    "jlnintp.dll": "7029153062b52dcbb0b6d571cfbb47704ee83d6f71f90767dfdf6ff9dd1ee9be",
+    "jom.dll": "d7d235da0f027814df47de740855509a7c222c83dd2c4289ce4853241bcea9e0",
+    "jomos.dll": "349786ebe04b4bdb5479174842ffc5c05a5aefffdfc817d80891c5c49b23838f",
+    "jomsupp.dll": "f769b339ca235ae859162cdf41f7ef2c09b271ef462dd5496b429f1df264f329"
+  },
+  "symbols": {
+    "BreakpointManager::incRefCount": 352720,
+    "Context::setBreakpointManager": 397392,
+    "BreakpointManager::BreakpointManager": 87904,
+    "getContext": 9536,
+    "xheap_INT": 507488,
+    "Context::getBreakpointManager": 379120
+  },
+  "layouts": {
+    "Debugger.waiting": 688
+  }
+}

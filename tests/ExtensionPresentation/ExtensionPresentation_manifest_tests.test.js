@@ -12,6 +12,6 @@ test('installed Details describes supported user workflows and setup without raw
  const readme=fs.readFileSync(path.join(root,'extension/README.md'),'utf8');
  assert.match(readme,/^# Jade Tools\r?\n/);assert.match(readme,/Windows[\s\S]*compatible.*Unicode Jade runtime/i);assert.match(readme,/Jade IDE.*not required/i);
  for(const feature of ['Run Local Test','Ctrl+F5','Testing','Object Explorer','Class Workspace','Database Objects','Jade: Set Up Project','Create Working copy and extract sources'])assert.ok(readme.includes(feature),feature);
- assert.match(readme,/Source remains separate and is not published by setup or local testing/);assert.match(readme,/Standalone builds[\s\S]*debugging and Source publication are not qualified/);assert.match(readme,/independent[\s\S]*Jade Software/i);
+ assert.match(readme,/Source remains separate and is not published by setup or local testing/);assert.match(readme,/Standalone builds[\s\S]*structural editing and Source publication are not qualified/);assert.match(readme,/independent[\s\S]*Jade Software/i);
  assert.doesNotMatch(readme,/```mermaid|^## Architecture|native ABI|shared local broker|SDK\/native development/mi);
 });
