@@ -13,7 +13,7 @@
     "method": {
       "name": "meta.method.jox",
       "begin": "<JadeMethod(?=\\s|/?>)",
-      "end": "</JadeMethod(?=\\s|>)|/\\s*>",
+      "end": "(?=</JadeMethod(?=\\s|>))|/\\s*>",
       "beginCaptures": {
         "0": {
           "name": "entity.name.tag.xml"
@@ -50,7 +50,7 @@
     "source": {
       "name": "meta.method.source.jox",
       "begin": "<source(?=\\s|/?>)",
-      "end": "</source(?=\\s|>)|/\\s*>",
+      "end": "(?=</source(?=\\s|>))|/\\s*>",
       "beginCaptures": {
         "0": {
           "name": "entity.name.tag.xml"

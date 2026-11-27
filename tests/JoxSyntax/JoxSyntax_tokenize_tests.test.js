@@ -6,7 +6,7 @@ async function tokenize(lines){
  await onig.loadWASM(fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm')).buffer);
  const registry=new Registry({onigLib:Promise.resolve({createOnigScanner:patterns=>new onig.OnigScanner(patterns),createOnigString:text=>new onig.OnigString(text)}),loadGrammar:async scope=>{
   if(scope==='source.jade-nz')return JSON.parse(fs.readFileSync(path.join(__dirname,'../../extension/syntaxes/jade.tmLanguage.json'),'utf8'));
-  if(scope==='text.xml')return process.env.JADE_XML_GRAMMAR?JSON.parse(fs.readFileSync(process.env.JADE_XML_GRAMMAR,'utf8')):{scopeName:'text.xml',patterns:[{name:'entity.name.tag.xml',match:'</?[A-Za-z][^>]*>'}]};
+  if(scope==='text.xml')return process.env.JADE_XML_GRAMMAR?JSON.parse(fs.readFileSync(process.env.JADE_XML_GRAMMAR,'utf8')):{scopeName:'text.xml',patterns:[{name:'meta.tag.xml',begin:'</?[A-Za-z][\\w:.-]*',end:'>',beginCaptures:{0:{name:'entity.name.tag.xml'}},endCaptures:{0:{name:'punctuation.definition.tag.xml'}},patterns:[{begin:'\"',end:'\"'},{begin:"'",end:"'"}]}]};
   const entry=manifest.contributes.grammars.find(row=>row.scopeName===scope);return entry?JSON.parse(fs.readFileSync(path.join(__dirname,'../../extension',entry.path),'utf8')):null;
  }});
  const grammar=await registry.loadGrammar('text.xml.jade-jox');assert.ok(grammar,'JOX XML grammar is contributed');
@@ -66,4 +66,14 @@ test('installed XML grammar keeps comments and metadata CDATA opaque to Jade reg
  const rows=await tokenize(['<JadeMethod name="real">','<!-- </JadeMethod> <source>begin</source> -->','<metadata><![CDATA[<source>begin</source>]]></metadata>','<source>','begin','end;','</source></JadeMethod>']);
  assert.equal(rows[1].concat(rows[2]).some(token=>token.scopes.includes('source.jade-nz')),false);
  assert.ok(rows[4].some(token=>token.text==='begin'&&token.scopes.includes('keyword.control.jade')));
+});
+
+test('complete closing tags retain XML scope through same-line or later-line delimiters',async()=>{
+ for(const closing of [['</source>','</JadeMethod>'],['</source',' >','</JadeMethod',' >']]){
+  const rows=await tokenize(['<JadeMethod><source>','begin','end;',...closing]);
+  for(const row of rows.slice(3)){
+   assert.equal(row.some(token=>token.scopes.includes('source.jade-nz')),false);
+   if(row.some(token=>token.text.includes('>')))assert.ok(row.some(token=>token.text.includes('>')&&token.scopes.some(scope=>scope.includes('tag')&&scope.endsWith('.xml'))),closing.join(' '));
+  }
+ }
 });
