@@ -271,7 +271,7 @@ On confirmed sync, `report.repositoryHead` identifies Working's accepted commit 
 
 ### Existing Working checkout synchronization
 
-Existing-mode writable debugging and object inspection are not included in this change; nativeDebug is disabled for existing targets, and read-only inspection is tracked separately in issue #168.
+Existing Working debugging is available for the exact supported ANSI debugger profile. Read-only object inspection remains tracked separately in issue #168.
 
 JOX checkout setup defaults to the existing configured Working database: `databasePath` is Working, and `schemas/` lives directly inside the repository root. Preview with `working.location`; initial `working.initialize` requires the preview's `expectedWorkingIdentity` and `overwriteWorkingChanges: true`, acknowledging that unexported Working source may be overwritten. Complete explicit configuration needs no root `jade.json`. No Source, vendor seed, backup, restore, extraction or second database is used by this mode. Select `workingMode: "source-backed"` explicitly for the separate legacy database-backed workflow.
 
@@ -326,6 +326,14 @@ $env:JADE_CPP_OID_TEST_SEED = '<private native-restored TEMP seed root>'
 ```
 
 
+## 0.11.10 changes
+
+Debug saved JOX methods in the configured existing Working database with the supported Jade 2025 ANSI runtime. Native preparation verifies the reviewed database identity, execution INI and installed DLLs against the packaged debugger profile before launch. Breakpoints, stepping and clean Stop preserve Working reuse; unsupported runtime builds remain unavailable.
+
+Raw JOX editor lookup returns the exact semantic method and native UTF16 source-map runs through entities, CDATA, CRLF and non-ASCII text. Dirty editors, stale file hashes and another selected member are refused. `source.semantic.read` accepts `originUri`, saved `originText`, and either `position` or `entityId`; `working.prepare` with `purpose: "debug"` and `expectedWorkingIdentity` returns the admitted `body.debugSession` for the caller to pass unchanged to the helper.
+
+Protected main promotes the exact successful PR artifact and its immutable digest. If those bytes are unavailable it stops instead of rebuilding another executable. Historical local debugger CLI hashes are evidence, not an identity requirement for the hosted release; exact helper/profile/runtime and all PR artifact/manifest checks remain active. See [the implementation plan](https://github.com/darrenhull/Jade-CLI/blob/main/plans/existing-working-debugging-and-raw-jox-navigation.md).
+
 ## 0.11.9 changes
 
 Large checkout Git queries now honor the existing saved-source preparation deadline rather than a hidden 30-second per-query cap. The default remains 15 minutes; sourcePreparationTimeoutSeconds and explicit timeoutMilliseconds precedence are unchanged. Unbounded standalone queries retain the 30-second fallback. Cancellation remains available.
@@ -377,7 +385,7 @@ Native error resources are decoded through Jade's SDK conversion. Resource/conve
 | Working native compilation, structural load/reorganisation and tests | SDK-typed helper | SDK-typed helper |
 | Read-only database metadata/object inspection | SDK-typed helper with native read-only sign-on | SDK-typed helper with native read-only sign-on |
 | Scratch Pad execution | Matching installed `jadclient` | Matching installed `jadclient` |
-| Debugging | Explicitly unavailable until a native ANSI debugger ABI profile is verified | Existing verified debugger ABI profiles |
+| Debugging | Existing Working with the packaged exact ANSI ABI profile | Existing verified debugger ABI profiles |
 | Retired offline compiler/type-cache helper | Explicitly unavailable | Existing supported private ABI profile |
 
 The distribution contains ABI-neutral inspection/test/debug entry points plus ANSI/Unicode typed variants. Vendor Jade DLLs are required from the configured installation and are not redistributed. Native `StringUtf8` values use the SDK UTF-8 reference getter directly, preserving Chinese, emoji and other Unicode characters even in ANSI databases. Ordinary ANSI `String` text uses the Windows active code page; CP1252 was exercised against the isolated local Jade 25.0.1.24 demo clone, with fake conversion coverage for DBCS CP932. This does not claim connected coverage of every code page or vendor hotfix. Loader method errors retain the native method and line; when native output provides no column, the existing line-only diagnostic uses column 1 rather than inventing an offset.

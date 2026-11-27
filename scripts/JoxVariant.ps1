@@ -53,7 +53,14 @@ function Assert-JoxAnsiVariant([Collections.IDictionary]$Manifest,[string]$Direc
  $variants=$jox.variants;$ansi=$variants.ansi
  $flags=@('managedUpload','nativeTests','initialization','nativeScratch');$keys=@('format','characterSet','engineCommit')+$flags
  if($ansi -is [Collections.IDictionary]){foreach($key in @('sync','checkoutInitialization','checkoutSeed','nativeDebug')){if($ansi.Contains($key)){$keys+=$key}}}
- if(($ansi -is [Collections.IDictionary] -and $ansi.Contains('nativeDebug') -and ($ansi.nativeDebug -isnot [bool] -or $ansi.nativeDebug -ne $false)) -or $variants -isnot [Collections.IDictionary] -or $variants.Count -ne 1 -or !$variants.Contains('ansi') -or $ansi -isnot [Collections.IDictionary] -or $ansi.Count -ne $keys.Count -or @($ansi.Keys|Where-Object{$_ -notin $keys}).Count -or ($ansi.format -isnot [int] -and $ansi.format -isnot [long]) -or $ansi.format -ne 1 -or $ansi.characterSet -cne 'ansi' -or $ansi.engineCommit -cne $jox.engineCommit){throw 'ANSI runtime needs an exact qualified per-mode declaration.'}
+ if(($ansi -is [Collections.IDictionary] -and $ansi.Contains('nativeDebug') -and $ansi.nativeDebug -isnot [bool]) -or $variants -isnot [Collections.IDictionary] -or $variants.Count -ne 1 -or !$variants.Contains('ansi') -or $ansi -isnot [Collections.IDictionary] -or $ansi.Count -ne $keys.Count -or @($ansi.Keys|Where-Object{$_ -notin $keys}).Count -or ($ansi.format -isnot [int] -and $ansi.format -isnot [long]) -or $ansi.format -ne 1 -or $ansi.characterSet -cne 'ansi' -or $ansi.engineCommit -cne $jox.engineCommit){throw 'ANSI runtime needs an exact qualified per-mode declaration.'}
+ if($ansi.nativeDebug -eq $true){
+  foreach($name in @('native/jade-debug-helper-ansi.exe','native/debugger-abi-ansi.json')){if(!$Manifest.runtimeFiles.Contains($name)){throw 'ANSI debugging requires its hashed helper and ABI profile.'}}
+  $profile=Join-Path $Directory 'native/debugger-abi-ansi.json'
+  if((Get-Item -LiteralPath $profile).Length -gt 1048576){throw 'ANSI debugger ABI profile is oversized.'}
+  try{$abi=Get-Content -LiteralPath $profile -Raw|ConvertFrom-Json -AsHashtable}catch{throw 'ANSI debugger ABI profile is invalid JSON.'}
+  if($abi -isnot [Collections.IDictionary] -or $abi.characterSet -cne 'ansi'){throw 'ANSI debugger ABI profile character mode differs.'}
+ }
  foreach($flag in $flags){if($ansi[$flag] -isnot [bool] -or ($flag -ne 'nativeScratch' -and !$ansi[$flag])){throw 'ANSI runtime purpose is not qualified or is not an explicit boolean.'}}
  $names=@('jade-jox-test-helper-ansi.exe','jadegitscm.dll','jadegitdev.dll');$proofName=$prefix+'runtime-provenance.json'
  if($payload.Count -ne 4){throw 'ANSI fixed helper, components and provenance are required.'}

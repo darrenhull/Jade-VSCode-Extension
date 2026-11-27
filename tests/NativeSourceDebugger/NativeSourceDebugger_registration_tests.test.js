@@ -12,11 +12,11 @@ function fixture(contributions){
  }};
  return {vscode,context,registered};
 }
-test('the actual shipped manifest can activate without claiming an undeclared debugger',()=>{
+test('the shipped manifest owns and registers its native debugger without bypassing runtime qualification',()=>{
  const f=fixture(manifest.contributes);
  assert.doesNotThrow(()=>registerNativeSourceDebugger(f.vscode,f.context,{},{}));
- assert.deepEqual(f.registered,[]);
- assert.deepEqual(f.context.subscriptions,[]);
+ assert.deepEqual(f.registered,['jade-native-experimental']);
+ assert.ok(f.context.subscriptions.length>0);
 });
 test('a different debugger declaration does not authorize this native adapter',()=>{
  const f=fixture({debuggers:[{type:'another-debugger'}]});

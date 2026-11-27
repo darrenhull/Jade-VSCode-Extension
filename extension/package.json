@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Browse and edit JOX source and run local native Jade tests in Visual Studio Code.",
-  "version": "0.23.11",
+  "version": "0.23.12",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"
@@ -405,6 +405,15 @@
           ".jcf"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "jade-jox",
+        "aliases": [
+          "Jade JOX"
+        ],
+        "extensions": [
+          ".jox"
+        ]
       }
     ],
     "grammars": [
@@ -412,6 +421,17 @@
         "language": "jade-nz",
         "scopeName": "source.jade-nz",
         "path": "./syntaxes/jade.tmLanguage.json"
+      },
+      {
+        "language": "jade-jox",
+        "scopeName": "text.xml.jade-jox",
+        "path": "./syntaxes/jox.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.jade-nz": "jade-nz"
+        },
+        "tokenTypes": {
+          "source.jade-nz": "other"
+        }
       }
     ],
     "keybindings": [
@@ -429,6 +449,11 @@
         "command": "jadeNative.runLocalTests",
         "key": "ctrl+f5",
         "when": "activeCustomEditorId == jade.classWorkspace && !inDebugMode && !jadeNative.publishing"
+      },
+      {
+        "command": "jadeNative.debugMethod",
+        "key": "f5",
+        "when": "!inDebugMode && !jadeNative.publishing && ((editorTextFocus && (resourceScheme == jade-source || resourceExtname == .jox)) || activeCustomEditorId == jade.classWorkspace)"
       }
     ],
     "menus": {
@@ -587,7 +612,7 @@
         },
         {
           "command": "jadeNative.debugMethod",
-          "when": "resourceScheme == jade-source",
+          "when": "resourceScheme == jade-source || resourceExtname == .jox || resourceExtname == .cls",
           "group": "navigation"
         },
         {
@@ -803,6 +828,46 @@
         ],
         "displayName": "Scratch Pad"
       }
+    ],
+    "debuggers": [
+      {
+        "type": "jade-native-experimental",
+        "label": "Jade Native",
+        "languages": [
+          "jade-nz",
+          "jade-jox"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Jade source document. Defaults to the active method editor."
+              },
+              "method": {
+                "type": "string",
+                "description": "Concrete parameterless instance method."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "jade-native-experimental",
+            "request": "launch",
+            "name": "Jade: Debug Current Method"
+          }
+        ]
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "jade-nz"
+      },
+      {
+        "language": "jade-jox"
+      }
     ]
   },
   "scripts": {
@@ -810,6 +875,6 @@
     "package": "node ../scripts/package.cjs"
   },
   "jadeNative": {
-    "minimumCliVersion": "0.11.9"
+    "minimumCliVersion": "0.11.10"
   }
 }

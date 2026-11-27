@@ -111,6 +111,12 @@ class CliWorkingSession{
  }
  workingLocation(config){return this.resolveNative('working.location',config,'working');}
  prepareWorking(config,output,options={}){return this.resolveNative('working.prepare',config,'working',options,output);}
+ async prepareDebugSession(config,output,options={}){
+  const {signal,...requestOptions}=options;
+  const body=await this.resolveNative('working.prepare',signal?{...config,signal}:config,'body',{...requestOptions,purpose:'debug'},output);
+  if(!body.debugSession||typeof body.debugSession!=='object'||Array.isArray(body.debugSession))throw Error('Native debug preparation returned no admitted session.');
+  return body.debugSession;
+ }
  inspectionTarget(config,target,output){return this.resolveNative('inspect.target',target==='source'?sourceConfiguration(config):config,'config',{target},output);}
  async runNative(executable,args,options={},output=()=>{}){
   const config=configDto({...options,installPath:options.installPath||path.dirname(path.dirname(executable))});

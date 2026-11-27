@@ -125,7 +125,7 @@ class NativeSourceProvider {
       this.sourceRoots = sourceRoots;
       this.projectRoot = projectRoot;
       this.snapshot = clone(snapshot);
-      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'documentReopen', 'sync']
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
         .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     }
     return clone(snapshot);
@@ -261,6 +261,24 @@ class NativeSourceProvider {
     const value = clone(document);
     this.documents.set(value, { document: clone(value), connection: this.connection });
     return value;
+  }
+
+  async readAtOrigin({originUri,originText,position,originByteHash,entityId} = {}, token) {
+    const binding=this.binding();
+    if(!this.flags.originLookup)throw Error('Update Jade Tools: native JOX method lookup is unavailable.');
+    if(typeof originText!=='string'||position===undefined&&typeof entityId!=='string'||position!==undefined&&(!Number.isSafeInteger(position?.line)||position.line<0||!Number.isSafeInteger(position?.character)||position.character<0))
+      throw Error('Invalid native JOX editor position or text.');
+    let origin;
+    for(const root of this.sourceRoots){try{origin=contained(root,originUri,'origin');break;}catch{}}
+    if(!origin)throw Error('Native lookup origin is outside its configured source roots.');
+    if(originByteHash!==undefined)hash(originByteHash,'origin');
+    const document=await this.request('source.semantic.read',{...binding,originUri,originText,...(position===undefined?{}:{position}),...(entityId===undefined?{}:{entityId:required(entityId,'entity identity')}),
+      ...(originByteHash===undefined?{}:{originByteHash})},token);
+    this.validateDocument(document,binding);
+    if(path.relative(origin,fileURLToPath(document.origin.uri))!==''||document.entity?.kind!=='method'||document.entity.id!==document.entityId||entityId!==undefined&&document.entityId!==entityId)
+      throw Error('Native JOX lookup did not preserve the requested origin/method binding.');
+    new (require('./NativeDebugSourceMap').NativeDebugSourceMap)(document.projection.mapping);
+    return this.retain(document);
   }
 
   async read(entityId, token, opened, { editor = false } = {}) {

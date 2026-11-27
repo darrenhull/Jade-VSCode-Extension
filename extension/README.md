@@ -13,7 +13,7 @@ An optional project `jade.json` can select the schema folder:
 
 `schemaPath` is relative to the Git repository root and defaults to `schemas`. Nested paths such as `src/jade/schemas` are supported; the current native engine requires the final folder to remain named `schemas`. Setup preserves this file, validates that the folder stays inside the checkout and contains saved JOX, and asks the native CLI to validate local storage before synchronization. Renamed schema-folder leaves are refused rather than silently compiled from another location.
 
-Bundles [official Jade CLI 0.11.9](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.9) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
+Bundles [official Jade CLI 0.11.10](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.10) with its verified ANSI and Unicode JOX runtimes and read-only inspection helpers.
 
 Large JOX preparation now honors its configured deadline. ANSI and UTF-8 values can coexist in a file without converting saved sources. File-local semantic projection problems are listed as warnings while other files remain available; Project Setup shows the complete warning count and opens the full local diagnostic report on request. Native JadeGit still receives the original saved source and reports its own load failures.
 
@@ -35,10 +35,14 @@ Use **Run Local Test**, **Ctrl+F5**, or the Testing view. Inputs are saved befor
 
 The qualified ANSI checkout flow covers saved-source initialization, synchronization and native tests; the existing Unicode method-edit and native-test flow remains available. Unsupported or unmappable declarations remain read-only or fail explicitly. Working data is persistent: executed application code can change it and can access resources allowed by the runtime.
 
-Native Scratch execution is also qualified on ANSI. Standalone builds, structural editing, debugging and Source publication are not qualified by this release. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
+Native Scratch execution and native debugging are qualified on matching ANSI installations. Debugging requires the packaged exact DLL/ABI profile; other character modes or builds are refused. Standalone builds, structural editing and Source publication are not qualified by this release. Existing CLS workflows remain in the preserved Jade-cls distribution; this JOX variant does not convert a CLS project automatically.
 
 The native runtime owns configuration, source interpretation, dependencies, compilation, tests and database ownership. No Node runtime is required by the packaged CLI. Database Objects retains its read-only Source/Working selection and native object identities.
 
 Official CLI update checks run on a best-effort five-minute schedule; this is not a five-minute delivery guarantee. Dependency updates open as Draft pull requests for validation and review before release.
 
 Independent tooling, not affiliated with Jade Software.
+
+Raw `.jox` files use XML highlighting, with Jade highlighting inside each `JadeMethod` source region (including CDATA). Open a saved method projection from Object Explorer, select a method in Class Workspace, or place the cursor inside a saved raw JOX method and press **F5** / **Jade: Debug Method**. Breakpoint and stack locations use native source mappings back to that editor; XML markup is not compiled as CLS. Save raw files before debugging.
+
+Debugging remains capability-gated: the CLI must explicitly support the selected Working mode and provide its matching native debugger helper and ABI profile. Older or unqualified CLI packages show an update/qualification message before a session starts. Declaring the VS Code debugger does not enable an unsupported native runtime. Existing CLS debugger routing is preserved.

@@ -1,0 +1,78 @@
+{
+  "name": "Jade JOX",
+  "scopeName": "text.xml.jade-jox",
+  "patterns": [
+    {
+      "include": "#method"
+    },
+    {
+      "include": "text.xml"
+    }
+  ],
+  "repository": {
+    "method": {
+      "name": "meta.method.jox",
+      "begin": "<JadeMethod\\b[^>]*>",
+      "end": "</JadeMethod\\s*>",
+      "beginCaptures": {
+        "0": {
+          "name": "entity.name.tag.xml"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "entity.name.tag.xml"
+        }
+      },
+      "patterns": [
+        {
+          "name": "meta.method.source.jox",
+          "begin": "<source\\b[^>]*>",
+          "end": "</source\\s*>",
+          "beginCaptures": {
+            "0": {
+              "name": "entity.name.tag.xml"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "entity.name.tag.xml"
+            }
+          },
+          "contentName": "source.jade-nz",
+          "patterns": [
+            {
+              "begin": "<!\\[CDATA\\[",
+              "end": "\\]\\]>",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.definition.string.begin.xml"
+                }
+              },
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.definition.string.end.xml"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "source.jade-nz"
+                }
+              ]
+            },
+            {
+              "name": "constant.character.entity.xml",
+              "match": "&(?:#[xX][0-9A-Fa-f]+|#\\d+|[A-Za-z_:][\\w:.-]*);"
+            },
+            {
+              "include": "source.jade-nz"
+            }
+          ]
+        },
+        {
+          "include": "text.xml"
+        }
+      ]
+    }
+  }
+}
