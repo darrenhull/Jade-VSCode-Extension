@@ -149,8 +149,23 @@ for(const invalid of ['missing-capture','invalid-hash','foreign-root'])test('def
 test('native cancellation acknowledgement reaches setup output without replacing the terminal result',async()=>{
  let cancel;const f=setup({reply:command=>command==='cancel'?{passed:true,code:0,cancelled:true}:undefined}),lines=[];
  const token={isCancellationRequested:false,onCancellationRequested(fn){cancel=fn;return{dispose(){}};}};
- f.reply=()=>{cancel();return{passed:true,code:0,body:clone(f.initialized)};};
+ f.reply=async()=>{cancel();await new Promise(resolve=>setImmediate(resolve));return{passed:true,code:0,body:clone(f.initialized)};};
  const result=await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(result.extractedFiles,7);assert.ok(lines.some(line=>/cancellation acknowledged/i.test(line)));
+});
+
+test('capture-only setup retains native edit admission for already open documents',async()=>{
+ const f=fixture(),provider=new NativeSourceProvider({client:f.client,config:f.config,projectRoot:'C:/project'});
+ await provider.prepare();const document=await provider.read(f.document.entityId);
+ provider.adoptInitialization({sourceCapture:{provider:'jox',projectId:f.snapshot.projectId,snapshotHash:f.snapshot.snapshotHash},semanticPreparationRequired:true,projectRoot:f.snapshot.projectRoot,sourceRoots:f.snapshot.sourceRoots},f.flags);
+ const saved=await provider.applyEdit(document,'saved after setup','projectionText');assert.equal(saved.projection.text,'saved after setup');
+});
+
+test('late cancellation acknowledgement is suppressed after a terminal initialization result',async()=>{
+ let cancel,finishCancel;const f=setup({reply:command=>command==='cancel'?new Promise(resolve=>finishCancel=resolve):undefined}),lines=[];
+ const token={isCancellationRequested:false,onCancellationRequested(fn){cancel=fn;return{dispose(){}};}};
+ f.reply=()=>{cancel();return{passed:true,code:0,body:clone(f.initialized)};};
+ await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
+ const before=lines.length;finishCancel({passed:true,code:0,cancelled:true});await new Promise(resolve=>setImmediate(resolve));assert.equal(lines.length,before);
 });

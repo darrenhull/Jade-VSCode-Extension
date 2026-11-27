@@ -68,9 +68,12 @@ class NativeSourceProvider {
     this.validateContext();
     const connection = this.connection;
     const request = this.client.request(command, body, output, undefined, connection);
+    let terminal = false;
     const cancel = () => {
+      if (terminal) return;
       try {
         void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          if (terminal) return;
           output?.(reply?.cancelled === true
             ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
             : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
@@ -91,7 +94,7 @@ class NativeSourceProvider {
       }
       this.assertConnection(connection);
       return result.body;
-    } finally { subscription?.dispose(); }
+    } finally { terminal = true; subscription?.dispose(); }
   }
 
   serializeSource(operation) {
@@ -190,7 +193,7 @@ class NativeSourceProvider {
       const roots = this.sourceContext(result);
       if (retained) { this.projectRoot = roots.projectRoot; this.sourceRoots = roots.sourceRoots; }
       this.snapshot = undefined;
-      this.flags = {};
+      // Existing editor admissions remain bound to their original connection/revision.
       this.semanticPreparationRequired = true;
       return clone(result);
     }
@@ -478,9 +481,12 @@ class NativeSourceProvider {
 
   async requestExecution(command, body, { token, output }, connection) {
     const request = this.client.request(command, body, output, undefined, connection);
+    let terminal = false;
     const cancel = () => {
+      if (terminal) return;
       try {
         void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          if (terminal) return;
           output?.(reply?.cancelled === true
             ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
             : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
@@ -494,7 +500,7 @@ class NativeSourceProvider {
       const result = await request.promise;
       if (typeof result?.passed !== 'boolean' || !Number.isInteger(result.code)) throw Error('Incomplete native execution result.');
       return result;
-    } finally { subscription?.dispose(); }
+    } finally { terminal = true; subscription?.dispose(); }
   }
 }
 

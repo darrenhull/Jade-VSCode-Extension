@@ -33,6 +33,7 @@ class NativeSourceWorkspace {
     this.watchSources = watchSources;
     this.projects = new Map();
     this.events = new vscode.EventEmitter();
+    this.invalidations = new vscode.EventEmitter();
     this.forwarding = new Map();
     this.executing = false;
     this.sourceListeners = new Set();
@@ -158,13 +159,16 @@ class NativeSourceWorkspace {
 
   async ensurePrepared(folder, token) {
     const project = this.project(folder);
-    if (project.provider.snapshot) return project;
     if (project.semanticPreparation) return project.semanticPreparation;
+    if (project.provider.snapshot && project.provider.connection === project.provider.client.client && !project.provider.connection?.closed) return project;
     const run = async (_, progressToken) => {
       this.reportProgress?.('Preparing Jade source views on demand...');
       try {
-        await project.provider.prepare(token || progressToken, text => this.reportProgress?.(text));
-        this.project(folder);
+        do {
+          project.semanticPreparationDirty = false;
+          await project.provider.prepare(token || progressToken, text => this.reportProgress?.(text));
+          if (this.project(folder) !== project) throw Error('The source project changed during preparation.');
+        } while (project.semanticPreparationDirty);
         this.observeSources(project);
         this.reportProgress?.('Jade source views are ready.');
         return project;
@@ -196,6 +200,13 @@ class NativeSourceWorkspace {
     return project;
   }
 
+  onDidInvalidateSource(listener) { return this.invalidations.event(listener); }
+
+  invalidateSources(project) {
+    project.explorerRevision = (project.explorerRevision || 0) + 1;
+    this.invalidations.fire(project);
+  }
+
   onDidChangeSource(listener) { this.sourceListeners.add(listener); return { dispose: () => this.sourceListeners.delete(listener) }; }
 
   observeSources(project) {
@@ -209,6 +220,7 @@ class NativeSourceWorkspace {
   }
 
   scheduleRefresh(project, prepared = false) {
+    if (project.semanticPreparation) { project.semanticPreparationDirty = true; return; }
     if (project.provider.semanticPreparationRequired === true && !project.provider.snapshot) {
       clearTimeout(this.pendingChanges.get(project)?.timer);
       this.pendingChanges.delete(project);
@@ -456,7 +468,7 @@ class NativeSourceWorkspace {
       void this.releaseProject(project).catch(error => this.reportError(error));
       project.files.dispose();
     }
-    this.forwarding.clear(); this.projects.clear(); this.events.dispose();
+    this.forwarding.clear(); this.projects.clear(); this.events.dispose(); this.invalidations.dispose();
   }
 }
 

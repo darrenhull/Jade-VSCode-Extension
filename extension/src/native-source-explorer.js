@@ -9,7 +9,8 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
       const expandable = row.queryKind || row.kind === 'project';
       const item = new vscode.TreeItem(label, expandable ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
       item.id = JSON.stringify([row.project.folder.uri.toString(), row.entity?.id || row.parentId || '', row.kind, row.offset || 0,
-        ...(row.kind === 'page' ? [row.queryKind] : [])]);
+        ...(row.kind === 'page' ? [row.queryKind] : []),
+        ...(row.kind === 'project' && row.project.explorerRevision ? ['view', row.project.explorerRevision] : [])]);
       item.description = row.entity?.signature || row.entity?.qualifiedName?.schema;
       item.contextValue = !row.entity ? 'jadeSourceProject' : row.entity.kind === 'schema' ? 'jadeSourceSchema'
         : ['class', 'interface', 'primitive', 'type'].includes(row.entity.kind) ? 'jadeSourceClass'
@@ -38,6 +39,7 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
   };
   const view = vscode.window.createTreeView('jadeNative.classes', { treeDataProvider: provider, showCollapseAll: true });
   context.subscriptions.push(events, view);
+  if (workspace.onDidInvalidateSource) context.subscriptions.push(workspace.onDidInvalidateSource(() => events.fire()));
   const open = async row => {
     if (!row?.project || !row.entity?.id) throw Error('Select a member from the native source catalogue.');
     if (row.generation && row.generation !== row.project.provider.binding().generation)

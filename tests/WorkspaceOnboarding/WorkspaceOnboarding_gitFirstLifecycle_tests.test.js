@@ -270,7 +270,7 @@ test('capture-only native setup commits the real staged provider without prepari
  const result=await f.setup.onboarding.setup(f.folder.uri);
  assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.viewsReady,false);
  assert.equal(f.calls.filter(row=>['source.semantic.prepare','ui.refresh','ui.jadeNative.classes.focus'].includes(row.command)).length,0);
- const project=f.workspace.project(f.folder);assert.equal(project.provider.snapshot,undefined);
+ const project=f.workspace.project(f.folder);assert.equal(project.provider.snapshot,undefined);assert.equal(project.explorerRevision,1);
  await Promise.all([f.workspace.ensurePrepared(f.folder),f.workspace.ensurePrepared(f.folder)]);
  assert.equal(f.calls.filter(row=>row.command==='source.semantic.prepare').length,1);
  assert.ok(project.provider.snapshot);assert.equal(project.provider.semanticPreparationRequired,false);
@@ -278,7 +278,7 @@ test('capture-only native setup commits the real staged provider without prepari
 
 test('capture-only repeat setup invalidates the retained live catalogue without preparing it during setup',async t=>{
  const f=fixture(t,{configured:true}),prior=f.workspace.project(f.folder),fork=f.client.fork;
- prior.provider.snapshot={provider:'jox',projectId:'prior-model'};prior.provider.connection=f.client.client;
+ prior.provider.snapshot={provider:'jox',projectId:'prior-model'};prior.provider.connection=f.client.client;prior.provider.flags={projectionEdit:true,documentReopen:true};
  f.client.fork=()=>{const child=fork(),request=child.request;child.request=function(command,...args){
   const operation=request.call(this,command,...args);
   if(command==='working.initialize')operation.promise=operation.promise.then(result=>{const body={...result.body,
@@ -287,7 +287,7 @@ test('capture-only repeat setup invalidates the retained live catalogue without 
  };return child;};
  const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));
  assert.equal(f.workspace.project(f.folder),prior);assert.equal(prior.provider.snapshot,undefined);
- assert.equal(prior.provider.semanticPreparationRequired,true);
+ assert.equal(prior.provider.semanticPreparationRequired,true);assert.deepEqual(prior.provider.flags,{projectionEdit:true,documentReopen:true});assert.equal(prior.explorerRevision,1);
  assert.equal(f.calls.filter(row=>['source.semantic.prepare','ui.refresh'].includes(row.command)).length,0);
 });
 

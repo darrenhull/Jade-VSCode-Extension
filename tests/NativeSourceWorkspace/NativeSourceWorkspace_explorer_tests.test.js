@@ -63,3 +63,13 @@ test('stale pagination still refuses before querying another source generation',
  await assert.rejects(f.provider.getChildren(a),/source catalogue changed/);
  assert.equal(f.queries.length,before);assert.deepEqual(f.opened,[]);
 });
+
+test('deferred setup invalidation replaces the expanded root identity without querying until next expansion',async()=>{
+ const f=setup(),workspace=new (require('../../extension/src/NativeSourceWorkspace').NativeSourceWorkspace)({vscode:f.vscode,client:f.client,configFor:()=>f.config});
+ const view=registerNativeSourceExplorer(f.vscode,f.context,workspace,{open(){},refresh(){}}),root=(await view.provider.getChildren())[0];
+ const original=view.provider.getTreeItem(root).id;let changed=0;view.provider.onDidChangeTreeData(()=>changed++);
+ workspace.invalidateSources(root.project);
+ const next=(await view.provider.getChildren())[0],item=view.provider.getTreeItem(next);
+ assert.notEqual(item.id,original);assert.equal(item.collapsibleState,f.vscode.TreeItemCollapsibleState.Collapsed);assert.equal(changed,1);assert.equal(f.requests.length,0);
+ await view.provider.getChildren(next);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,1);
+});
