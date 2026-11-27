@@ -68,8 +68,17 @@ class NativeSourceProvider {
     this.validateContext();
     const connection = this.connection;
     const request = this.client.request(command, body, output, undefined, connection);
+    let terminal = false;
     const cancel = () => {
-      try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
+      if (terminal) return;
+      try {
+        void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          if (terminal) return;
+          output?.(reply?.cancelled === true
+            ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
+            : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
+        }).catch(() => {});
+      }
       catch { /* The original request still owns the terminal connection result. */ }
     };
     const subscription = token?.onCancellationRequested(cancel);
@@ -85,7 +94,7 @@ class NativeSourceProvider {
       }
       this.assertConnection(connection);
       return result.body;
-    } finally { subscription?.dispose(); }
+    } finally { terminal = true; subscription?.dispose(); }
   }
 
   serializeSource(operation) {
@@ -94,14 +103,16 @@ class NativeSourceProvider {
     return result;
   }
 
-  prepare(token) { return this.serializeSource(() => this.prepareSource(token)); }
+  prepare(token, output) { return this.serializeSource(() => this.prepareSource(token, output)); }
 
-  async prepareSource(token) {
+  async prepareSource(token, output) {
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
     this.validateContext();
     const capabilities = await this.capability();
-    const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token);
-    return this.adoptSnapshot(snapshot, capabilities);
+    const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token, output);
+    const adopted = this.adoptSnapshot(snapshot, capabilities);
+    this.semanticPreparationRequired = false;
+    return adopted;
   }
 
   adoptSnapshot(snapshot, capabilities, retain = true) {
@@ -109,6 +120,19 @@ class NativeSourceProvider {
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
     hash(snapshot.snapshotHash, 'snapshot');
+    const { projectRoot, sourceRoots } = this.sourceContext(snapshot);
+    if (retain) {
+      this.sourceRoots = sourceRoots;
+      this.projectRoot = projectRoot;
+      this.snapshot = clone(snapshot);
+      this.projectLease = { provider: snapshot.provider, projectId: snapshot.projectId, connection: this.connection };
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
+        .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
+    }
+    return clone(snapshot);
+  }
+
+  sourceContext(snapshot) {
     const project = new URL(required(snapshot.projectRoot, 'project root'));
     if (project.protocol !== 'file:' || project.search || project.hash) throw Error('Invalid native project root URI.');
     const projectRoot = path.resolve(fileURLToPath(project));
@@ -121,14 +145,7 @@ class NativeSourceProvider {
       if (value.search || value.hash || value.protocol !== 'file:') throw Error('Invalid native source root URI.');
       return fileURLToPath(value);
     });
-    if (retain) {
-      this.sourceRoots = sourceRoots;
-      this.projectRoot = projectRoot;
-      this.snapshot = clone(snapshot);
-      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
-        .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
-    }
-    return clone(snapshot);
+    return { projectRoot, sourceRoots };
   }
 
   initialize({ destination, schemas, expectedWorkingIdentity }, token, output) {
@@ -170,7 +187,19 @@ class NativeSourceProvider {
 
   adoptInitialization(result, capabilities) {
     const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
+    if (result.semanticPreparationRequired === true && !result.sourceSnapshot) {
+      if (result.sourceCapture?.provider !== 'jox') throw Error('Invalid native source capture binding.');
+      required(result.sourceCapture.projectId, 'source capture project');
+      hash(result.sourceCapture.snapshotHash, 'source capture');
+      const roots = this.sourceContext(result);
+      if (retained) { this.projectRoot = roots.projectRoot; this.sourceRoots = roots.sourceRoots; }
+      this.snapshot = undefined;
+      // Existing editor admissions remain bound to their original connection/revision.
+      this.semanticPreparationRequired = true;
+      return clone(result);
+    }
     this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
+    this.semanticPreparationRequired = false;
     if (!retained) this.snapshot = undefined;
     return clone(result);
   }
@@ -295,17 +324,20 @@ class NativeSourceProvider {
 
   closeProject() {
     return this.serializeSource(async () => {
-      const snapshot = this.snapshot, connection = this.connection;
-      if (!snapshot || !connection || this.client.client !== connection || connection.closed) return;
+      const snapshot = this.snapshot, lease = this.projectLease;
+      const scoped = lease || (snapshot && {provider:snapshot.provider,projectId:snapshot.projectId,connection:this.connection});
+      const connection = scoped?.connection;
+      if (!scoped || !connection || this.client.client !== connection || connection.closed) return;
       // Scope may already be closed in VS Code. Cleanup uses only the captured
       // authenticated channel; it neither rediscovers config nor spawns a client.
       const request = this.client.request('source.semantic.closeProject', {
-        provider: snapshot.provider, projectId: snapshot.projectId
+        provider: scoped.provider, projectId: scoped.projectId
       }, undefined, undefined, connection);
       const result = await request.promise;
       if (result?.passed !== true || result.code !== 0)
         throw Error(result?.report?.error || 'The native source project could not be closed.');
       if (this.snapshot === snapshot) this.snapshot = undefined;
+      if (this.projectLease === lease) this.projectLease = undefined;
     });
   }
 
@@ -315,8 +347,10 @@ class NativeSourceProvider {
     // Disposal/restart must never spawn another client to clean an old binding.
     if (retained.connection !== this.client.client || retained.connection.closed) return;
     const document = retained.document;
-    await this.request('source.semantic.closeDocument', { ...this.binding(), documentId: document.documentId,
-      entityId: document.entityId, documentBinding: document.documentBinding.key });
+    const result = await this.client.request('source.semantic.closeDocument', { provider: document.provider, projectId: document.projectId,
+      documentId: document.documentId, entityId: document.entityId, documentBinding: document.documentBinding.key }, undefined, undefined, retained.connection).promise;
+    if (result?.passed !== true || result.code !== 0)
+      throw Object.assign(Error(result?.report?.error || 'The native source editor could not be closed.'), {result});
     this.documents.delete(opened);
   }
 
@@ -453,8 +487,17 @@ class NativeSourceProvider {
 
   async requestExecution(command, body, { token, output }, connection) {
     const request = this.client.request(command, body, output, undefined, connection);
+    let terminal = false;
     const cancel = () => {
-      try { void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.catch(() => {}); }
+      if (terminal) return;
+      try {
+        void this.client.request('cancel', { operationId: request.id }, undefined, undefined, connection).promise.then(reply => {
+          if (terminal) return;
+          output?.(reply?.cancelled === true
+            ? '[Working setup] Native cancellation acknowledged; waiting for the operation to finish.\n'
+            : '[Working setup] Native cancellation was not accepted; waiting for the terminal operation result.\n');
+        }).catch(() => {});
+      }
       catch { /* Preserve the terminal result from this captured request. */ }
     };
     const subscription = token?.onCancellationRequested(cancel);
@@ -463,7 +506,7 @@ class NativeSourceProvider {
       const result = await request.promise;
       if (typeof result?.passed !== 'boolean' || !Number.isInteger(result.code)) throw Error('Incomplete native execution result.');
       return result;
-    } finally { subscription?.dispose(); }
+    } finally { terminal = true; subscription?.dispose(); }
   }
 }
 

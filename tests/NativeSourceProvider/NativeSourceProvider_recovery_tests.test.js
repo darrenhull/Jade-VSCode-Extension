@@ -146,3 +146,16 @@ test('project disposal never starts a replacement connection to release an old m
   await f.provider.closeProject();
   assert.equal(f.requests.length, before);
 });
+
+test('deferred catalogue closes a retained editor on its original authenticated project binding',async()=>{
+ const f=await setup(),opened=await f.provider.read(f.document.entityId,undefined,undefined,{editor:true});
+ f.provider.snapshot=undefined;f.provider.semanticPreparationRequired=true;const before=f.requests.length;
+ await f.provider.close(opened);const close=f.requests.slice(before);
+ assert.equal(close.length,1);assert.equal(close[0].command,'source.semantic.closeDocument');
+ assert.equal(close[0].body.projectId,opened.projectId);assert.equal(close[0].body.documentBinding,opened.documentBinding.key);
+ assert.equal(Object.hasOwn(close[0].body,'generation'),false);
+});
+test('deferred catalogue releases its captured project ownership without reopening a connection',async()=>{
+ const f=await setup();f.provider.snapshot=undefined;f.provider.semanticPreparationRequired=true;const before=f.requests.length;
+ await f.provider.closeProject();assert.deepEqual(f.requests.slice(before).map(row=>row.command),['source.semantic.closeProject']);
+});

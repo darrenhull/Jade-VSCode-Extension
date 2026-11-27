@@ -33,6 +33,7 @@ class NativeSourceWorkspace {
     this.watchSources = watchSources;
     this.projects = new Map();
     this.events = new vscode.EventEmitter();
+    this.invalidations = new vscode.EventEmitter();
     this.forwarding = new Map();
     this.executing = false;
     this.sourceListeners = new Set();
@@ -156,6 +157,35 @@ class NativeSourceWorkspace {
     return project;
   }
 
+  async ensurePrepared(folder, token) {
+    const project = this.project(folder);
+    if (project.semanticPreparation) return project.semanticPreparation;
+    if (project.provider.snapshot && project.provider.connection === project.provider.client.client && !project.provider.connection?.closed) return project;
+    const run = async (_, progressToken) => {
+      this.reportProgress?.('Preparing Jade source views on demand...');
+      try {
+        do {
+          project.semanticPreparationDirty = false;
+          await project.provider.prepare(token || progressToken, text => this.reportProgress?.(text));
+          if (this.project(folder) !== project) throw Error('The source project changed during preparation.');
+        } while (project.semanticPreparationDirty);
+        this.observeSources(project);
+        this.reportProgress?.('Jade source views are ready.');
+        return project;
+      } catch (error) {
+        project.provider.snapshot = undefined;
+        project.provider.semanticPreparationRequired = true;
+        this.reportProgress?.('Source view preparation stopped: ' + error.message); throw error;
+      }
+    };
+    const operation = Promise.resolve().then(() => this.vscode.window?.withProgress
+      ? this.vscode.window.withProgress({ location: this.vscode.ProgressLocation.Notification, title: 'Preparing Jade source views', cancellable: true }, run)
+      : run(undefined, token));
+    project.semanticPreparation = operation;
+    try { return await operation; }
+    finally { if (project.semanticPreparation === operation) delete project.semanticPreparation; }
+  }
+
   async refresh(folder, token, { prepared = false } = {}) {
     const project = prepared ? this.project(folder) : await this.prepare(folder, token);
     const errors = [];
@@ -174,6 +204,13 @@ class NativeSourceWorkspace {
     return project;
   }
 
+  onDidInvalidateSource(listener) { return this.invalidations.event(listener); }
+
+  invalidateSources(project) {
+    project.explorerRevision = (project.explorerRevision || 0) + 1;
+    this.invalidations.fire(project);
+  }
+
   onDidChangeSource(listener) { this.sourceListeners.add(listener); return { dispose: () => this.sourceListeners.delete(listener) }; }
 
   observeSources(project) {
@@ -187,6 +224,12 @@ class NativeSourceWorkspace {
   }
 
   scheduleRefresh(project, prepared = false) {
+    if (project.semanticPreparation) { project.semanticPreparationDirty = true; return; }
+    if (project.provider.semanticPreparationRequired === true && !project.provider.snapshot) {
+      clearTimeout(this.pendingChanges.get(project)?.timer);
+      this.pendingChanges.delete(project);
+      return;
+    }
     if (this.disposed || !this.folders().some(folder => folder.uri.toString() === project.folder.uri.toString())) return;
     const pending = this.pendingChanges.get(project) || { needsPrepare: false };
     pending.needsPrepare ||= !prepared;
@@ -199,6 +242,7 @@ class NativeSourceWorkspace {
     if (this.changing.has(project)) return this.changing.get(project).promise;
     const pending = this.pendingChanges.get(project);
     if (!pending) return;
+    if (project.provider.semanticPreparationRequired === true && !project.provider.snapshot) { this.scheduleRefresh(project); return; }
     clearTimeout(pending.timer);
     if (this.executing || [...project.files.documents.values()].some(value => value.saving)) return;
     this.pendingChanges.delete(project);
@@ -261,13 +305,9 @@ class NativeSourceWorkspace {
   }
 
   async recover(uri) {
-    const project = this.projectForUri(uri);
+    let project = this.projectForUri(uri);
     if (!project.files.documents.has(uri.toString())) {
-      if (!project.provider.snapshot) {
-        const operation = project.recoveryPreparation ||= this.prepare(project.folder);
-        try { await operation; }
-        finally { if (project.recoveryPreparation === operation) project.recoveryPreparation = undefined; }
-      }
+      project = await this.ensurePrepared(project.folder);
       await project.files.recover(uri);
     }
     return project;
@@ -282,8 +322,7 @@ class NativeSourceWorkspace {
     const key = value => process.platform === 'win32' ? path.resolve(value).toLowerCase() : path.resolve(value);
     const folders = this.folders().filter(folder => !projectRoot || folder.uri.toString() === projectRoot || key(folder.uri.fsPath) === key(projectRoot));
     if (folders.length !== 1) throw Error('Choose the originating Jade project before opening source.');
-    const project = this.project(folders[0]);
-    if (!project.provider.snapshot) await this.prepare(project.folder);
+    const project = await this.ensurePrepared(folders[0]);
     const page = await project.provider.query({ kind: 'type', qualifiedName: { schema, type: name }, offset: 0, limit: 100 });
     const matches = page.items.filter(entity => entity.qualifiedName?.type === name && entity.qualifiedName?.schema === schema);
     if (matches.length > 1) throw Error('Several native declarations share this display name. Select the exact declaration in Object Explorer.');
@@ -428,7 +467,7 @@ class NativeSourceWorkspace {
       void this.releaseProject(project).catch(error => this.reportError(error));
       project.files.dispose();
     }
-    this.forwarding.clear(); this.projects.clear(); this.events.dispose();
+    this.forwarding.clear(); this.projects.clear(); this.events.dispose(); this.invalidations.dispose();
   }
 }
 

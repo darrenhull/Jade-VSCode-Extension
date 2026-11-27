@@ -380,3 +380,18 @@ test('setup retains full warning summary when the bounded inline list is empty',
  const value=await f.controller.setup(f.folder.uri);assert.equal(value.completed,true);assert.equal(value.projectionSkippedFiles,1);assert.equal(value.remainingWarningCount,1);assert.equal(value.warningDetailsUri,uri);
  assert.ok(f.logs.some(line=>/completed with warnings/.test(line)));
 });
+
+test('capture-only checkout setup finishes without preparing semantic views or opening Object Explorer',async t=>{
+ const f=fixture(t,{warnings:['Sync checkout to existing Working']});
+ const working={identity:'review',databasePath:path.join(f.root,'working'),installPath:'C:/Jade'};
+ const target={working,workingState:'existing',workingMode:'existing',sourceRoots:[f.uri(f.root).toString()]};
+ Object.assign(f.services,{jox:true,checkoutTargets:async()=>target,
+  initializeCheckout:async()=>({sourceCapture:{provider:'jox',projectId:'project',snapshotHash:'a'.repeat(64)},semanticPreparationRequired:true}),
+  commitCheckout:async()=>({prepared:false,semanticPreparationRequired:true}),
+  refreshProject:async()=>assert.fail('Setup must not prepare semantic views'),
+  openExplorer:async()=>assert.fail('Opening the tree eagerly starts semantic preparation')});
+ const result=await f.controller.setup(f.folder.uri);
+ assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.workingPrepared,true);
+ assert.equal(result.viewsReady,false);assert.equal(result.semanticPreparationRequired,true);
+ assert.ok(f.logs.some(line=>/on demand|when.*Object Explorer|prepared when/i.test(line)));
+});

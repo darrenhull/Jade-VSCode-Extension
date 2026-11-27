@@ -118,3 +118,54 @@ test('a capability probe on the replacement process cannot adopt the older initi
  const result=await f.provider.initialize({destination:'C:/project/sources'});
  assert.equal(result.viewRefreshRequired,true);assert.equal(result.extractedFiles,7);assert.equal(f.provider.snapshot,undefined);
 });
+
+test('capture-only initialization keeps the semantic catalogue unprepared until explicitly requested',async()=>{
+ const f=setup({flags:{checkoutInitialization:true}});
+ f.initialized.working={identity:'reviewed-working',root:'C:/private/work'};
+ f.initialized.report={workingMode:'git-first',workingPrepared:true,publicationEstablished:true};
+ f.initialized.sourceCapture={provider:'jox',projectId:'project',snapshotHash:f.snapshot.snapshotHash};
+ f.initialized.semanticPreparationRequired=true;delete f.initialized.sourceSnapshot;
+ const value=await f.provider.initializeCheckout({expectedWorkingIdentity:'reviewed-working'});
+ assert.equal(value.semanticPreparationRequired,true);
+ assert.equal(f.provider.snapshot,undefined);
+ assert.deepEqual(f.requests.map(x=>x.command),['working.initialize']);
+ assert.throws(()=>f.provider.binding(),/prepare/i);
+ await f.provider.prepare();assert.equal(f.provider.binding().generation,f.snapshot.generation);
+});
+
+for(const invalid of ['missing-capture','invalid-hash','foreign-root'])test('deferred initialization refuses '+invalid+' without inventing a catalogue',async()=>{
+ const f=setup({flags:{checkoutInitialization:true}});
+ f.initialized.working={identity:'reviewed-working',root:'C:/private/work'};
+ f.initialized.report={workingMode:'git-first',workingPrepared:true,publicationEstablished:true};
+ f.initialized.semanticPreparationRequired=true;delete f.initialized.sourceSnapshot;
+ f.initialized.sourceCapture={provider:'jox',projectId:'project',snapshotHash:f.snapshot.snapshotHash};
+ if(invalid==='missing-capture')delete f.initialized.sourceCapture;
+ if(invalid==='invalid-hash')f.initialized.sourceCapture.snapshotHash='invalid';
+ if(invalid==='foreign-root')f.initialized.projectRoot='file:///C:/foreign';
+ await assert.rejects(f.provider.initializeCheckout({expectedWorkingIdentity:'reviewed-working'}),/binding|capture|root|context/i);
+ assert.equal(f.provider.snapshot,undefined);assert.equal(f.requests.filter(x=>x.command==='source.semantic.prepare').length,0);
+});
+
+test('native cancellation acknowledgement reaches setup output without replacing the terminal result',async()=>{
+ let cancel;const f=setup({reply:command=>command==='cancel'?{passed:true,code:0,cancelled:true}:undefined}),lines=[];
+ const token={isCancellationRequested:false,onCancellationRequested(fn){cancel=fn;return{dispose(){}};}};
+ f.reply=async()=>{cancel();await new Promise(resolve=>setImmediate(resolve));return{passed:true,code:0,body:clone(f.initialized)};};
+ const result=await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(result.extractedFiles,7);assert.ok(lines.some(line=>/cancellation acknowledged/i.test(line)));
+});
+
+test('capture-only setup retains native edit admission for already open documents',async()=>{
+ const f=fixture(),provider=new NativeSourceProvider({client:f.client,config:f.config,projectRoot:'C:/project'});
+ await provider.prepare();const document=await provider.read(f.document.entityId);
+ provider.adoptInitialization({sourceCapture:{provider:'jox',projectId:f.snapshot.projectId,snapshotHash:f.snapshot.snapshotHash},semanticPreparationRequired:true,projectRoot:f.snapshot.projectRoot,sourceRoots:f.snapshot.sourceRoots},f.flags);
+ const saved=await provider.applyEdit(document,'saved after setup','projectionText');assert.equal(saved.projection.text,'saved after setup');
+});
+
+test('late cancellation acknowledgement is suppressed after a terminal initialization result',async()=>{
+ let cancel,finishCancel;const f=setup({reply:command=>command==='cancel'?new Promise(resolve=>finishCancel=resolve):undefined}),lines=[];
+ const token={isCancellationRequested:false,onCancellationRequested(fn){cancel=fn;return{dispose(){}};}};
+ f.reply=()=>{cancel();return{passed:true,code:0,body:clone(f.initialized)};};
+ await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
+ const before=lines.length;finishCancel({passed:true,code:0,cancelled:true});await new Promise(resolve=>setImmediate(resolve));assert.equal(lines.length,before);
+});
