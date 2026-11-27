@@ -33,6 +33,7 @@ class NativeSourceProvider {
     if (this.config.sourceFormat !== 'jox') throw Error('A JOX source provider requires its native format binding.');
     this.root = path.resolve(required(projectRoot, 'project context'));
     this.documents = new WeakMap();
+    this.sourceRevision = 0;
   }
 
   async capability() {
@@ -108,14 +109,16 @@ class NativeSourceProvider {
   async prepareSource(token, output) {
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
     this.validateContext();
+    const revision = this.sourceRevision;
     const capabilities = await this.capability();
     const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token, output);
-    const adopted = this.adoptSnapshot(snapshot, capabilities);
+    const adopted = this.adoptSnapshot(snapshot, capabilities, true, revision);
     this.semanticPreparationRequired = false;
     return adopted;
   }
 
-  adoptSnapshot(snapshot, capabilities, retain = true) {
+  adoptSnapshot(snapshot, capabilities, retain = true, revision = this.sourceRevision) {
+    if (revision !== this.sourceRevision) throw Error('Source preparation was superseded by a newer setup revision. Prepare source views again.');
     if (snapshot.provider !== 'jox') throw Error('Invalid native provider binding.');
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
@@ -185,6 +188,12 @@ class NativeSourceProvider {
     });
   }
 
+  deferSemanticPreparation() {
+    this.sourceRevision++;
+    this.snapshot = undefined;
+    this.semanticPreparationRequired = true;
+  }
+
   adoptInitialization(result, capabilities) {
     const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
     if (result.semanticPreparationRequired === true && !result.sourceSnapshot) {
@@ -193,9 +202,8 @@ class NativeSourceProvider {
       hash(result.sourceCapture.snapshotHash, 'source capture');
       const roots = this.sourceContext(result);
       if (retained) { this.projectRoot = roots.projectRoot; this.sourceRoots = roots.sourceRoots; }
-      this.snapshot = undefined;
       // Existing editor admissions remain bound to their original connection/revision.
-      this.semanticPreparationRequired = true;
+      this.deferSemanticPreparation();
       return clone(result);
     }
     this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);

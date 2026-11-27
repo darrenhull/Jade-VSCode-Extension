@@ -163,10 +163,16 @@ class NativeSourceWorkspace {
     if (project.provider.snapshot && project.provider.connection === project.provider.client.client && !project.provider.connection?.closed) return project;
     const run = async (_, progressToken) => {
       this.reportProgress?.('Preparing Jade source views on demand...');
+      const combined = token && progressToken && token !== progressToken ? new this.vscode.CancellationTokenSource() : undefined;
+      const subscriptions = [];
       try {
+        if (combined) for (const source of [token, progressToken]) {
+          subscriptions.push(source.onCancellationRequested(() => combined.cancel()));
+          if (source.isCancellationRequested) combined.cancel();
+        }
         do {
           project.semanticPreparationDirty = false;
-          await project.provider.prepare(token || progressToken, text => this.reportProgress?.(text));
+          await project.provider.prepare(combined?.token || token || progressToken, text => this.reportProgress?.(text));
           if (this.project(folder) !== project) throw Error('The source project changed during preparation.');
         } while (project.semanticPreparationDirty);
         this.observeSources(project);
@@ -176,6 +182,9 @@ class NativeSourceWorkspace {
         project.provider.snapshot = undefined;
         project.provider.semanticPreparationRequired = true;
         this.reportProgress?.('Source view preparation stopped: ' + error.message); throw error;
+      } finally {
+        for (const subscription of subscriptions) subscription.dispose();
+        combined?.dispose();
       }
     };
     const operation = Promise.resolve().then(() => this.vscode.window?.withProgress
@@ -207,6 +216,7 @@ class NativeSourceWorkspace {
   onDidInvalidateSource(listener) { return this.invalidations.event(listener); }
 
   invalidateSources(project) {
+    project.provider.deferSemanticPreparation();
     project.explorerRevision = (project.explorerRevision || 0) + 1;
     this.invalidations.fire(project);
   }

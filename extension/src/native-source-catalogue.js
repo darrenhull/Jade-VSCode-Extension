@@ -33,6 +33,11 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
       return classWorkspaces.open({ project, entity: row.nativeEntity });
     }
   });
+  if (workspace.onDidInvalidateSource) context.subscriptions.push(workspace.onDidInvalidateSource(selected => {
+    if (project?.folder.uri.toString() !== selected.folder.uri.toString()) return;
+    project = selected;
+    catalogue.invalidate({deferred:true});
+  }));
   const show = async row => {
     let folder = row?.project?.folder;
     if (!folder) folder = workspace.folders().length === 1 ? workspace.folders()[0]

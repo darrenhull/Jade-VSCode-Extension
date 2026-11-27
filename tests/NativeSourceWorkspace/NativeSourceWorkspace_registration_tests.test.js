@@ -312,3 +312,23 @@ test('import-qualified native type navigation uses its qualified identity rather
   const result = await registered.workspace.findClass('Package::Widget', 'Example', f.folder.uri.fsPath);
   assert.equal(result?.entity.id, 'imported-type');
 });
+
+test('deferred setup clears tests and class search without preparing, then explicit demand repopulates',async()=>{
+ let f;f=setup({testing:true,reply:(command,request)=>command==='source.semantic.query'?{passed:true,code:0,body:{provider:'jox',projectId:f.snapshot.projectId,generation:f.snapshot.generation,offset:0,limit:100,total:1,nextOffset:null,items:request.kind==='test'?[{id:'test',kind:'method',name:'check',testIdentity:{schema:'Example',class:'Tests',method:'check'}}]:[{id:'type',kind:'class',name:'Domain',qualifiedName:{schema:'Example',type:'Domain'}}]}}:undefined});
+ const registered=registerJoxWorkspace(f.vscode,f.context,{client:f.client,configFor:()=>f.config});
+ await registered.testing.discover();await registered.classView.catalogue.show();const panel=f.panels.at(-1);await panel.receive({command:'ready'});
+ assert.equal(registered.testing.controller.items.size,1);const before=f.requests.length,project=registered.workspace.project(f.folder);
+ registered.workspace.invalidateSources(project);
+ assert.equal(registered.testing.controller.items.size,0);assert.equal(f.requests.length,before);
+ assert.equal(panel.sent.filter(row=>row.command==='catalogue').at(-1).page.items.length,0);
+ await registered.testing.discover();await registered.classView.catalogue.refresh();
+ assert.equal(registered.testing.controller.items.size,1);assert.equal(panel.sent.filter(row=>row.command==='catalogue').at(-1).page.items.length,1);
+});
+
+test('test discovery finishing after deferred invalidation cannot resurrect obsolete test items',async()=>{
+ let finish,f;f=setup({testing:true,reply:(command,request)=>command==='source.semantic.query'&&request.kind==='test'?new Promise(resolve=>finish=()=>resolve({passed:true,code:0,body:{provider:'jox',projectId:f.snapshot.projectId,generation:f.snapshot.generation,items:[{id:'obsolete',kind:'method',name:'check',testIdentity:{schema:'Example',class:'Tests',method:'check'}}],total:1,offset:0,limit:100,nextOffset:null}})):undefined});
+ const registered=registerJoxWorkspace(f.vscode,f.context,{client:f.client,configFor:()=>f.config});
+ const pending=registered.testing.discover();await new Promise(resolve=>setImmediate(resolve));
+ registered.workspace.invalidateSources(registered.workspace.project(f.folder));finish();await pending;
+ assert.equal(registered.testing.controller.items.size,0);assert.equal(f.requests.filter(row=>row.command==='source.semantic.prepare').length,1);
+});
