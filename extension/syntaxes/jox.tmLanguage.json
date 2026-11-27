@@ -26,13 +26,24 @@
       },
       "patterns": [
         {
+          "begin": ">",
+          "end": "(?=</JadeMethod(?=\\s|>))",
+          "beginCaptures": {
+            "0": {
+              "name": "entity.name.tag.xml"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#source"
+            },
+            {
+              "include": "text.xml"
+            }
+          ]
+        },
+        {
           "include": "#method-opening"
-        },
-        {
-          "include": "#source"
-        },
-        {
-          "include": "text.xml"
         }
       ]
     },
@@ -97,7 +108,7 @@
     "method-opening": {
       "name": "meta.tag.jox",
       "begin": "(?<=<JadeMethod)\\G",
-      "end": "(?=/\\s*>)|>",
+      "end": "(?=>|/\\s*>)",
       "endCaptures": {
         "0": {
           "name": "entity.name.tag.xml"
