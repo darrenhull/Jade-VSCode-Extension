@@ -2,6 +2,7 @@
 
 - Breakpoint replies and updates keep the correct coordinates for the editor that requested them, even when a raw JOX editor and method projection are open together.
 - Breakpoints at different columns on one line no longer borrow another breakpoint's location or verified status.
+- Native locations outside an editor's source map remain unverified at the requested location, with an explanation instead of a zero-line marker.
 - Line-only breakpoints choose the first mapped source column, skipping ranges that ended on the previous line.
 - JOX highlighting recognizes exact method/source element names and handles self-closing tags and quoted attributes without leaking Jade scopes into XML.
 

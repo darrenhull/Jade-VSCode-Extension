@@ -656,7 +656,7 @@ function registerDebugger(vscode, context, services) {
       const mapping=this.editorLocations.get(sourceKey(breakpoint.requestedFile));
       if(!mapping)return position;
       const point=mapping.toEditor({line:position.line-1,character:position.column-1});
-      return point?{line:point.line+1,column:point.character+1}:{line:0,column:0};
+      return point&&{line:point.line+1,column:point.character+1};
     }
     async applyBreakpoints() {
       const operation = this.breakpointQueue.then(() =>
@@ -686,20 +686,20 @@ function registerDebugger(vscode, context, services) {
       const result = await this.native.request("breakpoints", {
         positions: candidates.map((b) => b.position),
       });
-      return candidates.map((b, i) => ({
-        id: b.id,
-        file: b.file,
-        requestedFile:b.requestedFile,
-        source:{path:b.requestedFile||this.editorSources.get(sourceKey(b.file))||b.file},
-        requested: b.requestedLine??b.line,
-        verified: true,
-        ...this.breakpointLocation(b,nativeLocation(
-          this.selected,
-          this.nativeSource,
-          result.positions[i],
-        )),
-      }));
+      return candidates.map((b,i)=>{
+        const position=result?.positions?.[i];
+        const location=Number.isInteger(position)&&position>=0&&position<=this.nativeSource.length
+          ? this.breakpointLocation(b,nativeLocation(this.selected,this.nativeSource,position)):undefined;
+        return {
+          id:b.id,file:b.file,requestedFile:b.requestedFile,
+          source:{path:b.requestedFile||this.editorSources.get(sourceKey(b.file))||b.file},
+          requested:b.requestedLine??b.line,verified:!!location,
+          ...(location||{line:b.requestedLine??b.line,...(b.requestedColumn===undefined?{}:{column:b.requestedColumn})}),
+          ...(!location?{message:'Native breakpoint location could not be mapped to the requesting source.'}:{}),
+        };
+      });
     }
+
     async presentStop() {
       this.pendingStop = false;
       const actual = await this.applyBreakpoints();
@@ -708,10 +708,11 @@ function registerDebugger(vscode, context, services) {
           reason: "changed",
           breakpoint: {
             id: b.id,
-            verified: true,
+            verified: b.verified,
             source: b.source,
             line: b.line,
             column:b.column,
+            ...(b.message?{message:b.message}:{}),
           },
         });
       this.event("stopped", {
