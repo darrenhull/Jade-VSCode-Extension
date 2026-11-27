@@ -326,28 +326,19 @@ function registerDebugger(vscode, context, services) {
             this.breakpoints = this.breakpoints.filter(
               (b) => sourceKey(b.requestedFile||b.file) !== sourceKey(requestedFile),
             );
+            const requested=[];
             for (const b of a.breakpoints || []) {
               const projected=locations?locations.breakpointLine(b.line,b.column):{line:b.line,column:b.column};
-              this.breakpoints.push({file,requestedFile,line:projected?.line,column:projected?.column,requestedLine:b.line,id:++this.breakpointSeq});
+              const entry={file,requestedFile,line:projected?.line,column:projected?.column,requestedLine:b.line,requestedColumn:b.column,id:++this.breakpointSeq};
+              this.breakpoints.push(entry);requested.push(entry);
             }
             const actual = await this.applyBreakpoints();
             this.response(request, {
-              breakpoints: (a.breakpoints || []).map(
-                (b) =>
-                  actual.find(
-                    (v) =>
-                      v.requested === b.line &&
-                      sourceKey(v.requestedFile||v.file) === sourceKey(requestedFile),
-                  ) || {
-                    id: this.breakpoints.find(
-                      (v) => sourceKey(v.requestedFile||v.file) === sourceKey(requestedFile) && v.requestedLine === b.line,
-                    )?.id,
-                    verified: false,
-                    line: b.line,
-                    message:
-                      "Initially supports breakpoints in the launched method.",
-                  },
-              ),
+              breakpoints:requested.map(entry=>actual.find(value=>value.id===entry.id)||{
+                id:entry.id,verified:false,source:{path:entry.requestedFile},line:entry.requestedLine,
+                ...(entry.requestedColumn===undefined?{}:{column:entry.requestedColumn}),
+                message:"Initially supports breakpoints in the launched method.",
+              }),
             });
             break;
           }
