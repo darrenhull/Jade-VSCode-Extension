@@ -73,3 +73,14 @@ for(const cancelled of [false,true])test('failed dirty follow-up invalidates its
  await assert.rejects(workspace.ensurePrepared(f.folder),/Follow-up stopped/);assert.equal(project.provider.snapshot,undefined);
  await workspace.ensurePrepared(f.folder);assert.equal(calls,3);assert.ok(project.provider.snapshot);
 });
+
+for(const requested of ['caller','notification'])test('either cancellation source stops semantic preparation and disposes combined subscriptions: '+requested,{timeout:1000},async()=>{
+ function source(){let cancelled=false;const listeners=new Set();return{listeners,token:{get isCancellationRequested(){return cancelled;},onCancellationRequested(fn){listeners.add(fn);return{dispose(){listeners.delete(fn);}};}},cancel(){cancelled=true;for(const listener of listeners)listener();},dispose(){listeners.clear();}};}
+ const f=setup(),caller=source(),notification=source();f.vscode.ProgressLocation={Notification:15};
+ f.vscode.CancellationTokenSource=class{constructor(){Object.assign(this,source());}};
+ f.vscode.window.withProgress=async(_options,run)=>run({},notification.token);
+ const workspace=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:()=>f.config}),project=workspace.project(f.folder);
+ let subscription;project.provider.prepare=async token=>{try{await new Promise((resolve,reject)=>{subscription=token.onCancellationRequested(()=>reject(Object.assign(Error('cancelled'),{cancelled:true})));});}finally{subscription?.dispose();}};
+ const operation=workspace.ensurePrepared(f.folder,caller.token);await new Promise(resolve=>setImmediate(resolve));(requested==='caller'?caller:notification).cancel();
+ await assert.rejects(operation,/cancelled/);assert.equal(caller.listeners.size,0);assert.equal(notification.listeners.size,0);
+});

@@ -12,11 +12,16 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
     const open = openFolderIds();
     controller.items.forEach(root => { if (!open.has(root.id)) controller.items.delete(root.id); });
   }));
+  if (workspace.onDidInvalidateSource) context.subscriptions.push(workspace.onDidInvalidateSource(project => {
+    const id = project.folder.uri.toString(), root = controller.items.get(id);
+    root?.children.forEach(item => details.delete(item));
+    controller.items.delete(id);
+  }));
   let discovering;
   async function discover({ project: selectedProject, prepare = true } = {}) {
     if (discovering) return discovering;
     discovering = (async () => {
-      const roots = [];
+      const roots = [], bindings = new Map();
       const folders = workspace.folders();
       for (const folder of selectedProject ? folders.filter(folder => folder.uri.toString() === selectedProject.folder.uri.toString()) : folders) {
         const selected = workspace.project(folder);
@@ -24,6 +29,7 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
         if (!project.provider.snapshot) continue;
         const root = controller.createTestItem(folder.uri.toString(), folder.name);
         roots.push(root);
+        bindings.set(root, {project,snapshot:project.provider.snapshot});
         let offset = 0;
         do {
           const page = await project.provider.query({ kind: 'test', offset, limit: 100 });
@@ -38,7 +44,10 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
           offset = page.nextOffset;
         } while (offset !== null);
       }
-      const open = openFolderIds(), current = roots.filter(root => open.has(root.id));
+      const open = openFolderIds(), current = roots.filter(root => {
+        const {project,snapshot} = bindings.get(root);
+        return open.has(root.id) && workspace.project(project.folder) === project && project.provider.snapshot === snapshot;
+      });
       if (selectedProject) current.forEach(root => controller.items.add(root)); else controller.items.replace(current);
     })();
     try { return await discovering; } finally { discovering = undefined; }

@@ -80,9 +80,9 @@ function registerClassCatalogue(vscode, context, options) {
     if (ready) void panel.webview.postMessage(lastPayload);
     return lastPayload;
   }
-  function invalidate() {
+  function invalidate({deferred=false} = {}) {
     ++fetchGeneration;
-    loading = true;
+    loading = !deferred;
     model = new ClassBrowserModel({ scope: metadata.scope });
     remotePage=undefined;
     publish();

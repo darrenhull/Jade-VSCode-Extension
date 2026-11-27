@@ -1,3 +1,9 @@
+# 0.23.15 - Reliable source view refresh
+
+- Repeat setup cannot restore an outdated catalogue from a preparation that started earlier.
+- Test Explorer and class search clear outdated results after setup; the next explicit view request repopulates them without delaying setup.
+- Cancel source preparation from either its progress notification or the originating command.
+
 # 0.23.14 - Faster setup and visible Working progress
 
 - Project Setup reconciles the saved checkout without first building the complete source catalogue. Object Explorer, class search and test discovery prepare source views on demand, with their own cancellable progress.

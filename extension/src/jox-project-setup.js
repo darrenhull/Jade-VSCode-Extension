@@ -369,10 +369,6 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');
         throw error;
       }
-      if(binding.retained&&binding.project.provider.semanticPreparationRequired===true){
-        binding.previous.provider.snapshot=undefined;
-        binding.previous.provider.semanticPreparationRequired=true;
-      }
       if(binding.project.provider.semanticPreparationRequired===true)workspace.invalidateSources(workspace.project(folder));
       binding.workspace.dispose();setupBindings.delete(key);pendingProfiles.delete(key);workspace.executing=false;flushRefreshes();
       return {prepared:!binding.retained,semanticPreparationRequired:binding.project.provider.semanticPreparationRequired===true};

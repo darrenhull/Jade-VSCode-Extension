@@ -169,3 +169,11 @@ test('late cancellation acknowledgement is suppressed after a terminal initializ
  await f.provider.initialize({destination:'C:/project/sources'},token,text=>lines.push(text));
  const before=lines.length;finishCancel({passed:true,code:0,cancelled:true});await new Promise(resolve=>setImmediate(resolve));assert.equal(lines.length,before);
 });
+
+test('repeat setup revision rejects a stale prepare reply before snapshot or flags adoption',async()=>{
+ const f=fixture(),provider=new NativeSourceProvider({client:f.client,config:f.config,projectRoot:'C:/project'});
+ await provider.prepare();const flags=provider.flags;let finish;
+ const request=f.client.request;f.client.request=function(command,...args){const result=request.call(this,command,...args);if(command==='source.semantic.prepare')result.promise=new Promise(resolve=>finish=()=>resolve({passed:true,code:0,body:{...clone(f.snapshot),generation:'stale',capabilities:{projectionEdit:false}}}));return result;};
+ const preparing=provider.prepare();await new Promise(resolve=>setImmediate(resolve));provider.deferSemanticPreparation();finish();
+ await assert.rejects(preparing,/changed|superseded|revision/i);assert.equal(provider.snapshot,undefined);assert.equal(provider.flags,flags);assert.equal(provider.semanticPreparationRequired,true);
+});
