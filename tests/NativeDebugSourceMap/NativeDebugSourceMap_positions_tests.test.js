@@ -23,3 +23,12 @@ test('UTF16 surrogate pairs and CRLF editor lines retain native run coordinates'
  assert.deepEqual(map.toEditor({line:0,character:1}),{line:3,character:9});
  assert.deepEqual(map.toEditor({line:1,character:2}),{line:4,character:2});
 });
+
+test('line-only breakpoints skip half-open previous-line runs and use first mapped column',()=>{
+ const map=new NativeDebugSourceMap([{rawRange:range(1,4,2,0),projectionRange:range(0,4,1,0)},{rawRange:range(2,7,2,12),projectionRange:range(1,3,1,8)}]);
+ assert.deepEqual(map.breakpointLine(3),{line:2,column:4});
+ assert.deepEqual(map.breakpointLine(3,10),{line:2,column:6});
+ assert.equal(map.breakpointLine(3,1),undefined);
+ assert.deepEqual(new NativeDebugSourceMap([{rawRange:range(1,4,2,3),projectionRange:range(0,4,1,3)}]).breakpointLine(3),{line:2,column:1});
+ assert.equal(new NativeDebugSourceMap([{rawRange:range(1,4,2,0),projectionRange:range(0,4,1,0)}]).breakpointLine(3),undefined);
+});

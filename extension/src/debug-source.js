@@ -72,14 +72,15 @@ function nativeLocation(method, nativeSource, position) {
     column: prefix.length - prefix.lastIndexOf("\n"),
   };
 }
-function breakpointPosition(method, nativeSource, line) {
+function breakpointPosition(method, nativeSource, line, column) {
   const relative = line - method.line + leadingLines(nativeSource);
   if (relative < 0) return undefined;
   const lines = nativeSource.split("\n");
   if (relative >= lines.length) return undefined;
+  if(column!==undefined&&(!Number.isInteger(column)||column<1||column>lines[relative].length+1))return undefined;
   return (
     lines.slice(0, relative).reduce((sum, l) => sum + l.length + 1, 0) +
-    (lines[relative].match(/^\s*/)?.[0].length || 0)
+    (column===undefined?(lines[relative].match(/^\s*/)?.[0].length || 0):column-1)
   );
 }
 module.exports = {
