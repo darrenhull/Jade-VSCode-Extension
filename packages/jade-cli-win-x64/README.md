@@ -1,5 +1,12 @@
 # Jade CLI — native C++
 
+## 0.11.11
+
+- Set up an existing Working database using only saved Git changes, without building the full source catalogue first.
+- Reuse the source catalogue after restarting, refreshing changed files only.
+- Show setup stages and elapsed progress, with broker exit details when a connection fails.
+- Preserve ignored deletions and saved edits hidden by Git index flags.
+
 `jade-cli.exe` is a native Windows C++ executable. Command handling, configuration discovery, the shared broker, dependency selection, Working database preparation and build/test orchestration run in C++. There is no embedded Node runtime, JavaScript engine or Python process in the CLI.
 
 Jade's installed native tools and object manager perform compilation and execution. The distribution includes our native helper executables, not Jade vendor DLLs or a database. A compatible licensed Windows Jade installation is required for connected operations. Terminal commands and JSONL service requests use the same native implementation.

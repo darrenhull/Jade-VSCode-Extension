@@ -1,3 +1,9 @@
+# 0.23.14 - Faster setup and visible Working progress
+
+- Project Setup reconciles the saved checkout without first building the complete source catalogue. Object Explorer, class search and test discovery prepare source views on demand, with their own cancellable progress.
+- Working setup immediately logs the reviewed target and operation, reports elapsed time while native output is quiet, and shows cancellation acknowledgements and final broker diagnostics.
+- Includes [Jade CLI 0.11.11](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.11), with capture-only existing-Working setup and detailed native stage/failure reporting.
+
 # 0.23.13 - JOX editor fixes
 
 - Breakpoint replies and updates keep the correct coordinates for the editor that requested them, even when a raw JOX editor and method projection are open together.

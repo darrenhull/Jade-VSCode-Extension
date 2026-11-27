@@ -15,9 +15,11 @@ class WorkingSetupProgress {
    if(['string','number','boolean'].includes(typeof report[key]))this.line('CLI '+key+'='+text(report[key]));
   const broker=report.brokerDiagnostics||value?.brokerDiagnostics||value?.body?.brokerDiagnostics;
   if(broker&&typeof broker==='object'){
-   const fields=['status','stage','operationId','pid','brokerPid','elapsedMilliseconds','queueMilliseconds','nativeOutputBytes','nativeClosed','nativeExitConfirmed','error'];
+   const fields=['status','stage','lastCompletedStage','operation','operationId','pid','brokerPid','brokerPID','brokerInstance','processState','terminationStatus','exitCode','exitCodeHex','stderrAvailable','stderrStatus','diagnosticsIncomplete','elapsedMilliseconds','queueMilliseconds','nativeOutputBytes','nativeClosed','nativeExitConfirmed','error'];
    const parts=fields.filter(key=>['string','number','boolean'].includes(typeof broker[key])).map(key=>key+'='+text(broker[key]));
    if(parts.length)this.line('CLI broker diagnostics: '+parts.join('; '));
+   for(const row of Array.isArray(broker.logTail)?broker.logTail.slice(-8):[])
+    if(typeof row?.stage==='string'&&typeof row?.status==='string')this.line('CLI broker stage '+text(row.stage)+': '+text(row.status)+(Number.isFinite(row.elapsedMilliseconds)?' ('+row.elapsedMilliseconds+' ms)':''));
   }
   for(const row of Array.isArray(report.diagnostics)?report.diagnostics.slice(0,50):[])
    for(const line of diagnosticLines(row))this.line('CLI '+text(line));
