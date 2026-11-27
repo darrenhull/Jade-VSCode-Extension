@@ -110,8 +110,12 @@ function registerWorkspaceOnboarding(vscode,context,services){
     if(creating||direct){
      const result=await services.initializeCheckout(folder,checkout);
      recordProjectionWarnings(result,status,folder);
-     if(!result?.sourceSnapshot)throw Error('Native setup did not return its saved checkout snapshot.');
-     status.workingPrepared=true;status.sourceReady=true;status.sourceSnapshot=result.sourceSnapshot;requireFolder(folder);
+     const deferred=result?.semanticPreparationRequired===true&&result.sourceCapture&&!result.sourceSnapshot;
+     if(!result?.sourceSnapshot&&!deferred)throw Error('Native setup did not return its saved checkout snapshot or capture.');
+     status.workingPrepared=true;status.sourceReady=true;
+     if(deferred){status.sourceCapture=result.sourceCapture;status.semanticPreparationRequired=true;}
+     else status.sourceSnapshot=result.sourceSnapshot;
+     requireFolder(folder);
      stage='refresh';
      if(result.viewRefreshRequired)throw Object.assign(Error(result.warning||'Working was created, but its view connection changed.'),{result:{...result,passed:false,code:2}});
      accepted=await services.commitCheckout?.(folder,checkout);
@@ -126,6 +130,10 @@ function registerWorkspaceOnboarding(vscode,context,services){
      status.sourceReady=true;
      requireFolder(folder);
      accepted=await services.commitCheckout?.(folder,checkout);
+    }
+    if(status.semanticPreparationRequired===true){
+     log('Working is ready. Source views will be prepared on demand when you expand Object Explorer or open source search/tests.');
+     return{...status,passed:true,code:0,completed:true,stage:'complete',sourceChoice:'git-first'};
     }
     stage='refresh';requireFolder(folder);
     await services.refreshProject(folder,{prepared:accepted?.prepared!==false});requireFolder(folder);

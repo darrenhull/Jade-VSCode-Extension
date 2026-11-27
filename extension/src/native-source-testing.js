@@ -19,7 +19,7 @@ function registerNativeSourceTesting(vscode, context, workspace, { reportDiagnos
       const roots = [];
       const folders = workspace.folders();
       for (const folder of selectedProject ? folders.filter(folder => folder.uri.toString() === selectedProject.folder.uri.toString()) : folders) {
-        const project = prepare ? await workspace.prepare(folder) : workspace.project(folder);
+        const project = prepare ? await workspace.ensurePrepared(folder) : workspace.project(folder);
         if (!project.provider.snapshot) continue;
         const root = controller.createTestItem(folder.uri.toString(), folder.name);
         roots.push(root);

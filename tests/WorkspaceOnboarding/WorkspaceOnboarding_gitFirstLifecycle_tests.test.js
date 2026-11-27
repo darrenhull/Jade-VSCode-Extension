@@ -258,3 +258,35 @@ test('native ancestor project file supersedes remembered configless defaults aft
 test('setup replaces an unused placeholder with stored projections without deleting those files',async t=>{const f=fixture(t),prior=f.workspace.project(f.folder),directory=path.join(f.root,'.jade','projections'),file=path.join(directory,'preserved.jade');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(file,'Preserved prior projection bytes');const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.notEqual(f.workspace.project(f.folder),prior);assert.equal(fs.readFileSync(file,'utf8'),'Preserved prior projection bytes');});
 
 test('explicit legacy checkout carries the picked profile through actual provider initialization',async t=>{const f=fixture(t,{configured:true}),request=f.client.request;f.vscode.window.showQuickPick=async rows=>rows[0];f.client.request=function(command,args,...rest){if(command==='prepare'&&!args.argv.includes('--profile'))return{promise:Promise.resolve({passed:false,code:2,report:{error:'Multiple Jade connection profiles are available (alpha, beta). Choose --profile <name>; no interactive prompt is available.'}})};if(command==='working.initialize')assert.equal(args.config.connection,'alpha');const reply=request.call(this,command,args,...rest);if(command==='prepare')return{promise:reply.promise.then(value=>({...value,prepared:{...value.prepared,config:{...value.prepared.config,connection:'alpha'}}}))};return reply;};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));assert.equal(f.calls.find(c=>c.command==='working.initialize').args.config.connection,'alpha');});
+
+test('capture-only native setup commits the real staged provider without preparing views, then prepares once on demand',async t=>{
+ const f=fixture(t,{configured:true}),fork=f.client.fork;
+ f.client.fork=()=>{const child=fork(),request=child.request;child.request=function(command,...args){
+  const operation=request.call(this,command,...args);
+  if(command==='working.initialize')operation.promise=operation.promise.then(result=>{const body={...result.body,
+   sourceCapture:{provider:'jox',projectId:result.body.sourceSnapshot.projectId,snapshotHash:result.body.sourceSnapshot.snapshotHash},semanticPreparationRequired:true};delete body.sourceSnapshot;return{...result,body};});
+  return operation;
+ };return child;};
+ const result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.completed,true,JSON.stringify(result));assert.equal(result.viewsReady,false);
+ assert.equal(f.calls.filter(row=>['source.semantic.prepare','ui.refresh','ui.jadeNative.classes.focus'].includes(row.command)).length,0);
+ const project=f.workspace.project(f.folder);assert.equal(project.provider.snapshot,undefined);
+ await Promise.all([f.workspace.ensurePrepared(f.folder),f.workspace.ensurePrepared(f.folder)]);
+ assert.equal(f.calls.filter(row=>row.command==='source.semantic.prepare').length,1);
+ assert.ok(project.provider.snapshot);assert.equal(project.provider.semanticPreparationRequired,false);
+});
+
+test('capture-only repeat setup invalidates the retained live catalogue without preparing it during setup',async t=>{
+ const f=fixture(t,{configured:true}),prior=f.workspace.project(f.folder),fork=f.client.fork;
+ prior.provider.snapshot={provider:'jox',projectId:'prior-model'};prior.provider.connection=f.client.client;
+ f.client.fork=()=>{const child=fork(),request=child.request;child.request=function(command,...args){
+  const operation=request.call(this,command,...args);
+  if(command==='working.initialize')operation.promise=operation.promise.then(result=>{const body={...result.body,
+   sourceCapture:{provider:'jox',projectId:result.body.sourceSnapshot.projectId,snapshotHash:result.body.sourceSnapshot.snapshotHash},semanticPreparationRequired:true};delete body.sourceSnapshot;return{...result,body};});
+  return operation;
+ };return child;};
+ const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));
+ assert.equal(f.workspace.project(f.folder),prior);assert.equal(prior.provider.snapshot,undefined);
+ assert.equal(prior.provider.semanticPreparationRequired,true);
+ assert.equal(f.calls.filter(row=>['source.semantic.prepare','ui.refresh'].includes(row.command)).length,0);
+});

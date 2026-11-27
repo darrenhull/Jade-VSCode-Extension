@@ -2,6 +2,8 @@
 
 For a Git checkout containing saved JOX, **Jade: Set Up Project** uses the configured database as **Working** and reads source from disk. The root schemas/ and sources/schemas/ layouts are detected automatically; other layouts use a source-root picker. Review the local paths and confirm that initial synchronization may overwrite unexported Working changes. This route does not create another database, make a backup, extract source, or require a clean seed. Unsupported CLI packages refuse this route before database preparation. An explicitly declared workingMode: source-backed project retains the separate extraction workflow. If connection profiles are ambiguous, choose one in VS Code; the workspace remembers that choice.
 
+With a compatible CLI, setup reconciles Working from a frozen capture of the saved checkout without building the semantic catalogue. Expand a project in Object Explorer, open class search, or discover tests to prepare source views on demand; this has its own cancellable progress and Jade Source output. Older CLI responses that already contain a prepared catalogue remain supported.
+
 An optional project `jade.json` can select the schema folder:
 
 ```json

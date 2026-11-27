@@ -7,7 +7,7 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
     getPage: async filter => {
       if (!project) throw Error('Choose a Jade source project.');
       workspace.project(project.folder);
-      if (!project.provider.snapshot) await workspace.prepare(project.folder);
+      if (!project.provider.snapshot) await workspace.ensurePrepared(project.folder);
       let parentId;
       if (filter.schema) {
         const schemas = await project.provider.query({ kind: 'schema', search: filter.schema, offset: 0, limit: 100 });
@@ -36,7 +36,7 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
     if (!folder) folder = workspace.folders().length === 1 ? workspace.folders()[0]
       : await vscode.window.showWorkspaceFolderPick({ placeHolder: 'Choose the Jade source project' });
     if (!folder) return;
-    project = await workspace.prepare(folder);
+    project = await workspace.ensurePrepared(folder);
     return catalogue.show(row?.entity?.kind === 'schema' ? { schema: row.entity.name } : {});
   };
   context.subscriptions.push(vscode.commands.registerCommand('jadeNative.browseSourceClasses', show));

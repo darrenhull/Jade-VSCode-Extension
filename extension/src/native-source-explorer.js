@@ -19,9 +19,9 @@ function registerNativeSourceExplorer(vscode, context, workspace, classWorkspace
     },
     async getChildren(row) {
       if (!row) return workspace.folders().map(folder => ({ kind: 'project', project: workspace.project(folder) }));
-      const project = row.project;
+      const project = row.kind === 'project' ? workspace.project(row.project.folder) : row.project;
       if (row.kind === 'project') {
-        if (!project.provider.snapshot) await workspace.prepare(project.folder);
+        if (!project.provider.snapshot) await workspace.ensurePrepared(project.folder);
       } else if (row.generation !== project.provider.binding().generation) throw Error('The source catalogue changed. Refresh Classes before continuing.');
       const kind = row.kind === 'project' ? 'schema' : row.queryKind;
       if (!kind) return [];

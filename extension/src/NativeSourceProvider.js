@@ -94,14 +94,16 @@ class NativeSourceProvider {
     return result;
   }
 
-  prepare(token) { return this.serializeSource(() => this.prepareSource(token)); }
+  prepare(token, output) { return this.serializeSource(() => this.prepareSource(token, output)); }
 
-  async prepareSource(token) {
+  async prepareSource(token, output) {
     if (token?.isCancellationRequested) throw Object.assign(Error('Source operation cancelled.'), { cancelled: true });
     this.validateContext();
     const capabilities = await this.capability();
-    const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token);
-    return this.adoptSnapshot(snapshot, capabilities);
+    const snapshot = await this.request('source.semantic.prepare', { cwd: this.root, config: clone(this.config) }, token, output);
+    const adopted = this.adoptSnapshot(snapshot, capabilities);
+    this.semanticPreparationRequired = false;
+    return adopted;
   }
 
   adoptSnapshot(snapshot, capabilities, retain = true) {
@@ -109,6 +111,18 @@ class NativeSourceProvider {
     required(snapshot.projectId, 'project binding');
     required(snapshot.generation, 'generation binding');
     hash(snapshot.snapshotHash, 'snapshot');
+    const { projectRoot, sourceRoots } = this.sourceContext(snapshot);
+    if (retain) {
+      this.sourceRoots = sourceRoots;
+      this.projectRoot = projectRoot;
+      this.snapshot = clone(snapshot);
+      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
+        .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
+    }
+    return clone(snapshot);
+  }
+
+  sourceContext(snapshot) {
     const project = new URL(required(snapshot.projectRoot, 'project root'));
     if (project.protocol !== 'file:' || project.search || project.hash) throw Error('Invalid native project root URI.');
     const projectRoot = path.resolve(fileURLToPath(project));
@@ -121,14 +135,7 @@ class NativeSourceProvider {
       if (value.search || value.hash || value.protocol !== 'file:') throw Error('Invalid native source root URI.');
       return fileURLToPath(value);
     });
-    if (retain) {
-      this.sourceRoots = sourceRoots;
-      this.projectRoot = projectRoot;
-      this.snapshot = clone(snapshot);
-      this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
-        .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
-    }
-    return clone(snapshot);
+    return { projectRoot, sourceRoots };
   }
 
   initialize({ destination, schemas, expectedWorkingIdentity }, token, output) {
@@ -170,7 +177,19 @@ class NativeSourceProvider {
 
   adoptInitialization(result, capabilities) {
     const retained = result.viewRefreshRequired !== true && this.client.client === this.connection && !this.connection.closed;
+    if (result.semanticPreparationRequired === true && !result.sourceSnapshot) {
+      if (result.sourceCapture?.provider !== 'jox') throw Error('Invalid native source capture binding.');
+      required(result.sourceCapture.projectId, 'source capture project');
+      hash(result.sourceCapture.snapshotHash, 'source capture');
+      const roots = this.sourceContext(result);
+      if (retained) { this.projectRoot = roots.projectRoot; this.sourceRoots = roots.sourceRoots; }
+      this.snapshot = undefined;
+      this.flags = {};
+      this.semanticPreparationRequired = true;
+      return clone(result);
+    }
     this.adoptSnapshot({ ...result.sourceSnapshot, projectRoot: result.projectRoot, sourceRoots: result.sourceRoots, capabilities: result.capabilities }, capabilities, retained);
+    this.semanticPreparationRequired = false;
     if (!retained) this.snapshot = undefined;
     return clone(result);
   }
