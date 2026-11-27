@@ -6,18 +6,20 @@ function registerNativeSourceCatalogue(vscode, context, workspace, classWorkspac
     scope: 'workspace', label: 'Object Explorer â€” Classes',
     getPage: async filter => {
       if (!project) throw Error('Choose a Jade source project.');
-      workspace.project(project.folder);
-      if (!project.provider.snapshot) await workspace.ensurePrepared(project.folder);
+      const selected = project;
+      const current = await workspace.ensurePrepared(selected.folder);
+      if (project !== selected) throw Error('The selected source project changed while preparing class search.');
+      project = current;
       let parentId;
       if (filter.schema) {
-        const schemas = await project.provider.query({ kind: 'schema', search: filter.schema, offset: 0, limit: 100 });
+        const schemas = await current.provider.query({ kind: 'schema', search: filter.schema, offset: 0, limit: 100 });
         const matching = schemas.items.filter(item => item.name === filter.schema);
         if (matching.length !== 1) throw Error('The selected schema is no longer available in the native catalogue.');
         parentId = matching[0].id;
       }
-      const page = await project.provider.query({ kind: 'type', parentId, search: filter.query || '', offset: filter.offset || 0, limit: 100 });
+      const page = await current.provider.query({ kind: 'type', parentId, search: filter.query || '', offset: filter.offset || 0, limit: 100 });
       const rows = page.items.map(entity => ({ provider: 'jox', entityId: entity.id, nativeEntity: entity,
-        projectId: page.projectId, projectName: project.folder.name, schema: entity.qualifiedName?.schema,
+        projectId: page.projectId, projectName: current.folder.name, schema: entity.qualifiedName?.schema,
         name: entity.name, kind: entity.kind, superclass: entity.metadata?.baseClass?.name }));
       return { rows, generation: page.generation, page: { items: rows, total: page.total, offset: page.offset, limit: page.limit,
         hasMore: page.nextOffset !== null, nextOffset: page.nextOffset, hasPrevious: page.offset > 0,

@@ -125,6 +125,7 @@ class NativeSourceProvider {
       this.sourceRoots = sourceRoots;
       this.projectRoot = projectRoot;
       this.snapshot = clone(snapshot);
+      this.projectLease = { provider: snapshot.provider, projectId: snapshot.projectId, connection: this.connection };
       this.flags = Object.fromEntries(['catalogue', 'projectionRead', 'projectionEdit', 'deploymentFromSavedSnapshot', 'nativeTests', 'nativeScratch', 'nativeDebug', 'originLookup', 'documentReopen', 'sync']
         .map(key => [key, capabilities[key] === true && snapshot.capabilities?.[key] === true]));
     }
@@ -323,17 +324,20 @@ class NativeSourceProvider {
 
   closeProject() {
     return this.serializeSource(async () => {
-      const snapshot = this.snapshot, connection = this.connection;
-      if (!snapshot || !connection || this.client.client !== connection || connection.closed) return;
+      const snapshot = this.snapshot, lease = this.projectLease;
+      const scoped = lease || (snapshot && {provider:snapshot.provider,projectId:snapshot.projectId,connection:this.connection});
+      const connection = scoped?.connection;
+      if (!scoped || !connection || this.client.client !== connection || connection.closed) return;
       // Scope may already be closed in VS Code. Cleanup uses only the captured
       // authenticated channel; it neither rediscovers config nor spawns a client.
       const request = this.client.request('source.semantic.closeProject', {
-        provider: snapshot.provider, projectId: snapshot.projectId
+        provider: scoped.provider, projectId: scoped.projectId
       }, undefined, undefined, connection);
       const result = await request.promise;
       if (result?.passed !== true || result.code !== 0)
         throw Error(result?.report?.error || 'The native source project could not be closed.');
       if (this.snapshot === snapshot) this.snapshot = undefined;
+      if (this.projectLease === lease) this.projectLease = undefined;
     });
   }
 
@@ -343,8 +347,10 @@ class NativeSourceProvider {
     // Disposal/restart must never spawn another client to clean an old binding.
     if (retained.connection !== this.client.client || retained.connection.closed) return;
     const document = retained.document;
-    await this.request('source.semantic.closeDocument', { ...this.binding(), documentId: document.documentId,
-      entityId: document.entityId, documentBinding: document.documentBinding.key });
+    const result = await this.client.request('source.semantic.closeDocument', { provider: document.provider, projectId: document.projectId,
+      documentId: document.documentId, entityId: document.entityId, documentBinding: document.documentBinding.key }, undefined, undefined, retained.connection).promise;
+    if (result?.passed !== true || result.code !== 0)
+      throw Object.assign(Error(result?.report?.error || 'The native source editor could not be closed.'), {result});
     this.documents.delete(opened);
   }
 

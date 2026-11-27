@@ -65,3 +65,11 @@ test('a second view waits for an in-flight dirty follow-up even after its first 
  let returned=false;const joining=workspace.ensurePrepared(f.folder).then(()=>returned=true);await new Promise(resolve=>setImmediate(resolve));
  try{assert.equal(returned,false,'Second view escaped with the earlier stale snapshot');}finally{second();await Promise.all([initial,joining]);}
 });
+
+for(const cancelled of [false,true])test('failed dirty follow-up invalidates its intermediate snapshot: cancelled='+cancelled,async()=>{
+ const f=setup(),workspace=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:()=>f.config}),project=workspace.project(f.folder);
+ const prepare=project.provider.prepare.bind(project.provider);let calls=0;
+ project.provider.prepare=async(...args)=>{calls++;if(calls===1){const value=await prepare(...args);workspace.scheduleRefresh(project);return value;}if(calls===2)throw Object.assign(Error('Follow-up stopped'),{cancelled});return prepare(...args);};
+ await assert.rejects(workspace.ensurePrepared(f.folder),/Follow-up stopped/);assert.equal(project.provider.snapshot,undefined);
+ await workspace.ensurePrepared(f.folder);assert.equal(calls,3);assert.ok(project.provider.snapshot);
+});
