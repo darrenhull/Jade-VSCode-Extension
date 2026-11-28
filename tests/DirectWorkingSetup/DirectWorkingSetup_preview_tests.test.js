@@ -1,14 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{pathToFileURL}=require('node:url');
 const {registerJoxProjectSetup}=require('../../extension/src/jox-project-setup');
-function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=false,remembered=false,accepted=false,missingProfile=false,complete=false}={}){
+function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=false,remembered=false,accepted=false,missingProfile=false,complete=false,withoutProject=false,nativeStoragePath}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'jade-root-checkout-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const uri=p=>({scheme:'file',fsPath:p,toString:()=>pathToFileURL(p).href}),folder={name:'Checkout',uri:uri(root)},calls=[],warnings=[],state=new Map();
  fs.mkdirSync(path.join(root,'.git'));const source=path.join(root,...(nested?['sources','schemas']:['schemas']),'Demo','types');fs.mkdirSync(source,{recursive:true});const file=path.join(source,'Fish.jox');fs.writeFileSync(file,'saved JOX');
- const project={sourceFormat:'jox',...(ambiguous?{}:{connection:'existing'}),...(sourceBacked?{workingMode:'source-backed'}:{})};fs.writeFileSync(path.join(root,'jade.json'),JSON.stringify(project));
+ const project=withoutProject?{}:{sourceFormat:'jox',...(ambiguous?{}:{connection:'existing'}),...(sourceBacked?{workingMode:'source-backed'}:{})};if(!withoutProject)fs.writeFileSync(path.join(root,'jade.json'),JSON.stringify(project));
  if(remembered){fs.unlinkSync(path.join(root,'jade.json'));state.set('jadeNative.acceptedGitFirstCheckouts',[folder.uri.toString()]);state.set('jadeNative.detectedCheckoutRuntimes',{[folder.uri.toString()]:{installPath:'C:/Old',workingSeedDirectory:'C:/OldSeed'}});}
  const configured={installPath:'C:/Jade',databasePath:network?'Z:/Working':'C:/Working/system',iniPath:'C:/Working/jade.ini',server:'singleUser'};
- const profileDefaults={...configured};let profileMissing=missingProfile;
+ const profileDefaults={...configured,...(nativeStoragePath?{storagePath:nativeStoragePath}:{})};let profileMissing=missingProfile;
  const connection={closed:false},flags={id:'jox',catalogue:true,initialization:true,checkoutInitialization:false,sync:true,reviewedWorkingSync:true};
  const client={client:connection,connect(){return this.client;},sourceCapabilities:async config=>{calls.push({command:'capability',config});return{sourceSemantic:{format:1,providers:[flags]}};},request(command,args){
   calls.push({command,args,profileAtRequest:state.get("jadeNative.connectionProfile:"+folder.uri.toString())});let value;
@@ -59,6 +59,29 @@ test('missing cloned direct profile uses reviewed native repair before Working p
 
 test('busy test or Scratch ownership prevents setup from releasing any client',async t=>{const f=fixture(t);let released=false;f.workspace.executing=true;f.workspace.beforeSetup=async()=>{released=true;};f.vscode.window.showWarningMessage=async(_message,_options,action)=>action;const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/operation.*running|Wait|busy/i);assert.equal(released,false);assert.equal(f.workspace.executing,true,'The existing execution owner must remain untouched');});
 test('confirmed ambiguous selection completes setup before committing its profile alias',async t=>{const f=fixture(t,{ambiguous:true,complete:true}),key='jadeNative.connectionProfile:'+f.folder.uri.toString();const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.completed,true,JSON.stringify(result));const init=f.calls.find(c=>c.command==='working.initialize');assert.equal(init.profileAtRequest,undefined);assert.equal(init.args.config.connection,'second');assert.equal(f.state.get(key),'second');assert.equal(f.setup.configFor(f.folder).connection,'second');assert.equal(f.setup.configFor(f.folder).workingMode,'existing');});
+
+test('fresh direct Working adopts and restores native-resolved storage without a project file or profile',async t=>{
+ const storagePath='C:/Private Jade/cache',f=fixture(t,{complete:true,withoutProject:true,nativeStoragePath:storagePath});
+ const result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.completed,true,JSON.stringify(result));
+ assert.equal(f.calls.find(row=>row.command==='working.initialize').args.config.storagePath,storagePath);
+ assert.equal(f.workspace.project(f.folder).provider.config.storagePath,storagePath);
+ assert.equal(f.restart().configFor(f.folder).storagePath,storagePath);
+ assert.equal(fs.existsSync(path.join(f.root,'jade.json')),false);
+ assert.equal(f.state.get('jadeNative.connectionProfile:'+f.folder.uri.toString()),undefined);
+ f.configured.storagePath='C:/Other/cache';
+ for(const setup of [f.setup,f.restart()])assert.throws(()=>setup.configFor(f.folder),/Set Up Project.*review/);
+});
+
+test('older accepted Working without saved storage still uses its explicit storage setting',t=>{
+ const f=fixture(t,{accepted:true}),storagePath='C:/Private Jade/configured cache';
+ f.configured.storagePath=storagePath;
+ for(const setup of [f.setup,f.restart()]){
+  const target=setup.configFor(f.folder);
+  assert.equal(target.databasePath,'C:/Working/system');
+  assert.equal(target.storagePath,storagePath);
+ }
+});
 
 test('failed native reconciliation does not commit a pending profile choice',async t=>{const f=fixture(t,{ambiguous:true,complete:true}),request=f.client.request;f.client.request=function(command,...args){return command==='working.initialize'?{promise:Promise.resolve({passed:false,code:6026,report:{error:'Native saved source rejected'}})}:request.call(this,command,...args);};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Native saved source rejected/);assert.equal(f.state.get('jadeNative.connectionProfile:'+f.folder.uri.toString()),undefined);assert.equal(f.workspace.executing,false);});
 test('failed owned preflight releases only setup execution ownership',async t=>{const f=fixture(t,{complete:true});f.workspace.beforeSetup=async()=>{throw Error('Owned closure refused');};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Owned closure refused/);assert.equal(f.workspace.executing,false);assert(!f.calls.some(row=>row.command==='working.initialize'));});
