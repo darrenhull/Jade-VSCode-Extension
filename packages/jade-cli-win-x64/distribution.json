@@ -1,62 +1,62 @@
 {
-  "packageVersion": "0.11.11",
   "executable": "jade-cli.exe",
-  "sourceFormats": [
-    "jox"
-  ],
   "formatVersion": 2,
-  "oidFormat": "jade-native",
-  "joxRuntime": {
-    "nativeTests": true,
-    "format": 1,
-    "nativeScratch": false,
-    "managedUpload": true,
-    "characterSet": "unicode",
-    "variants": {
-      "ansi": {
-        "sync": true,
-        "initialization": true,
-        "format": 1,
-        "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e",
-        "nativeTests": true,
-        "checkoutInitialization": false,
-        "nativeDebug": true,
-        "nativeScratch": true,
-        "managedUpload": true,
-        "characterSet": "ansi"
-      }
-    },
-    "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e",
-    "initialization": true
-  },
   "runtimeFiles": {
-    "native/jade-debug-helper-ansi.exe": "4f39f9fb6c73943e2d81acdc8eecfe6fa12ed616759f84fddb2e9a6f47112d7a",
+    "licenses/tinyxml2-LICENSE.txt": "9332252e9b9e46db8285d4a3f0bf25f139bf1dca6781b956d57f2302efca6432",
+    "native/jox/jadegitdev.dll": "808334b89a68ca12fb3ba7c6aeff8dc2674fb2334f91065ae09dfefa57e1677c",
+    "licenses/JadeGit-LGPL-3.0.txt": "14ff7cbffb68870ba2a040206653eb7760f3a46f4493249d078bdaed88602935",
     "native/jade-inspect-helper-unicode.exe": "0e24ca1f68298d58a5f78337cb818c1903f9c39aaf744824d0944cfac8799eb3",
+    "ThirdPartyNotices.txt": "fa99cedfef07af51bf38a9acb4b3136a665c14000f11e9ffb93621825d96118e",
+    "native/jade-inspect-helper-ansi.exe": "934fcc23f15f5c234dff710deee84e260890fdba6ac16c3be134fbe0cfa0aa01",
+    "native/debugger-abi-ansi.json": "30bd125063a66a22c4791158862c1cffcb2e640f4d8f0069e8087398b928a989",
     "native/jox/ansi/jade-jox-test-helper-ansi.exe": "9ec192f2906cf3d4fc45cc1034e60e359a99c4d0099ead265234ca048c046d85",
-    "native/jox/jadegitscm.dll": "d4e497c60017b6e95b3b158908693042d7eda6c9dc1f5984017adb2776639d7c",
+    "licenses/flatbuffers-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "licenses/tomlplusplus-LICENSE.txt": "529bc3900a9571e49db285b0df432397e70b881cc3bf48de6667ae74ff4b06d8",
+    "licenses/JadeGit-GPL-3.0.txt": "c7e0e64fee6c053b690ed08a0b3170375322ba71b1f4b6f6e89886f70daf4be2",
+    "licenses/libgit2-COPYING.txt": "e3712465634e97cfd850822a4eb5ac7d2f8a10f753189366d5a2060046f28288",
+    "native/jade-debug-helper-ansi.exe": "4f39f9fb6c73943e2d81acdc8eecfe6fa12ed616759f84fddb2e9a6f47112d7a",
+    "native/jox/ansi/jadegitscm.dll": "d8463cf8c75bea540372bb9948fab82e84b9f74357206be12c5bb69a8d7b2b4e",
+    "native/jox/ansi/runtime-provenance.json": "a4d2fa6a5c5c9377a38da6bf87296eeb7aea72c0a8c7b0ad265bb911bddfd47a",
+    "native/jade-debug-helper.exe": "29093883ad782519f553250fed923540e4b625ee4c685fb5d7bc7b1befb4dfd8",
     "licenses/CLI11-LICENSE.txt": "009a05a07c254fe5a3bd8da28c8b8db91995e9447a2edb54b302ee5b46d8fa18",
     "licenses/stduuid-LICENSE.txt": "afb11426e09da40a1ae4f8fa17ddcc6b6a52d14df04c29bc5bcd06eb8730624d",
-    "licenses/JadeGit-LGPL-3.0.txt": "14ff7cbffb68870ba2a040206653eb7760f3a46f4493249d078bdaed88602935",
+    "native/jox/jade-jox-test-helper-unicode.exe": "94136237065f465d44809e6adf254ff5606c53ceac4a4c637c6b78b6bd05922d",
     "native/jox/runtime-provenance.json": "fc1c99f0674d8d6c2e7c4a05662b238e38328b14799b173aab208dd595c0e087",
-    "native/jox/ansi/jadegitscm.dll": "2745b8994a1e59e5c34790db29b28aed459e74c2b846a3be685c74e458069c7d",
-    "ThirdPartyNotices.txt": "fa99cedfef07af51bf38a9acb4b3136a665c14000f11e9ffb93621825d96118e",
-    "native/jox/ansi/jadegitdev.dll": "ccc5db0103dcdf792b6768abc7c8e64d5894d506ec95c7115cf74eeed030e990",
-    "licenses/libgit2-COPYING.txt": "e3712465634e97cfd850822a4eb5ac7d2f8a10f753189366d5a2060046f28288",
-    "native/jade-debug-helper.exe": "29093883ad782519f553250fed923540e4b625ee4c685fb5d7bc7b1befb4dfd8",
+    "README.md": "8364a58eb8ca58ac343465e891f6683b26b6f4905a50391a282d1d36b8368fb1",
     "native/jade-inspect-helper.exe": "2c46987cb8a7b1a6afff70cb806ef1cc8fab4fe1c3d05463cfe6a2cfe0d0008b",
-    "licenses/flatbuffers-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    "native/debugger-abi-ansi.json": "30bd125063a66a22c4791158862c1cffcb2e640f4d8f0069e8087398b928a989",
-    "native/jox/jadegitdev.dll": "808334b89a68ca12fb3ba7c6aeff8dc2674fb2334f91065ae09dfefa57e1677c",
-    "licenses/tinyxml2-LICENSE.txt": "9332252e9b9e46db8285d4a3f0bf25f139bf1dca6781b956d57f2302efca6432",
-    "native/jade-inspect-helper-ansi.exe": "934fcc23f15f5c234dff710deee84e260890fdba6ac16c3be134fbe0cfa0aa01",
-    "native/jox/ansi/runtime-provenance.json": "4a2a44299e605c6a53f711443051d6910a85cab788ae4f5d8ee682eab8abc76a",
-    "licenses/JadeGit-GPL-3.0.txt": "c7e0e64fee6c053b690ed08a0b3170375322ba71b1f4b6f6e89886f70daf4be2",
-    "README.md": "ed212b99876d46efa13ad37fb7f1ebc62f30d186c991724dd88f0a3adc90a9d8",
-    "licenses/tomlplusplus-LICENSE.txt": "529bc3900a9571e49db285b0df432397e70b881cc3bf48de6667ae74ff4b06d8",
-    "native/jox/jade-jox-test-helper-unicode.exe": "94136237065f465d44809e6adf254ff5606c53ceac4a4c637c6b78b6bd05922d"
+    "native/jox/ansi/jadegitdev.dll": "ccc5db0103dcdf792b6768abc7c8e64d5894d506ec95c7115cf74eeed030e990",
+    "native/jox/jadegitscm.dll": "d4e497c60017b6e95b3b158908693042d7eda6c9dc1f5984017adb2776639d7c"
   },
-  "runtime": "native-cpp",
+  "joxRuntime": {
+    "characterSet": "unicode",
+    "format": 1,
+    "managedUpload": true,
+    "nativeScratch": false,
+    "initialization": true,
+    "nativeTests": true,
+    "variants": {
+      "ansi": {
+        "nativeTests": true,
+        "nativeScratch": true,
+        "nativeDebug": true,
+        "characterSet": "ansi",
+        "managedUpload": true,
+        "format": 1,
+        "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e",
+        "initialization": true,
+        "sync": true,
+        "checkoutInitialization": false
+      }
+    },
+    "engineCommit": "f61e1802d430bdea41bada9b10d333e69f85eb9e"
+  },
   "platform": "win32",
-  "executableSha256": "b184f3337922fd8e1b25a5169ae8ab45f73d7e7fb054c936489ffe176f0befd3",
-  "arch": "x64"
+  "packageVersion": "0.11.12",
+  "oidFormat": "jade-native",
+  "executableSha256": "6749ee1e90143885d60011804b3568d6adbb460367bcc2886790f3c2ba47ff68",
+  "arch": "x64",
+  "runtime": "native-cpp",
+  "sourceFormats": [
+    "jox"
+  ]
 }

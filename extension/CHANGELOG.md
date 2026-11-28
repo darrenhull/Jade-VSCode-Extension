@@ -1,3 +1,7 @@
+# 0.23.16 - Jade CLI 0.11.12
+
+- Bundles [Jade CLI 0.11.12](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.12) for local Jade operations.
+
 # 0.23.15 - Reliable source view refresh
 
 - Repeat setup cannot restore an outdated catalogue from a preparation that started earlier.
