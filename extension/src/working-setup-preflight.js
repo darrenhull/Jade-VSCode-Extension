@@ -6,8 +6,10 @@ async function releaseWorkingConsumers({inspector,client,projects=[],retainedWor
  // A CLI disconnect closes Working for the whole broker, across all its proxies.
  // Keep the existing session only for a lone reviewed owner with no pending runtime operations.
  const {project,owner,connection}=retainedWorking||{};
+ const canShare=other=>!other||other===connection||other.closed||other.lastRuntimeRequest===0;
  const canRetain=()=>connection&&!connection.closed&&active.includes(project)&&
    project.ownedClient===owner&&owner?.client===connection&&project.provider?.connection===connection&&
+   canShare(client?.client)&&[...(client?.ownedClients||[])].every(canShare)&&
    !owner.pending?.size&&!owner.activeSources?.size&&!client?.pending?.size&&!client?.activeSources?.size&&
    active.every(other=>other===project||!other.ownedClient?.client&&!other.provider?.snapshot);
  if(canRetain()){
