@@ -1,3 +1,7 @@
+# 0.23.18 - Keep Working connected after Project Setup
+
+- Keep the storage location accepted in Set Up Project so Object Explorer and other Jade commands use the same Working target after setup and after reloading VS Code.
+
 # 0.23.17 - Jade CLI 0.11.13
 
 - Bundles [Jade CLI 0.11.13](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.13) for local Jade operations.

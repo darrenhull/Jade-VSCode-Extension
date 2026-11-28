@@ -10,6 +10,8 @@ const {NativeSourceWorkspace}=require('./NativeSourceWorkspace');
 const {PrivateRuntimeSettings}=require('./PrivateRuntimeSettings');
 const CHECKOUT_STATE='jadeNative.acceptedGitFirstCheckouts';
 const CHECKOUT_FILES='jadeNative.acceptedGitFirstProjectFiles';
+const DIRECT_WORKING_DEFAULTS=['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots','storagePath'];
+const CHECKOUT_DEFAULTS=[...DIRECT_WORKING_DEFAULTS,'workingSeedDirectory'];
 const { checkoutConfiguration }=require('./jox-checkout-config');
 const {checkoutRoute}=require('./checkout-route');
 const {WorkspaceConnectionProfile}=require('./WorkspaceConnectionProfile');
@@ -44,7 +46,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const privateRuntime=folder=>new PrivateRuntimeSettings(state,folder.uri.toString());
   const transientRuntime={values:()=>({}),stage:(_values,{validate=()=>{}}={})=>({commit:validate,rollback:async()=>{}})};
   const savedFiles=state?.get(CHECKOUT_FILES,{});
-  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&(entry.file===null||typeof entry.file==='string')&&(entry.fingerprint===null||/^[a-f0-9]{64}$/.test(entry.fingerprint))&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>['installPath','workingSeedDirectory','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots'].includes(key)&&(typeof value==='string'||key==='workspaceRoots'&&Array.isArray(value)&&value.every(root=>typeof root==='string')))));
+  const acceptedFiles=new Map(Object.entries(savedFiles&&typeof savedFiles==='object'&&!Array.isArray(savedFiles)?savedFiles:{}).filter(([,entry])=>entry&&(entry.file===null||typeof entry.file==='string')&&(entry.fingerprint===null||/^[a-f0-9]{64}$/.test(entry.fingerprint))&&entry.defaults&&Object.entries(entry.defaults).every(([key,value])=>CHECKOUT_DEFAULTS.includes(key)&&(typeof value==='string'||key==='workspaceRoots'&&Array.isArray(value)&&value.every(root=>typeof root==='string')))));
   const projectBytes=(folder,file=projectFile(folder))=>require('node:crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
@@ -60,10 +62,15 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const acceptedDirect=acceptedFiles.get(folder.uri.toString());
     const effectiveMode=project.workingMode==='source-backed'?'source-backed':configured.workingMode||project.workingMode;
     if(acceptedDirect?.defaults.workingMode==='existing'&&effectiveMode&&effectiveMode!=='existing')return {...configured,workingMode:effectiveMode};
-    const targetChanged=acceptedDirect&&['installPath','databasePath','iniPath','server','characterSet','schemaPath','workspaceRoots'].some(key=>configured[key]!==undefined&&configured[key]!==''&&!isDeepStrictEqual(configured[key],acceptedDirect.defaults[key]));
+    const targetKeys=['installPath','databasePath','iniPath','server','characterSet','schemaPath','workspaceRoots'];
+    if(acceptedDirect?.defaults.storagePath!==undefined)targetKeys.push('storagePath');
+    const targetChanged=acceptedDirect&&targetKeys.some(key=>configured[key]!==undefined&&configured[key]!==''&&!isDeepStrictEqual(configured[key],acceptedDirect.defaults[key]));
     if(!reviewedSetup&&acceptedDirect?.defaults.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing')&&(targetChanged||(configured.connection||project.connection)!==acceptedDirect.defaults.connection||!sameFile(acceptedDirect.file,currentFile)||acceptedDirect.fingerprint!==(currentFile?projectBytes(folder,currentFile):null)))throw Error('Project configuration changed after Working acceptance. Run Set Up Project to review its Working target again.');
-    if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null))
-      return checkoutRoute({...acceptedDirect.defaults,...configured},project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
+    if((!configured.workingMode||configured.workingMode==='existing')&&acceptedDirect?.defaults.workingMode==='existing'&&(!(configured.connection||project.connection)||(configured.connection||project.connection)===acceptedDirect.defaults.connection)&&sameFile(acceptedDirect.file,currentFile)&&acceptedDirect.fingerprint===(currentFile?projectBytes(folder,currentFile):null)){
+      const replay={...acceptedDirect.defaults,...configured};
+      if(configured.storagePath===undefined||configured.storagePath==='')replay.storagePath=acceptedDirect.defaults.storagePath;
+      return checkoutRoute(replay,project,acceptedDirect.defaults.workspaceRoots?.[0]||folder.uri.fsPath);
+    }
     if(project.workingMode==='existing'&&(!configured.workingMode||configured.workingMode==='existing'))return checkoutRoute(configured,project,folder.uri.fsPath);
     if(projectFile(folder)){const accepted=acceptedFiles.get(folder.uri.toString());return accepted&&accepted.defaults.workingMode!=='existing'&&sameFile(accepted.file,projectFile(folder))&&accepted.fingerprint===projectBytes(folder)?{...accepted.defaults,...configured}:configured;}
     return selected&&(!configured.workingMode||configured.workingMode==='git-first')?checkoutConfiguration({...privateRuntime(folder).values(),...configured},path.join(folder.uri.fsPath,'sources')):configured;
@@ -173,7 +180,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     const selectedProfile=pendingProfiles.get(folder.uri.toString());
     reviewedRoots.set(target,{sourceRoot,configured,runtime,profileStage:selectedProfile?profilesFor(folder).stage(selectedProfile.name,selectedProfile.previous):undefined,baseline:settingsBaseline,
       discoveryConfig:{...discoveryOverrides,...(configured.connection?{connection:configured.connection}:{})},discovery:JSON.stringify({file:discovery.prepared.configFile||null,config:discovery.prepared.config}),
-      providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>['installPath','databasePath','iniPath','connection','workingMode','sourceFormat','server','characterSet','schemaPath','workspaceRoots'].includes(key))),explicitProject:!!reviewedFile,
+      providerConfig:configured,runtimeDefaults:Object.fromEntries(Object.entries(configured).filter(([key])=>DIRECT_WORKING_DEFAULTS.includes(key))),explicitProject:!!reviewedFile,
       fingerprint:reviewedFile?reviewedFingerprint:null,projectFile:reviewedFile||null});
     return target;
   }
