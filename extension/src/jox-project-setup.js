@@ -325,6 +325,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         previous.ownedClient?.client===accepted.connection&&previous.provider.connection===accepted.connection&&
         !accepted.connection.closed?{project:previous,owner:previous.ownedClient,connection:accepted.connection}:undefined;
       await workspace.beforeSetup?.(retainedWorking);
+      if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native cleanup. Run Set Up Project again.');
       if(previous&&!workspace.canReconfigure(previous,{allowExecuting:true,allowStoredProjections:true})&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       let stageClient,owner;

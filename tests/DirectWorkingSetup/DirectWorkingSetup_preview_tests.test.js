@@ -118,6 +118,19 @@ test('a replacement native Working identity at the same configured path does not
 });
 
 test('failed native reconciliation does not commit a pending profile choice',async t=>{const f=fixture(t,{ambiguous:true,complete:true}),request=f.client.request;f.client.request=function(command,...args){return command==='working.initialize'?{promise:Promise.resolve({passed:false,code:6026,report:{error:'Native saved source rejected'}})}:request.call(this,command,...args);};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Native saved source rejected/);assert.equal(f.state.get('jadeNative.connectionProfile:'+f.folder.uri.toString()),undefined);assert.equal(f.workspace.executing,false);});
+test('settings changed while native cleanup waits stop setup before staging',async t=>{
+ const f=fixture(t,{complete:true});
+ f.workspace.beforeSetup=async()=>{
+  await Promise.resolve();
+  f.configured.databasePath='C:/OtherWorking/system';
+  f.client.fork=()=>assert.fail('Setup must not stage the previous settings');
+ };
+ const result=await f.setup.onboarding.setup(f.folder.uri);
+ assert.equal(result.passed,false);
+ assert.match(result.error,/settings changed during native cleanup/i);
+ assert.equal(f.workspace.executing,false);
+ assert(!f.calls.some(row=>row.command==='working.initialize'));
+});
 test('failed owned preflight releases only setup execution ownership',async t=>{const f=fixture(t,{complete:true});f.workspace.beforeSetup=async()=>{throw Error('Owned closure refused');};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Owned closure refused/);assert.equal(f.workspace.executing,false);assert(!f.calls.some(row=>row.command==='working.initialize'));});
  test('a newly explicit profile cannot inherit accepted database paths for another alias',t=>{const f=fixture(t,{accepted:true});f.configured.connection='explicit-new';delete f.configured.installPath;delete f.configured.databasePath;delete f.configured.iniPath;assert.throws(()=>f.setup.configFor(f.folder),/Set Up Project.*review/);});
 
