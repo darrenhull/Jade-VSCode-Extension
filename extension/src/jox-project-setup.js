@@ -50,7 +50,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
   const projectBytes=(folder,file=projectFile(folder))=>require('node:crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const restored=state?.get(CHECKOUT_STATE,[]);
   const checkoutRoots=new Map((Array.isArray(restored)?restored:[]).filter(uri=>typeof uri==='string').map(uri=>[uri,true]));
-  const reviewedRoots=new WeakMap(),setupBindings=new Map();
+  const reviewedRoots=new WeakMap(),setupBindings=new Map(),acceptedWorkingSessions=new WeakMap();
   const flushRefreshes=()=>{for(const [changed,pending] of workspace.pendingChanges)workspace.scheduleRefresh(changed,!pending.needsPrepare);};
   const configurationFor=(folder,{reviewedSetup=false}={})=>{
     const binding=setupBindings.get(folder.uri.toString());
@@ -293,7 +293,7 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
     try {
       await workspace.changing.get(binding?.previous||project)?.promise;
       if(binding){await binding.workspace.changing.get(project)?.promise;await requireReviewedCheckout(folder,binding.record);projectFor(folder);}
-      if(workspace.beforeSetup)await workspace.beforeSetup();else await workspace.beforeOperation?.();projectFor(folder);
+      if(workspace.beforeSetup)await workspace.beforeSetup(binding?.retainedWorking);else await workspace.beforeOperation?.();projectFor(folder);
       return await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title,cancellable:true},
         async(progress,token)=>{
           if(token?.isCancellationRequested)throw Object.assign(Error('Working setup cancelled.'),{cancelled:true});
@@ -314,20 +314,25 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
       workspace.executing=true;
       try{
       await workspace.changing?.get(workspace.projects.get(key))?.promise;
-      await workspace.beforeSetup?.();
       const record=reviewedRoots.get(reviewed);if(!record)return;
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed after Working review. Run Set Up Project again.');
       await requireReviewedDiscovery(folder,record);
       if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native preflight. Run Set Up Project again.');
       const previous=workspace.projects.get(key);
       const same=previous&&isDeepStrictEqual(previous.provider.config,workspace.projectConfiguration(folder,record.providerConfig));
+      const accepted=previous&&acceptedWorkingSessions.get(previous);
+      const retainedWorking=same&&reviewed.workingMode==='existing'&&accepted&&accepted.identity===reviewed.working.identity&&
+        previous.ownedClient?.client===accepted.connection&&previous.provider.connection===accepted.connection&&
+        !accepted.connection.closed?{project:previous,owner:previous.ownedClient,connection:accepted.connection}:undefined;
+      await workspace.beforeSetup?.(retainedWorking);
+      if(JSON.stringify(configDto(configFor(folder)))!==record.baseline)throw Error('Project settings changed during native cleanup. Run Set Up Project again.');
       if(previous&&!workspace.canReconfigure(previous,{allowExecuting:true,allowStoredProjections:true})&&!same)throw Error('Jade project settings changed. Close its source editors and reload the window before continuing.');
       if(!workspace.folders().some(value=>value.uri.toString()===key))throw Error('The selected Jade project is no longer open.');
       let stageClient,owner;
       try{
         stageClient=client.fork();owner=new NativeSourceWorkspace({vscode,client:stageClient,configFor:()=>record.providerConfig,watchSources:false});
         owner.beforeOperation=()=>workspace.beforeOperation?.();
-        const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,originalConfig:configurationFor(folder,{reviewedSetup:true}),record});workspace.executing=true;
+        const project=owner.project(folder);setupBindings.set(key,{workspace:owner,client:stageClient,project,previous,retainedWorking,originalConfig:configurationFor(folder,{reviewedSetup:true}),record});workspace.executing=true;
       }catch(error){
         const failures=[];for(const cleanup of [()=>owner?.dispose(),()=>stageClient?.dispose()]){try{await cleanup();}catch(failure){failures.push(failure.message);}}
         if(failures.length)error.message+=' Temporary setup cleanup failed: '+failures.join('; ');
@@ -376,7 +381,10 @@ function registerJoxProjectSetup(vscode,context,workspace,{client,configFor,dete
         if(failures.length)error.message+=' Private selection rollback failed: '+failures.join('; ');
         throw error;
       }
-      if(binding.project.provider.semanticPreparationRequired===true)workspace.invalidateSources(workspace.project(folder));
+      const project=workspace.project(folder);
+      if(binding.project.provider.semanticPreparationRequired===true)workspace.invalidateSources(project);
+      if(reviewed.workingMode==='existing'&&project.ownedClient?.client&&!project.ownedClient.client.closed)
+        acceptedWorkingSessions.set(project,{identity:reviewed.working.identity,connection:project.ownedClient.client});
       binding.workspace.dispose();setupBindings.delete(key);pendingProfiles.delete(key);workspace.executing=false;flushRefreshes();
       return {prepared:!binding.retained,semanticPreparationRequired:binding.project.provider.semanticPreparationRequired===true};
     },

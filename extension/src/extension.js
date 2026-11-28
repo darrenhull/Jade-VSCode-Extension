@@ -187,7 +187,7 @@ function activate(context) {
     workingLocation:config=>nativeTests.workingLocation(config)
   });
   source.workspace.beforeOperation=()=>objectExplorer.releaseForOperation();
-  source.workspace.beforeSetup=()=>require('./working-setup-preflight').releaseWorkingConsumers({inspector:objectExplorer,client:nativeTests,projects:source.workspace.projects.values()});
+  source.workspace.beforeSetup=retainedWorking=>require('./working-setup-preflight').releaseWorkingConsumers({inspector:objectExplorer,client:nativeTests,projects:source.workspace.projects.values(),retainedWorking});
   const setup=require('./jox-project-setup').registerJoxProjectSetup(vscode,context,source.workspace,{client:nativeTests,configFor,detect:detectSettings});
   configFor=setup.configFor;
   void setup.onboarding.resume().catch(error=>vscode.window.showErrorMessage(error.message));

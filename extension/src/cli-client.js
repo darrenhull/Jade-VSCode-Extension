@@ -28,7 +28,7 @@ class CliWorkingSession{
   if(this.client)return this.client;
   const invocation=cliInvocation(this.entry,['service','--stdio'],{windowsHide:true,stdio:['pipe','pipe','pipe']});
   const child=this.spawn(invocation.executable,invocation.args,invocation.options);
-  const client={child,decoder:new StringDecoder('utf8'),buffer:'',stderr:'',closed:false};
+  const client={child,decoder:new StringDecoder('utf8'),buffer:'',stderr:'',closed:false,lastRuntimeRequest:0};
   client.closePromise=new Promise(resolve=>{client.resolveClose=resolve;});
   this.ownedClients.add(client);this.client=client;
   const fail=error=>{
@@ -66,6 +66,8 @@ class CliWorkingSession{
   if(command.startsWith('source.')&&!command.startsWith('source.semantic.')&&body.config)body={...body,config:sourceConfiguration(body.config)};
   if(expectedClient&&this.client!==expectedClient)throw Error("The original native source connection is closed.");
   const client=expectedClient||this.connect(),id=++this.nextId;
+  // Setup discovery uses these commands without opening or retaining a database.
+  if(command!=='prepare'&&command!=='doctor'&&command!=='working.location')client.lastRuntimeRequest=id;
   const promise=new Promise((resolve,reject)=>{
    this.pending.set(id,{resolve,reject,output,events,client,command});
    try{client.child.stdin.write(JSON.stringify({id,command,...body})+'\n');}catch(error){this.pending.delete(id);reject(error);}
@@ -93,8 +95,10 @@ class CliWorkingSession{
  }
  async release(){
   if(!this.client)return;
-  const result=await this.request('disconnect').promise;
+  const idle=!this.pending.size&&!this.activeSources.size;
+  const request=this.request('disconnect'),result=await request.promise;
   if(result?.passed===false)throw Error(result.report?.error||'Jade CLI could not release its native session.');
+  if(idle&&result?.passed===true&&request.client?.lastRuntimeRequest===request.id)request.client.lastRuntimeRequest=0;
  }
  async resolveNative(command,config,field,body={},output){
   if((command.startsWith('working.')||command==='inspect.target'&&body.target==='working')&&config?.workingJadeGitPolicy&&config.workingJadeGitPolicy!=='inherit')
