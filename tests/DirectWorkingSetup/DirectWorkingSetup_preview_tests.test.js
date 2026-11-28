@@ -69,6 +69,10 @@ test('fresh direct Working adopts and restores native-resolved storage without a
  assert.equal(f.restart().configFor(f.folder).storagePath,storagePath);
  assert.equal(fs.existsSync(path.join(f.root,'jade.json')),false);
  assert.equal(f.state.get('jadeNative.connectionProfile:'+f.folder.uri.toString()),undefined);
+ for(const clearedStorage of ['',undefined]){
+  f.configured.storagePath=clearedStorage;
+  for(const setup of [f.setup,f.restart()])assert.equal(setup.configFor(f.folder).storagePath,storagePath,'Cleared storage setting: '+String(clearedStorage));
+ }
  f.configured.storagePath='C:/Other/cache';
  for(const setup of [f.setup,f.restart()])assert.throws(()=>setup.configFor(f.folder),/Set Up Project.*review/);
 });
