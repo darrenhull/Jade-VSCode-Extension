@@ -1,3 +1,8 @@
+# 0.23.19 - Jade CLI 0.11.14
+
+- Bundles [Jade CLI 0.11.14](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.14) for local Jade operations.
+- Reuses the live Working connection during repeat Setup in the same window when the reviewed configuration and Working identity still match.
+
 # 0.23.18 - Keep Working connected after Project Setup
 
 - Keep the storage location accepted in Set Up Project so Object Explorer and other Jade commands use the same Working target after setup and after reloading VS Code.

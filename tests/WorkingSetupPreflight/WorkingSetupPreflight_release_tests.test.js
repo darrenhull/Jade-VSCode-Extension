@@ -4,3 +4,14 @@ const {releaseWorkingConsumers}=require('../../extension/src/working-setup-prefl
 test('setup awaits inspector cursors and retained native clients before touching policy',async()=>{const events=[];const release=name=>async()=>{await new Promise(r=>setImmediate(r));events.push(name);};await releaseWorkingConsumers({inspector:{releaseForOperation:release('inspection-closed')},client:{release:release('runtime-disconnected')},projects:[{provider:{snapshot:{},closeProject:release('source-project-closed')},ownedClient:{release:release('retained-client-disconnected')}}]});events.push('setup');assert.deepEqual(events,['inspection-closed','source-project-closed','retained-client-disconnected','runtime-disconnected','setup']);});
 test('a failed owned closure stops setup and never kills external processes',async()=>{const events=[];await assert.rejects(releaseWorkingConsumers({inspector:{releaseForOperation:async()=>{throw Error('Owned inspection closure failed');}},client:{release:async()=>events.push('disconnected')},projects:[]}),/closure failed/);assert.deepEqual(events,[]);});
 test('a cold source provider remains reconfigurable after setup preflight',async()=>{const {setup}=require('../NativeSourceWorkspace/fixtures/vscode.cjs'),{NativeSourceWorkspace}=require('../../extension/src/NativeSourceWorkspace');const f=setup(),workspace=new NativeSourceWorkspace({vscode:f.vscode,client:f.client,configFor:()=>f.config}),project=workspace.project(f.folder);assert.equal(workspace.canReconfigure(project,{allowStoredProjections:true}),true);await releaseWorkingConsumers({projects:[project],client:{release:async()=>{}}});assert.equal(project.provider.sourceOperation,undefined);assert.equal(workspace.canReconfigure(project,{allowStoredProjections:true}),true);});
+
+for(const conflict of ['none','another project','shared pending request'])test('reviewed Working preflight with '+conflict,async()=>{
+ const calls=[],record=name=>async()=>{calls.push(name);};
+ const retainedWorking={provider:{snapshot:{},closeProject:record('close source')},ownedClient:{client:{},release:record('release accepted')}};
+ const inspector={releaseForOperation:record('close inspector')},client={release:record('release shared')},projects=[retainedWorking];
+ if(conflict==='another project')projects.push({ownedClient:{client:{},release:record('release other')}});
+ if(conflict==='shared pending request')client.pending=new Map([[1,{}]]);
+ await releaseWorkingConsumers({inspector,client,projects,retainedWorking});
+ assert.deepEqual(calls,conflict==='none'?['close inspector','close source']:
+   ['close inspector','close source','release accepted',...(conflict==='another project'?['release other']:[]),'release shared']);
+});

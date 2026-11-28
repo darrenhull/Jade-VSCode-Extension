@@ -2,7 +2,7 @@
   "name": "jade-native-runner-cpp-preview",
   "displayName": "Jade Tools",
   "description": "Browse and edit JOX source and run local native Jade tests in Visual Studio Code.",
-  "version": "0.23.18",
+  "version": "0.23.19",
   "publisher": "jade-local-tools",
   "engines": {
     "vscode": "^1.85.0"

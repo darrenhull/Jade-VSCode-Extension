@@ -8,7 +8,7 @@ function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=fals
  const project=withoutProject?{}:{sourceFormat:'jox',...(ambiguous?{}:{connection:'existing'}),...(sourceBacked?{workingMode:'source-backed'}:{})};if(!withoutProject)fs.writeFileSync(path.join(root,'jade.json'),JSON.stringify(project));
  if(remembered){fs.unlinkSync(path.join(root,'jade.json'));state.set('jadeNative.acceptedGitFirstCheckouts',[folder.uri.toString()]);state.set('jadeNative.detectedCheckoutRuntimes',{[folder.uri.toString()]:{installPath:'C:/Old',workingSeedDirectory:'C:/OldSeed'}});}
  const configured={installPath:'C:/Jade',databasePath:network?'Z:/Working':'C:/Working/system',iniPath:'C:/Working/jade.ini',server:'singleUser'};
- const profileDefaults={...configured,...(nativeStoragePath?{storagePath:nativeStoragePath}:{})};let profileMissing=missingProfile;
+ const profileDefaults={...configured,...(nativeStoragePath?{storagePath:nativeStoragePath}:{})};let profileMissing=missingProfile,workingIdentity='reviewed-direct';
  const connection={closed:false},flags={id:'jox',catalogue:true,initialization:true,checkoutInitialization:false,sync:true,reviewedWorkingSync:true};
  const client={client:connection,connect(){return this.client;},sourceCapabilities:async config=>{calls.push({command:'capability',config});return{sourceSemantic:{format:1,providers:[flags]}};},request(command,args){
   calls.push({command,args,profileAtRequest:state.get("jadeNative.connectionProfile:"+folder.uri.toString())});let value;
@@ -18,11 +18,11 @@ function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=fals
    value={passed:true,code:0,prepared:{config:{...profileDefaults,...configured,...project,workingMode:sourceBacked?'source-backed':'source-backed',...(ambiguous?{connection:'second'}:{})},configFile:fs.existsSync(path.join(root,'jade.json'))?path.join(root,'jade.json'):null}};
   }else if(command==='working.initialize'){
  const sourceSnapshot={provider:'jox',projectId:'direct-source',generation:'generation',snapshotHash:'a'.repeat(64)};
- value={passed:true,code:0,body:{sourceSnapshot,projectRoot:folder.uri.toString(),sourceRoots:args.config.workspaceRoots.map(p=>uri(path.resolve(root,p)).toString()),capabilities:flags,working:{identity:'reviewed-direct',root:path.join(root,'.jade','operations'),workingMode:'existing',databasePath:args.config.databasePath},sourceAuthority:'checkout',report:{workingPrepared:true,publicationEstablished:true,extracted:false}}};
+ value={passed:true,code:0,body:{sourceSnapshot,projectRoot:folder.uri.toString(),sourceRoots:args.config.workspaceRoots.map(p=>uri(path.resolve(root,p)).toString()),capabilities:flags,working:{identity:workingIdentity,root:path.join(root,'.jade','operations'),workingMode:'existing',databasePath:args.config.databasePath},sourceAuthority:'checkout',report:{workingPrepared:true,publicationEstablished:true,extracted:false}}};
  }else if(command==='source.semantic.closeProject')value={passed:true,code:0,body:{}};
  else if(command==='working.location'){
    if(network)return{promise:Promise.resolve({passed:false,code:2,report:{error:'Existing Working requires local fixed storage'}})};
-   value={passed:true,code:0,body:{checkoutConfigured:true,workingMode:'existing',workingState:'new',working:{identity:'reviewed-direct',root:path.join(root,'.jade','operations'),databasePath:args.config.databasePath,installPath:args.config.installPath},sourceRoots:args.config.workspaceRoots.map(value=>uri(path.resolve(root,value)).toString())}};
+   value={passed:true,code:0,body:{checkoutConfigured:true,workingMode:'existing',workingState:'new',working:{identity:workingIdentity,root:path.join(root,'.jade','operations'),databasePath:args.config.databasePath,installPath:args.config.installPath},sourceRoots:args.config.workspaceRoots.map(value=>uri(path.resolve(root,value)).toString())}};
    }else if(command==='cli'){
  if(missingProfile&&args.argv.includes('--install')){profileMissing=false;value={passed:true,code:0,created:false,connection:'existing',git:{root,initialized:false,reused:true,ignoreEnsured:true}};}
  else value={passed:false,code:2,report:{error:missingProfile?"Unknown Jade connection profile 'existing'. Run jade-cli init --profile existing.":'Explicit Source-backed initialization selected'}};
@@ -39,7 +39,7 @@ function fixture(t,{nested=false,sourceBacked=false,network=false,ambiguous=fals
  const context={subscriptions:[],workspaceState:{get:(k,d)=>state.get(k)??d,update:async(k,v)=>state.set(k,v)},globalState:{get(){},update:async()=>{}}},workspace=complete?new (require('../../extension/src/NativeSourceWorkspace').NativeSourceWorkspace)({vscode,client,configFor:()=>configured}):{projects:new Map(),pendingChanges:new Map()};
  if(complete){workspace.refresh=async()=>{};workspace.observeSources=()=>{};workspace.project(folder);}
  const setup=registerJoxProjectSetup(vscode,context,workspace,{client,configFor:()=>configured,detect:async()=>assert.fail('Existing detected Working settings need no seed or detection')});
- return{root,folder,file,calls,warnings,setup,state,configured,vscode,workspace,client,restart:()=>registerJoxProjectSetup(vscode,context,{projects:new Map(),pendingChanges:new Map()},{client,configFor:()=>configured,detect:async()=>assert.fail('No new runtime selection')})};
+ return{root,folder,file,calls,warnings,setup,state,configured,vscode,workspace,client,setWorkingIdentity:value=>{workingIdentity=value;},restart:()=>registerJoxProjectSetup(vscode,context,{projects:new Map(),pendingChanges:new Map()},{client,configFor:()=>configured,detect:async()=>assert.fail('No new runtime selection')})};
 }
 for(const nested of [false,true])test('saved '+(nested?'nested sources':'root schemas')+' checkout previews direct Working without extraction or a seed',async t=>{
  const f=fixture(t,{nested});const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.cancelled,true,JSON.stringify(result));const target=f.calls.find(c=>c.command==='working.location');assert.equal(target.args.config.workingMode,'existing');assert.equal(target.args.config.databasePath,f.configured.databasePath);assert.deepEqual(target.args.config.workspaceRoots,[nested?path.join(f.root,'sources'):f.root]);assert.equal(target.args.config.schemaPath,nested?'sources/schemas':'schemas');assert.equal(target.args.config.workingSeedDirectory,undefined);assert.match(f.warnings[0].detail,/Working-only changes.*overwritten/);assert.match(f.warnings[0].detail,/No backup, extraction or second database/);assert(!f.calls.some(c=>c.command==='cli'||/extract|backup/.test(c.command)));const scan=f.calls.find(c=>c.command==='find');assert.equal(scan.pattern.pattern,'**/*.[jJ][oO][xX]');assert.match(scan.exclude,/.jade/);assert.equal(scan.limit,1);assert.equal(fs.readFileSync(f.file,'utf8'),'saved JOX');
@@ -85,6 +85,34 @@ test('older accepted Working without saved storage still uses its explicit stora
   assert.equal(target.databasePath,'C:/Working/system');
   assert.equal(target.storagePath,storagePath);
  }
+});
+
+test('repeat direct Setup keeps only the accepted working connection and still requests consent',async t=>{
+ const f=fixture(t,{complete:true,withoutProject:true});
+ const preflights=[];
+ f.workspace.beforeSetup=async retained=>preflights.push(retained);
+ assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
+ assert.ok(preflights.length>0&&preflights.every(value=>value===undefined));
+ const accepted=f.workspace.project(f.folder);
+ preflights.length=0;
+ assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
+ assert.equal(f.warnings.length,2,'Both native writes require consent');
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,2);
+ assert.ok(preflights.length>0&&preflights.every(value=>value===accepted),'No global release for an identical, live accepted target');
+ accepted.provider.connection.closed=true;
+ preflights.length=0;
+ assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
+ assert.ok(preflights.length>0&&preflights.every(value=>value===undefined),'A dead owner takes the normal release path');
+});
+
+test('a replacement native Working identity at the same configured path does not keep the accepted session',async t=>{
+ const f=fixture(t,{complete:true,withoutProject:true}),preflights=[];
+ f.workspace.beforeSetup=async retained=>preflights.push(retained);
+ assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
+ f.setWorkingIdentity('replacement-at-same-path');preflights.length=0;
+ assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
+ assert.equal(f.calls.filter(row=>row.command==='working.initialize').at(-1).args.expectedWorkingIdentity,'replacement-at-same-path');
+ assert.ok(preflights.length>0&&preflights.every(value=>value===undefined));
 });
 
 test('failed native reconciliation does not commit a pending profile choice',async t=>{const f=fixture(t,{ambiguous:true,complete:true}),request=f.client.request;f.client.request=function(command,...args){return command==='working.initialize'?{promise:Promise.resolve({passed:false,code:6026,report:{error:'Native saved source rejected'}})}:request.call(this,command,...args);};const result=await f.setup.onboarding.setup(f.folder.uri);assert.equal(result.passed,false);assert.match(result.error,/Native saved source rejected/);assert.equal(f.state.get('jadeNative.connectionProfile:'+f.folder.uri.toString()),undefined);assert.equal(f.workspace.executing,false);});
