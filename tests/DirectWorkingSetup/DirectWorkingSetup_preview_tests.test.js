@@ -98,7 +98,9 @@ test('repeat direct Setup keeps only the accepted working connection and still r
  assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
  assert.equal(f.warnings.length,2,'Both native writes require consent');
  assert.equal(f.calls.filter(row=>row.command==='working.initialize').length,2);
- assert.ok(preflights.length>0&&preflights.every(value=>value===accepted),'No global release for an identical, live accepted target');
+ assert.equal(preflights.length,2);
+ assert.equal(preflights[0],preflights[1],'Both preflights must check the same captured connection');
+ assert.deepEqual(preflights[0],{project:accepted,owner:accepted.ownedClient,connection:accepted.provider.connection});
  accepted.provider.connection.closed=true;
  preflights.length=0;
  assert.equal((await f.setup.onboarding.setup(f.folder.uri)).completed,true);
