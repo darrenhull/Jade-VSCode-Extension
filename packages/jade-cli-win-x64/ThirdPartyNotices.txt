@@ -25,3 +25,5 @@ SOFTWARE.
 JadeJox uses maintained JadeGit v0.18.1 and pinned dependencies. Full notices are in licenses/.
 Corresponding application source and reproducible pinned bootstrap: https://github.com/darrenhull/Jade-CLI/tree/main ; upstream https://gitlab.com/jadelab/jadegit/-/tree/f61e1802d430bdea41bada9b10d333e69f85eb9e .
 No licensed Jade runtime DLL or SDK is included; native connected execution requires the compatible installed Jade runtime.
+
+The legacy ANSI runtime uses JadeGit v0.16.1. Corresponding pinned upstream source: https://gitlab.com/jadelab/jadegit/-/tree/5756cffcc4ab2fa76b1f250e117f0f6233d165fc .

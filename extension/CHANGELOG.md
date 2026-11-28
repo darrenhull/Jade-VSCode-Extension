@@ -1,3 +1,7 @@
+# 0.23.17 - Jade CLI 0.11.13
+
+- Bundles [Jade CLI 0.11.13](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.13) for local Jade operations.
+
 # 0.23.16 - Jade CLI 0.11.12
 
 - Bundles [Jade CLI 0.11.12](https://github.com/darrenhull/Jade-CLI/releases/tag/v0.11.12) for local Jade operations.

@@ -10,8 +10,8 @@
   "loaderDiagnostics": false,
   "observedProvider": false,
   "files": {
-    "jade-jox-test-helper-ansi.exe": "9ec192f2906cf3d4fc45cc1034e60e359a99c4d0099ead265234ca048c046d85",
-    "jadegitscm.dll": "d8463cf8c75bea540372bb9948fab82e84b9f74357206be12c5bb69a8d7b2b4e",
+    "jade-jox-test-helper-ansi.exe": "c0240d066ec3b71451e75a2e4989c59881417471bd5078b3552897b6ac039675",
+    "jadegitscm.dll": "4fe673b68d75d4a9ab30c8483097b95c0c3341831310cab145ea93beed6f3c8c",
     "jadegitdev.dll": "ccc5db0103dcdf792b6768abc7c8e64d5894d506ec95c7115cf74eeed030e990"
   },
   "qualification": {
@@ -30,7 +30,7 @@
   "build": {
     "crt": "MT",
     "arch": "x64",
-    "cliVersion": "0.11.12"
+    "cliVersion": "0.11.13"
   },
   "qualificationBasis": {
     "model": "sdk-build-controls",
@@ -41,13 +41,13 @@
       "JoxManagedValidity_tests"
     ],
     "sourceRuntime": {
-      "connectedTested": false,
-      "policySha256": "df8cdcc9b4c86de74ef9d229c4c7b43eae00b713a6d590495536c0614e36e5f3",
-      "packagedCliSha256": "6749ee1e90143885d60011804b3568d6adbb460367bcc2886790f3c2ba47ff68",
+      "policySha256": "38d296f9cce87fdc12997ae0175d42d16dc5ff02b112f9ddd1089461c1a0dce3",
       "controls": [
         "JoxManagedActivation_tests",
         "JoxManagedValidity_tests"
       ],
+      "connectedTested": false,
+      "packagedCliSha256": "cfb4491afbda896097ac5a0f2f6db34868f6646ffb5d7756d4620b69e7ed5926",
       "model": "sdk-build-controls"
     }
   },
